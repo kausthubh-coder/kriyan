@@ -47,6 +47,7 @@ export default function HomeScreen() {
   const todayTasks = useQuery(api.tasks.listToday, {});
   const overdueTasks = useQuery(api.tasks.listOverdue, {});
   const upcomingReminders = useQuery(api.reminders.listUpcoming, { days: 7 });
+  const recentNotes = useQuery(api.notes.getRecent, { limit: 3 });
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -63,6 +64,11 @@ export default function HomeScreen() {
   const navigateToReminders = () => {
     Haptics.selectionAsync();
     router.push('/(tabs)/reminders');
+  };
+
+  const navigateToNotes = () => {
+    Haptics.selectionAsync();
+    router.push('/(tabs)/notes');
   };
 
   return (
@@ -110,6 +116,14 @@ export default function HomeScreen() {
             title="Reminders"
             value={upcomingReminders?.length ?? 0}
             onPress={navigateToReminders}
+            colors={colors}
+          />
+          <StatCard
+            icon="doc.text"
+            iconColor={colors.accent}
+            title="Notes"
+            value={recentNotes?.length ?? 0}
+            onPress={navigateToNotes}
             colors={colors}
           />
         </View>
@@ -206,16 +220,62 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Recent Notes Section */}
+        {recentNotes && recentNotes.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Recent Notes</ThemedText>
+              <TouchableOpacity onPress={navigateToNotes}>
+                <ThemedText style={[styles.seeAll, { color: colors.primary }]}>See all</ThemedText>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.notesList}>
+              {recentNotes.map((note) => (
+                <TouchableOpacity
+                  key={note._id}
+                  style={[styles.noteItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    router.push({
+                      pathname: '/note-modal',
+                      params: { noteId: note._id, mode: 'edit' },
+                    });
+                  }}>
+                  <View
+                    style={[
+                      styles.noteIcon,
+                      { backgroundColor: colors.accent + '20' },
+                    ]}>
+                    <IconSymbol size={14} name="doc.text" color={colors.accent} />
+                  </View>
+                  <View style={styles.noteContent}>
+                    <ThemedText style={styles.noteTitle} numberOfLines={1}>
+                      {note.title || 'Untitled Note'}
+                    </ThemedText>
+                    {note.tags.length > 0 && (
+                      <ThemedText style={[styles.noteTags, { color: colors.textMuted }]}>
+                        {note.tags.slice(0, 2).map(t => `#${t}`).join(' ')}
+                      </ThemedText>
+                    )}
+                  </View>
+                  <IconSymbol size={16} name="chevron.right" color={colors.textMuted} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Empty State */}
         {(!pendingTasks || pendingTasks.length === 0) &&
-          (!upcomingReminders || upcomingReminders.length === 0) && (
+          (!upcomingReminders || upcomingReminders.length === 0) &&
+          (!recentNotes || recentNotes.length === 0) && (
             <View style={styles.emptyState}>
               <IconSymbol size={48} name="sparkles" color={colors.textMuted} />
               <ThemedText style={[styles.emptyTitle, { color: colors.textSecondary }]}>
                 You're all caught up!
               </ThemedText>
               <ThemedText style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-                Create tasks or reminders to get started
+                Create tasks, reminders, or notes to get started
               </ThemedText>
             </View>
           )}
@@ -346,6 +406,35 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   reminderTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  notesList: {
+    gap: 8,
+  },
+  noteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  noteIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  noteContent: {
+    flex: 1,
+  },
+  noteTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  noteTags: {
     fontSize: 12,
     marginTop: 2,
   },
