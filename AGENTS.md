@@ -34,7 +34,7 @@ From root: `bun run dev` - runs Convex, Web, and Mobile concurrently with colore
 
 When you need up-to-date information about technologies used in this project, use btca to query source repositories directly.
 
-**Available resources**: convex, nextjs, expo, tailwind, react, reactNavigation, bun, typescript, aiSdk, supermemory
+**Available resources**: convex, nextjs, expo, tailwind, react, reactNavigation, bun, typescript, aiSdk, supermemory, tiptap
 
 ### Usage
 

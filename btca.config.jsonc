@@ -78,6 +78,14 @@
       "url": "https://github.com/supermemoryai/supermemory",
       "branch": "main",
       "specialNotes": "Supermemory AI memory layer. Check docs/ and packages/ for usage."
+    },
+    {
+      "name": "tiptap",
+      "type": "git",
+      "url": "https://github.com/ueberdosis/tiptap",
+      "branch": "develop",
+      "searchPath": "packages",
+      "specialNotes": "TipTap rich text editor. Check packages/ for extensions and core. Uses ProseMirror under the hood."
     }
   ],
   "model": "minimax-m2.1-free",
