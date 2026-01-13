@@ -1,0 +1,85 @@
+{
+  "$schema": "https://btca.dev/btca.schema.json",
+  "resources": [
+    {
+      "name": "convex",
+      "type": "git",
+      "url": "https://github.com/get-convex/convex-backend",
+      "branch": "main",
+      "specialNotes": "Convex backend source. Focus on crates/docs for documentation."
+    },
+    {
+      "name": "nextjs",
+      "type": "git",
+      "url": "https://github.com/vercel/next.js",
+      "branch": "canary",
+      "searchPath": "docs",
+      "specialNotes": "Next.js documentation. Use docs/ for guides and API reference."
+    },
+    {
+      "name": "expo",
+      "type": "git",
+      "url": "https://github.com/expo/expo",
+      "branch": "main",
+      "searchPath": "docs",
+      "specialNotes": "Expo SDK and documentation."
+    },
+    {
+      "name": "tailwind",
+      "type": "git",
+      "url": "https://github.com/tailwindlabs/tailwindcss.com",
+      "branch": "main",
+      "searchPath": "src",
+      "specialNotes": "Tailwind CSS documentation website."
+    },
+    {
+      "name": "react",
+      "type": "git",
+      "url": "https://github.com/reactjs/react.dev",
+      "branch": "main",
+      "searchPath": "src/content",
+      "specialNotes": "React documentation. Focus on src/content for docs."
+    },
+    {
+      "name": "reactNavigation",
+      "type": "git",
+      "url": "https://github.com/react-navigation/react-navigation.github.io",
+      "branch": "main",
+      "searchPath": "versioned_docs",
+      "specialNotes": "React Navigation documentation."
+    },
+    {
+      "name": "bun",
+      "type": "git",
+      "url": "https://github.com/oven-sh/bun",
+      "branch": "main",
+      "searchPath": "docs",
+      "specialNotes": "Bun runtime documentation."
+    },
+    {
+      "name": "typescript",
+      "type": "git",
+      "url": "https://github.com/microsoft/TypeScript-Website",
+      "branch": "v2",
+      "searchPath": "packages/documentation",
+      "specialNotes": "TypeScript documentation website."
+    },
+    {
+      "name": "aiSdk",
+      "type": "git",
+      "url": "https://github.com/vercel/ai",
+      "branch": "main",
+      "searchPath": "content/docs",
+      "specialNotes": "Vercel AI SDK documentation and source."
+    },
+    {
+      "name": "supermemory",
+      "type": "git",
+      "url": "https://github.com/supermemoryai/supermemory",
+      "branch": "main",
+      "specialNotes": "Supermemory AI memory layer. Check docs/ and packages/ for usage."
+    }
+  ],
+  "model": "minimax-m2.1-free",
+  "provider": "opencode"
+}

@@ -29,3 +29,21 @@ From root: `bun run dev` - runs Convex, Web, and Mobile concurrently with colore
 - Add native packages with postinstall to `trustedDependencies` in package.json
 - Web: prefix Next.js scripts with `bun --bun` to use Bun runtime
 - Mobile: Metro bundler runs on Node.js, but use `bun run` for scripts
+
+## btca
+
+When you need up-to-date information about technologies used in this project, use btca to query source repositories directly.
+
+**Available resources**: convex, nextjs, expo, tailwind, react, reactNavigation, bun, typescript, aiSdk, supermemory
+
+### Usage
+
+```bash
+btca ask -r <resource> -q "<question>"
+```
+
+Use multiple `-r` flags to query multiple resources at once:
+
+```bash
+btca ask -r convex -r aiSdk -q "How do I integrate AI SDK with Convex actions?"
+```

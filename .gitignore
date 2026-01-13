@@ -61,3 +61,6 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+
+# btca
+.btca
