@@ -1,12 +1,29 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Glass morphism design system based on plan.md
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Design system colors
+export const DesignColors = {
+  background: '#0a0a0f',
+  surface: '#12121a',
+  glass: 'rgba(255, 255, 255, 0.05)',
+  glassBorder: 'rgba(255, 255, 255, 0.1)',
+  glassHover: 'rgba(255, 255, 255, 0.08)',
+  primary: '#8b5cf6',
+  primaryGlow: 'rgba(139, 92, 246, 0.3)',
+  accent: '#06b6d4',
+  success: '#22c55e',
+  warning: '#f59e0b',
+  error: '#ef4444',
+  textPrimary: '#fafafa',
+  textSecondary: '#a1a1aa',
+  textMuted: '#52525b',
+};
+
+const tintColorLight = '#8b5cf6';
+const tintColorDark = '#8b5cf6';
 
 export const Colors = {
   light: {
@@ -16,14 +33,30 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    surface: '#f4f4f5',
+    border: '#e4e4e7',
+    primary: '#8b5cf6',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    error: '#ef4444',
+    textSecondary: '#71717a',
+    textMuted: '#a1a1aa',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
+    text: DesignColors.textPrimary,
+    background: DesignColors.background,
     tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    icon: DesignColors.textSecondary,
+    tabIconDefault: DesignColors.textMuted,
+    tabIconSelected: DesignColors.primary,
+    surface: DesignColors.surface,
+    border: DesignColors.glassBorder,
+    primary: DesignColors.primary,
+    success: DesignColors.success,
+    warning: DesignColors.warning,
+    error: DesignColors.error,
+    textSecondary: DesignColors.textSecondary,
+    textMuted: DesignColors.textMuted,
   },
 };
 
