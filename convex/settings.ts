@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -140,5 +140,29 @@ export const removeFavoriteModel = mutation({
       });
     }
     return null;
+  },
+});
+
+/**
+ * Internal: Get settings for internal functions.
+ */
+export const getInternal = internalQuery({
+  args: {},
+  returns: v.union(
+    v.object({
+      _id: v.id("settings"),
+      _creationTime: v.number(),
+      expoPushToken: v.optional(v.string()),
+      openrouterApiKey: v.optional(v.string()),
+      defaultModel: v.optional(v.string()),
+      theme: v.optional(v.union(v.literal("dark"), v.literal("light"))),
+      favoriteModels: v.optional(v.array(v.string())),
+      calendarSyncEnabled: v.optional(v.boolean()),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    const settings = await ctx.db.query("settings").first();
+    return settings ?? null;
   },
 });
