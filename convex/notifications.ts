@@ -1,6 +1,6 @@
 "use node";
 
-import { internalAction } from "./_generated/server";
+import { internalAction, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
 
@@ -231,5 +231,23 @@ export const sendBatchNotifications = internalAction({
     } catch {
       return { success: false, sent: 0, failed: messages.length };
     }
+  },
+});
+
+/**
+ * Internal: Get Expo push token from settings.
+ */
+export const getExpoPushToken = internalQuery({
+  args: {},
+  returns: v.union(
+    v.object({
+      expoPushToken: v.optional(v.string()),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    const settings = await ctx.db.query("settings").first();
+    if (!settings) return null;
+    return { expoPushToken: settings.expoPushToken };
   },
 });
