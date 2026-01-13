@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { api } from '../../../convex/_generated/api';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, DesignColors } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -272,7 +272,7 @@ export default function HomeScreen() {
             <View style={styles.emptyState}>
               <IconSymbol size={48} name="sparkles" color={colors.textMuted} />
               <ThemedText style={[styles.emptyTitle, { color: colors.textSecondary }]}>
-                You're all caught up!
+                You&apos;re all caught up!
               </ThemedText>
               <ThemedText style={[styles.emptySubtitle, { color: colors.textMuted }]}>
                 Create tasks, reminders, or notes to get started

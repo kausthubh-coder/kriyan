@@ -53,6 +53,18 @@ export default function RootLayout() {
               headerShown: false,
             }}
           />
+          <Stack.Screen
+            name="note-modal"
+            options={{
+              presentation: 'modal',
+              title: 'Note',
+              headerStyle: {
+                backgroundColor: isDark ? DesignColors.surface : '#fff',
+              },
+              headerTintColor: isDark ? DesignColors.textPrimary : '#11181C',
+              headerShown: false,
+            }}
+          />
         </Stack>
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </ThemeProvider>

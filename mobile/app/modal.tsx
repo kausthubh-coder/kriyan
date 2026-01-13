@@ -16,11 +16,13 @@ import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+// eslint-disable-next-line import/no-unresolved
 import { api } from '../convex/_generated/api';
+// eslint-disable-next-line import/no-unresolved
 import { Id } from '../convex/_generated/dataModel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, DesignColors } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -31,7 +33,6 @@ export default function ModalScreen() {
   const params = useLocalSearchParams<{ taskId?: string; mode?: ModalMode }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
-  const isDark = colorScheme === 'dark';
 
   const mode = (params.mode as ModalMode) || 'create';
   const taskId = params.taskId as Id<'tasks'> | undefined;
@@ -95,7 +96,7 @@ export default function ModalScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       router.back();
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to save task');
     } finally {
       setIsSaving(false);

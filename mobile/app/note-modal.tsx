@@ -15,7 +15,9 @@ import { useQuery, useMutation } from 'convex/react';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 
+// eslint-disable-next-line import/no-unresolved
 import { api } from '../convex/_generated/api';
+// eslint-disable-next-line import/no-unresolved
 import { Id } from '../convex/_generated/dataModel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -80,7 +82,7 @@ export default function NoteModalScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       router.back();
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to save note');
     } finally {
       setIsSaving(false);
