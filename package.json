@@ -7,7 +7,7 @@
     "dev": "concurrently -n convex,web,mobile -c blue,green,magenta \"bun run dev:convex\" \"bun run dev:web\" \"bun run dev:mobile\"",
     "dev:convex": "bunx convex dev",
     "dev:web": "cd web && bun run dev",
-    "dev:mobile": "cd mobile && bun run start",
+    "dev:mobile": "cd mobile && bun run android",
     "deploy:convex": "bunx convex deploy",
     "lint": "bun run lint:web && bun run lint:mobile",
     "lint:web": "cd web && bun run lint",
