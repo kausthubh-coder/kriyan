@@ -14,7 +14,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation } from 'convex/react';
 import { format } from 'date-fns';
 import * as Haptics from 'expo-haptics';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 // eslint-disable-next-line import/no-unresolved
 import { api } from '../convex/_generated/api';
@@ -28,115 +27,87 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 
 type ModalMode = 'create' | 'edit' | 'view';
 
-export default function ModalScreen() {
+export default function NoteModalScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ taskId?: string; mode?: ModalMode }>();
+  const params = useLocalSearchParams<{ noteId?: string; mode?: ModalMode }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
 
   const mode = (params.mode as ModalMode) || 'create';
-  const taskId = params.taskId as Id<'tasks'> | undefined;
+  const noteId = params.noteId as Id<'notes'> | undefined;
 
   // State
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState<Date | null>(null);
-  const [dueTime, setDueTime] = useState<string>('');
+  const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Queries & Mutations
-  const task = useQuery(api.tasks.get, taskId ? { id: taskId } : 'skip');
-  const createTask = useMutation(api.tasks.create);
-  const updateTask = useMutation(api.tasks.update);
-  const deleteTask = useMutation(api.tasks.remove);
-  const completeTask = useMutation(api.tasks.complete);
-  const uncompleteTask = useMutation(api.tasks.uncomplete);
+  const note = useQuery(api.notes.get, noteId ? { id: noteId } : 'skip');
+  const createNote = useMutation(api.notes.create);
+  const updateNote = useMutation(api.notes.update);
+  const deleteNote = useMutation(api.notes.remove);
 
-  // Load existing task data
+  // Load existing note data
   useEffect(() => {
-    if (task && mode === 'edit') {
-      setTitle(task.title);
-      setDescription(task.description || '');
-      setDueDate(task.dueDate ? new Date(task.dueDate) : null);
-      setDueTime(task.dueTime || '');
-      setTags(task.tags);
+    if (note && mode === 'edit') {
+      setTitle(note.title);
+      setTags(note.tags);
+      // Note: Content would come from prosemirror-sync in a full implementation
+      // For mobile, we'll use a simple text content field
     }
-  }, [task, mode]);
+  }, [note, mode]);
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a task title');
+      Alert.alert('Error', 'Please enter a note title');
       return;
     }
 
     setIsSaving(true);
     try {
       if (mode === 'create') {
-        await createTask({
+        await createNote({
           title: title.trim(),
-          description: description.trim() || undefined,
-          dueDate: dueDate?.getTime(),
-          dueTime: dueTime || undefined,
           tags,
         });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else if (mode === 'edit' && taskId) {
-        await updateTask({
-          id: taskId,
+      } else if (mode === 'edit' && noteId) {
+        await updateNote({
+          id: noteId,
           title: title.trim(),
-          description: description.trim() || undefined,
-          dueDate: dueDate?.getTime(),
-          dueTime: dueTime || undefined,
           tags,
         });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       router.back();
     } catch {
-      Alert.alert('Error', 'Failed to save task');
+      Alert.alert('Error', 'Failed to save note');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = () => {
-    if (!taskId) return;
-    
-    Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
+    if (!noteId) return;
+
+    Alert.alert('Delete Note', 'Are you sure you want to delete this note?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteTask({ id: taskId });
+            await deleteNote({ id: noteId });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
           } catch {
-            Alert.alert('Error', 'Failed to delete task');
+            Alert.alert('Error', 'Failed to delete note');
           }
         },
       },
     ]);
-  };
-
-  const handleToggleComplete = async () => {
-    if (!taskId || !task) return;
-    
-    try {
-      if (task.status === 'completed') {
-        await uncompleteTask({ id: taskId });
-      } else {
-        await completeTask({ id: taskId });
-      }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {
-      Alert.alert('Error', 'Failed to update task status');
-    }
   };
 
   const handleAddTag = () => {
@@ -151,21 +122,7 @@ export default function ModalScreen() {
     setTags(tags.filter((t) => t !== tag));
   };
 
-  const handleDateChange = (_event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setDueDate(selectedDate);
-    }
-  };
-
-  const handleTimeChange = (_event: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
-      setDueTime(format(selectedTime, 'HH:mm'));
-    }
-  };
-
-  const isLoading = mode === 'edit' && task === undefined;
+  const isLoading = mode === 'edit' && note === undefined;
 
   if (isLoading) {
     return (
@@ -187,16 +144,16 @@ export default function ModalScreen() {
               Cancel
             </ThemedText>
           </TouchableOpacity>
-          
+
           <ThemedText style={styles.headerTitle}>
-            {mode === 'create' ? 'New Task' : 'Edit Task'}
+            {mode === 'create' ? 'New Note' : 'Edit Note'}
           </ThemedText>
-          
+
           <TouchableOpacity onPress={handleSave} disabled={isSaving}>
             {isSaving ? (
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             ) : (
-              <ThemedText style={[styles.headerButton, { color: colors.primary }]}>
+              <ThemedText style={[styles.headerButton, { color: colors.accent }]}>
                 Save
               </ThemedText>
             )}
@@ -218,15 +175,15 @@ export default function ModalScreen() {
               ]}
               value={title}
               onChangeText={setTitle}
-              placeholder="What do you need to do?"
+              placeholder="Note title..."
               placeholderTextColor={colors.textMuted}
             />
           </View>
 
-          {/* Description */}
+          {/* Content - Simple text editor for mobile */}
           <View style={styles.inputGroup}>
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>
-              Description
+              Content
             </ThemedText>
             <TextInput
               style={[
@@ -238,67 +195,18 @@ export default function ModalScreen() {
                   color: colors.text,
                 },
               ]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Add more details..."
+              value={content}
+              onChangeText={setContent}
+              placeholder="Write your note here..."
               placeholderTextColor={colors.textMuted}
               multiline
-              numberOfLines={4}
+              numberOfLines={10}
               textAlignVertical="top"
             />
+            <ThemedText style={[styles.hint, { color: colors.textMuted }]}>
+              Note: For rich text editing, use the web app. Mobile supports plain text.
+            </ThemedText>
           </View>
-
-          {/* Due Date */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Due Date</ThemedText>
-            <TouchableOpacity
-              style={[
-                styles.input,
-                styles.dateInput,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-              onPress={() => setShowDatePicker(true)}>
-              <IconSymbol size={18} name="calendar" color={colors.textSecondary} />
-              <ThemedText style={{ color: dueDate ? colors.text : colors.textMuted }}>
-                {dueDate ? format(dueDate, 'EEEE, MMMM d, yyyy') : 'Select a date'}
-              </ThemedText>
-              {dueDate && (
-                <TouchableOpacity
-                  onPress={() => setDueDate(null)}
-                  style={styles.clearButton}>
-                  <IconSymbol size={16} name="xmark.circle.fill" color={colors.textMuted} />
-                </TouchableOpacity>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Due Time */}
-          {dueDate && (
-            <View style={styles.inputGroup}>
-              <ThemedText style={[styles.label, { color: colors.textSecondary }]}>
-                Due Time
-              </ThemedText>
-              <TouchableOpacity
-                style={[
-                  styles.input,
-                  styles.dateInput,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => setShowTimePicker(true)}>
-                <IconSymbol size={18} name="clock" color={colors.textSecondary} />
-                <ThemedText style={{ color: dueTime ? colors.text : colors.textMuted }}>
-                  {dueTime || 'Select a time'}
-                </ThemedText>
-                {dueTime && (
-                  <TouchableOpacity
-                    onPress={() => setDueTime('')}
-                    style={styles.clearButton}>
-                    <IconSymbol size={16} name="xmark.circle.fill" color={colors.textMuted} />
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* Tags */}
           <View style={styles.inputGroup}>
@@ -322,87 +230,65 @@ export default function ModalScreen() {
                 returnKeyType="done"
               />
               <TouchableOpacity
-                style={[styles.addTagButton, { backgroundColor: colors.primary }]}
+                style={[styles.addTagButton, { backgroundColor: colors.accent }]}
                 onPress={handleAddTag}>
                 <IconSymbol size={18} name="plus" color="#fff" />
               </TouchableOpacity>
             </View>
-            
+
             {tags.length > 0 && (
               <View style={styles.tagsContainer}>
                 {tags.map((tag) => (
                   <TouchableOpacity
                     key={tag}
-                    style={[styles.tag, { backgroundColor: colors.primary + '20' }]}
+                    style={[styles.tag, { backgroundColor: colors.accent + '20' }]}
                     onPress={() => handleRemoveTag(tag)}>
-                    <ThemedText style={[styles.tagText, { color: colors.primary }]}>
+                    <ThemedText style={[styles.tagText, { color: colors.accent }]}>
                       #{tag}
                     </ThemedText>
-                    <IconSymbol size={12} name="xmark" color={colors.primary} />
+                    <IconSymbol size={12} name="xmark" color={colors.accent} />
                   </TouchableOpacity>
                 ))}
               </View>
             )}
           </View>
 
-          {/* Actions for Edit Mode */}
-          {mode === 'edit' && task && (
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor:
-                      task.status === 'completed' ? colors.warning + '20' : colors.success + '20',
-                  },
-                ]}
-                onPress={handleToggleComplete}>
-                <IconSymbol
-                  size={18}
-                  name={task.status === 'completed' ? 'arrow.uturn.backward' : 'checkmark'}
-                  color={task.status === 'completed' ? colors.warning : colors.success}
-                />
-                <ThemedText
-                  style={{
-                    color: task.status === 'completed' ? colors.warning : colors.success,
-                    fontWeight: '500',
-                  }}>
-                  {task.status === 'completed' ? 'Mark Incomplete' : 'Mark Complete'}
+          {/* Note Info for Edit Mode */}
+          {mode === 'edit' && note && (
+            <View style={[styles.infoContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.infoRow}>
+                <ThemedText style={[styles.infoLabel, { color: colors.textMuted }]}>
+                  Created
                 </ThemedText>
-              </TouchableOpacity>
+                <ThemedText style={[styles.infoValue, { color: colors.textSecondary }]}>
+                  {format(new Date(note.createdAt), 'MMM d, yyyy h:mm a')}
+                </ThemedText>
+              </View>
+              <View style={styles.infoRow}>
+                <ThemedText style={[styles.infoLabel, { color: colors.textMuted }]}>
+                  Updated
+                </ThemedText>
+                <ThemedText style={[styles.infoValue, { color: colors.textSecondary }]}>
+                  {format(new Date(note.updatedAt), 'MMM d, yyyy h:mm a')}
+                </ThemedText>
+              </View>
+            </View>
+          )}
 
+          {/* Actions for Edit Mode */}
+          {mode === 'edit' && note && (
+            <View style={styles.actionsContainer}>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.error + '20' }]}
                 onPress={handleDelete}>
                 <IconSymbol size={18} name="trash" color={colors.error} />
                 <ThemedText style={{ color: colors.error, fontWeight: '500' }}>
-                  Delete Task
+                  Delete Note
                 </ThemedText>
               </TouchableOpacity>
             </View>
           )}
         </ScrollView>
-
-        {/* Date Picker Modal */}
-        {showDatePicker && (
-          <DateTimePicker
-            value={dueDate || new Date()}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-            minimumDate={new Date()}
-          />
-        )}
-
-        {/* Time Picker Modal */}
-        {showTimePicker && (
-          <DateTimePicker
-            value={dueTime ? new Date(`2000-01-01T${dueTime}`) : new Date()}
-            mode="time"
-            display="default"
-            onChange={handleTimeChange}
-          />
-        )}
       </ThemedView>
     </KeyboardAvoidingView>
   );
@@ -453,16 +339,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   textArea: {
-    minHeight: 100,
+    minHeight: 200,
     paddingTop: 12,
   },
-  dateInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  clearButton: {
-    marginLeft: 'auto',
+  hint: {
+    fontSize: 12,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   tagsInputContainer: {
     flexDirection: 'row',
@@ -496,9 +379,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  infoContainer: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  infoLabel: {
+    fontSize: 14,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   actionsContainer: {
     gap: 12,
-    marginTop: 24,
+    marginTop: 8,
     paddingTop: 24,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',

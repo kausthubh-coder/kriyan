@@ -17,7 +17,7 @@ import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, DesignColors } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -209,7 +209,7 @@ export default function TasksScreen() {
       } else {
         await complete({ id: task._id });
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to update task');
     }
   };
