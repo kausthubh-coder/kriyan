@@ -1,0 +1,23 @@
+{
+  "name": "kriyan",
+  "type": "module",
+  "private": true,
+  "workspaces": ["web", "mobile"],
+  "scripts": {
+    "dev": "concurrently -n convex,web,mobile -c blue,green,magenta \"bun run dev:convex\" \"bun run dev:web\" \"bun run dev:mobile\"",
+    "dev:convex": "bunx convex dev",
+    "dev:web": "cd web && bun run dev",
+    "dev:mobile": "cd mobile && bun run start",
+    "deploy:convex": "bunx convex deploy",
+    "lint": "bun run lint:web && bun run lint:mobile",
+    "lint:web": "cd web && bun run lint",
+    "lint:mobile": "cd mobile && bun run lint"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "convex": "^1.31.4"
+  }
+}
