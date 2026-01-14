@@ -42,10 +42,22 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
-            name="modal"
+            name="note-modal"
             options={{
               presentation: 'modal',
-              title: 'Task',
+              title: 'Note',
+              headerStyle: {
+                backgroundColor: isDark ? DesignColors.surface : '#fff',
+              },
+              headerTintColor: isDark ? DesignColors.textPrimary : '#11181C',
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="voice-modal"
+            options={{
+              presentation: 'modal',
+              title: 'Voice',
               headerStyle: {
                 backgroundColor: isDark ? DesignColors.surface : '#fff',
               },
