@@ -1,10 +1,9 @@
-"use node";
-
 import {
   query,
   mutation,
   internalMutation,
   internalAction,
+  internalQuery,
   action,
 } from "./_generated/server";
 import { v } from "convex/values";
@@ -327,13 +326,56 @@ export const saveDescription = internalMutation({
     // Also index in RAG for search
     const image = await ctx.db.get(args.imageId);
     if (image) {
-      // TODO: Implement RAG indexing
-      // await rag.insert(ctx, {
-      //   content: args.description,
-      //   sourceType: "noteImage",
-      //   sourceId: args.imageId,
-      //   noteId: image.noteId,
-      // });
+      await ctx.scheduler.runAfter(0, internal.noteImages.indexInRagAction, {
+        imageId: args.imageId,
+        description: args.description,
+        fileName: image.fileName,
+        noteId: image.noteId,
+        createdAt: image.createdAt,
+      });
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Internal Action: Index image description in RAG.
+ */
+export const indexInRagAction = internalAction({
+  args: {
+    imageId: v.id("noteImages"),
+    description: v.string(),
+    fileName: v.string(),
+    noteId: v.id("notes"),
+    createdAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { rag, buildSearchableText, createFilterValues } = await import(
+      "./rag"
+    );
+
+    const text = buildSearchableText({
+      title: args.fileName,
+      content: args.description,
+    });
+
+    try {
+      await rag.add(ctx, {
+        namespace: "kriyan",
+        key: `noteImage:${args.imageId}`,
+        title: args.fileName,
+        text,
+        filterValues: createFilterValues("noteImage", []),
+        metadata: {
+          sourceId: args.imageId,
+          title: args.fileName,
+          createdAt: args.createdAt,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to index note image in RAG:", error);
     }
 
     return null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -13,6 +13,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Typography from "@tiptap/extension-typography";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
+import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,16 @@ import { EditorToolbar } from "@/components/notes";
 
 const lowlight = createLowlight(common);
 
+const defaultDoc = {
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [],
+    },
+  ],
+};
+
 export default function NoteEditorPage() {
   const params = useParams();
   const router = useRouter();
@@ -30,25 +41,26 @@ export default function NoteEditorPage() {
   const [title, setTitle] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [isEditingTags, setIsEditingTags] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const contentRef = useRef<string>("");
+  const [isInitializingDoc, setIsInitializingDoc] = useState(false);
 
   // Queries
   const note = useQuery(api.notes.get, { id: noteId });
 
   // Mutations
   const updateNote = useMutation(api.notes.update);
-  const touchNote = useMutation(api.notes.touch);
   const deleteNote = useMutation(api.notes.remove);
   const generateUploadUrl = useMutation(api.noteImages.generateUploadUrl);
   const saveImage = useMutation(api.noteImages.saveImage);
 
-  // Initialize editor
-  const editor = useEditor({
-    extensions: [
+  // Prosemirror sync
+  const sync = useTiptapSync(api.prosemirror, noteId, {
+    onSyncError: (error) => {
+      console.error("Sync error:", error);
+    },
+  });
+
+  const baseExtensions = useMemo(
+    () => [
       StarterKit.configure({
         codeBlock: false,
       }),
@@ -73,17 +85,21 @@ export default function NoteEditorPage() {
         lowlight,
       }),
     ],
-    content: "",
+    []
+  );
+
+  const extensions = useMemo(() => {
+    return sync.extension ? [...baseExtensions, sync.extension] : baseExtensions;
+  }, [baseExtensions, sync.extension]);
+
+  const editor = useEditor({
+    extensions,
+    content: sync.initialContent ?? defaultDoc,
     editorProps: {
       attributes: {
         class:
           "prose prose-invert prose-sm sm:prose-base max-w-none focus:outline-none min-h-[400px] p-4",
       },
-    },
-    onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      contentRef.current = html;
-      debouncedSave(html);
     },
   });
 
@@ -95,45 +111,35 @@ export default function NoteEditorPage() {
     }
   }, [note]);
 
-  // Debounced save function
-  const debouncedSave = useCallback(
-    (_content: string) => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+  // Initialize the document if it does not exist
+  useEffect(() => {
+    if (sync.isLoading || sync.initialContent !== null) return;
+    if (!("create" in sync)) return;
+    if (isInitializingDoc) return;
 
-      setIsSaving(true);
-      saveTimeoutRef.current = setTimeout(async () => {
-        try {
-          await touchNote({ id: noteId });
-          setLastSaved(new Date());
-        } catch (error) {
-          console.error("Failed to save:", error);
-        } finally {
-          setIsSaving(false);
-        }
-      }, 1000);
-    },
-    [noteId, touchNote]
-  );
+    setIsInitializingDoc(true);
+    sync
+      .create(defaultDoc)
+      .catch((error) => {
+        console.error("Failed to initialize document:", error);
+      })
+      .finally(() => {
+        setIsInitializingDoc(false);
+      });
+  }, [sync, isInitializingDoc]);
+
+  // Update editor content once initial content is loaded
+  useEffect(() => {
+    if (!editor || sync.isLoading || sync.initialContent === null) return;
+    editor.commands.setContent(sync.initialContent, false);
+  }, [editor, sync.initialContent, sync.isLoading]);
 
   // Handle title change
   const handleTitleChange = useCallback(
     async (newTitle: string) => {
       setTitle(newTitle);
 
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      saveTimeoutRef.current = setTimeout(async () => {
-        try {
-          await updateNote({ id: noteId, title: newTitle });
-          setLastSaved(new Date());
-        } catch (error) {
-          console.error("Failed to update title:", error);
-        }
-      }, 500);
+      await updateNote({ id: noteId, title: newTitle });
     },
     [noteId, updateNote]
   );
@@ -148,39 +154,33 @@ export default function NoteEditorPage() {
     try {
       await updateNote({ id: noteId, tags });
       setIsEditingTags(false);
-      setLastSaved(new Date());
     } catch (error) {
       console.error("Failed to update tags:", error);
     }
   }, [noteId, tagsInput, updateNote]);
 
   // Handle image upload
-  const handleImageUpload = useCallback(async () => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+  const handleImageUpload = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (e) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
       if (!file || !editor) return;
 
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         alert("Please select an image file");
         return;
       }
 
-      // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         alert("Image must be less than 10MB");
         return;
       }
 
       try {
-        // Get upload URL
         const uploadUrl = await generateUploadUrl();
-
-        // Upload file
         const response = await fetch(uploadUrl, {
           method: "POST",
           headers: { "Content-Type": file.type },
@@ -193,7 +193,6 @@ export default function NoteEditorPage() {
 
         const { storageId } = await response.json();
 
-        // Save image metadata
         await saveImage({
           noteId,
           storageId,
@@ -201,24 +200,15 @@ export default function NoteEditorPage() {
           mimeType: file.type,
         });
 
-        // Get the URL and insert into editor
-        // For now, we'll create a placeholder that will be replaced when the image loads
         const tempUrl = URL.createObjectURL(file);
         editor.chain().focus().setImage({ src: tempUrl }).run();
-
-        // Touch note to update timestamp
-        await touchNote({ id: noteId });
-        setLastSaved(new Date());
       } catch (error) {
         console.error("Failed to upload image:", error);
         alert("Failed to upload image. Please try again.");
       }
-
-      // Clear input
-      e.target.value = "";
-    },
-    [editor, generateUploadUrl, noteId, saveImage, touchNote]
-  );
+    };
+    input.click();
+  }, [editor, generateUploadUrl, noteId, saveImage]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -233,7 +223,9 @@ export default function NoteEditorPage() {
   }, [deleteNote, noteId, router]);
 
   // Format last saved time
-  const formatLastSaved = (date: Date) => {
+  const formatLastSaved = (timestamp?: number) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffSecs = Math.floor(diffMs / 1000);
@@ -243,7 +235,7 @@ export default function NoteEditorPage() {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  if (note === undefined) {
+  if (note === undefined || sync.isLoading) {
     return (
       <div className="p-8 max-w-4xl">
         <div className="animate-pulse">
@@ -282,7 +274,6 @@ export default function NoteEditorPage() {
 
   return (
     <div className="p-8 max-w-4xl">
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => router.push("/notes")}
@@ -295,18 +286,9 @@ export default function NoteEditorPage() {
         </button>
 
         <div className="flex items-center gap-3">
-          {/* Save status */}
           <span className="text-xs text-text-muted">
-            {isSaving ? (
-              "Saving..."
-            ) : lastSaved ? (
-              `Saved ${formatLastSaved(lastSaved)}`
-            ) : (
-              ""
-            )}
+            {isInitializingDoc ? "Initializing..." : `Saved ${formatLastSaved(note.updatedAt)}`}
           </span>
-
-          {/* Delete button */}
           <Button variant="ghost" size="sm" onClick={handleDelete}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -320,7 +302,6 @@ export default function NoteEditorPage() {
         </div>
       </div>
 
-      {/* Title */}
       <input
         type="text"
         value={title}
@@ -329,7 +310,6 @@ export default function NoteEditorPage() {
         className="w-full text-3xl font-bold text-text-primary bg-transparent border-none outline-none mb-4"
       />
 
-      {/* Tags */}
       <div className="mb-4">
         {isEditingTags ? (
           <div className="flex items-center gap-2">
@@ -395,20 +375,10 @@ export default function NoteEditorPage() {
         )}
       </div>
 
-      {/* Editor */}
       <div className="glass-card overflow-hidden">
         <EditorToolbar editor={editor} onImageUpload={handleImageUpload} />
         <EditorContent editor={editor} />
       </div>
-
-      {/* Hidden file input for image upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="hidden"
-      />
     </div>
   );
 }

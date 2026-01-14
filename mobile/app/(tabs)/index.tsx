@@ -48,6 +48,7 @@ export default function HomeScreen() {
   const overdueTasks = useQuery(api.tasks.listOverdue, {});
   const upcomingReminders = useQuery(api.reminders.listUpcoming, { days: 7 });
   const recentNotes = useQuery(api.notes.getRecent, { limit: 3 });
+  const recentVoiceNotes = useQuery(api.voiceNotes.list, { limit: 3 });
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -69,6 +70,11 @@ export default function HomeScreen() {
   const navigateToNotes = () => {
     Haptics.selectionAsync();
     router.push('/(tabs)/notes');
+  };
+
+  const navigateToVoice = () => {
+    Haptics.selectionAsync();
+    router.push('/(tabs)/voice');
   };
 
   return (
@@ -124,6 +130,14 @@ export default function HomeScreen() {
             title="Notes"
             value={recentNotes?.length ?? 0}
             onPress={navigateToNotes}
+            colors={colors}
+          />
+          <StatCard
+            icon="mic"
+            iconColor={colors.primary}
+            title="Voice"
+            value={recentVoiceNotes?.length ?? 0}
+            onPress={navigateToVoice}
             colors={colors}
           />
         </View>

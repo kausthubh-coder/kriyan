@@ -8,11 +8,26 @@
  * @module
  */
 
+import type * as agent from "../agent.js";
+import type * as agentDefinition from "../agentDefinition.js";
+import type * as agentThreads from "../agentThreads.js";
+import type * as calendar from "../calendar.js";
+import type * as crons from "../crons.js";
+import type * as files from "../files.js";
 import type * as google from "../google.js";
 import type * as googleActions from "../googleActions.js";
 import type * as http from "../http.js";
+import type * as noteImages from "../noteImages.js";
+import type * as notes from "../notes.js";
+import type * as notesSync from "../notesSync.js";
+import type * as notifications from "../notifications.js";
+import type * as prosemirror from "../prosemirror.js";
+import type * as rag from "../rag.js";
+import type * as reminders from "../reminders.js";
 import type * as settings from "../settings.js";
 import type * as tags from "../tags.js";
+import type * as tasks from "../tasks.js";
+import type * as voiceNotes from "../voiceNotes.js";
 
 import type {
   ApiFromModules,
@@ -21,11 +36,26 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agent: typeof agent;
+  agentDefinition: typeof agentDefinition;
+  agentThreads: typeof agentThreads;
+  calendar: typeof calendar;
+  crons: typeof crons;
+  files: typeof files;
   google: typeof google;
   googleActions: typeof googleActions;
   http: typeof http;
+  noteImages: typeof noteImages;
+  notes: typeof notes;
+  notesSync: typeof notesSync;
+  notifications: typeof notifications;
+  prosemirror: typeof prosemirror;
+  rag: typeof rag;
+  reminders: typeof reminders;
   settings: typeof settings;
   tags: typeof tags;
+  tasks: typeof tasks;
+  voiceNotes: typeof voiceNotes;
 }>;
 
 /**

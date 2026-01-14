@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditor, EditorContent, Editor } from "@tiptap/react";
+import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
@@ -10,9 +10,18 @@ import Highlight from "@tiptap/extension-highlight";
 import Typography from "@tiptap/extension-typography";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 const lowlight = createLowlight(common);
+
+// Safe hydration check using useSyncExternalStore
+function useHasMounted(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
 
 interface NoteEditorProps {
   content?: string;
@@ -29,7 +38,7 @@ export function NoteEditor({
   placeholder = "Start writing... Use / for commands",
   className = "",
 }: NoteEditorProps) {
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useHasMounted();
 
   const editor = useEditor({
     extensions: [
@@ -70,10 +79,6 @@ export function NoteEditor({
       }
     },
   });
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     if (editor && content && editor.getHTML() !== content) {

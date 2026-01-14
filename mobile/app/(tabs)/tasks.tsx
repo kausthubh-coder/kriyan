@@ -170,11 +170,10 @@ export default function TasksScreen() {
   const router = useRouter();
 
   const [filter, setFilter] = useState<FilterType>('all');
-  const [showCompleted, setShowCompleted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // Queries based on filter
-  const allTasks = useQuery(api.tasks.list, { status: showCompleted ? undefined : 'pending' });
+  const allTasks = useQuery(api.tasks.list, { status: 'pending' });
   const todayTasks = useQuery(api.tasks.listToday, {});
   const upcomingTasks = useQuery(api.tasks.listUpcoming, { days: 7 });
   const overdueTasks = useQuery(api.tasks.listOverdue, {});

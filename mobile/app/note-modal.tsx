@@ -45,19 +45,29 @@ export default function NoteModalScreen() {
 
   // Queries & Mutations
   const note = useQuery(api.notes.get, noteId ? { id: noteId } : 'skip');
+  const noteSnapshot = useQuery(
+    api.notesSync.getSnapshot,
+    noteId ? { noteId } : 'skip'
+  );
   const createNote = useMutation(api.notes.create);
   const updateNote = useMutation(api.notes.update);
   const deleteNote = useMutation(api.notes.remove);
+  const initializeDocument = useMutation(api.notesSync.initializeDocument);
+
 
   // Load existing note data
   useEffect(() => {
     if (note && mode === 'edit') {
       setTitle(note.title);
       setTags(note.tags);
-      // Note: Content would come from prosemirror-sync in a full implementation
-      // For mobile, we'll use a simple text content field
     }
   }, [note, mode]);
+
+  useEffect(() => {
+    if (noteSnapshot && noteSnapshot.doc) {
+      setContent(extractTextFromDoc(noteSnapshot.doc));
+    }
+  }, [noteSnapshot]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -68,9 +78,13 @@ export default function NoteModalScreen() {
     setIsSaving(true);
     try {
       if (mode === 'create') {
-        await createNote({
+        const createdId = await createNote({
           title: title.trim(),
           tags,
+        });
+        await initializeDocument({
+          noteId: createdId,
+          doc: buildDocFromText(content),
         });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (mode === 'edit' && noteId) {
@@ -78,6 +92,10 @@ export default function NoteModalScreen() {
           id: noteId,
           title: title.trim(),
           tags,
+        });
+        await initializeDocument({
+          noteId,
+          doc: buildDocFromText(content),
         });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -120,6 +138,33 @@ export default function NoteModalScreen() {
 
   const handleRemoveTag = (tag: string) => {
     setTags(tags.filter((t) => t !== tag));
+  };
+
+  const buildDocFromText = (text: string) => ({
+    type: 'doc',
+    content: text
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => ({
+        type: 'paragraph',
+        content: [{ type: 'text', text: line }],
+      })),
+  });
+
+  const extractTextFromDoc = (doc: unknown): string => {
+    const texts: string[] = [];
+    const traverse = (node: unknown) => {
+      if (!node || typeof node !== 'object') return;
+      const n = node as Record<string, unknown>;
+      if (n.type === 'text' && typeof n.text === 'string') {
+        texts.push(n.text);
+      }
+      if (Array.isArray(n.content)) {
+        n.content.forEach(traverse);
+      }
+    };
+    traverse(doc);
+    return texts.join('\n');
   };
 
   const isLoading = mode === 'edit' && note === undefined;

@@ -1,11 +1,10 @@
-"use node";
-
 import {
   query,
   mutation,
   internalMutation,
   internalQuery,
   internalAction,
+  action,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
@@ -804,7 +803,7 @@ export const deleteFromDrive = internalAction({
 
 /**
  * Internal: Index transcription in RAG.
- * This will be fully implemented when RAG component is set up.
+ * Schedules an action to add the voice note to the RAG index.
  */
 export const indexInRag = internalMutation({
   args: {
@@ -815,22 +814,62 @@ export const indexInRag = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // TODO: Implement RAG indexing when component is configured
-    // For now, this is a placeholder
-    // Example:
-    // await rag.insert(ctx, {
-    //   content: args.transcription,
-    //   metadata: {
-    //     sourceType: "voiceNote",
-    //     sourceId: args.voiceNoteId,
-    //     title: args.title,
-    //     tags: args.tags,
-    //   },
-    // });
+    const voiceNote = await ctx.db.get(args.voiceNoteId);
+    if (!voiceNote) return null;
 
-    console.log(
-      `Indexed voice note ${args.voiceNoteId} transcription in RAG (placeholder)`
+    // Schedule the action to index in RAG
+    await ctx.scheduler.runAfter(0, internal.voiceNotes.indexInRagAction, {
+      voiceNoteId: args.voiceNoteId,
+      transcription: args.transcription,
+      title: args.title,
+      tags: args.tags,
+      createdAt: voiceNote.createdAt,
+    });
+
+    return null;
+  },
+});
+
+/**
+ * Internal Action: Actually index the voice note in RAG.
+ */
+export const indexInRagAction = internalAction({
+  args: {
+    voiceNoteId: v.id("voiceNotes"),
+    transcription: v.string(),
+    title: v.optional(v.string()),
+    tags: v.array(v.string()),
+    createdAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { rag, buildSearchableText, createFilterValues } = await import(
+      "./rag"
     );
+
+    const text = buildSearchableText({
+      title: args.title,
+      content: args.transcription,
+      tags: args.tags,
+    });
+
+    try {
+      await rag.add(ctx, {
+        namespace: "kriyan",
+        key: `voiceNote:${args.voiceNoteId}`,
+        title: args.title || "Voice Note",
+        text,
+        filterValues: createFilterValues("voiceNote", args.tags),
+        metadata: {
+          sourceId: args.voiceNoteId,
+          title: args.title,
+          tags: args.tags,
+          createdAt: args.createdAt,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to index voice note in RAG:", error);
+    }
 
     return null;
   },

@@ -18,12 +18,15 @@
     "concurrently": "^9.1.2"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/openai": "^3.0.10",
+    "@ai-sdk/provider-utils": "^3.0.7",
     "@convex-dev/agent": "^0.3.2",
     "@convex-dev/prosemirror-sync": "^0.2.0",
     "@convex-dev/rag": "^0.6.1",
-    "ai": "^4.0.0",
+    "ai": "^5.0.29",
+    "btca": "^1.0.41",
     "convex": "^1.31.4",
+    "convex-helpers": "^0.1.103",
     "convex-timeline": "^0.1.2"
   }
 }

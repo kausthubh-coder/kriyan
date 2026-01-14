@@ -2,6 +2,7 @@ import {
   query,
   mutation,
   internalMutation,
+  internalAction,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -525,7 +526,7 @@ export const getByTag = query({
 
 /**
  * Internal: Index task in RAG for semantic search.
- * This will be implemented when RAG component is set up.
+ * Schedules an action to add the task to the RAG index.
  */
 export const indexInRag = internalMutation({
   args: {
@@ -533,13 +534,63 @@ export const indexInRag = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // TODO: Implement RAG indexing when component is configured
-    // For now, this is a placeholder
     const task = await ctx.db.get(args.taskId);
     if (!task) return null;
 
-    // RAG indexing will be added here
-    // Example: await rag.insert(ctx, { content: task.title + " " + task.description, ... });
+    // Schedule the action to index in RAG (needs to be action for AI SDK)
+    await ctx.scheduler.runAfter(0, internal.tasks.indexInRagAction, {
+      taskId: args.taskId,
+      title: task.title,
+      description: task.description,
+      tags: task.tags,
+      createdAt: task.createdAt,
+    });
+
+    return null;
+  },
+});
+
+/**
+ * Internal Action: Actually index the task in RAG.
+ * This is an action because it needs to call the AI SDK for embeddings.
+ */
+export const indexInRagAction = internalAction({
+  args: {
+    taskId: v.id("tasks"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    tags: v.array(v.string()),
+    createdAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { rag, buildSearchableText, createFilterValues } = await import(
+      "./rag"
+    );
+
+    const text = buildSearchableText({
+      title: args.title,
+      description: args.description,
+      tags: args.tags,
+    });
+
+    try {
+      await rag.add(ctx, {
+        namespace: "kriyan",
+        key: `task:${args.taskId}`,
+        title: args.title,
+        text,
+        filterValues: createFilterValues("task", args.tags),
+        metadata: {
+          sourceId: args.taskId,
+          title: args.title,
+          tags: args.tags,
+          createdAt: args.createdAt,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to index task in RAG:", error);
+    }
 
     return null;
   },

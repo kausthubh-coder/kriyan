@@ -1,29 +1,28 @@
 "use client";
 
 import { Editor } from "@tiptap/react";
-import { Button } from "@/components/ui/button";
 
 interface EditorToolbarProps {
   editor: Editor | null;
   onImageUpload?: () => void;
 }
 
-export function EditorToolbar({ editor, onImageUpload }: EditorToolbarProps) {
-  if (!editor) return null;
+interface ToolbarButtonProps {
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  title: string;
+  children: React.ReactNode;
+}
 
-  const ToolbarButton = ({
-    onClick,
-    active,
-    disabled,
-    title,
-    children,
-  }: {
-    onClick: () => void;
-    active?: boolean;
-    disabled?: boolean;
-    title: string;
-    children: React.ReactNode;
-  }) => (
+function ToolbarButton({
+  onClick,
+  active,
+  disabled,
+  title,
+  children,
+}: ToolbarButtonProps) {
+  return (
     <button
       type="button"
       onClick={onClick}
@@ -38,6 +37,10 @@ export function EditorToolbar({ editor, onImageUpload }: EditorToolbarProps) {
       {children}
     </button>
   );
+}
+
+export function EditorToolbar({ editor, onImageUpload }: EditorToolbarProps) {
+  if (!editor) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-1 p-2 border-b border-glass-border bg-glass/50">

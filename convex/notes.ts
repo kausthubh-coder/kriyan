@@ -3,6 +3,7 @@ import {
   mutation,
   internalMutation,
   internalQuery,
+  internalAction,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -277,7 +278,7 @@ export const touch = mutation({
 
 /**
  * Internal: Index note content in RAG.
- * Called when note content is saved.
+ * Schedules an action to add the note to the RAG index.
  */
 export const indexInRag = internalMutation({
   args: {
@@ -289,13 +290,59 @@ export const indexInRag = internalMutation({
     const note = await ctx.db.get(args.noteId);
     if (!note) return null;
 
-    // TODO: Implement RAG indexing when component is configured
-    // Example: await rag.insert(ctx, {
-    //   content: note.title + "\n" + args.content,
-    //   sourceType: "note",
-    //   sourceId: args.noteId,
-    //   tags: note.tags,
-    // });
+    // Schedule the action to index in RAG
+    await ctx.scheduler.runAfter(0, internal.notes.indexInRagAction, {
+      noteId: args.noteId,
+      title: note.title,
+      content: args.content,
+      tags: note.tags,
+      createdAt: note.createdAt,
+    });
+
+    return null;
+  },
+});
+
+/**
+ * Internal Action: Actually index the note in RAG.
+ */
+export const indexInRagAction = internalAction({
+  args: {
+    noteId: v.id("notes"),
+    title: v.string(),
+    content: v.string(),
+    tags: v.array(v.string()),
+    createdAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { rag, buildSearchableText, createFilterValues } = await import(
+      "./rag"
+    );
+
+    const text = buildSearchableText({
+      title: args.title,
+      content: args.content,
+      tags: args.tags,
+    });
+
+    try {
+      await rag.add(ctx, {
+        namespace: "kriyan",
+        key: `note:${args.noteId}`,
+        title: args.title,
+        text,
+        filterValues: createFilterValues("note", args.tags),
+        metadata: {
+          sourceId: args.noteId,
+          title: args.title,
+          tags: args.tags,
+          createdAt: args.createdAt,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to index note in RAG:", error);
+    }
 
     return null;
   },

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
 export default function RootPage() {
-  redirect("/");
+  // Redirect to dashboard tasks page as the default landing
+  redirect("/tasks");
 }

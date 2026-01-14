@@ -1,14 +1,13 @@
-"use node";
-
 import {
   query,
   mutation,
   internalMutation,
   internalQuery,
   internalAction,
+  action,
 } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 
 // Extraction status validator
 const extractionStatusValidator = v.union(
@@ -209,10 +208,53 @@ export const create = mutation({
   },
 });
 
-/**
- * Create a file from a URL (YouTube, webpage, GitHub).
- */
-export const createFromUrl = mutation({
+  /**
+   * Upload a file to Google Drive and create a file record.
+   */
+  export const uploadFile = action({
+    args: {
+      fileName: v.string(),
+      mimeType: v.string(),
+      fileData: v.array(v.number()),
+      tags: v.optional(v.array(v.string())),
+    },
+    returns: v.object({
+      success: v.boolean(),
+      fileId: v.optional(v.id("files")),
+      error: v.optional(v.string()),
+    }),
+    handler: async (ctx, args) => {
+      const uploadResult = await ctx.runAction(internal.files.uploadToDrive, {
+        fileData: args.fileData,
+        fileName: args.fileName,
+        mimeType: args.mimeType,
+      });
+
+      if (!uploadResult.success || !uploadResult.driveFileId) {
+        return {
+          success: false,
+          error: uploadResult.error ?? "Upload failed",
+        };
+      }
+
+      const fileId = await ctx.runMutation(api.files.create, {
+        fileName: args.fileName,
+        mimeType: args.mimeType,
+        fileSize: args.fileData.length,
+        driveFileId: uploadResult.driveFileId,
+        driveWebViewLink: uploadResult.driveWebViewLink,
+        sourceType: "upload",
+        tags: args.tags,
+      });
+
+      return { success: true, fileId };
+    },
+  });
+
+  /**
+   * Create a file from a URL (YouTube, webpage, GitHub).
+   */
+  export const createFromUrl = mutation({
   args: {
     url: v.string(),
     tags: v.optional(v.array(v.string())),
@@ -693,6 +735,7 @@ export const deleteFromDrive = internalAction({
 
 /**
  * Internal: Index file content in RAG.
+ * Schedules an action to add the file to the RAG index.
  */
 export const indexInRag = internalMutation({
   args: {
@@ -704,22 +747,64 @@ export const indexInRag = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // TODO: Implement RAG indexing when component is configured
-    // Example:
-    // await rag.insert(ctx, {
-    //   content: args.textContent,
-    //   metadata: {
-    //     sourceType: "file",
-    //     sourceId: args.fileId,
-    //     fileName: args.fileName,
-    //     fileSourceType: args.sourceType,
-    //     tags: args.tags,
-    //   },
-    // });
+    const file = await ctx.db.get(args.fileId);
+    if (!file) return null;
 
-    console.log(
-      `Indexed file ${args.fileId} content in RAG (placeholder)`
+    // Schedule the action to index in RAG
+    await ctx.scheduler.runAfter(0, internal.files.indexInRagAction, {
+      fileId: args.fileId,
+      textContent: args.textContent,
+      fileName: args.fileName,
+      sourceType: args.sourceType,
+      tags: args.tags,
+      createdAt: file.createdAt,
+    });
+
+    return null;
+  },
+});
+
+/**
+ * Internal Action: Actually index the file in RAG.
+ */
+export const indexInRagAction = internalAction({
+  args: {
+    fileId: v.id("files"),
+    textContent: v.string(),
+    fileName: v.string(),
+    sourceType: sourceTypeValidator,
+    tags: v.array(v.string()),
+    createdAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { rag, buildSearchableText, createFilterValues } = await import(
+      "./rag"
     );
+
+    const text = buildSearchableText({
+      title: args.fileName,
+      content: args.textContent,
+      tags: args.tags,
+    });
+
+    try {
+      await rag.add(ctx, {
+        namespace: "kriyan",
+        key: `file:${args.fileId}`,
+        title: args.fileName,
+        text,
+        filterValues: createFilterValues("file", args.tags),
+        metadata: {
+          sourceId: args.fileId,
+          title: args.fileName,
+          tags: args.tags,
+          createdAt: args.createdAt,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to index file in RAG:", error);
+    }
 
     return null;
   },
