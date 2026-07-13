@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import { TodayApp } from '@/components/today/today-app'
 
 export default function RootPage() {
-  // Redirect to dashboard tasks page as the default landing
-  redirect("/tasks");
+  return <TodayApp initialSection="today" />
 }
