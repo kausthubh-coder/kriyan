@@ -1,12 +1,7 @@
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
-import {
-  assertId,
-  assertShortText,
-  assertTimestamp,
-  withoutSystemFields,
-} from './lib'
+import { assertId, assertShortText, withoutSystemFields } from './lib'
 import { installationValue } from './validators'
 
 export const create = mutation({
@@ -14,7 +9,6 @@ export const create = mutation({
     installationId: v.string(),
     timezone: v.string(),
     protocolVersion: v.string(),
-    now: v.number(),
   },
   returns: v.object({
     created: v.boolean(),
@@ -24,7 +18,7 @@ export const create = mutation({
     assertId(args.installationId, 'installationId')
     assertShortText(args.timezone, 'timezone')
     assertShortText(args.protocolVersion, 'protocolVersion')
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
 
     const existing = await ctx.db
       .query('installations')
@@ -47,8 +41,8 @@ export const create = mutation({
       installationId: args.installationId,
       timezone: args.timezone,
       protocolVersion: args.protocolVersion,
-      createdAt: args.now,
-      updatedAt: args.now,
+      createdAt: now,
+      updatedAt: now,
     })
     const installation = await ctx.db.get(id)
     if (installation === null) {

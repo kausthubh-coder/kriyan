@@ -44,7 +44,6 @@ export const createTask = mutation({
     title: v.string(),
     status: taskStatus,
     dueAt: v.optional(v.number()),
-    now: v.number(),
   },
   returns: v.object({ created: v.boolean(), task: taskValue }),
   handler: async (ctx, args) => {
@@ -53,7 +52,7 @@ export const createTask = mutation({
     assertId(args.idempotencyKey, 'idempotencyKey')
     assertBoundedString(args.title, 'title', 1_024)
     if (args.dueAt !== undefined) assertTimestamp(args.dueAt, 'dueAt')
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     await assertInstallation(ctx, args.installationId)
     const byId = await ctx.db
       .query('tasks')
@@ -93,8 +92,8 @@ export const createTask = mutation({
       status: args.status,
       dueAt: args.dueAt,
       revision: 0,
-      createdAt: args.now,
-      updatedAt: args.now,
+      createdAt: now,
+      updatedAt: now,
     }
     await ctx.db.insert('tasks', task)
     return { created: true, task }
@@ -214,7 +213,6 @@ export const updateTask = mutation({
     title: v.optional(v.string()),
     dueAt: v.optional(v.number()),
     clearDueAt: v.optional(v.boolean()),
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
@@ -224,7 +222,7 @@ export const updateTask = mutation({
     if (args.title !== undefined)
       assertBoundedString(args.title, 'title', 1_024)
     if (args.dueAt !== undefined) assertTimestamp(args.dueAt, 'dueAt')
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     if (args.dueAt !== undefined && args.clearDueAt) {
       throw new Error('dueAt and clearDueAt are mutually exclusive')
     }
@@ -244,7 +242,7 @@ export const updateTask = mutation({
       title: args.title ?? task.title,
       dueAt: args.clearDueAt ? undefined : (args.dueAt ?? task.dueAt),
       revision: task.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return { ok: true as const, revision: task.revision + 1 }
   },
@@ -256,14 +254,13 @@ export const setTaskStatus = mutation({
     taskId: v.string(),
     expectedRevision: v.number(),
     status: taskStatus,
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.taskId, 'taskId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const task = await ctx.db
       .query('tasks')
       .withIndex('by_installation_task', (q) =>
@@ -279,7 +276,7 @@ export const setTaskStatus = mutation({
     await ctx.db.patch(task._id, {
       status: args.status,
       revision: task.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return { ok: true as const, revision: task.revision + 1 }
   },
@@ -290,14 +287,13 @@ export const tombstoneTask = mutation({
     installationId: v.string(),
     taskId: v.string(),
     expectedRevision: v.number(),
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.taskId, 'taskId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const task = await ctx.db
       .query('tasks')
       .withIndex('by_installation_task', (q) =>
@@ -312,9 +308,9 @@ export const tombstoneTask = mutation({
       return { ok: false as const, reason: 'stale_revision' as const }
     await ctx.db.patch(task._id, {
       status: 'cancelled',
-      deletedAt: args.now,
+      deletedAt: now,
       revision: task.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return { ok: true as const, revision: task.revision + 1 }
   },
@@ -329,7 +325,6 @@ export const createReminder = mutation({
     remindAt: v.number(),
     timezone: v.string(),
     status: reminderStatus,
-    now: v.number(),
   },
   returns: v.object({ created: v.boolean(), reminder: reminderValue }),
   handler: async (ctx, args) => {
@@ -339,7 +334,7 @@ export const createReminder = mutation({
     assertBoundedString(args.message, 'message', 4_096)
     assertTimestamp(args.remindAt, 'remindAt')
     assertShortText(args.timezone, 'timezone')
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     await assertInstallation(ctx, args.installationId)
     const byId = await ctx.db
       .query('reminders')
@@ -383,8 +378,8 @@ export const createReminder = mutation({
       timezone: args.timezone,
       status: args.status,
       revision: 0,
-      createdAt: args.now,
-      updatedAt: args.now,
+      createdAt: now,
+      updatedAt: now,
     }
     await ctx.db.insert('reminders', reminder)
     return { created: true, reminder }
@@ -507,7 +502,6 @@ export const updateReminder = mutation({
     message: v.optional(v.string()),
     remindAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
@@ -518,7 +512,7 @@ export const updateReminder = mutation({
       assertBoundedString(args.message, 'message', 4_096)
     if (args.remindAt !== undefined) assertTimestamp(args.remindAt, 'remindAt')
     if (args.timezone !== undefined) assertShortText(args.timezone, 'timezone')
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const reminder = await ctx.db
       .query('reminders')
       .withIndex('by_installation_reminder', (q) =>
@@ -538,7 +532,7 @@ export const updateReminder = mutation({
       remindAt: args.remindAt ?? reminder.remindAt,
       timezone: args.timezone ?? reminder.timezone,
       revision: reminder.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return { ok: true as const, revision: reminder.revision + 1 }
   },
@@ -550,14 +544,13 @@ export const setReminderStatus = mutation({
     reminderId: v.string(),
     expectedRevision: v.number(),
     status: reminderStatus,
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.reminderId, 'reminderId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const reminder = await ctx.db
       .query('reminders')
       .withIndex('by_installation_reminder', (q) =>
@@ -575,7 +568,7 @@ export const setReminderStatus = mutation({
     await ctx.db.patch(reminder._id, {
       status: args.status,
       revision: reminder.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return { ok: true as const, revision: reminder.revision + 1 }
   },
@@ -586,14 +579,13 @@ export const tombstoneReminder = mutation({
     installationId: v.string(),
     reminderId: v.string(),
     expectedRevision: v.number(),
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.reminderId, 'reminderId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const reminder = await ctx.db
       .query('reminders')
       .withIndex('by_installation_reminder', (q) =>
@@ -610,9 +602,9 @@ export const tombstoneReminder = mutation({
       return { ok: false as const, reason: 'stale_revision' as const }
     await ctx.db.patch(reminder._id, {
       status: 'cancelled',
-      deletedAt: args.now,
+      deletedAt: now,
       revision: reminder.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return { ok: true as const, revision: reminder.revision + 1 }
   },

@@ -7,7 +7,7 @@ if (convexUrl === undefined || convexUrl.length === 0) {
   throw new Error('CONVEX_URL is required')
 }
 
-const fixtureId = `round3-${crypto.randomUUID()}`
+const fixtureId = `round4-${crypto.randomUUID()}`
 const installationId = `installation:${fixtureId}`
 const nodeId = `node:${fixtureId}`
 const commandId = `command:${fixtureId}`
@@ -15,17 +15,15 @@ const client = new ConvexClient(convexUrl)
 
 try {
   console.log(JSON.stringify({ phase: 'fixture', fixtureId, installationId }))
-  const now = Date.now()
   await client.mutation(api.installations.create, {
     installationId,
     timezone: 'UTC',
     protocolVersion: '1',
-    now,
   })
   await client.mutation(api.worker.registerNode, {
     installationId,
     nodeId,
-    displayName: 'Round 3 external smoke worker',
+    displayName: 'Round 4 external smoke worker',
     capabilities: ['reminders'],
     protocolVersion: '1',
   })
@@ -33,9 +31,8 @@ try {
     installationId,
     commandId,
     idempotencyKey: `idempotency:${fixtureId}`,
-    input: 'round 3 external worker facade smoke',
+    input: 'round 4 external worker facade smoke',
     maxAttempts: 2,
-    now: now + 1,
   })
   const claim = await client.mutation(api.worker.claimJob, {
     installationId,

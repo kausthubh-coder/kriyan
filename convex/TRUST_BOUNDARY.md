@@ -23,6 +23,12 @@ the Convex deployment and worker process inside their local/self-hosted trust
 boundary and avoid sharing the deployment URL. Do not add a hard-coded or
 cosmetic bearer token and call it secure.
 
+All public control-plane bookkeeping timestamps are server-authored. This
+includes installation, command, job, task, reminder, cancellation, run, event,
+lease, and heartbeat lifecycle fields. Callers still provide semantic user
+intent such as `dueAt`, `remindAt`, and bounded query cutoffs, but cannot supply
+a clock that changes claim order, lease truth, lifecycle history, or event time.
+
 Explicit limits: heartbeats expire after 60 seconds; leases are at most 30
 seconds; list pages are at most 100 records; claims examine at most 64 queued,
 64 leased, and 64 running candidates; an event batch contains 1-32 events, each
@@ -33,7 +39,10 @@ If `cleanupPending` is true, the operator calls
 effective immediately for transition validation; continuation only finishes
 the bounded physical release/requeue of remaining jobs. Development seed/reset
 functions are internal Convex mutations and are absent from the public client
-API.
+API. Reset deletes at most the requested 1-64 documents per call, always
+through an installation-prefixed index. Its `processedTable`, `nextTable`, and
+`done` result supports explicit resumable cleanup; calling it again after
+completion safely returns zero deletions.
 
 Ordinary task and reminder list queries use live-record indexes before Convex
 pagination, so a cursor advances over visible records and cannot yield an empty

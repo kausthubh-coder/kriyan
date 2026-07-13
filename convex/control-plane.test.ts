@@ -1,7 +1,7 @@
 import { convexTest } from 'convex-test'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import schema from './schema'
 
 const modules = import.meta.glob('./**/*.ts')
@@ -18,6 +18,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   vi.useRealTimers()
 })
 
@@ -60,7 +61,6 @@ async function createInstallation(
     installationId,
     timezone: 'America/New_York',
     protocolVersion: '1',
-    now: 1,
   })
 }
 
@@ -90,7 +90,6 @@ async function submit(
     idempotencyKey: `idempotency:${commandId}`,
     input: 'remind me tomorrow at 8 to practice Korean',
     maxAttempts,
-    now: 3,
   })
 }
 
@@ -113,7 +112,6 @@ describe('command submission', () => {
         idempotencyKey: 'idempotency:command-a',
         input: 'different input',
         maxAttempts: 3,
-        now: 4,
       }),
     ).rejects.toThrow('idempotency key conflicts')
   })
@@ -134,7 +132,6 @@ describe('command submission', () => {
         idempotencyKey: 'oversized',
         input: 'x'.repeat(8_193),
         maxAttempts: 3,
-        now: 4,
       }),
     ).rejects.toThrow('input must contain')
   })
@@ -545,7 +542,6 @@ describe('terminal transitions and projections', () => {
         installationId: 'installation-a',
         commandId: submission.command.commandId,
         expectedRevision: 0,
-        now: 4,
       }),
     ).toEqual({ ok: true, revision: 1 })
     expect(
@@ -553,7 +549,6 @@ describe('terminal transitions and projections', () => {
         installationId: 'installation-a',
         commandId: submission.command.commandId,
         expectedRevision: 0,
-        now: 5,
       }),
     ).toEqual({ ok: false, reason: 'already_terminal' })
     expect((await readJobs(t))[0]?.status).toBe('cancelled')
@@ -569,7 +564,6 @@ describe('terminal transitions and projections', () => {
       title: 'Practice Korean',
       status: 'open' as const,
       dueAt: 100,
-      now: 10,
     }
     const reminderArgs = {
       installationId: 'installation-a',
@@ -579,7 +573,6 @@ describe('terminal transitions and projections', () => {
       remindAt: 100,
       timezone: 'America/New_York',
       status: 'scheduled' as const,
-      now: 10,
     }
     expect(
       await t.mutation(api.projections.createTask, taskArgs),
@@ -871,7 +864,6 @@ describe('round 1 rejection regressions', () => {
       idempotencyKey: 'task-key-a',
       title: 'Practice Korean',
       status: 'open',
-      now: 10,
     })
     await expect(
       t.mutation(api.projections.createTask, {
@@ -880,7 +872,6 @@ describe('round 1 rejection regressions', () => {
         idempotencyKey: 'task-key-b',
         title: 'Duplicate',
         status: 'open',
-        now: 11,
       }),
     ).rejects.toThrow('taskId or idempotencyKey conflicts')
     await t.mutation(api.projections.createReminder, {
@@ -891,7 +882,6 @@ describe('round 1 rejection regressions', () => {
       remindAt: 100,
       timezone: 'America/New_York',
       status: 'scheduled',
-      now: 10,
     })
     await expect(
       t.mutation(api.projections.createReminder, {
@@ -902,7 +892,6 @@ describe('round 1 rejection regressions', () => {
         remindAt: 101,
         timezone: 'America/New_York',
         status: 'scheduled',
-        now: 11,
       }),
     ).rejects.toThrow('reminderId or idempotencyKey conflicts')
   })
@@ -919,7 +908,6 @@ describe('reactive projection API', () => {
       title: 'First title',
       status: 'open',
       dueAt: 100,
-      now: 10,
     })
     expect(
       await t.mutation(api.projections.updateTask, {
@@ -928,7 +916,6 @@ describe('reactive projection API', () => {
         expectedRevision: createdTask.task.revision,
         title: 'Updated title',
         clearDueAt: true,
-        now: 11,
       }),
     ).toEqual({ ok: true, revision: 1 })
     expect(
@@ -937,7 +924,6 @@ describe('reactive projection API', () => {
         taskId: 'crud-task',
         expectedRevision: 1,
         status: 'completed',
-        now: 12,
       }),
     ).toEqual({ ok: true, revision: 2 })
     expect(
@@ -964,7 +950,6 @@ describe('reactive projection API', () => {
         installationId: 'installation-a',
         taskId: 'crud-task',
         expectedRevision: 2,
-        now: 13,
       }),
     ).toEqual({ ok: true, revision: 3 })
     expect(
@@ -979,7 +964,7 @@ describe('reactive projection API', () => {
         taskId: 'crud-task',
         includeDeleted: true,
       }),
-    ).toMatchObject({ deletedAt: 13, revision: 3 })
+    ).toMatchObject({ deletedAt: 1_000, revision: 3 })
 
     const createdReminder = await t.mutation(api.projections.createReminder, {
       installationId: 'installation-a',
@@ -989,7 +974,6 @@ describe('reactive projection API', () => {
       remindAt: 100,
       timezone: 'UTC',
       status: 'scheduled',
-      now: 10,
     })
     expect(
       await t.mutation(api.projections.updateReminder, {
@@ -999,7 +983,6 @@ describe('reactive projection API', () => {
         message: 'Updated',
         remindAt: 200,
         timezone: 'America/New_York',
-        now: 11,
       }),
     ).toEqual({ ok: true, revision: 1 })
     expect(
@@ -1008,7 +991,6 @@ describe('reactive projection API', () => {
         reminderId: 'crud-reminder',
         expectedRevision: 1,
         status: 'fired',
-        now: 12,
       }),
     ).toEqual({ ok: true, revision: 2 })
     expect(
@@ -1026,7 +1008,6 @@ describe('reactive projection API', () => {
         installationId: 'installation-a',
         reminderId: 'crud-reminder',
         expectedRevision: 2,
-        now: 13,
       }),
     ).toEqual({ ok: true, revision: 3 })
   })
@@ -1096,7 +1077,6 @@ describe('round 2 rejection regressions', () => {
         idempotencyKey: `task-key-${suffix}`,
         title: `Task ${suffix}`,
         status: 'open',
-        now: 10,
       })
       await t.mutation(api.projections.createReminder, {
         installationId: 'installation-a',
@@ -1106,20 +1086,17 @@ describe('round 2 rejection regressions', () => {
         remindAt: 100,
         timezone: 'UTC',
         status: 'scheduled',
-        now: 10,
       })
     }
     await t.mutation(api.projections.tombstoneTask, {
       installationId: 'installation-a',
       taskId: 'task-a',
       expectedRevision: 0,
-      now: 11,
     })
     await t.mutation(api.projections.tombstoneReminder, {
       installationId: 'installation-a',
       reminderId: 'reminder-a',
       expectedRevision: 0,
-      now: 11,
     })
 
     const taskPage = await t.query(api.projections.listTasks, {
@@ -1138,11 +1115,11 @@ describe('round 2 rejection regressions', () => {
     expect(reminderPage.isDone).toBe(true)
   })
 
-  test('revokes large owned-work sets in bounded resumable transactions', async () => {
+  test('revokes 70 owned jobs with concurrent idempotent continuation', async () => {
     const t = backend()
     await createInstallation(t)
     const registration = await registerNode(t, 'node-a')
-    for (let index = 0; index < 40; index += 1) {
+    for (let index = 0; index < 70; index += 1) {
       await submit(t, `cleanup-command-${index}`)
       const claim = await t.mutation(api.worker.claimJob, {
         installationId: 'installation-a',
@@ -1166,15 +1143,318 @@ describe('round 2 rejection regressions', () => {
     })
     expect(
       (await readJobs(t)).filter((job) => job.leaseOwnerNodeId === 'node-a'),
-    ).toHaveLength(8)
+    ).toHaveLength(38)
+    const continuations = await Promise.all([
+      t.mutation(api.worker.continueNodeRevocationCleanup, {
+        installationId: 'installation-a',
+        nodeId: 'node-a',
+      }),
+      t.mutation(api.worker.continueNodeRevocationCleanup, {
+        installationId: 'installation-a',
+        nodeId: 'node-a',
+      }),
+    ])
+    expect(continuations).toEqual(
+      expect.arrayContaining([
+        { ok: true, releasedWork: 32, cleanupPending: true },
+        { ok: true, releasedWork: 6, cleanupPending: false },
+      ]),
+    )
     expect(
       await t.mutation(api.worker.continueNodeRevocationCleanup, {
         installationId: 'installation-a',
         nodeId: 'node-a',
       }),
-    ).toEqual({ ok: true, releasedWork: 8, cleanupPending: false })
+    ).toEqual({ ok: true, releasedWork: 0, cleanupPending: false })
     expect(
       (await readJobs(t)).filter((job) => job.leaseOwnerNodeId === 'node-a'),
     ).toHaveLength(0)
+  })
+})
+
+describe('round 4 rejection regressions', () => {
+  test('server creation time preserves submit order for claims', async () => {
+    const t = backend()
+    await createInstallation(t)
+    await registerNode(t, 'node-a')
+
+    vi.setSystemTime(1_100)
+    await submit(t, 'submitted-first')
+    vi.setSystemTime(1_200)
+    await submit(t, 'submitted-second')
+
+    const claim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation-a',
+      nodeId: 'node-a',
+      leaseDurationMs: 100,
+    })
+    expect(claim?.job.commandId).toBe('submitted-first')
+    expect(claim?.job.createdAt).toBe(1_100)
+  })
+
+  test('cancellation uses server time for every lifecycle timestamp', async () => {
+    const t = backend()
+    await createInstallation(t)
+    await registerNode(t, 'node-a')
+    const submission = await submit(t, 'server-cancel-command')
+    const claim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation-a',
+      nodeId: 'node-a',
+      leaseDurationMs: 30_000,
+    })
+    if (claim === null) throw new Error('expected claim')
+    const started = await t.mutation(api.worker.startRun, {
+      installationId: 'installation-a',
+      jobId: claim.job.jobId,
+      nodeId: 'node-a',
+      expectedJobRevision: claim.job.revision,
+    })
+    if (!started.ok) throw new Error('expected run')
+
+    vi.setSystemTime(2_000)
+    expect(
+      await t.mutation(api.commands.cancel, {
+        installationId: 'installation-a',
+        commandId: submission.command.commandId,
+        expectedRevision: submission.command.revision,
+      }),
+    ).toEqual({ ok: true, revision: 1 })
+
+    expect(
+      await t.query(api.commands.get, {
+        installationId: 'installation-a',
+        commandId: submission.command.commandId,
+      }),
+    ).toMatchObject({ status: 'cancelled', updatedAt: 2_000 })
+    expect((await readJobs(t))[0]).toMatchObject({
+      status: 'cancelled',
+      updatedAt: 2_000,
+    })
+    expect((await readRuns(t, started.job.jobId))[0]).toMatchObject({
+      status: 'cancelled',
+      finishedAt: 2_000,
+    })
+  })
+
+  test('filtered task and reminder cursors traverse every live page', async () => {
+    const t = backend()
+    await createInstallation(t)
+    for (let index = 0; index < 6; index += 1) {
+      await t.mutation(api.projections.createTask, {
+        installationId: 'installation-a',
+        taskId: `cursor-task-${index}`,
+        idempotencyKey: `cursor-task-key-${index}`,
+        title: `Task ${index}`,
+        status: index === 5 ? 'completed' : 'open',
+        dueAt: 100 + index,
+      })
+      await t.mutation(api.projections.createReminder, {
+        installationId: 'installation-a',
+        reminderId: `cursor-reminder-${index}`,
+        idempotencyKey: `cursor-reminder-key-${index}`,
+        message: `Reminder ${index}`,
+        remindAt: 100 + index,
+        timezone: 'UTC',
+        status: index === 5 ? 'fired' : 'scheduled',
+      })
+    }
+    await t.mutation(api.projections.tombstoneTask, {
+      installationId: 'installation-a',
+      taskId: 'cursor-task-1',
+      expectedRevision: 0,
+    })
+    await t.mutation(api.projections.tombstoneReminder, {
+      installationId: 'installation-a',
+      reminderId: 'cursor-reminder-1',
+      expectedRevision: 0,
+    })
+
+    const taskIds: string[] = []
+    const reminderIds: string[] = []
+    let taskCursor: string | null = null
+    let reminderCursor: string | null = null
+    let taskDone = false
+    let reminderDone = false
+    while (!taskDone) {
+      const result = await t.query(api.projections.listTasks, {
+        installationId: 'installation-a',
+        status: 'open',
+        dueBefore: 200,
+        paginationOpts: { numItems: 2, cursor: taskCursor },
+      })
+      taskIds.push(...result.page.map((task) => task.taskId))
+      taskCursor = result.continueCursor
+      taskDone = result.isDone
+    }
+    while (!reminderDone) {
+      const result = await t.query(api.projections.listReminders, {
+        installationId: 'installation-a',
+        status: 'scheduled',
+        remindBefore: 200,
+        paginationOpts: { numItems: 2, cursor: reminderCursor },
+      })
+      reminderIds.push(...result.page.map((reminder) => reminder.reminderId))
+      reminderCursor = result.continueCursor
+      reminderDone = result.isDone
+    }
+    expect(taskIds).toEqual([
+      'cursor-task-0',
+      'cursor-task-2',
+      'cursor-task-3',
+      'cursor-task-4',
+    ])
+    expect(reminderIds).toEqual([
+      'cursor-reminder-0',
+      'cursor-reminder-2',
+      'cursor-reminder-3',
+      'cursor-reminder-4',
+    ])
+  })
+
+  test('internal dev cleanup is bounded, resumable, and idempotent across all eight tables', async () => {
+    const t = backend()
+    vi.stubEnv('KRIYAN_DEV_DEPLOYMENT', 'qualified-sandpiper-726')
+    await createInstallation(t)
+    await registerNode(t, 'node-a')
+    await submit(t, 'dev-cleanup-command')
+    const claim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation-a',
+      nodeId: 'node-a',
+      leaseDurationMs: 30_000,
+    })
+    if (claim === null) throw new Error('expected claim')
+    const started = await t.mutation(api.worker.startRun, {
+      installationId: 'installation-a',
+      jobId: claim.job.jobId,
+      nodeId: 'node-a',
+      expectedJobRevision: claim.job.revision,
+    })
+    if (!started.ok) throw new Error('expected run')
+    await t.mutation(api.worker.appendRunEvents, {
+      installationId: 'installation-a',
+      jobId: started.job.jobId,
+      runId: started.run.runId,
+      nodeId: 'node-a',
+      expectedJobRevision: started.job.revision,
+      expectedRunRevision: started.run.revision,
+      events: [
+        {
+          eventId: 'dev-cleanup-event',
+          sequence: 1,
+          type: 'status',
+          data: 'fixture',
+        },
+      ],
+    })
+    await t.mutation(api.projections.createTask, {
+      installationId: 'installation-a',
+      taskId: 'dev-cleanup-task',
+      idempotencyKey: 'dev-cleanup-task-key',
+      title: 'fixture',
+      status: 'open',
+    })
+    await t.mutation(api.projections.createReminder, {
+      installationId: 'installation-a',
+      reminderId: 'dev-cleanup-reminder',
+      idempotencyKey: 'dev-cleanup-reminder-key',
+      message: 'fixture',
+      remindAt: 2_000,
+      timezone: 'UTC',
+      status: 'scheduled',
+    })
+
+    const processedTables = new Set<string>()
+    let done = false
+    for (let call = 0; call < 16 && !done; call += 1) {
+      const result = await t.mutation(internal.dev.resetInstallation, {
+        deploymentName: 'qualified-sandpiper-726',
+        installationId: 'installation-a',
+        confirmation: 'RESET_KRIYAN_DEV',
+        batchSize: 1,
+      })
+      if (result.processedTable !== null) {
+        processedTables.add(result.processedTable)
+      }
+      expect(result.deleted).toBeLessThanOrEqual(1)
+      done = result.done
+    }
+    expect(done).toBe(true)
+    expect([...processedTables]).toEqual([
+      'runEvents',
+      'runs',
+      'jobs',
+      'commands',
+      'tasks',
+      'reminders',
+      'nodes',
+      'installations',
+    ])
+    expect(
+      await t.mutation(internal.dev.resetInstallation, {
+        deploymentName: 'qualified-sandpiper-726',
+        installationId: 'installation-a',
+        confirmation: 'RESET_KRIYAN_DEV',
+        batchSize: 1,
+      }),
+    ).toEqual({
+      deleted: 0,
+      processedTable: null,
+      nextTable: null,
+      done: true,
+    })
+
+    const remaining = await t.run(async (ctx) => ({
+      installations: await ctx.db
+        .query('installations')
+        .withIndex('by_installation_id', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+      nodes: await ctx.db
+        .query('nodes')
+        .withIndex('by_installation_node', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+      commands: await ctx.db
+        .query('commands')
+        .withIndex('by_installation_command', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+      jobs: await ctx.db
+        .query('jobs')
+        .withIndex('by_installation_job', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+      runs: await ctx.db
+        .query('runs')
+        .withIndex('by_installation_status', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+      runEvents: await ctx.db
+        .query('runEvents')
+        .withIndex('by_installation_event', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+      tasks: await ctx.db
+        .query('tasks')
+        .withIndex('by_installation_task', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+      reminders: await ctx.db
+        .query('reminders')
+        .withIndex('by_installation_reminder', (q) =>
+          q.eq('installationId', 'installation-a'),
+        )
+        .take(1),
+    }))
+    expect(
+      Object.values(remaining).every((records) => records.length === 0),
+    ).toBe(true)
   })
 })

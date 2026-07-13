@@ -1,4 +1,4 @@
-# kriyan
+# Kriyan Convex control plane
 
 To install dependencies:
 
@@ -6,10 +6,19 @@ To install dependencies:
 bun install
 ```
 
-To run:
+Focused backend verification:
 
 ```bash
-bun run index.ts
+bun run typecheck:convex
+bun run typecheck:smoke
+bun run test:convex
+bun run codegen:convex
 ```
 
-This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+The public control-plane API uses Convex server time for bookkeeping. Semantic
+timestamps such as task `dueAt` and reminder `remindAt` remain caller supplied.
+
+Development fixture cleanup is internal-only. Call
+`dev:resetInstallation` with the guarded deployment name, confirmation literal,
+installation ID, and a `batchSize` from 1-64 until `done` is true. Each call is
+installation-indexed and bounded; repeating a completed cleanup is safe.

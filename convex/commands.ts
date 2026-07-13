@@ -10,7 +10,6 @@ import {
   assertInput,
   assertExpectedRevision,
   assertPositiveInteger,
-  assertTimestamp,
   MAX_PAGE_SIZE,
   withoutSystemFields,
 } from './lib'
@@ -29,7 +28,6 @@ export const submit = mutation({
     idempotencyKey: v.string(),
     input: v.string(),
     maxAttempts: v.number(),
-    now: v.number(),
   },
   returns: submissionResult,
   handler: async (ctx, args) => {
@@ -38,7 +36,7 @@ export const submit = mutation({
     assertId(args.idempotencyKey, 'idempotencyKey')
     assertInput(args.input)
     assertPositiveInteger(args.maxAttempts, 'maxAttempts', 10)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
 
     const installation = await ctx.db
       .query('installations')
@@ -105,8 +103,8 @@ export const submit = mutation({
       input: args.input,
       status: 'accepted' as const,
       revision: 0,
-      createdAt: args.now,
-      updatedAt: args.now,
+      createdAt: now,
+      updatedAt: now,
     }
     const jobDoc = {
       installationId: args.installationId,
@@ -116,8 +114,8 @@ export const submit = mutation({
       attempt: 0,
       maxAttempts: args.maxAttempts,
       revision: 0,
-      createdAt: args.now,
-      updatedAt: args.now,
+      createdAt: now,
+      updatedAt: now,
     }
     await ctx.db.insert('commands', commandDoc)
     await ctx.db.insert('jobs', jobDoc)
@@ -269,7 +267,6 @@ export const cancel = mutation({
     installationId: v.string(),
     commandId: v.string(),
     expectedRevision: v.number(),
-    now: v.number(),
   },
   returns: v.union(
     v.object({ ok: v.literal(true), revision: v.number() }),
@@ -286,7 +283,7 @@ export const cancel = mutation({
     assertId(args.installationId, 'installationId')
     assertId(args.commandId, 'commandId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const command = await ctx.db
       .query('commands')
       .withIndex('by_installation_command', (q) =>
@@ -318,14 +315,14 @@ export const cancel = mutation({
     await ctx.db.patch(command._id, {
       status: 'cancelled',
       revision: command.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     await ctx.db.patch(job._id, {
       status: 'cancelled',
       leaseOwnerNodeId: undefined,
       leaseExpiresAt: undefined,
       revision: job.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     const activeRun = await ctx.db
       .query('runs')
@@ -340,7 +337,7 @@ export const cancel = mutation({
       await ctx.db.patch(activeRun._id, {
         status: 'cancelled',
         revision: activeRun.revision + 1,
-        finishedAt: args.now,
+        finishedAt: now,
       })
     }
     return { ok: true as const, revision: command.revision + 1 }
