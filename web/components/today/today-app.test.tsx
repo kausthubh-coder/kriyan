@@ -40,19 +40,23 @@ describe('Today presentational components', () => {
     expect(markup).toContain('View all')
   })
 
-  test('keeps View all targets at least 44px and renders one responsive activity tree', async () => {
+  test('keeps navigation clear of scroll targets and renders one responsive activity tree', async () => {
     const css = await Bun.file(new URL('../../app/globals.css', import.meta.url)).text()
     const source = await Bun.file(new URL('./today-app.tsx', import.meta.url)).text()
     expect(css).toContain('.section-heading a { min-width: 44px; min-height: 44px;')
     expect(css).toContain('grid-template-columns: minmax(0, 1fr) auto')
-    expect(css).toContain('calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + var(--mobile-bottom-spacing))')
+    expect(css).toContain('--mobile-navigation-clearance: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + var(--mobile-bottom-spacing));')
+    expect(css).toContain('html { scroll-padding-bottom: var(--mobile-navigation-clearance); }')
+    expect(css).toContain('.app-shell { display: block; padding-bottom: var(--mobile-navigation-clearance); }')
     expect(source.match(/<ActivityPanel/g)).toHaveLength(1)
     expect(source).not.toContain('mobile-activity')
   })
 
-  test('submits only plain non-composing Enter and preserves native Shift Enter, Tab, and IME behavior', async () => {
+  test('submits only plain non-composing Enter and inserts Tab indentation without moving focus', async () => {
     let submissions = 0
     let prevented = 0
+    let changedValue = ''
+    const restoredSelection: number[] = []
     const submit = async (): Promise<void> => { submissions += 1 }
     const press = (overrides: Partial<Parameters<typeof handleComposerKeyDown>[0]>): void => {
       handleComposerKeyDown({
@@ -64,17 +68,27 @@ describe('Today presentational components', () => {
         nativeEvent: {},
         preventDefault: () => { prevented += 1 },
         ...overrides,
-      }, submit)
+      }, submit, (value) => { changedValue = value })
     }
 
     press({})
     press({ shiftKey: true })
-    press({ key: 'Tab' })
+    press({
+      key: 'Tab',
+      currentTarget: {
+        value: 'ask Kriyan',
+        selectionStart: 4,
+        selectionEnd: 4,
+        setSelectionRange: (start, end) => { restoredSelection.push(start, end) },
+      },
+    })
     press({ nativeEvent: { isComposing: true } })
     press({ nativeEvent: { keyCode: 229 } })
     await Promise.resolve()
     expect(submissions).toBe(1)
-    expect(prevented).toBe(1)
+    expect(prevented).toBe(2)
+    expect(changedValue).toBe('ask \tKriyan')
+    expect(restoredSelection).toEqual([5, 5])
   })
 
   test('hydrates deterministic date, connection, node, and relative-time markup without errors', async () => {

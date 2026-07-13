@@ -295,19 +295,44 @@ export interface ComposerKeyEvent {
   metaKey: boolean
   nativeEvent: { isComposing?: boolean; keyCode?: number }
   preventDefault: () => void
+  currentTarget?: {
+    value: string
+    selectionStart: number | null
+    selectionEnd: number | null
+    setSelectionRange: (selectionStart: number, selectionEnd: number) => void
+  }
 }
 
 export function handleComposerKeyDown(
   event: ComposerKeyEvent,
   onSubmit: () => Promise<void>,
+  onChange: (value: string) => void,
 ): void {
+  const isComposing = event.nativeEvent.isComposing === true
+    || event.nativeEvent.keyCode === 229
+  const isPlainTab = event.key === 'Tab'
+    && !event.shiftKey
+    && !event.altKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && !isComposing
+  if (isPlainTab && event.currentTarget) {
+    event.preventDefault()
+    const target = event.currentTarget
+    const selectionStart = target.selectionStart ?? target.value.length
+    const selectionEnd = target.selectionEnd ?? selectionStart
+    const nextValue = `${target.value.slice(0, selectionStart)}\t${target.value.slice(selectionEnd)}`
+    const nextCaret = selectionStart + 1
+    onChange(nextValue)
+    queueMicrotask(() => target.setSelectionRange(nextCaret, nextCaret))
+    return
+  }
   const isPlainEnter = event.key === 'Enter'
     && !event.shiftKey
     && !event.altKey
     && !event.ctrlKey
     && !event.metaKey
-    && event.nativeEvent.isComposing !== true
-    && event.nativeEvent.keyCode !== 229
+    && !isComposing
   if (!isPlainEnter) return
   event.preventDefault()
   void onSubmit()
@@ -318,10 +343,10 @@ function CommandComposer({ value, onChange, onSubmit, busy, nodeOnline }: { valu
     <section className="composer" aria-labelledby="composer-title">
       <div><h2 id="composer-title">What should Kriyan handle?</h2><span>{nodeOnline ? 'Your node is ready.' : 'No node is online. New commands will wait in the queue.'}</span></div>
       <div className="composer-control">
-        <textarea value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => handleComposerKeyDown(event, onSubmit)} rows={2} maxLength={8192} placeholder="remind me tomorrow at 8 to practice Korean" aria-describedby="composer-help" disabled={busy} />
+        <textarea value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => handleComposerKeyDown(event, onSubmit, onChange)} rows={2} maxLength={8192} placeholder="remind me tomorrow at 8 to practice Korean" aria-describedby="composer-help" disabled={busy} />
         <button className="primary-button send-button" onClick={() => void onSubmit()} disabled={!value.trim() || busy} aria-label={busy ? 'Queueing command' : 'Queue command'}>{busy ? <span className="spinner" /> : <SendIcon />}</button>
       </div>
-      <p id="composer-help">Enter to queue · Shift + Enter for a new line</p>
+      <p id="composer-help">Enter to queue · Shift + Enter for a new line · Tab to indent</p>
     </section>
   )
 }

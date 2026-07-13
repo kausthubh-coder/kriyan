@@ -27,6 +27,7 @@
   --z-toast: 50;
   --mobile-nav-height: 60px;
   --mobile-bottom-spacing: 16px;
+  --mobile-navigation-clearance: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + var(--mobile-bottom-spacing));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -242,7 +243,8 @@ svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
 }
 
 @media (max-width: 720px) {
-  .app-shell { display: block; padding-bottom: 0; }
+  html { scroll-padding-bottom: var(--mobile-navigation-clearance); }
+  .app-shell { display: block; padding-bottom: var(--mobile-navigation-clearance); }
   .side-rail { display: none; }
   .mobile-header { position: sticky; top: 0; min-height: 56px; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: color-mix(in oklch, var(--surface) 94%, transparent); backdrop-filter: blur(12px); z-index: var(--z-sticky); }
   .brand-compact { padding: 0; }
@@ -250,8 +252,8 @@ svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
   .node-summary.compact { width: auto; margin: 0; padding: 0.35rem 0.5rem; display: flex; border: 0; border-radius: 8px; background: var(--surface-subtle); }
   .node-summary.compact svg { width: 0.9rem; }
   .node-summary.compact strong { max-width: 120px; font-size: 0.68rem; }
-  .main-content { padding: 1.45rem 1rem calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + var(--mobile-bottom-spacing)); }
-  .activity-rail { padding: 1.25rem 1rem calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + var(--mobile-bottom-spacing)); }
+  .main-content { padding: 1.45rem 1rem 2rem; }
+  .activity-rail { padding: 1.25rem 1rem 2rem; }
   .page-header { margin-bottom: 1.4rem; }
   .page-header h1 { font-size: 1.65rem; }
   .page-header > span { font-size: 0.84rem; }

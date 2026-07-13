@@ -330,29 +330,33 @@ export function useConvexRepository(
     runEventsPage.status,
   ])
   const connectionMode = deriveConnectionMode(connectionTracker)
-  const lastConfirmedSnapshot = useRef<RemoteSnapshot | null>(null)
-  useEffect(() => {
-    if (connectionMode === 'online') lastConfirmedSnapshot.current = currentSnapshot
-  }, [connectionMode, currentSnapshot])
+  const [lastConfirmedSnapshot, setLastConfirmedSnapshot] = useState<RemoteSnapshot | null>(null)
+  if (connectionMode === 'online' && lastConfirmedSnapshot !== currentSnapshot) {
+    setLastConfirmedSnapshot(currentSnapshot)
+  }
   const remote = retainLastConfirmed(
     connectionMode,
     currentSnapshot,
-    lastConfirmedSnapshot.current,
+    lastConfirmedSnapshot,
   )
   const remoteTasks = remote.tasks
   const remoteReminders = remote.reminders
 
-  useEffect(() => {
+  const [lastReconciledTasks, setLastReconciledTasks] = useState(remoteTasks)
+  if (lastReconciledTasks !== remoteTasks) {
+    setLastReconciledTasks(remoteTasks)
     const remoteIds = new Set(remoteTasks.map((task) => task.taskId))
     setPendingTasks((current) => current.filter((task) => !remoteIds.has(task.taskId)))
     setTaskPatches((current) => reconcilePatches(remoteTasks, current, (task) => task.taskId))
-  }, [remoteTasks])
+  }
 
-  useEffect(() => {
+  const [lastReconciledReminders, setLastReconciledReminders] = useState(remoteReminders)
+  if (lastReconciledReminders !== remoteReminders) {
+    setLastReconciledReminders(remoteReminders)
     const remoteIds = new Set(remoteReminders.map((reminder) => reminder.reminderId))
     setPendingReminders((current) => current.filter((reminder) => !remoteIds.has(reminder.reminderId)))
     setReminderPatches((current) => reconcilePatches(remoteReminders, current, (reminder) => reminder.reminderId))
-  }, [remoteReminders])
+  }
 
   const tasks = useMemo(() => {
     const reconciled = reconcileEntities(remoteTasks, pendingTasks, (task) => task.taskId)
