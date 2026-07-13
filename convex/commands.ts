@@ -340,6 +340,12 @@ export const cancel = mutation({
         finishedAt: now,
       })
     }
+    if (job.threadId !== undefined && job.turnId !== undefined) {
+      const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', job.threadId!)).unique()
+      if (thread?.activeTurnId === job.turnId) await ctx.db.patch(thread._id, { activeTurnId: undefined, updatedAt: now })
+      const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', args.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
+      for (const message of messages) await ctx.db.patch(message._id, { state: 'cancelled', updatedAt: now, finalizedAt: now })
+    }
     return { ok: true as const, revision: command.revision + 1 }
   },
 })

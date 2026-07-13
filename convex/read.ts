@@ -217,3 +217,36 @@ export const runEvents = query({
     return { ...page, page: page.page.map(withoutSystemFields) }
   },
 })
+
+export const clientSnapshot = query({
+  args: { installationId: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    const [tasks, reminders, calendarEvents, notes, notificationIntents, sources, knowledge, nodes, commands, threads, messages, artifacts] = await Promise.all([
+      ctx.db.query('tasks').withIndex('by_installation_live_task', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
+      ctx.db.query('reminders').withIndex('by_installation_live_reminder', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
+      ctx.db.query('calendarEvents').withIndex('by_installation_live_start', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
+      ctx.db.query('notes').withIndex('by_installation_live_updated', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
+      ctx.db.query('notificationIntents').withIndex('by_installation_live_schedule', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
+      ctx.db.query('sourceRefs').withIndex('by_installation_live_kind', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
+      ctx.db.query('knowledgeDocuments').withIndex('by_installation_live_kind', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
+      ctx.db.query('nodes').withIndex('by_installation_node', (q) => q.eq('installationId', args.installationId)).take(100),
+      ctx.db.query('commands').withIndex('by_installation_created', (q) => q.eq('installationId', args.installationId)).order('desc').take(100),
+      ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId)).take(100),
+      ctx.db.query('agentMessages').withIndex('by_installation_message', (q) => q.eq('installationId', args.installationId)).take(100),
+      ctx.db.query('artifacts').withIndex('by_installation_artifact', (q) => q.eq('installationId', args.installationId)).take(100),
+    ])
+    const activity = await Promise.all(commands.map(async (command) => {
+      const job = await ctx.db.query('jobs').withIndex('by_installation_command', (q) => q.eq('installationId', args.installationId).eq('commandId', command.commandId)).unique()
+      const run = job === null || job.attempt === 0 ? null : await ctx.db.query('runs').withIndex('by_installation_job_attempt', (q) => q.eq('installationId', args.installationId).eq('jobId', job.jobId).eq('attempt', job.attempt)).unique()
+      return { command: withoutSystemFields(command), job: job === null ? undefined : withoutSystemFields(job), run: run === null ? undefined : withoutSystemFields(run) }
+    }))
+    return {
+      productivity: { tasks: tasks.map(withoutSystemFields), reminders: reminders.map(withoutSystemFields), calendarEvents: calendarEvents.map(withoutSystemFields), notes: notes.map(withoutSystemFields), notificationIntents: notificationIntents.map(withoutSystemFields) },
+      agents: { threads: threads.map(withoutSystemFields), messages: messages.map(withoutSystemFields) },
+      knowledge: { sources: sources.map(withoutSystemFields), documents: knowledge.map(withoutSystemFields), artifacts: artifacts.filter((item) => item.deletedAt === undefined).map(withoutSystemFields) },
+      nodes: { items: nodes.map(withoutSystemFields), activity },
+    }
+  },
+})

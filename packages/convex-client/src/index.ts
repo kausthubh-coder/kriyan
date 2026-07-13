@@ -11,6 +11,7 @@ import {
 } from './knowledge-projections'
 
 export * from './knowledge-projections'
+export * from './worker-contract'
 
 export type JobStatus =
   | 'queued'
@@ -24,6 +25,16 @@ export interface Job {
   installationId: string
   jobId: string
   commandId: string
+  contractVersion?: string
+  kind?: string
+  requiredCapabilities?: string[]
+  preferredNodeId?: string
+  threadId?: string
+  turnId?: string
+  turnOrdinal?: number
+  agentRevisionId?: string
+  assistantMessageId?: string
+  leaseToken?: string
   status: JobStatus
   attempt: number
   maxAttempts: number
@@ -94,7 +105,11 @@ export function deriveNodeHealth(
 export interface RunEventInput {
   eventId: string
   sequence: number
-  type: 'status' | 'message' | 'tool' | 'error'
+  type:
+    | 'status' | 'message' | 'tool' | 'error'
+    | 'run.claimed' | 'run.started' | 'message.delta' | 'message.completed'
+    | 'tool.started' | 'tool.finished' | 'knowledge.changed'
+    | 'run.finished' | 'run.failed'
   data: string
   installationId?: string
   runId?: string
@@ -124,7 +139,7 @@ export interface ControlPlane {
     | { ok: true; duplicate: boolean; revision: number }
     | { ok: false; reason: string }
   >
-  completeRun(installationId: string, nodeId: string, job: Job, run: Run): Promise<Transition>
+  completeRun(installationId: string, nodeId: string, job: Job, run: Run, assistantContent?: string): Promise<Transition>
   failRun(
     installationId: string,
     nodeId: string,
@@ -221,6 +236,7 @@ export class ConvexControlPlane
       installationId,
       nodeId,
       expectedRevision: job.revision,
+      expectedLeaseToken: job.leaseToken,
       jobId: job.jobId,
       leaseDurationMs,
     })
@@ -232,6 +248,7 @@ export class ConvexControlPlane
       nodeId,
       jobId: job.jobId,
       expectedJobRevision: job.revision,
+      expectedLeaseToken: job.leaseToken,
     })
   }
 
@@ -249,11 +266,12 @@ export class ConvexControlPlane
       runId: run.runId,
       expectedJobRevision: job.revision,
       expectedRunRevision: run.revision,
+      expectedLeaseToken: job.leaseToken,
       events,
     })
   }
 
-  async completeRun(installationId: string, nodeId: string, job: Job, run: Run) {
+  async completeRun(installationId: string, nodeId: string, job: Job, run: Run, assistantContent?: string) {
     return await this.client.mutation(api.worker.completeRun, {
       installationId,
       nodeId,
@@ -261,6 +279,8 @@ export class ConvexControlPlane
       runId: run.runId,
       expectedJobRevision: job.revision,
       expectedRunRevision: run.revision,
+      expectedLeaseToken: job.leaseToken,
+      assistantContent,
     })
   }
 
@@ -279,6 +299,7 @@ export class ConvexControlPlane
       runId: run.runId,
       expectedJobRevision: job.revision,
       expectedRunRevision: run.revision,
+      expectedLeaseToken: job.leaseToken,
       error,
       retryable,
     })

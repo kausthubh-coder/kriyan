@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  ConvexProductRepository, type AppNoteItem, type CalendarEventItem, type InjectedConvexProductClient,
+  ConvexProductRepository, createReactiveSnapshotStore, deriveActivity,
+  type AppNoteItem, type CalendarEventItem, type InjectedConvexProductClient,
   type KnowledgeDocumentItem, type NotificationIntentItem, type ProductMutationResult, type ProductPage,
-  type ProductRepository, type ReminderItem, type SourceRefItem, type TaskItem,
+  type ProductRepository, type ReactiveClientRepository, type ReminderItem, type SourceRefItem, type TaskItem,
 } from '@kriyan/client-core'
-import { ConvexHttpClient } from 'convex/browser'
+import { ConvexClient } from 'convex/browser'
 
 import { api } from '@convex/_generated/api'
 
@@ -14,21 +15,32 @@ const failure = <T,>(reason: string): ProductMutationResult<T> => ({ ok: false, 
 const success = <T,>(created: boolean, value: T): ProductMutationResult<T> => ({ ok: true, created, revision: (value as any).revision, value })
 const event = (value: any): CalendarEventItem => ({ ...value, lifecycle: value.status, recurrence: value.recurrenceRule ? { rule: value.recurrenceRule } : undefined })
 
-export async function createConvexRepository(url: string): Promise<ProductRepository> {
-  const client = new ConvexHttpClient(url)
+export async function createConvexRepository(url: string): Promise<ProductRepository & ReactiveClientRepository> {
+  const client = new ConvexClient(url)
+  const snapshots = createReactiveSnapshotStore()
   const installationId = process.env.EXPO_PUBLIC_INSTALLATION_ID ?? 'mobile:default'
   await client.mutation(api.installations.create, { installationId, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, protocolVersion: '1' })
-  const getTask = (taskId: string, includeDeleted = false) => client.query(api.projections.getTask, { installationId, taskId, includeDeleted }) as Promise<TaskItem | null>
-  const getReminder = (reminderId: string, includeDeleted = false) => client.query(api.projections.getReminder, { installationId, reminderId, includeDeleted }) as Promise<ReminderItem | null>
-  const getIntent = (notificationIntentId: string) => client.query(api.notifications.get, { installationId, notificationIntentId }) as Promise<NotificationIntentItem | null>
-  const getEvent = async (calendarEventId: string, includeDeleted = false) => { const value = await client.query(api.calendar.get, { installationId, calendarEventId, includeDeleted }); return value ? event(value) : null }
-  const getNote = (noteId: string, includeDeleted = false) => client.query(api.notes.get, { installationId, noteId, includeDeleted }) as Promise<AppNoteItem | null>
-  const getSource = (sourceRefId: string) => client.query(api.knowledge.getSourceRef, { installationId, sourceRefId }) as Promise<SourceRefItem | null>
-  const getKnowledge = (knowledgeDocumentId: string) => client.query(api.knowledge.getKnowledgeDocument, { installationId, knowledgeDocumentId }) as Promise<KnowledgeDocumentItem | null>
+  const fromSnapshot = async <T,>(read: () => T | undefined): Promise<T | null> => {
+    const current = read(); if (current !== undefined) return current
+    return await new Promise((resolve) => {
+      const timeout = setTimeout(() => { unsubscribe(); resolve(null) }, 2_000)
+      const unsubscribe = snapshots.subscribe(() => {
+        const next = read(); if (next === undefined) return
+        clearTimeout(timeout); unsubscribe(); resolve(next)
+      })
+    })
+  }
+  const getTask = async (taskId: string, _includeDeleted = false) => fromSnapshot(() => snapshots.getSnapshot().productivity.tasks.find((item) => item.taskId === taskId))
+  const getReminder = async (reminderId: string, _includeDeleted = false) => fromSnapshot(() => snapshots.getSnapshot().productivity.reminders.find((item) => item.reminderId === reminderId))
+  const getIntent = async (notificationIntentId: string) => fromSnapshot(() => snapshots.getSnapshot().productivity.notificationIntents.find((item) => item.notificationIntentId === notificationIntentId))
+  const getEvent = async (calendarEventId: string, _includeDeleted = false) => fromSnapshot(() => snapshots.getSnapshot().productivity.calendarEvents.find((item) => item.calendarEventId === calendarEventId))
+  const getNote = async (noteId: string, _includeDeleted = false) => fromSnapshot(() => snapshots.getSnapshot().productivity.notes.find((item) => item.noteId === noteId))
+  const getSource = async (sourceRefId: string) => fromSnapshot(() => snapshots.getSnapshot().knowledge.sources.find((item) => item.sourceRefId === sourceRefId))
+  const getKnowledge = async (knowledgeDocumentId: string) => fromSnapshot(() => snapshots.getSnapshot().knowledge.documents.find((item) => item.knowledgeDocumentId === knowledgeDocumentId))
   const after = async <T,>(transition: any, load: () => Promise<T | null>): Promise<ProductMutationResult<T>> => {
     if (!transition.ok) return failure(transition.reason)
     const value = await load()
-    return value ? success(false, value) : failure('not_found')
+    return value ? { ok: true, created: false, revision: transition.revision, value: { ...value as object, revision: transition.revision } as T } : failure('not_found')
   }
 
   const injected: InjectedConvexProductClient = {
@@ -77,5 +89,29 @@ export async function createConvexRepository(url: string): Promise<ProductReposi
       tombstone: async (id, revision) => after(await client.mutation(api.knowledge.tombstoneProjection, { installationId, kind: 'knowledge', projectionId: id, expectedRevision: revision }), () => getKnowledge(id)),
     },
   }
-  return new ConvexProductRepository(injected)
+  const repository = new ConvexProductRepository(injected)
+  const unsubscribe = client.onUpdate(api.read.clientSnapshot, { installationId }, (value: any) => {
+    snapshots.replace({
+      productivity: {
+        tasks: value.productivity.tasks,
+        reminders: value.productivity.reminders,
+        calendarEvents: value.productivity.calendarEvents.map(event),
+        notes: value.productivity.notes,
+        notificationIntents: value.productivity.notificationIntents,
+      },
+      agents: value.agents,
+      knowledge: value.knowledge,
+      nodes: { items: value.nodes.items, activity: deriveActivity(value.nodes.activity) },
+      connection: 'online',
+    })
+  }, (cause: Error) => snapshots.replace({ ...snapshots.getSnapshot(), connection: 'offline', error: cause.message }))
+  return Object.assign(repository, {
+    getSnapshot: snapshots.getSnapshot,
+    subscribe: snapshots.subscribe,
+    dispose(): void {
+      unsubscribe()
+      snapshots.dispose()
+      void client.close()
+    },
+  })
 }

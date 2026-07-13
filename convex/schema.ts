@@ -17,6 +17,11 @@ import {
   syncState,
   taskPriority,
   taskStatus,
+  agentMessageRole,
+  agentTurnState,
+  correctionAction,
+  correctionState,
+  projectionState,
 } from './validators'
 
 export default defineSchema({
@@ -26,6 +31,8 @@ export default defineSchema({
     protocolVersion: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    contractVersion: v.optional(v.string()),
+    compatibilityMode: v.optional(v.union(v.literal('dual-read'), v.literal('canonical'), v.literal('rollback'))),
   }).index('by_installation_id', ['installationId']),
 
   nodes: defineTable({
@@ -48,6 +55,12 @@ export default defineSchema({
     commandId: v.string(),
     idempotencyKey: v.string(),
     input: v.string(),
+    contractVersion: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    turnId: v.optional(v.string()),
+    turnOrdinal: v.optional(v.number()),
+    agentRevisionId: v.optional(v.string()),
     status: commandStatus,
     revision: v.number(),
     createdAt: v.number(),
@@ -62,6 +75,18 @@ export default defineSchema({
     installationId: v.string(),
     jobId: v.string(),
     commandId: v.string(),
+    contractVersion: v.optional(v.string()),
+    kind: v.optional(v.string()),
+    requiredCapabilities: v.optional(v.array(v.string())),
+    preferredNodeId: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+    turnId: v.optional(v.string()),
+    turnOrdinal: v.optional(v.number()),
+    agentRevisionId: v.optional(v.string()),
+    assistantMessageId: v.optional(v.string()),
+    leaseToken: v.optional(v.string()),
+    effectCheckpoint: v.optional(v.string()),
+    sessionCheckpoint: v.optional(v.string()),
     status: jobStatus,
     attempt: v.number(),
     maxAttempts: v.number(),
@@ -83,6 +108,11 @@ export default defineSchema({
     .index('by_installation_lease_owner', [
       'installationId',
       'leaseOwnerNodeId',
+    ])
+    .index('by_installation_thread_ordinal', [
+      'installationId',
+      'threadId',
+      'turnOrdinal',
     ]),
 
   runs: defineTable({
@@ -91,6 +121,11 @@ export default defineSchema({
     jobId: v.string(),
     attempt: v.number(),
     nodeId: v.string(),
+    threadId: v.optional(v.string()),
+    turnId: v.optional(v.string()),
+    turnOrdinal: v.optional(v.number()),
+    agentRevisionId: v.optional(v.string()),
+    assistantMessageId: v.optional(v.string()),
     status: runStatus,
     revision: v.number(),
     startedAt: v.number(),
@@ -277,6 +312,8 @@ export default defineSchema({
     wordCount: v.number(),
     tags: v.array(v.string()),
     entityId: v.optional(v.string()),
+    currentVersionId: v.optional(v.string()),
+    contentHash: v.optional(v.string()),
     revision: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -285,6 +322,70 @@ export default defineSchema({
     .index('by_installation_note', ['installationId', 'noteId'])
     .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
     .index('by_installation_live_updated', ['installationId', 'deletedAt', 'updatedAt']),
+
+  noteVersions: defineTable({
+    installationId: v.string(), noteVersionId: v.string(), noteId: v.string(),
+    version: v.number(), contentJson: v.string(), contentHash: v.string(),
+    plainTextPreview: v.string(), wordCount: v.number(), authorOrigin: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_installation_version', ['installationId', 'noteVersionId'])
+    .index('by_installation_note_version', ['installationId', 'noteId', 'version']),
+
+  artifacts: defineTable({
+    installationId: v.string(), artifactId: v.string(), noteId: v.string(),
+    noteVersionId: v.string(), slug: v.string(), projectionState,
+    projectedHash: v.optional(v.string()), projectedPath: v.optional(v.string()),
+    lastError: v.optional(v.string()), revision: v.number(), createdAt: v.number(),
+    updatedAt: v.number(), deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_artifact', ['installationId', 'artifactId'])
+    .index('by_installation_note', ['installationId', 'noteId']),
+
+  noteLinks: defineTable({
+    installationId: v.string(), noteLinkId: v.string(), noteId: v.string(),
+    targetKind: v.string(), targetId: v.string(), relation: v.string(),
+    provenanceIds: v.array(v.string()), createdAt: v.number(), deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_link', ['installationId', 'noteLinkId'])
+    .index('by_installation_note', ['installationId', 'noteId']),
+
+  agents: defineTable({
+    installationId: v.string(), agentId: v.string(), displayName: v.string(),
+    currentRevisionId: v.string(), revision: v.number(), createdAt: v.number(),
+    updatedAt: v.number(), deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_agent', ['installationId', 'agentId']),
+
+  agentRevisions: defineTable({
+    installationId: v.string(), agentRevisionId: v.string(), agentId: v.string(),
+    ordinal: v.number(), displayName: v.string(), systemPrompt: v.string(),
+    toolCapabilities: v.array(v.string()), createdAt: v.number(),
+  })
+    .index('by_installation_revision', ['installationId', 'agentRevisionId'])
+    .index('by_installation_agent_ordinal', ['installationId', 'agentId', 'ordinal']),
+
+  agentThreads: defineTable({
+    installationId: v.string(), threadId: v.string(), agentId: v.string(),
+    agentRevisionId: v.string(), title: v.optional(v.string()),
+    nextTurnOrdinal: v.number(), activeTurnId: v.optional(v.string()),
+    preferredNodeId: v.optional(v.string()), piSessionRef: v.optional(v.string()),
+    sessionRevision: v.number(), createdAt: v.number(), updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_thread', ['installationId', 'threadId'])
+    .index('by_installation_agent', ['installationId', 'agentId']),
+
+  agentMessages: defineTable({
+    installationId: v.string(), messageId: v.string(), threadId: v.string(),
+    turnId: v.string(), turnOrdinal: v.number(), role: agentMessageRole,
+    state: agentTurnState, content: v.string(), origin: v.string(),
+    agentRevisionId: v.string(), createdAt: v.number(), updatedAt: v.number(),
+    finalizedAt: v.optional(v.number()),
+  })
+    .index('by_installation_message', ['installationId', 'messageId'])
+    .index('by_installation_thread_ordinal', ['installationId', 'threadId', 'turnOrdinal'])
+    .index('by_installation_turn_role', ['installationId', 'turnId', 'role']),
 
   sourceRefs: defineTable({
     installationId: v.string(),
@@ -330,4 +431,31 @@ export default defineSchema({
     .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
     .index('by_installation_live_kind', ['installationId', 'deletedAt', 'kind'])
     .index('by_installation_live_sync', ['installationId', 'deletedAt', 'syncState']),
+
+  knowledgeRelations: defineTable({
+    installationId: v.string(), relationId: v.string(), fromId: v.string(),
+    toId: v.string(), kind: v.string(), changeId: v.string(), confidence: v.number(),
+    revision: v.number(), createdAt: v.number(), updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  }).index('by_installation_relation', ['installationId', 'relationId']),
+
+  provenanceLinks: defineTable({
+    installationId: v.string(), provenanceLinkId: v.string(), targetKind: v.string(),
+    targetId: v.string(), sourceRefId: v.string(), sourceVersion: v.string(),
+    citation: v.string(), createdAt: v.number(), deletedAt: v.optional(v.number()),
+  }).index('by_installation_provenance', ['installationId', 'provenanceLinkId']),
+
+  projectionCursors: defineTable({
+    installationId: v.string(), cursorId: v.string(), vaultId: v.string(),
+    cursor: v.number(), documentHash: v.optional(v.string()), mode: v.string(),
+    revision: v.number(), createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_installation_cursor', ['installationId', 'cursorId']),
+
+  memoryCorrections: defineTable({
+    installationId: v.string(), correctionId: v.string(), targetKind: v.string(),
+    targetId: v.string(), action: correctionAction, replacement: v.optional(v.string()),
+    reason: v.string(), actor: v.string(), origin: v.string(), expectedRevision: v.number(),
+    state: correctionState, appliedRevision: v.optional(v.number()),
+    conflict: v.optional(v.string()), createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_installation_correction', ['installationId', 'correctionId']),
 })

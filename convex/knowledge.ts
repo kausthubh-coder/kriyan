@@ -25,6 +25,7 @@ import {
   indexState,
   knowledgeDocumentValue,
   knowledgeKind,
+  memoryCorrectionValue,
   projectionUpsertResult,
   sourceKind,
   sourceRefValue,
@@ -144,6 +145,143 @@ export const upsertSourceRef = mutation({
       created: false,
       revision: existing.revision + 1,
     }
+  },
+})
+
+export const upsertRelation = mutation({
+  args: { installationId: v.string(), relationId: v.string(), fromId: v.string(), toId: v.string(), kind: v.string(), changeId: v.string(), confidence: v.number(), expectedRevision: v.optional(v.number()) },
+  returns: projectionUpsertResult,
+  handler: async (ctx, args) => {
+    for (const [name, value] of Object.entries({ installationId: args.installationId, relationId: args.relationId, fromId: args.fromId, toId: args.toId, changeId: args.changeId })) assertId(value, name)
+    if (!Number.isFinite(args.confidence) || args.confidence < 0 || args.confidence > 1) throw new Error('confidence must be between 0 and 1')
+    const activeCorrections = (await ctx.db.query('memoryCorrections').withIndex('by_installation_correction', (q) => q.eq('installationId', args.installationId)).collect())
+      .filter((correction) => correction.targetKind === 'relation' && correction.targetId === args.relationId && correction.state === 'applied' && correction.action !== 'restore')
+    if (activeCorrections.length > 0) return { ok: false as const, reason: 'invalid_state' as const }
+    const existing = await ctx.db.query('knowledgeRelations').withIndex('by_installation_relation', (q) => q.eq('installationId', args.installationId).eq('relationId', args.relationId)).unique()
+    const now = Date.now()
+    if (existing === null) {
+      if (args.expectedRevision !== undefined) return { ok: false as const, reason: 'not_found' as const }
+      await ctx.db.insert('knowledgeRelations', { installationId: args.installationId, relationId: args.relationId, fromId: args.fromId, toId: args.toId, kind: args.kind, changeId: args.changeId, confidence: args.confidence, revision: 0, createdAt: now, updatedAt: now })
+      return { ok: true as const, created: true, revision: 0 }
+    }
+    if (args.expectedRevision === undefined || existing.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
+    await ctx.db.patch(existing._id, { fromId: args.fromId, toId: args.toId, kind: args.kind, changeId: args.changeId, confidence: args.confidence, deletedAt: undefined, revision: existing.revision + 1, updatedAt: now })
+    return { ok: true as const, created: false, revision: existing.revision + 1 }
+  },
+})
+
+export const upsertProvenance = mutation({
+  args: { installationId: v.string(), provenanceLinkId: v.string(), targetKind: v.string(), targetId: v.string(), sourceRefId: v.string(), sourceVersion: v.string(), citation: v.string() },
+  returns: v.object({ created: v.boolean() }),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.query('provenanceLinks').withIndex('by_installation_provenance', (q) => q.eq('installationId', args.installationId).eq('provenanceLinkId', args.provenanceLinkId)).unique()
+    if (existing !== null) {
+      const same = existing.targetKind === args.targetKind && existing.targetId === args.targetId && existing.sourceRefId === args.sourceRefId && existing.sourceVersion === args.sourceVersion && existing.citation === args.citation
+      if (!same) throw new Error('provenanceLinkId conflicts')
+      return { created: false }
+    }
+    await ctx.db.insert('provenanceLinks', { ...args, createdAt: Date.now() })
+    return { created: true }
+  },
+})
+
+export const advanceProjectionCursor = mutation({
+  args: { installationId: v.string(), cursorId: v.string(), vaultId: v.string(), cursor: v.number(), documentHash: v.optional(v.string()), mode: v.string(), expectedRevision: v.optional(v.number()) },
+  returns: projectionUpsertResult,
+  handler: async (ctx, args) => {
+    assertExpectedRevision(args.cursor)
+    const existing = await ctx.db.query('projectionCursors').withIndex('by_installation_cursor', (q) => q.eq('installationId', args.installationId).eq('cursorId', args.cursorId)).unique()
+    const now = Date.now()
+    if (existing === null) {
+      if (args.expectedRevision !== undefined) return { ok: false as const, reason: 'not_found' as const }
+      await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId: args.cursorId, vaultId: args.vaultId, cursor: args.cursor, documentHash: args.documentHash, mode: args.mode, revision: 0, createdAt: now, updatedAt: now })
+      return { ok: true as const, created: true, revision: 0 }
+    }
+    if (args.expectedRevision === undefined || existing.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
+    if (args.cursor < existing.cursor) return { ok: false as const, reason: 'invalid_state' as const }
+    await ctx.db.patch(existing._id, { cursor: args.cursor, documentHash: args.documentHash, mode: args.mode, revision: existing.revision + 1, updatedAt: now })
+    return { ok: true as const, created: false, revision: existing.revision + 1 }
+  },
+})
+
+export const createCorrection = mutation({
+  args: { installationId: v.string(), correctionId: v.string(), targetKind: v.string(), targetId: v.string(), action: v.union(v.literal('retract'), v.literal('replace'), v.literal('restore')), replacement: v.optional(v.string()), reason: v.string(), actor: v.string(), origin: v.string(), expectedRevision: v.number() },
+  returns: v.object({ created: v.boolean(), correction: memoryCorrectionValue }),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.query('memoryCorrections').withIndex('by_installation_correction', (q) => q.eq('installationId', args.installationId).eq('correctionId', args.correctionId)).unique()
+    if (existing !== null) return { created: false, correction: withoutSystemFields(existing) }
+    if (args.action === 'replace' && args.replacement === undefined) throw new Error('replacement is required for replace')
+    const now = Date.now(); const correction = { ...args, state: 'pending' as const, createdAt: now, updatedAt: now }
+    await ctx.db.insert('memoryCorrections', correction)
+    return { created: true, correction }
+  },
+})
+
+async function transitionCorrection(ctx: MutationCtx, installationId: string, correctionId: string, state: 'applied' | 'restored' | 'conflict', appliedRevision?: number, conflict?: string): Promise<{ ok: true; revision: number } | { ok: false; reason: 'not_found' | 'invalid_state' }> {
+  const correction = await ctx.db.query('memoryCorrections').withIndex('by_installation_correction', (q) => q.eq('installationId', installationId).eq('correctionId', correctionId)).unique()
+  if (correction === null) return { ok: false, reason: 'not_found' }
+  if (state === 'restored' && correction.state !== 'applied') return { ok: false, reason: 'invalid_state' }
+  if (state !== 'restored' && correction.state !== 'pending') return { ok: false, reason: 'invalid_state' }
+  await ctx.db.patch(correction._id, { state, appliedRevision, conflict, updatedAt: Date.now() })
+  return { ok: true, revision: appliedRevision ?? correction.expectedRevision }
+}
+
+export const applyCorrection = mutation({ args: { installationId: v.string(), correctionId: v.string(), appliedRevision: v.number() }, returns: transitionResult, handler: async (ctx, args) => transitionCorrection(ctx, args.installationId, args.correctionId, 'applied', args.appliedRevision) })
+export const restoreCorrection = mutation({ args: { installationId: v.string(), correctionId: v.string(), appliedRevision: v.number() }, returns: transitionResult, handler: async (ctx, args) => transitionCorrection(ctx, args.installationId, args.correctionId, 'restored', args.appliedRevision) })
+export const conflictCorrection = mutation({ args: { installationId: v.string(), correctionId: v.string(), conflict: v.string() }, returns: transitionResult, handler: async (ctx, args) => transitionCorrection(ctx, args.installationId, args.correctionId, 'conflict', undefined, args.conflict) })
+
+export const tombstoneReconciliationRelation = mutation({
+  args: { installationId: v.string(), relationId: v.string(), expectedRevision: v.number() }, returns: transitionResult,
+  handler: async (ctx, args) => {
+    const relation = await ctx.db.query('knowledgeRelations').withIndex('by_installation_relation', (q) => q.eq('installationId', args.installationId).eq('relationId', args.relationId)).unique()
+    if (relation === null) return { ok: false as const, reason: 'not_found' as const }
+    if (relation.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
+    if (relation.deletedAt !== undefined) return { ok: false as const, reason: 'invalid_state' as const }
+    const now = Date.now(); await ctx.db.patch(relation._id, { deletedAt: now, revision: relation.revision + 1, updatedAt: now })
+    return { ok: true as const, revision: relation.revision + 1 }
+  },
+})
+
+export const backfillLegacyProjections = mutation({
+  args: { installationId: v.string(), phase: v.union(v.literal('source'), v.literal('knowledge')), cursor: v.union(v.null(), v.string()), numItems: v.number() },
+  returns: v.object({ continueCursor: v.string(), isDone: v.boolean(), scanned: v.number(), provenanceCreated: v.number() }),
+  handler: async (ctx, args) => {
+    assertPositiveInteger(args.numItems, 'numItems', 100)
+    const page = args.phase === 'source'
+      ? await ctx.db.query('sourceRefs').withIndex('by_installation_source', (q) => q.eq('installationId', args.installationId)).paginate({ cursor: args.cursor, numItems: args.numItems })
+      : await ctx.db.query('knowledgeDocuments').withIndex('by_installation_knowledge', (q) => q.eq('installationId', args.installationId)).paginate({ cursor: args.cursor, numItems: args.numItems })
+    let provenanceCreated = 0
+    for (const projection of page.page) {
+      const targetId = 'sourceRefId' in projection ? projection.sourceRefId : projection.knowledgeDocumentId
+      for (const provenanceId of projection.provenanceIds) {
+        const provenanceLinkId = `legacy-provenance:${args.phase}:${targetId}:${provenanceId}`
+        const existing = await ctx.db.query('provenanceLinks').withIndex('by_installation_provenance', (q) => q.eq('installationId', args.installationId).eq('provenanceLinkId', provenanceLinkId)).unique()
+        if (existing !== null) continue
+        await ctx.db.insert('provenanceLinks', { installationId: args.installationId, provenanceLinkId, targetKind: args.phase, targetId, sourceRefId: args.phase === 'source' ? targetId : provenanceId, sourceVersion: 'd41', citation: provenanceId, createdAt: projection.createdAt })
+        provenanceCreated += 1
+      }
+    }
+    const cursorId = `d41-backfill:${args.phase}`
+    const existingCursor = await ctx.db.query('projectionCursors').withIndex('by_installation_cursor', (q) => q.eq('installationId', args.installationId).eq('cursorId', cursorId)).unique()
+    const now = Date.now()
+    if (existingCursor === null) await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId, vaultId: 'legacy:d41', cursor: page.page.length, mode: page.isDone ? 'verified' : 'backfill', revision: 0, createdAt: now, updatedAt: now })
+    else await ctx.db.patch(existingCursor._id, { cursor: existingCursor.cursor + page.page.length, mode: page.isDone ? 'verified' : 'backfill', revision: existingCursor.revision + 1, updatedAt: now })
+    return { continueCursor: page.continueCursor, isDone: page.isDone, scanned: page.page.length, provenanceCreated }
+  },
+})
+
+export const verifyProjectionBackfill = query({
+  args: { installationId: v.string() },
+  returns: v.object({ sources: v.number(), knowledge: v.number(), provenanceLinks: v.number(), sourceCursorVerified: v.boolean(), knowledgeCursorVerified: v.boolean() }),
+  handler: async (ctx, args) => {
+    const [sources, knowledge, links, sourceCursor, knowledgeCursor] = await Promise.all([
+      ctx.db.query('sourceRefs').withIndex('by_installation_source', (q) => q.eq('installationId', args.installationId)).collect(),
+      ctx.db.query('knowledgeDocuments').withIndex('by_installation_knowledge', (q) => q.eq('installationId', args.installationId)).collect(),
+      ctx.db.query('provenanceLinks').withIndex('by_installation_provenance', (q) => q.eq('installationId', args.installationId)).collect(),
+      ctx.db.query('projectionCursors').withIndex('by_installation_cursor', (q) => q.eq('installationId', args.installationId).eq('cursorId', 'd41-backfill:source')).unique(),
+      ctx.db.query('projectionCursors').withIndex('by_installation_cursor', (q) => q.eq('installationId', args.installationId).eq('cursorId', 'd41-backfill:knowledge')).unique(),
+    ])
+    return { sources: sources.length, knowledge: knowledge.length, provenanceLinks: links.length, sourceCursorVerified: sourceCursor?.mode === 'verified', knowledgeCursorVerified: knowledgeCursor?.mode === 'verified' }
   },
 })
 

@@ -4,6 +4,10 @@
   "private": true,
   "exports": { ".": "./src/index.ts" },
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "typecheck": "tsc --noEmit --strict --skipLibCheck --module ESNext --moduleResolution Bundler --target ES2022 src/index.ts"
+  },
+  "dependencies": {
+    "@kriyan/contracts": "workspace:*"
   }
 }

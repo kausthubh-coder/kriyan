@@ -7,6 +7,7 @@
       "dependencies": {
         "@earendil-works/pi-ai": "0.80.6",
         "@earendil-works/pi-coding-agent": "0.80.6",
+        "@kriyan/contracts": "workspace:*",
         "btca": "^1.0.41",
         "convex": "^1.42.1",
       },
@@ -123,6 +124,17 @@
     "packages/client-core": {
       "name": "@kriyan/client-core",
       "version": "0.1.0",
+      "dependencies": {
+        "@kriyan/contracts": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/contracts": {
+      "name": "@kriyan/contracts",
+      "version": "1.0.0",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5.9.3",
@@ -130,6 +142,9 @@
     },
     "packages/convex-client": {
       "name": "@kriyan/convex-client",
+      "dependencies": {
+        "@kriyan/contracts": "workspace:*",
+      },
     },
     "packages/knowledge-vault": {
       "name": "@kriyan/knowledge-vault",
@@ -664,6 +679,8 @@
     "@kriyan/cli": ["@kriyan/cli@workspace:apps/cli"],
 
     "@kriyan/client-core": ["@kriyan/client-core@workspace:packages/client-core"],
+
+    "@kriyan/contracts": ["@kriyan/contracts@workspace:packages/contracts"],
 
     "@kriyan/convex-client": ["@kriyan/convex-client@workspace:packages/convex-client"],
 

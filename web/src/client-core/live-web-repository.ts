@@ -2,6 +2,7 @@
 
 import {
   createClientId,
+  createReactiveSnapshotStore,
   normalizeTransitionReason,
   PAGE_SIZE,
   type ActionResult,
@@ -11,9 +12,10 @@ import {
   type ReminderItem,
   type SourceRefItem,
   type TaskItem,
+  type ReactiveClientRepository,
 } from '@kriyan/client-core'
-import { useMemo, useRef, useState } from 'react'
-import { useMutation, usePaginatedQuery } from 'convex/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 
 import { api } from '@convex/_generated/api'
 import type { KriyanWebConfiguration } from '@/lib/convex'
@@ -41,7 +43,7 @@ export function useLiveWebRepository(
   configuration: KriyanWebConfiguration,
   selectedRunId: string | null,
   clientGeneration: number,
-): { repository: WebRepository; connectionMode: ReturnType<typeof useConvexRepository>['connectionMode']; connectionRecoveryRequired: boolean } {
+): { repository: WebRepository; reactiveRepository: ReactiveClientRepository; connectionMode: ReturnType<typeof useConvexRepository>['connectionMode']; connectionRecoveryRequired: boolean } {
   const base = useConvexRepository(configuration, selectedRunId, clientGeneration)
   const { installationId } = configuration
   const [localPending, setLocalPending] = useState<ReadonlySet<string>>(new Set())
@@ -50,6 +52,7 @@ export function useLiveWebRepository(
   const notesPage = usePaginatedQuery(api.notes.list, { installationId }, { initialNumItems: PAGE_SIZE })
   const sourcesPage = usePaginatedQuery(api.knowledge.listSourceRefs, { installationId }, { initialNumItems: PAGE_SIZE })
   const knowledgePage = usePaginatedQuery(api.knowledge.listKnowledgeDocuments, { installationId }, { initialNumItems: PAGE_SIZE })
+  const contractSnapshot = useQuery(api.read.clientSnapshot, { installationId })
 
   const createTask = useMutation(api.projections.createTask)
   const updateTask = useMutation(api.projections.updateTask)
@@ -196,5 +199,17 @@ export function useLiveWebRepository(
     },
   }
 
-  return { repository, connectionMode: base.connectionMode, connectionRecoveryRequired: base.connectionRecoveryRequired }
+  const reactive = useMemo(() => createReactiveSnapshotStore(), [])
+  useEffect(() => {
+    reactive.replace({
+      productivity: { tasks: repository.tasks, reminders: repository.reminders, calendarEvents: repository.calendarEvents, notes: repository.notes, notificationIntents: [] },
+      agents: contractSnapshot?.agents ?? { threads: [], messages: [] },
+      knowledge: { sources: repository.sourceRefs, documents: repository.knowledgeDocuments, artifacts: contractSnapshot?.knowledge.artifacts ?? [] },
+      nodes: { items: repository.nodes, activity: repository.activity },
+      connection: base.connectionMode,
+    })
+  }, [base.connectionMode, contractSnapshot?.agents, contractSnapshot?.knowledge.artifacts, reactive, repository.activity, repository.calendarEvents, repository.knowledgeDocuments, repository.nodes, repository.notes, repository.reminders, repository.sourceRefs, repository.tasks])
+  useEffect(() => () => reactive.dispose(), [reactive])
+
+  return { repository, reactiveRepository: reactive, connectionMode: base.connectionMode, connectionRecoveryRequired: base.connectionRecoveryRequired }
 }

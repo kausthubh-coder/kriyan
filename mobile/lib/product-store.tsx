@@ -1,5 +1,5 @@
 import type {
-  AppNoteItem, CalendarEventItem, KnowledgeDocumentItem, ProductMutationResult, ProductRepository,
+  AppNoteItem, CalendarEventItem, ClientSnapshot, KnowledgeDocumentItem, ProductMutationResult, ProductRepository, ReactiveClientRepository,
   ReminderItem, SourceRefItem, TaskItem,
 } from '@kriyan/client-core'
 import React, { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
@@ -26,6 +26,10 @@ interface ProductState {
 
 const StoreContext = createContext<ProductState | null>(null)
 
+function isReactive(repository: ProductRepository): repository is ProductRepository & ReactiveClientRepository {
+  return 'getSnapshot' in repository && 'subscribe' in repository && 'dispose' in repository
+}
+
 export function ProductStoreProvider({ children }: { children: ReactNode }) {
   const [repository, setRepository] = useState<ProductRepository>()
   const [connection, setConnection] = useState<ProductState['connection']>('connecting')
@@ -40,6 +44,14 @@ export function ProductStoreProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!repository) return
+    if (isReactive(repository)) {
+      const snapshot = repository.getSnapshot()
+      setTasks(snapshot.productivity.tasks); setReminders(snapshot.productivity.reminders)
+      setEvents(snapshot.productivity.calendarEvents); setNotes(snapshot.productivity.notes)
+      setSources(snapshot.knowledge.sources); setKnowledge(snapshot.knowledge.documents)
+      setConnection(snapshot.connection); setError(snapshot.error)
+      return
+    }
     setConnection((current) => current === 'online' ? 'reconnecting' : 'connecting')
     try {
       const [taskPage, reminderPage, eventPage, notePage, sourcePage, knowledgePage] = await Promise.all([
@@ -64,15 +76,27 @@ export function ProductStoreProvider({ children }: { children: ReactNode }) {
       setConnection('offline'); setError(cause instanceof Error ? cause.message : 'Data setup failed')
     })
   }, [])
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    if (!repository) return
+    if (!isReactive(repository)) { void refresh(); return }
+    const synchronize = (): void => {
+      const snapshot: ClientSnapshot = repository.getSnapshot()
+      setTasks(snapshot.productivity.tasks); setReminders(snapshot.productivity.reminders)
+      setEvents(snapshot.productivity.calendarEvents); setNotes(snapshot.productivity.notes)
+      setSources(snapshot.knowledge.sources); setKnowledge(snapshot.knowledge.documents)
+      setConnection(snapshot.connection); setError(snapshot.error)
+    }
+    synchronize()
+    const unsubscribe = repository.subscribe(synchronize)
+    return () => { unsubscribe(); repository.dispose() }
+  }, [refresh, repository])
 
   const runWrite = useCallback(async <T extends Entity,>(operation: (value: ProductRepository) => Promise<ProductMutationResult<T>>) => {
     if (!repository) return { ok: false, reason: 'transport_error', message: 'Repository is still connecting.' } as ProductMutationResult<T>
     const result = await operation(repository)
-    if (result.ok) await refresh()
-    else setError(result.message)
+    if (!result.ok) setError(result.message)
     return result
-  }, [refresh, repository])
+  }, [repository])
 
   const value = useMemo(() => ({ mode, connection, error, tasks, reminders, events, notes, sources, knowledge, repository, refresh, runWrite }),
     [mode, connection, error, tasks, reminders, events, notes, sources, knowledge, repository, refresh, runWrite])

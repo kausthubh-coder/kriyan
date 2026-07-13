@@ -34,6 +34,51 @@ export const runEventType = v.union(
   v.literal('message'),
   v.literal('tool'),
   v.literal('error'),
+  v.literal('run.claimed'),
+  v.literal('run.started'),
+  v.literal('message.delta'),
+  v.literal('message.completed'),
+  v.literal('tool.started'),
+  v.literal('tool.finished'),
+  v.literal('knowledge.changed'),
+  v.literal('run.finished'),
+  v.literal('run.failed'),
+)
+
+export const agentMessageRole = v.union(
+  v.literal('user'),
+  v.literal('assistant'),
+  v.literal('system'),
+  v.literal('tool'),
+)
+
+export const agentTurnState = v.union(
+  v.literal('queued'),
+  v.literal('active'),
+  v.literal('completed'),
+  v.literal('failed'),
+  v.literal('cancelled'),
+  v.literal('waiting_for_node'),
+)
+
+export const projectionState = v.union(
+  v.literal('pending'),
+  v.literal('projected'),
+  v.literal('failed'),
+  v.literal('tombstoned'),
+)
+
+export const correctionAction = v.union(
+  v.literal('retract'),
+  v.literal('replace'),
+  v.literal('restore'),
+)
+
+export const correctionState = v.union(
+  v.literal('pending'),
+  v.literal('applied'),
+  v.literal('restored'),
+  v.literal('conflict'),
 )
 
 export const taskStatus = v.union(
@@ -119,6 +164,8 @@ export const installationValue = v.object({
   protocolVersion: v.string(),
   createdAt: v.number(),
   updatedAt: v.number(),
+  contractVersion: v.optional(v.string()),
+  compatibilityMode: v.optional(v.union(v.literal('dual-read'), v.literal('canonical'), v.literal('rollback'))),
 })
 
 export const nodeValue = v.object({
@@ -139,6 +186,12 @@ export const commandValue = v.object({
   commandId: v.string(),
   idempotencyKey: v.string(),
   input: v.string(),
+  contractVersion: v.optional(v.string()),
+  kind: v.optional(v.string()),
+  threadId: v.optional(v.string()),
+  turnId: v.optional(v.string()),
+  turnOrdinal: v.optional(v.number()),
+  agentRevisionId: v.optional(v.string()),
   status: commandStatus,
   revision: v.number(),
   createdAt: v.number(),
@@ -149,6 +202,18 @@ export const jobValue = v.object({
   installationId: v.string(),
   jobId: v.string(),
   commandId: v.string(),
+  contractVersion: v.optional(v.string()),
+  kind: v.optional(v.string()),
+  requiredCapabilities: v.optional(v.array(v.string())),
+  preferredNodeId: v.optional(v.string()),
+  threadId: v.optional(v.string()),
+  turnId: v.optional(v.string()),
+  turnOrdinal: v.optional(v.number()),
+  agentRevisionId: v.optional(v.string()),
+  assistantMessageId: v.optional(v.string()),
+  leaseToken: v.optional(v.string()),
+  effectCheckpoint: v.optional(v.string()),
+  sessionCheckpoint: v.optional(v.string()),
   status: jobStatus,
   attempt: v.number(),
   maxAttempts: v.number(),
@@ -166,6 +231,11 @@ export const runValue = v.object({
   jobId: v.string(),
   attempt: v.number(),
   nodeId: v.string(),
+  threadId: v.optional(v.string()),
+  turnId: v.optional(v.string()),
+  turnOrdinal: v.optional(v.number()),
+  agentRevisionId: v.optional(v.string()),
+  assistantMessageId: v.optional(v.string()),
   status: runStatus,
   revision: v.number(),
   startedAt: v.number(),
@@ -286,10 +356,64 @@ export const noteValue = v.object({
   wordCount: v.number(),
   tags: v.array(v.string()),
   entityId: v.optional(v.string()),
+  currentVersionId: v.optional(v.string()),
+  contentHash: v.optional(v.string()),
   revision: v.number(),
   createdAt: v.number(),
   updatedAt: v.number(),
   deletedAt: v.optional(v.number()),
+})
+
+export const agentValue = v.object({
+  installationId: v.string(), agentId: v.string(), displayName: v.string(),
+  currentRevisionId: v.string(), revision: v.number(), createdAt: v.number(),
+  updatedAt: v.number(), deletedAt: v.optional(v.number()),
+})
+
+export const agentRevisionValue = v.object({
+  installationId: v.string(), agentRevisionId: v.string(), agentId: v.string(),
+  ordinal: v.number(), displayName: v.string(), systemPrompt: v.string(),
+  toolCapabilities: v.array(v.string()), createdAt: v.number(),
+})
+
+export const agentThreadValue = v.object({
+  installationId: v.string(), threadId: v.string(), agentId: v.string(),
+  agentRevisionId: v.string(), title: v.optional(v.string()),
+  nextTurnOrdinal: v.number(), activeTurnId: v.optional(v.string()),
+  preferredNodeId: v.optional(v.string()), piSessionRef: v.optional(v.string()),
+  sessionRevision: v.number(), createdAt: v.number(), updatedAt: v.number(),
+  deletedAt: v.optional(v.number()),
+})
+
+export const agentMessageValue = v.object({
+  installationId: v.string(), messageId: v.string(), threadId: v.string(),
+  turnId: v.string(), turnOrdinal: v.number(), role: agentMessageRole,
+  state: agentTurnState, content: v.string(), origin: v.string(),
+  agentRevisionId: v.string(), createdAt: v.number(), updatedAt: v.number(),
+  finalizedAt: v.optional(v.number()),
+})
+
+export const noteVersionValue = v.object({
+  installationId: v.string(), noteVersionId: v.string(), noteId: v.string(),
+  version: v.number(), contentJson: v.string(), contentHash: v.string(),
+  plainTextPreview: v.string(), wordCount: v.number(), authorOrigin: v.string(),
+  createdAt: v.number(),
+})
+
+export const artifactValue = v.object({
+  installationId: v.string(), artifactId: v.string(), noteId: v.string(),
+  noteVersionId: v.string(), slug: v.string(), projectionState,
+  projectedHash: v.optional(v.string()), projectedPath: v.optional(v.string()),
+  lastError: v.optional(v.string()), revision: v.number(), createdAt: v.number(),
+  updatedAt: v.number(), deletedAt: v.optional(v.number()),
+})
+
+export const memoryCorrectionValue = v.object({
+  installationId: v.string(), correctionId: v.string(), targetKind: v.string(),
+  targetId: v.string(), action: correctionAction, replacement: v.optional(v.string()),
+  reason: v.string(), actor: v.string(), origin: v.string(), expectedRevision: v.number(),
+  state: correctionState, appliedRevision: v.optional(v.number()),
+  conflict: v.optional(v.string()), createdAt: v.number(), updatedAt: v.number(),
 })
 
 export const sourceRefValue = v.object({

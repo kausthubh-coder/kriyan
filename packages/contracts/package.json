@@ -1,18 +1,14 @@
 {
-  "name": "@kriyan/client-core",
-  "version": "0.1.0",
+  "name": "@kriyan/contracts",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./testing": "./testing/index.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@kriyan/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

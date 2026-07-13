@@ -10,7 +10,6 @@ export function useVisibilityClock(heartbeatTimestamps: readonly number[]): numb
     let timer: ReturnType<typeof setTimeout> | undefined
     const schedule = (): void => {
       if (timer) clearTimeout(timer)
-      if (document.visibilityState === 'hidden') return
       const current = Date.now()
       setNow(current)
       timer = setTimeout(schedule, nextClockDelay(current, heartbeatTimestamps))

@@ -43,6 +43,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@kriyan/contracts": "workspace:*",
     "@earendil-works/pi-ai": "0.80.6",
     "@earendil-works/pi-coding-agent": "0.80.6",
     "btca": "^1.0.41",

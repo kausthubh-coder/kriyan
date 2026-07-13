@@ -1,4 +1,8 @@
 import { v } from 'convex/values'
+import {
+  deterministicAssistantMessageId,
+  REMINDER_CAPABILITY,
+} from '@kriyan/contracts'
 
 import type { Doc } from './_generated/dataModel'
 import { mutation, type MutationCtx } from './_generated/server'
@@ -25,7 +29,6 @@ import {
   transitionResult,
 } from './validators'
 
-const WORK_CAPABILITY = 'reminders'
 const CLAIM_SCAN_LIMIT = 64
 const OWNED_WORK_RELEASE_LIMIT = 32
 
@@ -145,7 +148,7 @@ async function getNode(
 function nodeFailure(
   node: Doc<'nodes'> | null,
   now: number,
-  capability: string,
+  capabilities: readonly string[],
 ): NodeFailure | null {
   if (node === null || node.status !== 'online') return 'inactive_node'
   if (
@@ -154,8 +157,14 @@ function nodeFailure(
   ) {
     return 'stale_heartbeat'
   }
-  if (!node.capabilities.includes(capability)) return 'missing_capability'
+  if (!capabilities.every((capability) => node.capabilities.includes(capability))) {
+    return 'missing_capability'
+  }
   return null
+}
+
+function requiredCapabilities(job: Doc<'jobs'>): readonly string[] {
+  return job.requiredCapabilities ?? [REMINDER_CAPABILITY]
 }
 
 async function closeActiveRun(
@@ -245,12 +254,13 @@ async function validateNode(
   installationId: string,
   nodeId: string,
   now: number,
+  capabilities: readonly string[] = [REMINDER_CAPABILITY],
 ): Promise<NodeFailure | null> {
   if ((await getInstallation(ctx, installationId)) === null) {
     return 'inactive_node'
   }
   const node = await getNode(ctx, installationId, nodeId)
-  const failure = nodeFailure(node, now, WORK_CAPABILITY)
+  const failure = nodeFailure(node, now, capabilities)
   if (failure === 'inactive_node' || failure === 'stale_heartbeat') {
     await releaseOwnedWork(ctx, installationId, nodeId, now, failure)
   }
@@ -287,8 +297,13 @@ function leaseFailure(
   job: Doc<'jobs'>,
   nodeId: string,
   now: number,
+  expectedLeaseToken?: string,
 ): 'not_lease_owner' | 'lease_expired' | null {
   if (job.leaseOwnerNodeId !== nodeId) return 'not_lease_owner'
+  if (
+    (expectedLeaseToken !== undefined && job.leaseToken !== expectedLeaseToken)
+    || (job.requiredCapabilities !== undefined && job.leaseToken !== expectedLeaseToken)
+  ) return 'not_lease_owner'
   if (job.leaseExpiresAt === undefined || job.leaseExpiresAt <= now) {
     return 'lease_expired'
   }
@@ -311,6 +326,37 @@ async function terminalizeExhaustedJob(
     updatedAt: now,
   })
   await updateCommandStatus(ctx, job, 'failed', now)
+}
+
+async function agentJobIsHeadOfLine(
+  ctx: MutationCtx,
+  job: Doc<'jobs'>,
+  nodeId: string,
+): Promise<boolean> {
+  if (job.threadId === undefined || job.turnId === undefined || job.turnOrdinal === undefined) return true
+  if (job.preferredNodeId !== undefined && job.preferredNodeId !== nodeId) {
+    const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
+    for (const message of messages) if (message.state === 'queued') await ctx.db.patch(message._id, { state: 'waiting_for_node', updatedAt: Date.now() })
+    return false
+  }
+  const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
+  if (thread === null || thread.deletedAt !== undefined) return false
+  if (thread.activeTurnId !== undefined && thread.activeTurnId !== job.turnId) return false
+  const turns = await ctx.db.query('jobs').withIndex('by_installation_thread_ordinal', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId)).collect()
+  const head = turns
+    .filter((candidate) => candidate.turnOrdinal !== undefined && !['succeeded', 'failed', 'cancelled'].includes(candidate.status))
+    .sort((left, right) => left.turnOrdinal! - right.turnOrdinal! || left.jobId.localeCompare(right.jobId))[0]
+  return head?._id === job._id
+}
+
+async function activateAgentTurn(ctx: MutationCtx, job: Doc<'jobs'>, now: number): Promise<void> {
+  if (job.threadId === undefined || job.turnId === undefined) return
+  const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
+  if (thread === null) throw new Error('agent job is missing its thread')
+  if (thread.activeTurnId !== undefined && thread.activeTurnId !== job.turnId) throw new Error('agent thread already has an active turn')
+  await ctx.db.patch(thread._id, { activeTurnId: job.turnId, updatedAt: now })
+  const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
+  for (const message of messages) if (message.state === 'queued' || message.state === 'waiting_for_node') await ctx.db.patch(message._id, { state: 'active', updatedAt: now })
 }
 
 export const registerNode = mutation({
@@ -488,6 +534,7 @@ export const claimJob = mutation({
       args.installationId,
       args.nodeId,
       now,
+      [],
     )
     if (failure !== null) throw new Error(`worker rejected: ${failure}`)
 
@@ -529,7 +576,7 @@ export const claimJob = mutation({
         job.leaseOwnerNodeId === undefined
           ? null
           : await getNode(ctx, args.installationId, job.leaseOwnerNodeId)
-      if (expired || nodeFailure(owner, now, WORK_CAPABILITY) !== null) {
+      if (expired || nodeFailure(owner, now, requiredCapabilities(job)) !== null) {
         reclaimable.push(job)
       }
     }
@@ -542,7 +589,12 @@ export const claimJob = mutation({
         ? left.jobId.localeCompare(right.jobId)
         : left.createdAt - right.createdAt,
     )
-    for (const job of candidates) {
+    const node = await getNode(ctx, args.installationId, args.nodeId)
+    if (node === null) throw new Error('worker rejected: inactive_node')
+    const compatible = candidates.filter((job) => nodeFailure(node, now, requiredCapabilities(job)) === null)
+    if (candidates.length > 0 && compatible.length === 0) throw new Error('worker rejected: missing_capability')
+    for (const job of compatible) {
+      if (!await agentJobIsHeadOfLine(ctx, job, args.nodeId)) continue
       const reclaimed = job.status !== 'queued'
       if (job.attempt >= job.maxAttempts) {
         await terminalizeExhaustedJob(ctx, job, now, 'attempts exhausted')
@@ -555,10 +607,12 @@ export const claimJob = mutation({
         attempt: job.attempt + 1,
         leaseOwnerNodeId: args.nodeId,
         leaseExpiresAt: now + args.leaseDurationMs,
+        leaseToken: `${job.jobId}:${job.revision + 1}:${now}:${args.nodeId}`,
         lastError: undefined,
         revision: job.revision + 1,
         updatedAt: now,
       }
+      await activateAgentTurn(ctx, job, now)
       await ctx.db.patch(job._id, claimed)
       return { job: claimed, reclaimed }
     }
@@ -572,6 +626,7 @@ export const renewLease = mutation({
     jobId: v.string(),
     nodeId: v.string(),
     expectedRevision: v.number(),
+    expectedLeaseToken: v.optional(v.string()),
     leaseDurationMs: v.number(),
   },
   returns: transitionResult,
@@ -586,23 +641,18 @@ export const renewLease = mutation({
       'leaseDurationMs',
       MAX_LEASE_DURATION_MS,
     )
-    const nodeFailure = await validateNode(
-      ctx,
-      args.installationId,
-      args.nodeId,
-      now,
-    )
-    if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const job = await getJob(ctx, args.installationId, args.jobId)
     if (job === null)
       return { ok: false as const, reason: 'not_found' as const }
+    const nodeFailure = await validateNode(ctx, args.installationId, args.nodeId, now, requiredCapabilities(job))
+    if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     if (job.revision !== args.expectedRevision) {
       return { ok: false as const, reason: 'stale_revision' as const }
     }
     if (job.status !== 'leased' && job.status !== 'running') {
       return { ok: false as const, reason: 'invalid_state' as const }
     }
-    const failure = leaseFailure(job, args.nodeId, now)
+    const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken)
     if (failure !== null) return { ok: false as const, reason: failure }
     await ctx.db.patch(job._id, {
       leaseExpiresAt: now + args.leaseDurationMs,
@@ -619,6 +669,7 @@ export const startRun = mutation({
     jobId: v.string(),
     nodeId: v.string(),
     expectedJobRevision: v.number(),
+    expectedLeaseToken: v.optional(v.string()),
   },
   returns: startRunResult,
   handler: async (ctx, args) => {
@@ -627,16 +678,11 @@ export const startRun = mutation({
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedJobRevision)
     const now = Date.now()
-    const nodeFailure = await validateNode(
-      ctx,
-      args.installationId,
-      args.nodeId,
-      now,
-    )
-    if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const job = await getJob(ctx, args.installationId, args.jobId)
     if (job === null)
       return { ok: false as const, reason: 'not_found' as const }
+    const nodeFailure = await validateNode(ctx, args.installationId, args.nodeId, now, requiredCapabilities(job))
+    if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const existingRun = await ctx.db
       .query('runs')
       .withIndex('by_installation_job_attempt', (q) =>
@@ -663,7 +709,7 @@ export const startRun = mutation({
     }
     if (job.status !== 'leased')
       return { ok: false as const, reason: 'invalid_state' as const }
-    const failure = leaseFailure(job, args.nodeId, now)
+    const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken)
     if (failure !== null) return { ok: false as const, reason: failure }
     const runId = `run:${job.jobId}:${job.attempt}`
     assertId(runId, 'derived runId')
@@ -679,6 +725,11 @@ export const startRun = mutation({
       jobId: job.jobId,
       attempt: job.attempt,
       nodeId: args.nodeId,
+      threadId: job.threadId,
+      turnId: job.turnId,
+      turnOrdinal: job.turnOrdinal,
+      agentRevisionId: job.agentRevisionId,
+      assistantMessageId: job.assistantMessageId,
       status: 'running' as const,
       revision: 0,
       startedAt: now,
@@ -697,6 +748,7 @@ export const appendRunEvents = mutation({
     nodeId: v.string(),
     expectedJobRevision: v.number(),
     expectedRunRevision: v.number(),
+    expectedLeaseToken: v.optional(v.string()),
     events: v.array(eventInput),
   },
   returns: eventBatchResult,
@@ -725,17 +777,12 @@ export const appendRunEvents = mutation({
         `event batch data must contain at most ${MAX_EVENT_BATCH_DATA} characters`,
       )
     }
-    const nodeFailure = await validateNode(
-      ctx,
-      args.installationId,
-      args.nodeId,
-      now,
-    )
-    if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const job = await getJob(ctx, args.installationId, args.jobId)
     const run = await getRun(ctx, args.installationId, args.runId)
     if (job === null || run === null)
       return { ok: false as const, reason: 'not_found' as const }
+    const nodeFailure = await validateNode(ctx, args.installationId, args.nodeId, now, requiredCapabilities(job))
+    if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     if (job.revision !== args.expectedJobRevision) {
       return { ok: false as const, reason: 'stale_revision' as const }
     }
@@ -748,7 +795,7 @@ export const appendRunEvents = mutation({
     }
     if (run.nodeId !== args.nodeId)
       return { ok: false as const, reason: 'not_lease_owner' as const }
-    const lease = leaseFailure(job, args.nodeId, now)
+    const lease = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken)
     if (lease !== null) return { ok: false as const, reason: lease }
 
     const duplicates: Doc<'runEvents'>[] = []
@@ -829,6 +876,8 @@ async function finishRun(
     nodeId: string
     expectedJobRevision: number
     expectedRunRevision: number
+    expectedLeaseToken?: string
+    assistantContent?: string
   },
   outcome:
     | { status: 'succeeded' }
@@ -847,23 +896,21 @@ async function finishRun(
     }
 > {
   const now = Date.now()
-  const activeFailure = await validateNode(
-    ctx,
-    args.installationId,
-    args.nodeId,
-    now,
-  )
-  if (activeFailure !== null)
-    return { ok: false as const, reason: activeFailure }
   const job = await getJob(ctx, args.installationId, args.jobId)
   const run = await getRun(ctx, args.installationId, args.runId)
   if (job === null || run === null)
     return { ok: false as const, reason: 'not_found' as const }
+  const activeFailure = await validateNode(ctx, args.installationId, args.nodeId, now, requiredCapabilities(job))
+  if (activeFailure !== null) return { ok: false as const, reason: activeFailure }
   if (
     outcome.status === 'succeeded' &&
     job.status === 'succeeded' &&
     run.status === 'succeeded'
   ) {
+    if (job.assistantMessageId !== undefined && args.assistantContent !== undefined) {
+      const assistant = await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) => q.eq('installationId', args.installationId).eq('messageId', job.assistantMessageId!)).unique()
+      if (assistant?.content !== args.assistantContent) throw new Error('assistant finalization conflicts with the completed turn')
+    }
     return { ok: true as const, revision: job.revision }
   }
   if (
@@ -881,9 +928,15 @@ async function finishRun(
   }
   if (run.nodeId !== args.nodeId)
     return { ok: false as const, reason: 'not_lease_owner' as const }
-  const lease = leaseFailure(job, args.nodeId, now)
+  const lease = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken)
   if (lease !== null) return { ok: false as const, reason: lease }
   if (outcome.status === 'succeeded') {
+    if (job.threadId !== undefined && args.assistantContent === undefined) return { ok: false as const, reason: 'invalid_state' as const }
+    if (job.threadId !== undefined && job.turnId !== undefined && job.turnOrdinal !== undefined && job.agentRevisionId !== undefined) {
+      const messageId = job.assistantMessageId ?? deterministicAssistantMessageId(job.threadId, job.turnOrdinal)
+      const existing = await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) => q.eq('installationId', job.installationId).eq('messageId', messageId)).unique()
+      if (existing === null) await ctx.db.insert('agentMessages', { installationId: job.installationId, messageId, threadId: job.threadId, turnId: job.turnId, turnOrdinal: job.turnOrdinal, role: 'assistant', state: 'completed', content: args.assistantContent!, origin: 'node', agentRevisionId: job.agentRevisionId, createdAt: now, updatedAt: now, finalizedAt: now })
+    }
     await ctx.db.patch(run._id, {
       status: 'succeeded',
       revision: run.revision + 1,
@@ -920,6 +973,12 @@ async function finishRun(
       now,
     )
   }
+  if (job.threadId !== undefined && job.turnId !== undefined && (outcome.status === 'succeeded' || !outcome.retryable || job.attempt >= job.maxAttempts)) {
+    const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
+    if (thread?.activeTurnId === job.turnId) await ctx.db.patch(thread._id, { activeTurnId: undefined, updatedAt: now })
+    const users = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
+    for (const message of users) await ctx.db.patch(message._id, { state: outcome.status === 'succeeded' ? 'completed' : 'failed', updatedAt: now, finalizedAt: now })
+  }
   return { ok: true as const, revision: job.revision + 1 }
 }
 
@@ -931,6 +990,8 @@ export const completeRun = mutation({
     nodeId: v.string(),
     expectedJobRevision: v.number(),
     expectedRunRevision: v.number(),
+    expectedLeaseToken: v.optional(v.string()),
+    assistantContent: v.optional(v.string()),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
@@ -940,9 +1001,12 @@ export const completeRun = mutation({
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedJobRevision)
     assertExpectedRevision(args.expectedRunRevision)
+    if (args.assistantContent !== undefined) assertEventData(args.assistantContent)
     return await finishRun(ctx, args, { status: 'succeeded' })
   },
 })
+
+export const finalizeAssistantRun = completeRun
 
 export const failRun = mutation({
   args: {
@@ -954,6 +1018,7 @@ export const failRun = mutation({
     retryable: v.boolean(),
     expectedJobRevision: v.number(),
     expectedRunRevision: v.number(),
+    expectedLeaseToken: v.optional(v.string()),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
@@ -969,5 +1034,39 @@ export const failRun = mutation({
       error: args.error,
       retryable: args.retryable,
     })
+  },
+})
+
+export const checkpointEffect = mutation({
+  args: { installationId: v.string(), jobId: v.string(), nodeId: v.string(), expectedJobRevision: v.number(), expectedLeaseToken: v.optional(v.string()), checkpoint: v.string() },
+  returns: transitionResult,
+  handler: async (ctx, args) => {
+    assertEventData(args.checkpoint)
+    const now = Date.now(); const job = await getJob(ctx, args.installationId, args.jobId)
+    if (job === null) return { ok: false as const, reason: 'not_found' as const }
+    if (job.revision !== args.expectedJobRevision) return { ok: false as const, reason: 'stale_revision' as const }
+    if (job.status !== 'running') return { ok: false as const, reason: 'invalid_state' as const }
+    const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken); if (failure !== null) return { ok: false as const, reason: failure }
+    await ctx.db.patch(job._id, { effectCheckpoint: args.checkpoint, revision: job.revision + 1, updatedAt: now })
+    return { ok: true as const, revision: job.revision + 1 }
+  },
+})
+
+export const checkpointSession = mutation({
+  args: { installationId: v.string(), jobId: v.string(), nodeId: v.string(), expectedJobRevision: v.number(), expectedLeaseToken: v.optional(v.string()), piSessionRef: v.string() },
+  returns: transitionResult,
+  handler: async (ctx, args) => {
+    assertShortText(args.piSessionRef, 'piSessionRef')
+    if (/[\\/\s]/.test(args.piSessionRef)) throw new Error('piSessionRef must be an opaque identifier, not a path or session content')
+    const now = Date.now(); const job = await getJob(ctx, args.installationId, args.jobId)
+    if (job === null) return { ok: false as const, reason: 'not_found' as const }
+    if (job.revision !== args.expectedJobRevision) return { ok: false as const, reason: 'stale_revision' as const }
+    const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken); if (failure !== null) return { ok: false as const, reason: failure }
+    if (job.threadId === undefined) return { ok: false as const, reason: 'invalid_state' as const }
+    const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', job.threadId!)).unique()
+    if (thread === null) return { ok: false as const, reason: 'not_found' as const }
+    await ctx.db.patch(thread._id, { piSessionRef: args.piSessionRef, preferredNodeId: args.nodeId, sessionRevision: thread.sessionRevision + 1, updatedAt: now })
+    await ctx.db.patch(job._id, { sessionCheckpoint: args.piSessionRef, revision: job.revision + 1, updatedAt: now })
+    return { ok: true as const, revision: job.revision + 1 }
   },
 })
