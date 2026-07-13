@@ -1,47 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-output=${1:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY}
-node_binary=${2:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY}
-cli_binary=${3:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY}
-root=$(cd "$(dirname "$0")/../.." && pwd)
+output=${1:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY SHA PROVENANCE_MANIFEST}
+node_binary=${2:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY SHA PROVENANCE_MANIFEST}
+cli_binary=${3:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY SHA PROVENANCE_MANIFEST}
+sha=${4:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY SHA PROVENANCE_MANIFEST}
+provenance=${5:?usage: build-release.sh OUTPUT.tar.gz NODE_BINARY CLI_BINARY SHA PROVENANCE_MANIFEST}
+root=$(git rev-parse --show-toplevel)
+commit=$(git rev-parse --verify "${sha}^{commit}")
 temporary="${output}.partial.$$"
-binary_staging="${temporary}.bin"
-trap 'rm -f "${temporary}"; rm -rf "${binary_staging}"' EXIT
+staging=$(mktemp -d "${TMPDIR:-/tmp}/kriyan-release-stage.XXXXXX")
+trap 'rm -f "${temporary}"; rm -rf "${staging}"' EXIT
 
-[[ -x ${node_binary} && -x ${cli_binary} ]] || {
-  echo "standalone binaries are missing or not executable" >&2
+[[ -x ${node_binary} && -x ${cli_binary} && -f ${provenance} ]] || {
+  echo "standalone binaries or provenance manifest are missing" >&2
   exit 2
 }
-install -d -m 0755 "${binary_staging}/bin"
-install -m 0755 "${node_binary}" "${binary_staging}/bin/kriyan-node"
-install -m 0755 "${cli_binary}" "${binary_staging}/bin/kriyan"
+git archive "${commit}" | tar -x -C "${staging}"
+install -d -m 0755 "${staging}/bin" "${staging}/provenance"
+install -m 0755 "${node_binary}" "${staging}/bin/kriyan-node"
+install -m 0755 "${cli_binary}" "${staging}/bin/kriyan"
+install -m 0644 "${provenance}" "${staging}/provenance/build.manifest"
+printf 'source_commit=%s\nsource_tree=%s\n' \
+  "${commit}" "$(git rev-parse "${commit}^{tree}")" >"${staging}/provenance/source.manifest"
 
-cd "${root}"
-tar \
-  --exclude=.git \
-  --exclude=node_modules \
-  --exclude='**/node_modules' \
-  --exclude='.env' \
-  --exclude='.env.*' \
-  --exclude='*.log' \
-  --exclude='.artifacts' \
-  --exclude='.sandbox' \
-  -czf "${temporary}" \
-  AGENTS.md package.json bun.lock tsconfig.json tsconfig.node.json \
-  apps packages packaging convex/_generated \
-  -C "${binary_staging}" bin/kriyan-node bin/kriyan
-tar -tzf "${temporary}" >/dev/null
-if tar -tzf "${temporary}" | grep -E '(^|/)(\.env($|\.)|node_modules|transcript\.jsonl|checkpoint\.json)' >/dev/null; then
-  echo "release contains a forbidden private path" >&2
-  exit 1
-fi
+COPYFILE_DISABLE=1 tar -czf "${temporary}" -C "${staging}" .
+"${root}/packaging/scripts/verify-release-archive.sh" "${temporary}"
 mv "${temporary}" "${output}"
-rm -rf "${binary_staging}"
-trap - EXIT
-if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "${output}" >"${output}.sha256"
-else
-  shasum -a 256 "${output}" >"${output}.sha256"
-fi
-echo "release verified: ${output}"
+shasum -a 256 "${output}" >"${output}.sha256"
+echo "release verified from exact commit ${commit}: ${output}"

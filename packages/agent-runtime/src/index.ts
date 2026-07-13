@@ -233,7 +233,10 @@ async function validatePiSession(path: string): Promise<void> {
   }
 }
 
-export function createFauxPiFactory(response: ReminderProduct): FauxPiFactory {
+export function createFauxPiFactory(
+  response: ReminderProduct,
+  options: { persistent?: boolean } = {},
+): FauxPiFactory {
   const provider = fauxProvider()
   provider.setResponses([
     fauxAssistantMessage(
@@ -264,13 +267,17 @@ export function createFauxPiFactory(response: ReminderProduct): FauxPiFactory {
   return {
     provider,
     factory: {
-      async create(workspace) {
+      async create(workspace, resumeSessionFile) {
         const { session } = await createAgentSession({
           cwd: workspace,
           model,
           authStorage,
           modelRegistry,
-          sessionManager: SessionManager.inMemory(),
+          sessionManager: options.persistent
+            ? resumeSessionFile === undefined
+              ? SessionManager.create(workspace)
+              : SessionManager.open(resumeSessionFile, undefined, workspace)
+            : SessionManager.inMemory(),
           tools: [],
         })
         return session

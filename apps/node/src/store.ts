@@ -1,15 +1,25 @@
 import { appendFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 
+import { type PreparedEffect, validatePreparedEffect } from '@kriyan/tools'
+
+export interface ShutdownBoundary {
+  requestedAt: number
+  phase: 'requested' | 'released'
+  reason: 'service_shutdown'
+}
+
 export interface RunCheckpoint {
-  version: 2
+  version: 3
   jobId: string
   runId: string
   commandId: string
   attempt: number
   nextSequence: number
-  preparedEffects: Record<string, { kind: 'reminder'; committed: boolean }>
+  preparedEffects: Record<string, PreparedEffect>
   completed: boolean
+  shutdown?: ShutdownBoundary
   piSessionFile?: string
 }
 
@@ -23,7 +33,7 @@ function isCheckpoint(value: unknown, runId: string): value is RunCheckpoint {
   if (typeof value !== 'object' || value === null) return false
   const checkpoint = value as Partial<RunCheckpoint>
   return (
-    checkpoint.version === 2 &&
+    checkpoint.version === 3 &&
     checkpoint.runId === runId &&
     typeof checkpoint.jobId === 'string' &&
     typeof checkpoint.commandId === 'string' &&
@@ -31,14 +41,21 @@ function isCheckpoint(value: unknown, runId: string): value is RunCheckpoint {
     Number.isSafeInteger(checkpoint.nextSequence) &&
     typeof checkpoint.preparedEffects === 'object' &&
     checkpoint.preparedEffects !== null &&
-    typeof checkpoint.completed === 'boolean'
+    Object.values(checkpoint.preparedEffects).every(validatePreparedEffect) &&
+    typeof checkpoint.completed === 'boolean' &&
+    (checkpoint.shutdown === undefined ||
+      (Number.isSafeInteger(checkpoint.shutdown.requestedAt) &&
+        ['requested', 'released'].includes(checkpoint.shutdown.phase) &&
+        checkpoint.shutdown.reason === 'service_shutdown'))
   )
 }
 
 export class LocalRunStore {
+  private readonly saves = new Map<string, Promise<void>>()
+
   constructor(private readonly dataDir: string) {}
 
-  private runDir(runId: string): string {
+  runDir(runId: string): string {
     return join(this.dataDir, 'runs', encodeURIComponent(runId))
   }
 
@@ -46,7 +63,7 @@ export class LocalRunStore {
     return join(this.runDir(runId), 'workspace')
   }
 
-  private checkpointPath(runId: string): string {
+  checkpointPath(runId: string): string {
     return join(this.runDir(runId), 'checkpoint.json')
   }
 
@@ -92,11 +109,20 @@ export class LocalRunStore {
   }
 
   async save(checkpoint: RunCheckpoint): Promise<void> {
-    await this.prepare(checkpoint.runId)
-    const path = this.checkpointPath(checkpoint.runId)
-    const temporary = `${path}.${process.pid}.tmp`
-    await writeFile(temporary, `${JSON.stringify(checkpoint)}\n`, { mode: 0o600 })
-    await rename(temporary, path)
+    const previous = this.saves.get(checkpoint.runId) ?? Promise.resolve()
+    const current = previous.catch(() => undefined).then(async () => {
+      await this.prepare(checkpoint.runId)
+      const path = this.checkpointPath(checkpoint.runId)
+      const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
+      await writeFile(temporary, `${JSON.stringify(checkpoint)}\n`, { mode: 0o600 })
+      await rename(temporary, path)
+    })
+    this.saves.set(checkpoint.runId, current)
+    try {
+      await current
+    } finally {
+      if (this.saves.get(checkpoint.runId) === current) this.saves.delete(checkpoint.runId)
+    }
   }
 
   async appendLocalEvent(runId: string, event: unknown): Promise<void> {
@@ -107,11 +133,7 @@ export class LocalRunStore {
     if (currentSize + Buffer.byteLength(line) > MAX_TRANSCRIPT_BYTES) {
       throw new Error('local transcript limit exceeded')
     }
-    await appendFile(
-      path,
-      line,
-      { mode: 0o600 },
-    )
+    await appendFile(path, line, { mode: 0o600 })
   }
 
   async cleanupWorkspace(runId: string): Promise<void> {

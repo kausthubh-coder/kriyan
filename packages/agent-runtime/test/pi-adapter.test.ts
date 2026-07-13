@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -69,6 +69,42 @@ test('truncated Pi session fails closed instead of silently starting over', asyn
       code: 'PI_SESSION_CORRUPT',
     })
   } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test('official Pi AgentSession reopens a real persisted JSONL session', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'kriyan-pi-persisted-'))
+  const expected = {
+    kind: 'reminder' as const,
+    message: 'persisted output',
+    remindAt: 456,
+    timezone: 'UTC',
+  }
+  const faux = createFauxPiFactory(expected, { persistent: true })
+  try {
+    const runtime = new PiAgentRuntime(faux.factory)
+    const first = await runtime.createSession('run:first', workspace)
+    const firstResult = await first.run(
+      {
+        runId: 'run:first',
+        input: 'first prompt',
+        workspace,
+        signal: new AbortController().signal,
+      },
+      async () => undefined,
+    )
+    const sessionFile = first.sessionFile
+    await first.dispose()
+    expect(firstResult.products).toEqual([expected])
+    expect(sessionFile).toBeString()
+    expect((await readFile(sessionFile!, 'utf8')).endsWith('\n')).toBe(true)
+
+    const reopened = await runtime.createSession('run:second', workspace, sessionFile)
+    expect(reopened.sessionFile).toBe(sessionFile)
+    await reopened.dispose()
+  } finally {
+    faux.dispose()
     await rm(workspace, { recursive: true, force: true })
   }
 })

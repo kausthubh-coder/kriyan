@@ -19,13 +19,20 @@ test('systemd service is unprivileged, hardened, and drains on SIGTERM', async (
 test('install and update paths are interruption-safe and rollback-capable', async () => {
   const install = await readFile('packaging/scripts/install.sh', 'utf8')
   const update = await readFile('packaging/scripts/update.sh', 'utf8')
+  const health = await readFile('packaging/scripts/wait-for-health.sh', 'utf8')
   expect(install).toContain('.partial.$$')
   expect(install).toContain("trap 'rm -rf")
   expect(install).toContain('immutable releases are never replaced')
   expect(install).toContain('verify-release-archive.sh')
   expect(install).not.toContain('rm -rf "${release_dir}"')
   expect(update).toContain('previous=$(readlink -f')
-  expect(update).toContain('--health-config')
+  expect(update).toContain('wait-for-health.sh')
+  expect(update).toContain('--process-health-config')
+  expect(health).toContain('--health-config')
+  expect(health).toContain('--expected-release')
+  expect(health).toContain('--not-instance')
+  expect(health).toContain('--heartbeat-after')
+  expect(health).toContain('--stability-ms')
   expect(update).toContain('previous release restored')
 })
 
@@ -130,4 +137,31 @@ test('root metadata check generates and passes the required function-spec argume
   expect(packageJson.scripts['check:convex-metadata']).toBe('bash scripts/check-convex-metadata.sh')
   expect(script).toContain('convex function-spec >"${spec}"')
   expect(script).toContain('assert-convex-function-spec.ts "${spec}"')
+})
+
+test('restore applies install-grade archive checks before extraction', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'qualified-sandpiper-726-restore-'))
+  try {
+    const source = join(directory, 'source')
+    const target = join(directory, 'target')
+    await mkdir(join(source, 'var', 'lib', 'kriyan'), { recursive: true })
+    await writeFile(join(source, 'var', 'lib', 'kriyan', 'checkpoint'), 'safe', 'utf8')
+    const valid = join(directory, 'backup.tar.gz')
+    Bun.spawnSync(['tar', '-czf', valid, '-C', source, 'var'])
+    expect(Bun.spawnSync([
+      'bash', 'packaging/scripts/restore.sh', valid, target,
+    ]).exitCode).toBe(0)
+    expect(await readFile(join(target, 'var', 'lib', 'kriyan', 'checkpoint'), 'utf8')).toBe('safe')
+
+    const unsafeSource = join(directory, 'unsafe')
+    await mkdir(unsafeSource)
+    await symlink('/etc/passwd', join(unsafeSource, 'credential-link'))
+    const unsafe = join(directory, 'unsafe.tar.gz')
+    Bun.spawnSync(['tar', '-czf', unsafe, '-C', unsafeSource, 'credential-link'])
+    expect(Bun.spawnSync([
+      'bash', 'packaging/scripts/restore.sh', unsafe, join(directory, 'unsafe-target'),
+    ]).exitCode).not.toBe(0)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

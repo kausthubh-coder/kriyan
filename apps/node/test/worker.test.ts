@@ -133,8 +133,10 @@ describe('Kriyan worker', () => {
     const active = worker.runOnce()
     await Bun.sleep(10)
     await worker.drain()
-    await expect(active).rejects.toThrow('cancelled')
+    await expect(active).rejects.toThrow('service shutdown')
     expect(plane.reminderRecords.size).toBe(0)
+    expect(plane.jobs.get('job:command:test')?.status).toBe('queued')
+    expect(plane.publicErrors).toContain('NODE_SHUTDOWN')
   })
 
   test('normal events and logs exclude raw command and secret-shaped input', async () => {

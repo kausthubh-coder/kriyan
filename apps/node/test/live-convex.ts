@@ -9,7 +9,7 @@ import { KriyanWorker } from '../src/worker'
 const convexUrl = Bun.env.CONVEX_URL
 if (convexUrl === undefined) throw new Error('CONVEX_URL is required')
 
-const fixture = `node-r2-${crypto.randomUUID()}`
+const fixture = `qualified-sandpiper-726-node-r3-${crypto.randomUUID()}`
 const installationId = `installation:${fixture}`
 let commandId = `command:${fixture}`
 const nodeId = `node:${fixture}`
@@ -56,7 +56,7 @@ try {
       [
         'setup', '--convex-url', convexUrl,
         '--installation-id', installationId, '--node-id', nodeId,
-        '--display-name', 'Round 2 live fixture', '--data-dir', dataDir,
+        '--display-name', 'Round 3 live fixture', '--data-dir', dataDir,
         '--config', configPath,
       ],
       { io },

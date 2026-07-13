@@ -34,6 +34,9 @@ tar -xzf "${archive}" -C "${staging_dir}"
 mv "${staging_dir}" "${release_dir}"
 trap - EXIT
 switch_current_release "${release_dir}"
+printf 'KRIYAN_RELEASE_VERSION=%s\n' "${version}" >/etc/kriyan/release.env
+chown root:kriyan /etc/kriyan/release.env
+chmod 0640 /etc/kriyan/release.env
 install -m 0644 "${release_dir}/packaging/systemd/kriyan-node.service" /etc/systemd/system/kriyan-node.service
 systemctl daemon-reload
 echo "installed ${version}; add /etc/kriyan/node.json before enabling the service"

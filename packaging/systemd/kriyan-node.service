@@ -8,6 +8,7 @@ Type=simple
 User=kriyan
 Group=kriyan
 WorkingDirectory=/var/lib/kriyan
+EnvironmentFile=/etc/kriyan/release.env
 ExecStart=/opt/kriyan/current/bin/kriyan-node --config /etc/kriyan/node.json
 Restart=on-failure
 RestartSec=5s
