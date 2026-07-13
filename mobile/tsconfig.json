@@ -4,7 +4,8 @@
     "strict": true,
     "paths": {
       "@/*": ["./*"],
-      "@convex/*": ["../convex/*"]
+      "@convex/*": ["../convex/*"],
+      "@kriyan/client-core": ["../packages/client-core/src/index.ts"]
     }
   },
   "include": [
@@ -12,6 +13,7 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "../convex/**/*.ts"
+    "../convex/_generated/**/*.ts",
+    "../packages/client-core/src/**/*.ts"
   ]
 }

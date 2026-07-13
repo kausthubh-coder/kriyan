@@ -1,179 +1,75 @@
-import { useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import { useRouter } from 'expo-router';
-import { useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import type { ReminderDeliveryPolicy } from '@kriyan/client-core'
+import { useRouter } from 'expo-router'
+import * as Notifications from 'expo-notifications'
+import { useEffect } from 'react'
+import { Platform } from 'react-native'
 
-// Configure notification handler
+import { channelForPolicy, NotificationIntentRegistry } from '@/lib/notification-intents'
+import { notificationIntentKey } from '@/lib/ids'
+
+const registry = new NotificationIntentRegistry()
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
+    shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true,
   }),
-});
+})
 
-export function useNotifications() {
-  const [expoPushToken, setExpoPushToken] = useState<string | undefined>(undefined);
-  const [notification, setNotification] = useState<Notifications.Notification | undefined>(undefined);
-  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
-  const responseListener = useRef<Notifications.EventSubscription | null>(null);
-  const router = useRouter();
-  
-  const updateSettings = useMutation(api.settings.update);
+export async function configureNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return
+  await Promise.all([
+    Notifications.setNotificationChannelAsync('reminders', { name: 'Reminders', importance: Notifications.AndroidImportance.DEFAULT }),
+    Notifications.setNotificationChannelAsync('persistent-reminders', { name: 'Persistent reminders', importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 250, 200, 250] }),
+    Notifications.setNotificationChannelAsync('critical-reminders', { name: 'Critical reminders', importance: Notifications.AndroidImportance.MAX, vibrationPattern: [0, 500, 250, 500] }),
+  ])
+}
 
+export async function ensureNotificationPermission(): Promise<boolean> {
+  await configureNotificationChannels()
+  const current = await Notifications.getPermissionsAsync()
+  if (current.granted) return true
+  const requested = await Notifications.requestPermissionsAsync()
+  return requested.granted
+}
+
+export async function scheduleReminderNotification(input: {
+  reminderId: string
+  message: string
+  scheduledFor: number
+  deliveryPolicy: ReminderDeliveryPolicy
+}): Promise<{ ok: true; intentKey: string; nativeId: string; reused: boolean } | { ok: false; message: string }> {
+  const intentKey = notificationIntentKey(input.reminderId, input.scheduledFor)
+  const existing = registry.get(intentKey)
+  if (existing) return { ok: true, intentKey, nativeId: existing.nativeId, reused: true }
+  if (!await ensureNotificationPermission()) return { ok: false, message: 'Notification permission was not granted.' }
+  const nativeId = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: input.deliveryPolicy === 'normal' ? 'Kriyan reminder' : `${input.deliveryPolicy === 'critical' ? 'Critical' : 'Persistent'} reminder`,
+      body: input.message,
+      data: { reminderId: input.reminderId, intentKey, deliveryPolicy: input.deliveryPolicy },
+      sound: true,
+      priority: input.deliveryPolicy === 'normal' ? Notifications.AndroidNotificationPriority.DEFAULT : Notifications.AndroidNotificationPriority.HIGH,
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(Math.max(Date.now() + 1_000, input.scheduledFor)), channelId: channelForPolicy(input.deliveryPolicy) },
+  })
+  registry.remember({ intentKey, nativeId, scheduledFor: input.scheduledFor, deliveryPolicy: input.deliveryPolicy })
+  return { ok: true, intentKey, nativeId, reused: false }
+}
+
+export async function cancelReminderNotifications(reminderId: string): Promise<void> {
+  await Promise.all(registry.findByReminder(reminderId).map(async (record) => {
+    registry.remove(record.intentKey)
+    await Notifications.cancelScheduledNotificationAsync(record.nativeId)
+  }))
+}
+
+export function useNotificationResponseObserver(): void {
+  const router = useRouter()
   useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        setExpoPushToken(token);
-        // Save token to settings
-        updateSettings({ expoPushToken: token }).catch(console.error);
-      }
-    });
-
-    // Listen for incoming notifications while app is foregrounded
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      setNotification(notification);
-    });
-
-    // Listen for notification responses (taps)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      handleNotificationTap(data);
-    });
-
-    return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
-      }
-    };
-  }, []);
-
-  const handleNotificationTap = (data: Record<string, unknown>) => {
-    // Deep link to the relevant screen
-    if (data.reminderId) {
-      router.push({
-        pathname: '/(tabs)/reminders',
-        params: { highlightId: data.reminderId as string },
-      });
-    } else if (data.taskId) {
-      router.push({
-        pathname: '/modal',
-        params: { taskId: data.taskId as string, mode: 'edit' },
-      });
-    }
-  };
-
-  return { expoPushToken, notification };
-}
-
-async function registerForPushNotificationsAsync(): Promise<string | undefined> {
-  let token: string | undefined;
-
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#8b5cf6',
-    });
-
-    await Notifications.setNotificationChannelAsync('alarms', {
-      name: 'Alarms',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 500, 500, 500],
-      lightColor: '#f59e0b',
-      sound: 'default',
-    });
-  }
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
-      return undefined;
-    }
-
-    try {
-      const pushTokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
-      });
-      token = pushTokenData.data;
-    } catch (error) {
-      console.log('Error getting push token:', error);
-    }
-  } else {
-    console.log('Must use physical device for Push Notifications');
-  }
-
-  return token;
-}
-
-export async function scheduleLocalNotification(params: {
-  title: string;
-  body: string;
-  triggerAt: Date;
-  data?: Record<string, unknown>;
-  isAlarm?: boolean;
-}): Promise<string | null> {
-  try {
-    const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') {
-      const { status: newStatus } = await Notifications.requestPermissionsAsync();
-      if (newStatus !== 'granted') {
-        console.log('Notification permission not granted');
-        return null;
-      }
-    }
-
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: params.title,
-        body: params.body,
-        data: params.data || {},
-        sound: true,
-        priority: params.isAlarm ? 'high' : 'default',
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: params.triggerAt,
-        channelId: params.isAlarm ? 'alarms' : 'default',
-      },
-    });
-
-    return notificationId;
-  } catch (error) {
-    console.error('Failed to schedule notification:', error);
-    return null;
-  }
-}
-
-export async function cancelScheduledNotification(notificationId: string): Promise<void> {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
-  } catch (error) {
-    console.error('Failed to cancel notification:', error);
-  }
-}
-
-export async function getAllScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
-  return await Notifications.getAllScheduledNotificationsAsync();
-}
-
-export async function cancelAllScheduledNotifications(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+    void configureNotificationChannels()
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (typeof response.notification.request.content.data.reminderId === 'string') router.push('/reminders')
+    })
+    return () => subscription.remove()
+  }, [router])
 }

@@ -18,6 +18,7 @@ config.resolver.nodeModulesPaths = [
 // Ensure convex folder is resolved correctly
 config.resolver.extraNodeModules = {
   '@convex': path.resolve(workspaceRoot, 'convex'),
+  '@kriyan/client-core': path.resolve(workspaceRoot, 'packages/client-core/src'),
 };
 
 module.exports = config;

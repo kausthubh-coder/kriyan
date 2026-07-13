@@ -1,85 +1,34 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
+import { Stack } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
+import 'react-native-reanimated'
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ConvexClientProvider } from '@/lib/convex';
-import { useNotifications } from '@/lib/notifications';
-import { DesignColors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme'
+import { useNotificationResponseObserver } from '@/lib/notifications'
+import { ProductStoreProvider } from '@/lib/product-store'
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+export const unstable_settings = { anchor: '(tabs)' }
 
 function NotificationHandler() {
-  // Initialize notification listeners
-  useNotifications();
-  return null;
+  useNotificationResponseObserver()
+  return null
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  // Customize the dark theme with our design colors
-  const customDarkTheme = {
-    ...DarkTheme,
-    colors: {
-      ...DarkTheme.colors,
-      primary: DesignColors.primary,
-      background: DesignColors.background,
-      card: DesignColors.surface,
-      text: DesignColors.textPrimary,
-      border: DesignColors.glassBorder,
-    },
-  };
-
+  const isDark = useColorScheme() === 'dark'
   return (
-    <ConvexClientProvider>
+    <ProductStoreProvider>
       <NotificationHandler />
-      <ThemeProvider value={isDark ? customDarkTheme : DefaultTheme}>
-        <Stack>
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="note-modal"
-            options={{
-              presentation: 'modal',
-              title: 'Note',
-              headerStyle: {
-                backgroundColor: isDark ? DesignColors.surface : '#fff',
-              },
-              headerTintColor: isDark ? DesignColors.textPrimary : '#11181C',
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="voice-modal"
-            options={{
-              presentation: 'modal',
-              title: 'Voice',
-              headerStyle: {
-                backgroundColor: isDark ? DesignColors.surface : '#fff',
-              },
-              headerTintColor: isDark ? DesignColors.textPrimary : '#11181C',
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="note-modal"
-            options={{
-              presentation: 'modal',
-              title: 'Note',
-              headerStyle: {
-                backgroundColor: isDark ? DesignColors.surface : '#fff',
-              },
-              headerTintColor: isDark ? DesignColors.textPrimary : '#11181C',
-              headerShown: false,
-            }}
-          />
+          <Stack.Screen name="reminders" options={{ title: 'Reminders' }} />
+          <Stack.Screen name="notes" options={{ title: 'Notes' }} />
+          <Stack.Screen name="knowledge" options={{ title: 'Knowledge' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         </Stack>
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </ThemeProvider>
-    </ConvexClientProvider>
-  );
+    </ProductStoreProvider>
+  )
 }
