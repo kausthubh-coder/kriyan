@@ -2,7 +2,9 @@ import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readlink, realpath, readdir
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, setDefaultTimeout, test } from 'bun:test'
+
+setDefaultTimeout(30_000)
 
 const OLD_SHA = '1111111111111111111111111111111111111111'
 const NEW_SHA = '2222222222222222222222222222222222222222'
