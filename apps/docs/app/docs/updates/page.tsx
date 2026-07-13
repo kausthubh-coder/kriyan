@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import type { JSX } from 'react'
 
 export const metadata: Metadata = {
@@ -56,7 +57,8 @@ export default function UpdatesPage(): JSX.Element {
         <ol className="event-sequence">
           <li><strong>Verify systemd.</strong> The unit is enabled and active.</li>
           <li><strong>Verify identity.</strong> The new process reports the expected release.</li>
-          <li><strong>Run doctor.</strong> Config, Convex, node health, and data directory checks pass.</li>
+          <li><strong>Run doctor.</strong> Loaded config, Convex reachability, and the configured node’s derived health pass; record the reported data directory path.</li>
+          <li><strong>Inspect storage separately.</strong> Run the <Link href="/docs/install#filesystem-checks">Ubuntu data-directory checks</Link> for existence, ownership, mode, service-user access, writability, and capacity.</li>
           <li><strong>Submit a namespaced command.</strong> Observe one complete app-to-node-to-app round trip.</li>
           <li><strong>Reboot when validating a release.</strong> Repeat identity and command proof after host restart.</li>
         </ol>

@@ -10,8 +10,9 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check:css": "bun scripts/check-css-regressions.ts",
+    "check:origin": "bun scripts/check-site-origin.ts",
     "check:routes": "bun scripts/check-routes.ts",
-    "verify": "bun run check:css && bun run lint && bun run typecheck && bun run build && bun run check:routes"
+    "verify": "bun run check:css && bun run check:origin && bun run lint && bun run typecheck && bun run build && bun run check:routes"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "5.2.9",

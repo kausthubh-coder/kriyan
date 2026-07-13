@@ -40,6 +40,21 @@ sudo KRIYAN_VERSION=<version> \\
 sudo systemctl enable --now kriyan-node
 sudo systemctl status kriyan-node --no-pager`
 
+const dataDirectoryChecks = `# Use the dataDir reported by doctor. The packaged default is shown here.
+DATA_DIR=/var/lib/kriyan
+
+# Existence, expected owner/group/mode, and effective service-user access.
+sudo test -d "$DATA_DIR"
+sudo test "$(stat -c '%U:%G:%a' "$DATA_DIR")" = 'kriyan:kriyan:700'
+sudo -u kriyan test -r "$DATA_DIR"
+sudo -u kriyan test -w "$DATA_DIR"
+sudo -u kriyan test -x "$DATA_DIR"
+
+# Prove a real create/remove cycle, then inspect byte and inode capacity.
+sudo -u kriyan sh -c 'probe="$1/.kriyan-write-check.$$"; : > "$probe" && rm -f "$probe"' sh "$DATA_DIR"
+df -h -- "$DATA_DIR"
+df -i -- "$DATA_DIR"`
+
 export default function InstallPage(): JSX.Element {
   return (
     <article className="prose docs-article">
@@ -111,13 +126,33 @@ export default function InstallPage(): JSX.Element {
           <div><dt><code>pair</code></dt><dd>Creates the configured installation record; it is not a finished QR enrollment flow.</dd></div>
           <div><dt><code>node run</code></dt><dd>Starts the worker against the configured coordination plane.</dd></div>
           <div><dt><code>status</code></dt><dd>Lists observed nodes and derived health.</dd></div>
-          <div><dt><code>doctor</code></dt><dd>Checks config, Convex reachability, node health, and the configured data directory.</dd></div>
+          <div><dt><code>doctor</code></dt><dd>Checks loaded config, Convex reachability, and the configured node’s derived health. It reports the configured data directory path but does not inspect that directory.</dd></div>
           <div><dt><code>submit</code></dt><dd>Queues text with an optional idempotency key.</dd></div>
           <div><dt><code>source register</code></dt><dd>Registers a Git, GitHub, Drive, local, or web source in the vault.</dd></div>
           <div><dt><code>ingest</code></dt><dd>Writes cited person, project, or topic knowledge from a registered source.</dd></div>
           <div><dt><code>search</code></dt><dd>Runs lexical or optional hybrid retrieval with citations.</dd></div>
           <div><dt><code>index rebuild</code></dt><dd>Recreates the derived SQLite index from the vault.</dd></div>
         </dl>
+      </section>
+
+      <section id="filesystem-checks">
+        <h2>Verify the data directory separately</h2>
+        <p>
+          Today, <code>doctor</code> does not check whether the reported path
+          exists, has the intended owner or mode, is accessible by the service
+          user, is writable, or has free capacity. On the packaged Ubuntu host,
+          run these OS-level checks separately. Replace the default path when
+          your configuration reports a different one.
+        </p>
+        <pre className="code-block" aria-label="Ubuntu data directory checks">
+          <code>{dataDirectoryChecks}</code>
+        </pre>
+        <p>
+          The write probe creates and removes one temporary file as the
+          unprivileged <code>kriyan</code> user. Treat a failed command or low
+          byte/inode capacity as an operational failure even if <code>doctor</code>
+          reports healthy Convex and node checks.
+        </p>
       </section>
 
       <section id="next">

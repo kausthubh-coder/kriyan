@@ -31,11 +31,11 @@ export const metadata: Metadata = {
     'personal productivity',
   ],
   authors: [{ name: 'Kriyan' }],
-  alternates: { canonical: '/' },
+  alternates: { canonical: siteUrl },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: '/',
+    url: siteUrl,
     siteName: 'Kriyan',
     title: 'Kriyan — Your work, your infrastructure',
     description: siteDescription,

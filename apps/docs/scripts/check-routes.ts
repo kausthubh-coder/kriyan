@@ -1,3 +1,5 @@
+import { siteHref, siteUrl } from '../lib/site'
+
 const host = '127.0.0.1'
 const port = 4329
 const baseUrl = `http://${host}:${port}`
@@ -20,6 +22,36 @@ const metadataRoutes = [
   { path: '/robots.txt', contentType: 'text/plain' },
   { path: '/sitemap.xml', contentType: 'application/xml' },
 ]
+
+function attribute(tag: string, name: string): string | undefined {
+  return tag.match(new RegExp(`\\b${name}="([^"]*)"`, 'i'))?.[1]
+}
+
+function metadataValue(
+  html: string,
+  identifyingAttribute: 'name' | 'property' | 'rel',
+  identifyingValue: string,
+  valueAttribute: 'content' | 'href',
+): string | undefined {
+  for (const match of html.matchAll(/<(?:link|meta)\b[^>]*>/gi)) {
+    const tag = match[0]
+    if (attribute(tag, identifyingAttribute) === identifyingValue) {
+      return attribute(tag, valueAttribute)
+    }
+  }
+
+  return undefined
+}
+
+function visibleText(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 const server = Bun.spawn(
   ['bun', 'run', 'start', '--hostname', host, '--port', String(port)],
@@ -58,6 +90,7 @@ function internalLinks(html: string): string[] {
 try {
   await waitForServer()
   const discoveredLinks = new Set<string>()
+  const renderedPages = new Map<string, string>()
   let samePageAnchorCount = 0
 
   for (const route of requiredRoutes) {
@@ -67,12 +100,46 @@ try {
     }
 
     const html = await response.text()
+    renderedPages.set(route, html)
+    const canonical = metadataValue(html, 'rel', 'canonical', 'href')
+    const expectedCanonical = route === '/' ? siteUrl : siteHref(route)
+    if (canonical !== expectedCanonical) {
+      throw new Error(
+        `${route} canonical was ${canonical ?? 'missing'}, expected ${expectedCanonical}`,
+      )
+    }
     if (
       route === '/' &&
       (!html.includes('property="og:image"') ||
         !html.includes('name="twitter:card"'))
     ) {
       throw new Error('Home page is missing Open Graph or Twitter metadata')
+    }
+    if (route === '/') {
+      const openGraphUrl = metadataValue(
+        html,
+        'property',
+        'og:url',
+        'content',
+      )
+      const openGraphImage = metadataValue(
+        html,
+        'property',
+        'og:image',
+        'content',
+      )
+      if (openGraphUrl !== siteUrl) {
+        throw new Error(`Open Graph URL was ${openGraphUrl ?? 'missing'}`)
+      }
+      if (
+        !openGraphImage ||
+        new URL(openGraphImage).origin !== siteUrl ||
+        new URL(openGraphImage).pathname !== '/opengraph-image'
+      ) {
+        throw new Error(
+          `Open Graph image did not use ${siteUrl}: ${openGraphImage ?? 'missing'}`,
+        )
+      }
     }
     for (const match of html.matchAll(/href="#([^"]+)"/g)) {
       const id = decodeURIComponent(match[1] ?? '')
@@ -112,8 +179,61 @@ try {
         `${route.path} returned ${response.status} with ${contentType}`,
       )
     }
+    if (route.path === '/robots.txt') {
+      const body = await response.text()
+      if (!body.includes(`Sitemap: ${siteHref('/sitemap.xml')}`)) {
+        throw new Error('/robots.txt did not advertise the canonical sitemap')
+      }
+    }
+    if (route.path === '/sitemap.xml') {
+      const body = await response.text()
+      const locations = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map(
+        (match) => match[1],
+      )
+      const expectedLocations = requiredRoutes.map((path) => siteHref(path))
+      if (
+        locations.length !== expectedLocations.length ||
+        expectedLocations.some((location) => !locations.includes(location))
+      ) {
+        throw new Error(
+          `/sitemap.xml URLs did not match ${siteUrl}: ${locations.join(', ')}`,
+        )
+      }
+    }
     console.log(`PASS ${response.status} ${route.path} (${route.contentType})`)
   }
+
+  const installCopy = visibleText(renderedPages.get('/docs/install') ?? '')
+  const updateCopy = visibleText(renderedPages.get('/docs/updates') ?? '')
+  const requiredInstallCopy = [
+    'It reports the configured data directory path but does not inspect that directory.',
+    'does not check whether the reported path exists',
+    'sudo test -d "$DATA_DIR"',
+    "stat -c '%U:%G:%a'",
+    'sudo -u kriyan test -w "$DATA_DIR"',
+    'df -h -- "$DATA_DIR"',
+    'df -i -- "$DATA_DIR"',
+  ]
+  for (const copy of requiredInstallCopy) {
+    if (!installCopy.includes(copy)) {
+      throw new Error(`/docs/install is missing truthful operator copy: ${copy}`)
+    }
+  }
+  if (
+    !updateCopy.includes('record the reported data directory path') ||
+    !updateCopy.includes('Inspect storage separately.')
+  ) {
+    throw new Error('/docs/updates is missing the separate storage-check gate')
+  }
+  for (const overclaim of [
+    'Checks config, Convex reachability, node health, and the configured data directory.',
+    'Config, Convex, node health, and data directory checks pass.',
+  ]) {
+    if (installCopy.includes(overclaim) || updateCopy.includes(overclaim)) {
+      throw new Error(`Docs still contain the doctor overclaim: ${overclaim}`)
+    }
+  }
+  console.log('PASS doctor copy and Ubuntu filesystem checks')
 
   const missingResponse = await fetch(`${baseUrl}/outside-the-constellation`)
   const missingHtml = await missingResponse.text()
