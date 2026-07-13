@@ -300,6 +300,13 @@ test('release construction binds provenance, rescans ELFs, and emits canonical d
     expect(Bun.spawnSync([
       'bash', 'packaging/scripts/scan-binary-content.sh', bunToolchainPath,
     ]).exitCode).toBe(0)
+
+    const scannerTools = join(directory, 'scanner-tools')
+    await mkdir(scannerTools)
+    await symlink(commandOutput(['which', 'grep']), join(scannerTools, 'grep'))
+    expect(Bun.spawnSync([
+      '/bin/bash', 'packaging/scripts/scan-binary-content.sh', bunToolchainPath,
+    ], { env: { ...process.env, PATH: scannerTools } }).exitCode).toBe(0)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
