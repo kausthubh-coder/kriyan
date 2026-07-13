@@ -1,0 +1,6 @@
+{
+  "name": "@kriyan/convex-client",
+  "type": "module",
+  "private": true,
+  "exports": { ".": "./src/index.ts" }
+}

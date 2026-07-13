@@ -1,0 +1,10 @@
+{
+  "name": "@kriyan/cli",
+  "type": "module",
+  "private": true,
+  "bin": { "kriyan": "./src/main.ts" },
+  "dependencies": {
+    "@kriyan/convex-client": "workspace:*",
+    "@kriyan/node": "workspace:*"
+  }
+}

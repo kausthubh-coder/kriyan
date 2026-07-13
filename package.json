@@ -3,9 +3,10 @@
   "type": "module",
   "private": true,
   "workspaces": [
+    "apps/*",
+    "packages/*",
     "web",
-    "mobile",
-    "packages/*"
+    "mobile"
   ],
   "scripts": {
     "dev": "concurrently -n convex,web,mobile -c blue,green,magenta \"bun run dev:convex\" \"bun run dev:web\" \"bun run dev:mobile\"",
@@ -19,8 +20,14 @@
     "typecheck:smoke": "bunx tsc --noEmit --strict --skipLibCheck --module ESNext --moduleResolution Bundler --target ES2022 --types bun scripts/convex-worker-smoke.ts scripts/assert-convex-function-spec.ts scripts/check-convex-metadata.ts",
     "test:convex": "bunx vitest run convex/control-plane.test.ts",
     "test:client-core": "bun run --cwd packages/client-core test",
-    "check:convex-metadata": "bun scripts/check-convex-metadata.ts",
+    "check:convex-metadata": "bash scripts/check-convex-metadata.sh",
+    "check:convex-metadata:secure": "bun scripts/check-convex-metadata.ts",
     "smoke:convex-worker": "bun --env-file=.env.local scripts/convex-worker-smoke.ts",
+    "typecheck:node": "bunx tsc -p tsconfig.node.json --noEmit",
+    "test:node": "bun test apps/node/test packages/agent-runtime/test packages/tools/test apps/cli/test",
+    "test:node:live": "bun --env-file=.env.local apps/node/test/live-convex.ts",
+    "build:node:linux-x64": "bash packaging/scripts/build-standalone.sh dist/kriyan-node-linux-x64 dist/kriyan-linux-x64",
+    "kriyan": "bun apps/cli/src/main.ts",
     "lint": "bun run lint:web && bun run lint:mobile",
     "lint:web": "cd web && bun run lint",
     "lint:mobile": "cd mobile && bun run lint"
@@ -33,6 +40,8 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-coding-agent": "0.80.6",
     "btca": "^1.0.41",
     "convex": "^1.42.1"
   }
