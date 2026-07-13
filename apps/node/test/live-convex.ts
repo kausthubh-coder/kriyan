@@ -59,6 +59,10 @@ let runId = `run:job:${commandId}:1`
 const dataDir = `/tmp/kriyan-${fixture}`
 const configPath = `${dataDir}/node.json`
 const plane = new ConvexControlPlane(convexUrl)
+const fixtureLogger = {
+  info: (): void => undefined,
+  error: (): void => undefined,
+}
 
 async function cleanup(): Promise<number> {
   let deleted = 0
@@ -116,7 +120,12 @@ try {
   const config: NodeConfig = await loadConfig(configPath)
   commandId = submission.commandId
   runId = `run:${submission.jobId}:1`
-  const worker = new KriyanWorker(config, plane, new FakeAgentRuntime({ now: () => 1_750_000_000_000 }))
+  const worker = new KriyanWorker(
+    config,
+    plane,
+    new FakeAgentRuntime({ now: () => 1_750_000_000_000 }),
+    fixtureLogger,
+  )
   await worker.register()
   if (!(await worker.runOnce())) throw new Error('live worker did not claim the submitted job')
   const command = await plane.command(installationId, commandId)
