@@ -11,13 +11,26 @@ strings "${binary}" >"${strings_file}"
 for literal in "$@"; do
   [[ -z ${literal} ]] && continue
   if grep -F -- "${literal}" "${strings_file}" >/dev/null; then
-    echo "binary contains forbidden build literal: ${literal}" >&2
+    echo "binary contains a caller-supplied forbidden build literal" >&2
     exit 1
   fi
 done
 
-if grep -E '/Users/[^/]+/|/home/[^/]+/|\.codex/worktrees/|/private/tmp/kriyan-|/tmp/kriyan-(isolated|build|source)-' "${strings_file}" >/dev/null; then
+if grep -E '/(private/)?var/folders/|/Users/[^/]+/|/home/[^/]+/|\.codex/worktrees/|/(private/)?tmp/kriyan-(isolated|source|build|release|temp)[^/ ]*' "${strings_file}" >/dev/null; then
   echo "binary contains a private user, worktree, or build-temporary path" >&2
   exit 1
 fi
+
+while IFS= read -r variable; do
+  case ${variable} in
+    *TOKEN*|*SECRET*|*PASSWORD*|*API_KEY*|*PRIVATE_KEY*|*ACCESS_KEY*|*CREDENTIAL*)
+      value=${!variable:-}
+      [[ ${#value} -ge 8 ]] || continue
+      if grep -F -- "${value}" "${strings_file}" >/dev/null; then
+        echo "binary contains a known secret environment value" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done < <(compgen -e)
 echo "binary content scan passed: ${binary}"
