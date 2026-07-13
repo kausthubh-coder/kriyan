@@ -17,7 +17,8 @@ import {
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { KRIYAN_CONFIG, KRIYAN_DEMO, useConvexClientControls } from '@/lib/convex'
+import { useConvexClientControls } from '@/lib/convex'
+import { useRuntimeSettings, type KriyanWebConfiguration } from '@/lib/runtime-settings'
 import { useDemoRepository } from '@/src/client-core/demo-repository'
 import { useLiveWebRepository } from '@/src/client-core/live-web-repository'
 import { useVisibilityClock } from '@/src/client-core/use-visibility-clock'
@@ -32,6 +33,7 @@ import {
   SourcesWorkspace,
   type ResultHandler,
 } from '@/components/productivity/workspaces'
+import { RuntimeSettingsWorkspace } from '@/components/productivity/runtime-settings'
 
 import {
   ActivityIcon,
@@ -47,12 +49,13 @@ import {
   PlusIcon,
   RetryIcon,
   SendIcon,
+  SettingsIcon,
   SourceIcon,
   TaskIcon,
   TodayIcon,
 } from './icons'
 
-export type Section = 'today' | 'tasks' | 'reminders' | 'calendar' | 'notes' | 'sources' | 'entities'
+export type Section = 'today' | 'tasks' | 'reminders' | 'calendar' | 'notes' | 'sources' | 'entities' | 'settings'
 type NoticeValue = { tone: 'error' | 'success'; text: string }
 
 const NAV_ITEMS: Array<{ key: Section; label: string; href: string; icon: typeof TodayIcon }> = [
@@ -63,6 +66,7 @@ const NAV_ITEMS: Array<{ key: Section; label: string; href: string; icon: typeof
   { key: 'notes', label: 'Notes', href: '/notes', icon: NoteIcon },
   { key: 'sources', label: 'Sources', href: '/sources', icon: SourceIcon },
   { key: 'entities', label: 'Entities', href: '/entities', icon: EntityIcon },
+  { key: 'settings', label: 'Settings', href: '/settings', icon: SettingsIcon },
 ]
 
 function eventData(data: string): string {
@@ -91,32 +95,34 @@ function handleResult(setNotice: (notice: NoticeValue | null) => void): ResultHa
 }
 
 export function TodayApp({ initialSection }: { initialSection: Section }) {
-  return KRIYAN_DEMO
-    ? <DemoTodayApp initialSection={initialSection} />
-    : <LiveTodayApp initialSection={initialSection} />
+  const { settings } = useRuntimeSettings()
+  return settings.demoMode
+    ? <DemoTodayApp initialSection={initialSection} displayName={settings.displayName} />
+    : <LiveTodayApp initialSection={initialSection} configuration={settings} displayName={settings.displayName} />
 }
 
-function LiveTodayApp({ initialSection }: { initialSection: Section }) {
+function LiveTodayApp({ initialSection, configuration, displayName }: { initialSection: Section; configuration: KriyanWebConfiguration; displayName: string }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
-  const configuration = KRIYAN_CONFIG!
   const convexClient = useConvexClientControls()
   const runtime = useLiveWebRepository(configuration, selectedRunId, convexClient.generation)
-  return <RepositoryTodayApp initialSection={initialSection} repository={runtime.repository} connectionMode={runtime.connectionMode} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+  return <RepositoryTodayApp initialSection={initialSection} repository={runtime.repository} connectionMode={runtime.connectionMode} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} displayName={displayName} demoMode={false} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
 }
 
-function DemoTodayApp({ initialSection }: { initialSection: Section }) {
+function DemoTodayApp({ initialSection, displayName }: { initialSection: Section; displayName: string }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>('run:demo-retrieval')
   const repository = useDemoRepository(selectedRunId)
-  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode="online" connectionRecoveryRequired={false} onRecreate={() => undefined} installationId="installation:memory" selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode="offline" connectionRecoveryRequired={false} onRecreate={() => undefined} installationId="installation:offline-demo" displayName={displayName} demoMode selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
 }
 
-function RepositoryTodayApp({ initialSection, repository, connectionMode, connectionRecoveryRequired, onRecreate, installationId, selectedRunId, setSelectedRunId }: {
+function RepositoryTodayApp({ initialSection, repository, connectionMode, connectionRecoveryRequired, onRecreate, installationId, displayName, demoMode, selectedRunId, setSelectedRunId }: {
   initialSection: Section
   repository: WebRepository
   connectionMode: ConnectionMode
   connectionRecoveryRequired: boolean
   onRecreate: () => void
   installationId: string
+  displayName: string
+  demoMode: boolean
   selectedRunId: string | null
   setSelectedRunId: (runId: string | null) => void
 }) {
@@ -133,7 +139,7 @@ function RepositoryTodayApp({ initialSection, repository, connectionMode, connec
 
   const activity = repository.activity
   const selectedActivity = activity.find((item) => item.command.commandId === selectedCommandId) ?? activity[0]
-  const liveNodes = now === null ? [] : repository.nodes.filter((node) => isNodeAvailable(node, now))
+  const liveNodes = demoMode || now === null ? [] : repository.nodes.filter((node) => isNodeAvailable(node, now))
 
   useEffect(() => {
     const nextRunId = selectedActivity?.run?.runId ?? null
@@ -171,21 +177,22 @@ function RepositoryTodayApp({ initialSection, repository, connectionMode, connec
   return (
     <div className="app-shell">
       <aside className="side-rail" aria-label="Primary navigation">
-        <Brand connectionMode={connectionMode} />
+        <Brand connectionMode={connectionMode} displayName={displayName} demoMode={demoMode} />
         <nav className="primary-nav">
           {NAV_ITEMS.map((item) => <NavItem key={item.key} item={item} active={item.key === initialSection} />)}
         </nav>
-        <NodeSummary nodes={repository.nodes} liveNodes={liveNodes} now={now} />
+        <NodeSummary nodes={repository.nodes} liveNodes={liveNodes} now={now} demoMode={demoMode} />
       </aside>
 
       <header className="mobile-header">
-        <Brand connectionMode={connectionMode} compact />
-        <NodeSummary nodes={repository.nodes} liveNodes={liveNodes} now={now} compact />
+        <Brand connectionMode={connectionMode} displayName={displayName} demoMode={demoMode} compact />
+        <NodeSummary nodes={repository.nodes} liveNodes={liveNodes} now={now} demoMode={demoMode} compact />
       </header>
 
       <main className="main-content" id="main-content">
         <PageHeader section={initialSection} now={now} />
-        {connectionMode !== 'online' && (
+        {demoMode && <DemoBanner />}
+        {!demoMode && connectionMode !== 'online' && (
           <ConnectionBanner
             mode={connectionMode}
             recoveryRequired={connectionRecoveryRequired}
@@ -237,6 +244,7 @@ function RepositoryTodayApp({ initialSection, repository, connectionMode, connec
         {initialSection === 'notes' && <NotesWorkspace repository={repository} onResult={handleResult(setNotice)} />}
         {initialSection === 'sources' && <SourcesWorkspace repository={repository} now={effectiveNow} />}
         {initialSection === 'entities' && <EntitiesWorkspace repository={repository} onResult={handleResult(setNotice)} />}
+        {initialSection === 'settings' && <RuntimeSettingsWorkspace />}
       </main>
 
       <aside className="activity-rail" aria-label="Run activity">
@@ -282,13 +290,13 @@ function EnrollmentRequired({ installationId }: { installationId: string }) {
   )
 }
 
-export function Brand({ connectionMode, compact = false }: { connectionMode: ConnectionMode; compact?: boolean }) {
+export function Brand({ connectionMode, displayName = 'Personal agent', demoMode = false, compact = false }: { connectionMode: ConnectionMode; displayName?: string; demoMode?: boolean; compact?: boolean }) {
   return (
     <div className={compact ? 'brand brand-compact' : 'brand'}>
       <div className="brand-mark">K</div>
-      <div><strong>Kriyan</strong>{!compact && <span>Personal agent</span>}</div>
-      <span className={`connection-label ${connectionMode}`} role="status" aria-live="polite">
-        <i />{connectionMode}
+      <div><strong>Kriyan</strong>{!compact && <span>{displayName}</span>}</div>
+      <span className={`connection-label ${demoMode ? 'demo' : connectionMode}`} role="status" aria-live="polite">
+        <i />{demoMode ? 'demo' : connectionMode}
       </span>
     </div>
   )
@@ -299,15 +307,15 @@ function NavItem({ item, active }: { item: (typeof NAV_ITEMS)[number]; active: b
   return <Link href={item.href} className={`nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined}><Icon /><span>{item.label}</span></Link>
 }
 
-export function NodeSummary({ nodes, liveNodes, now, compact = false }: { nodes: NodeItem[]; liveNodes: NodeItem[]; now: number | null; compact?: boolean }) {
+export function NodeSummary({ nodes, liveNodes, now, demoMode = false, compact = false }: { nodes: NodeItem[]; liveNodes: NodeItem[]; now: number | null; demoMode?: boolean; compact?: boolean }) {
   const live = liveNodes[0]
-  const label = live ? live.displayName : nodes.length > 0 ? 'Node offline' : 'No node paired'
-  const detail = live && now !== null ? `Heartbeat ${formatRelativeTime(live.lastHeartbeatAt, now)}` : 'Commands will wait safely'
+  const label = demoMode ? 'Sample VPS node' : live ? live.displayName : nodes.length > 0 ? 'Node offline' : 'No node paired'
+  const detail = demoMode ? 'Static offline verification data' : live && now !== null ? `Heartbeat ${formatRelativeTime(live.lastHeartbeatAt, now)}` : 'Commands will wait safely'
   return (
     <div className={compact ? 'node-summary compact' : 'node-summary'} role="status" aria-live="polite">
       <NodeIcon />
       <div><strong>{label}</strong>{!compact && <span>{detail}</span>}</div>
-      <span className={`node-state-label ${live ? 'online' : 'offline'}`}><i />{live ? 'Online' : 'Offline'}</span>
+      <span className={`node-state-label ${live ? 'online' : 'offline'}`}><i />{demoMode ? 'Demo' : live ? 'Online' : 'Offline'}</span>
     </div>
   )
 }
@@ -321,11 +329,16 @@ export function PageHeader({ section, now }: { section: Section; now: number | n
     notes: ['Notes', 'Durable writing stored as validated TipTap JSON with a searchable preview.'],
     sources: ['Knowledge sources', 'See what your node has synchronized and indexed without exposing the private vault.'],
     entities: ['Entities', 'Compact project, person, and topic projections with traceable provenance.'],
+    settings: ['Settings', 'Choose this client’s self-hosted Convex installation or a fully offline demo.'],
   }[section]
   const dateLabel = now === null
     ? 'Your current day'
     : new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(now)
   return <header className="page-header"><p>{dateLabel}</p><h1>{copy[0]}</h1><span>{copy[1]}</span></header>
+}
+
+function DemoBanner() {
+  return <div className="connection-banner demo" role="status"><span className="status-dot" /><span>Offline demo mode. All visible work is local sample data; no Convex deployment or VPS node is connected.</span><Link className="quiet-button" href="/settings">Connection settings</Link></div>
 }
 
 function ConnectionBanner({ mode, recoveryRequired, onRecreate }: { mode: ConnectionMode; recoveryRequired: boolean; onRecreate: () => void }) {

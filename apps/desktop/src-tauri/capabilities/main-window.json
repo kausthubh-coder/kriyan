@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "The Kriyan product shell does not call native commands or plugins.",
+  "windows": ["main"],
+  "permissions": []
+}
