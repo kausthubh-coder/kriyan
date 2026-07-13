@@ -11,7 +11,8 @@ secret and must not be described as one. Operational worker mutations validate:
 - the installation exists;
 - the node is registered, online, not revoked, and has the `reminders`
   capability;
-- the supplied cooperative timestamp is within the 60-second heartbeat window;
+- Convex mutation time is the only clock used for heartbeats, leases, claims,
+  reclaim, run lifecycle transitions, event timestamps, and retry bookkeeping;
 - the node owns an unexpired lease for the exact installation/job/run; and
 - expected revisions and ordered event sequences still match.
 
@@ -26,5 +27,15 @@ Explicit limits: heartbeats expire after 60 seconds; leases are at most 30
 seconds; list pages are at most 100 records; claims examine at most 64 queued,
 64 leased, and 64 running candidates; an event batch contains 1-32 events, each
 payload is at most 16,384 characters, and aggregate payload is at most 65,536
-characters. Development seed/reset functions are internal Convex mutations and
-are absent from the public client API.
+characters. Node revocation releases at most 32 owned jobs in its transaction.
+If `cleanupPending` is true, the operator calls
+`worker:continueNodeRevocationCleanup` until it returns false. Revocation is
+effective immediately for transition validation; continuation only finishes
+the bounded physical release/requeue of remaining jobs. Development seed/reset
+functions are internal Convex mutations and are absent from the public client
+API.
+
+Ordinary task and reminder list queries use live-record indexes before Convex
+pagination, so a cursor advances over visible records and cannot yield an empty
+tombstone-only intermediate page. `includeDeleted: true` intentionally switches
+to the complete-history indexes while retaining the same bounded cursor API.

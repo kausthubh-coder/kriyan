@@ -141,8 +141,8 @@ export const listTasks = query({
       'paginationOpts.numItems',
       MAX_PAGE_SIZE,
     )
-    const page =
-      args.status !== undefined
+    const page = args.includeDeleted
+      ? args.status !== undefined
         ? await ctx.db
             .query('tasks')
             .withIndex('by_installation_status_due', (q) => {
@@ -151,7 +151,7 @@ export const listTasks = query({
                 .eq('status', args.status!)
               return args.dueBefore === undefined
                 ? scoped
-                : scoped.lte('dueAt', args.dueBefore)
+                : scoped.gt('dueAt', undefined).lte('dueAt', args.dueBefore)
             })
             .paginate(args.paginationOpts)
         : args.dueBefore !== undefined
@@ -160,6 +160,7 @@ export const listTasks = query({
               .withIndex('by_installation_due', (q) =>
                 q
                   .eq('installationId', args.installationId)
+                  .gt('dueAt', undefined)
                   .lte('dueAt', args.dueBefore!),
               )
               .paginate(args.paginationOpts)
@@ -169,17 +170,39 @@ export const listTasks = query({
                 q.eq('installationId', args.installationId),
               )
               .paginate(args.paginationOpts)
-    return {
-      ...page,
-      page: page.page
-        .filter(
-          (task) =>
-            (args.includeDeleted || task.deletedAt === undefined) &&
-            (args.dueBefore === undefined ||
-              (task.dueAt !== undefined && task.dueAt <= args.dueBefore)),
-        )
-        .map(withoutSystemFields),
-    }
+      : args.status !== undefined
+        ? await ctx.db
+            .query('tasks')
+            .withIndex('by_installation_live_status_due', (q) => {
+              const scoped = q
+                .eq('installationId', args.installationId)
+                .eq('deletedAt', undefined)
+                .eq('status', args.status!)
+              return args.dueBefore === undefined
+                ? scoped
+                : scoped.gt('dueAt', undefined).lte('dueAt', args.dueBefore)
+            })
+            .paginate(args.paginationOpts)
+        : args.dueBefore !== undefined
+          ? await ctx.db
+              .query('tasks')
+              .withIndex('by_installation_live_due', (q) =>
+                q
+                  .eq('installationId', args.installationId)
+                  .eq('deletedAt', undefined)
+                  .gt('dueAt', undefined)
+                  .lte('dueAt', args.dueBefore!),
+              )
+              .paginate(args.paginationOpts)
+          : await ctx.db
+              .query('tasks')
+              .withIndex('by_installation_live_task', (q) =>
+                q
+                  .eq('installationId', args.installationId)
+                  .eq('deletedAt', undefined),
+              )
+              .paginate(args.paginationOpts)
+    return { ...page, page: page.page.map(withoutSystemFields) }
   },
 })
 
@@ -413,8 +436,8 @@ export const listReminders = query({
       'paginationOpts.numItems',
       MAX_PAGE_SIZE,
     )
-    const page =
-      args.status !== undefined
+    const page = args.includeDeleted
+      ? args.status !== undefined
         ? await ctx.db
             .query('reminders')
             .withIndex('by_installation_status_time', (q) => {
@@ -441,10 +464,38 @@ export const listReminders = query({
                 q.eq('installationId', args.installationId),
               )
               .paginate(args.paginationOpts)
-    const filtered = page.page.filter(
-      (reminder) => args.includeDeleted || reminder.deletedAt === undefined,
-    )
-    return { ...page, page: filtered.map(withoutSystemFields) }
+      : args.status !== undefined
+        ? await ctx.db
+            .query('reminders')
+            .withIndex('by_installation_live_status_time', (q) => {
+              const scoped = q
+                .eq('installationId', args.installationId)
+                .eq('deletedAt', undefined)
+                .eq('status', args.status!)
+              return args.remindBefore === undefined
+                ? scoped
+                : scoped.lte('remindAt', args.remindBefore)
+            })
+            .paginate(args.paginationOpts)
+        : args.remindBefore !== undefined
+          ? await ctx.db
+              .query('reminders')
+              .withIndex('by_installation_live_time', (q) =>
+                q
+                  .eq('installationId', args.installationId)
+                  .eq('deletedAt', undefined)
+                  .lte('remindAt', args.remindBefore!),
+              )
+              .paginate(args.paginationOpts)
+          : await ctx.db
+              .query('reminders')
+              .withIndex('by_installation_live_reminder', (q) =>
+                q
+                  .eq('installationId', args.installationId)
+                  .eq('deletedAt', undefined),
+              )
+              .paginate(args.paginationOpts)
+    return { ...page, page: page.page.map(withoutSystemFields) }
   },
 })
 

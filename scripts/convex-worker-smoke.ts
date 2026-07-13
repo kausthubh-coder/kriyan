@@ -7,7 +7,7 @@ if (convexUrl === undefined || convexUrl.length === 0) {
   throw new Error('CONVEX_URL is required')
 }
 
-const fixtureId = `round2-${crypto.randomUUID()}`
+const fixtureId = `round3-${crypto.randomUUID()}`
 const installationId = `installation:${fixtureId}`
 const nodeId = `node:${fixtureId}`
 const commandId = `command:${fixtureId}`
@@ -25,23 +25,21 @@ try {
   await client.mutation(api.worker.registerNode, {
     installationId,
     nodeId,
-    displayName: 'Round 2 external smoke worker',
+    displayName: 'Round 3 external smoke worker',
     capabilities: ['reminders'],
     protocolVersion: '1',
-    now,
   })
   await client.mutation(api.commands.submit, {
     installationId,
     commandId,
     idempotencyKey: `idempotency:${fixtureId}`,
-    input: 'round 2 external worker facade smoke',
+    input: 'round 3 external worker facade smoke',
     maxAttempts: 2,
     now: now + 1,
   })
   const claim = await client.mutation(api.worker.claimJob, {
     installationId,
     nodeId,
-    now: now + 2,
     leaseDurationMs: 30_000,
   })
   if (claim === null) throw new Error('external worker did not claim its job')
@@ -50,7 +48,6 @@ try {
     jobId: claim.job.jobId,
     nodeId,
     expectedJobRevision: claim.job.revision,
-    now: now + 3,
   })
   if (!started.ok) throw new Error(`external start failed: ${started.reason}`)
   const appended = await client.mutation(api.worker.appendRunEvents, {
@@ -66,17 +63,14 @@ try {
         sequence: 1,
         type: 'status',
         data: 'external Bun ConvexClient reached the worker facade',
-        createdAt: now + 4,
       },
       {
         eventId: `event:${fixtureId}:2`,
         sequence: 2,
         type: 'message',
         data: 'ordered atomic batch accepted',
-        createdAt: now + 5,
       },
     ],
-    now: now + 5,
   })
   if (!appended.ok)
     throw new Error(`external append failed: ${appended.reason}`)
@@ -87,7 +81,6 @@ try {
     nodeId,
     expectedJobRevision: started.job.revision,
     expectedRunRevision: appended.revision,
-    now: now + 6,
   })
   if (!completed.ok)
     throw new Error(`external completion failed: ${completed.reason}`)

@@ -10,6 +10,7 @@
     "module": "ESNext",
     "target": "ESNext",
     "lib": ["ES2021", "DOM"],
+    "types": ["bun"],
     "noEmit": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true

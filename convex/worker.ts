@@ -10,7 +10,6 @@ import {
   assertId,
   assertPositiveInteger,
   assertShortText,
-  assertTimestamp,
   MAX_EVENT_BATCH_DATA,
   MAX_EVENT_BATCH_SIZE,
   MAX_LEASE_DURATION_MS,
@@ -28,6 +27,7 @@ import {
 
 const WORK_CAPABILITY = 'reminders'
 const CLAIM_SCAN_LIMIT = 64
+const OWNED_WORK_RELEASE_LIMIT = 32
 
 type NodeFailure = 'inactive_node' | 'stale_heartbeat' | 'missing_capability'
 
@@ -63,8 +63,36 @@ const eventInput = v.object({
   sequence: v.number(),
   type: runEventType,
   data: v.string(),
-  createdAt: v.number(),
 })
+
+const revocationResult = v.union(
+  v.object({
+    ok: v.literal(true),
+    revision: v.number(),
+    releasedWork: v.number(),
+    cleanupPending: v.boolean(),
+  }),
+  v.object({
+    ok: v.literal(false),
+    reason: v.union(
+      v.literal('not_found'),
+      v.literal('stale_revision'),
+      v.literal('invalid_state'),
+    ),
+  }),
+)
+
+const cleanupResult = v.union(
+  v.object({
+    ok: v.literal(true),
+    releasedWork: v.number(),
+    cleanupPending: v.boolean(),
+  }),
+  v.object({
+    ok: v.literal(false),
+    reason: v.union(v.literal('not_found'), v.literal('invalid_state')),
+  }),
+)
 
 const eventBatchResult = v.union(
   v.object({
@@ -184,14 +212,15 @@ async function releaseOwnedWork(
   nodeId: string,
   now: number,
   error: string,
-): Promise<void> {
+): Promise<{ releasedWork: number; cleanupPending: boolean }> {
   const jobs = await ctx.db
     .query('jobs')
     .withIndex('by_installation_lease_owner', (q) =>
       q.eq('installationId', installationId).eq('leaseOwnerNodeId', nodeId),
     )
-    .collect()
-  for (const job of jobs) {
+    .take(OWNED_WORK_RELEASE_LIMIT + 1)
+  const batch = jobs.slice(0, OWNED_WORK_RELEASE_LIMIT)
+  for (const job of batch) {
     if (job.status !== 'leased' && job.status !== 'running') continue
     await closeActiveRun(ctx, job, now, error)
     const exhausted = job.attempt >= job.maxAttempts
@@ -204,6 +233,10 @@ async function releaseOwnedWork(
       updatedAt: now,
     })
     await updateCommandStatus(ctx, job, exhausted ? 'failed' : 'accepted', now)
+  }
+  return {
+    releasedWork: batch.length,
+    cleanupPending: jobs.length > OWNED_WORK_RELEASE_LIMIT,
   }
 }
 
@@ -287,7 +320,6 @@ export const registerNode = mutation({
     displayName: v.string(),
     capabilities: v.array(v.string()),
     protocolVersion: v.string(),
-    now: v.number(),
   },
   returns: v.object({ created: v.boolean(), node: nodeValue }),
   handler: async (ctx, args) => {
@@ -296,7 +328,7 @@ export const registerNode = mutation({
     assertShortText(args.displayName, 'displayName')
     assertCapabilities(args.capabilities)
     assertShortText(args.protocolVersion, 'protocolVersion')
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const installation = await getInstallation(ctx, args.installationId)
     if (installation === null) throw new Error('installation not found')
     if (installation.protocolVersion !== args.protocolVersion) {
@@ -328,10 +360,10 @@ export const registerNode = mutation({
       capabilities: args.capabilities,
       protocolVersion: args.protocolVersion,
       status: 'online' as const,
-      lastHeartbeatAt: args.now,
+      lastHeartbeatAt: now,
       revision: 0,
-      createdAt: args.now,
-      updatedAt: args.now,
+      createdAt: now,
+      updatedAt: now,
     }
     await ctx.db.insert('nodes', node)
     return { created: true, node }
@@ -343,14 +375,13 @@ export const heartbeatNode = mutation({
     installationId: v.string(),
     nodeId: v.string(),
     expectedRevision: v.number(),
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     if ((await getInstallation(ctx, args.installationId)) === null) {
       return { ok: false as const, reason: 'inactive_node' as const }
     }
@@ -362,13 +393,10 @@ export const heartbeatNode = mutation({
     if (node.revision !== args.expectedRevision) {
       return { ok: false as const, reason: 'stale_revision' as const }
     }
-    if (args.now < node.lastHeartbeatAt) {
-      return { ok: false as const, reason: 'stale_heartbeat' as const }
-    }
     await ctx.db.patch(node._id, {
       status: 'online',
-      lastHeartbeatAt: args.now,
-      updatedAt: args.now,
+      lastHeartbeatAt: now,
+      updatedAt: now,
       revision: node.revision + 1,
     })
     return { ok: true as const, revision: node.revision + 1 }
@@ -380,14 +408,13 @@ export const revokeNode = mutation({
     installationId: v.string(),
     nodeId: v.string(),
     expectedRevision: v.number(),
-    now: v.number(),
   },
-  returns: transitionResult,
+  returns: revocationResult,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const node = await getNode(ctx, args.installationId, args.nodeId)
     if (node === null)
       return { ok: false as const, reason: 'not_found' as const }
@@ -399,16 +426,44 @@ export const revokeNode = mutation({
     await ctx.db.patch(node._id, {
       status: 'revoked',
       revision: node.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
-    await releaseOwnedWork(
+    const cleanup = await releaseOwnedWork(
       ctx,
       args.installationId,
       args.nodeId,
-      args.now,
+      now,
       'node revoked',
     )
-    return { ok: true as const, revision: node.revision + 1 }
+    return { ok: true as const, revision: node.revision + 1, ...cleanup }
+  },
+})
+
+export const continueNodeRevocationCleanup = mutation({
+  args: {
+    installationId: v.string(),
+    nodeId: v.string(),
+  },
+  returns: cleanupResult,
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    assertId(args.nodeId, 'nodeId')
+    const node = await getNode(ctx, args.installationId, args.nodeId)
+    if (node === null)
+      return { ok: false as const, reason: 'not_found' as const }
+    if (node.status !== 'revoked') {
+      return { ok: false as const, reason: 'invalid_state' as const }
+    }
+    return {
+      ok: true as const,
+      ...(await releaseOwnedWork(
+        ctx,
+        args.installationId,
+        args.nodeId,
+        Date.now(),
+        'node revoked',
+      )),
+    }
   },
 })
 
@@ -416,14 +471,13 @@ export const claimJob = mutation({
   args: {
     installationId: v.string(),
     nodeId: v.string(),
-    now: v.number(),
     leaseDurationMs: v.number(),
   },
   returns: claimedJobResult,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.nodeId, 'nodeId')
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     assertPositiveInteger(
       args.leaseDurationMs,
       'leaseDurationMs',
@@ -433,7 +487,7 @@ export const claimJob = mutation({
       ctx,
       args.installationId,
       args.nodeId,
-      args.now,
+      now,
     )
     if (failure !== null) throw new Error(`worker rejected: ${failure}`)
 
@@ -449,7 +503,7 @@ export const claimJob = mutation({
         .withIndex('by_installation_lease', (q) =>
           q
             .eq('installationId', args.installationId)
-            .lte('leaseExpiresAt', args.now),
+            .lte('leaseExpiresAt', now),
         )
         .take(CLAIM_SCAN_LIMIT)
     ).filter((job) => job.status === 'leased' || job.status === 'running')
@@ -470,12 +524,12 @@ export const claimJob = mutation({
     const reclaimable: Doc<'jobs'>[] = []
     for (const job of active) {
       const expired =
-        job.leaseExpiresAt !== undefined && job.leaseExpiresAt <= args.now
+        job.leaseExpiresAt !== undefined && job.leaseExpiresAt <= now
       const owner =
         job.leaseOwnerNodeId === undefined
           ? null
           : await getNode(ctx, args.installationId, job.leaseOwnerNodeId)
-      if (expired || nodeFailure(owner, args.now, WORK_CAPABILITY) !== null) {
+      if (expired || nodeFailure(owner, now, WORK_CAPABILITY) !== null) {
         reclaimable.push(job)
       }
     }
@@ -491,19 +545,19 @@ export const claimJob = mutation({
     for (const job of candidates) {
       const reclaimed = job.status !== 'queued'
       if (job.attempt >= job.maxAttempts) {
-        await terminalizeExhaustedJob(ctx, job, args.now, 'attempts exhausted')
+        await terminalizeExhaustedJob(ctx, job, now, 'attempts exhausted')
         continue
       }
-      if (reclaimed) await closeActiveRun(ctx, job, args.now, 'lease reclaimed')
+      if (reclaimed) await closeActiveRun(ctx, job, now, 'lease reclaimed')
       const claimed = {
         ...withoutSystemFields(job),
         status: 'leased' as const,
         attempt: job.attempt + 1,
         leaseOwnerNodeId: args.nodeId,
-        leaseExpiresAt: args.now + args.leaseDurationMs,
+        leaseExpiresAt: now + args.leaseDurationMs,
         lastError: undefined,
         revision: job.revision + 1,
-        updatedAt: args.now,
+        updatedAt: now,
       }
       await ctx.db.patch(job._id, claimed)
       return { job: claimed, reclaimed }
@@ -518,7 +572,6 @@ export const renewLease = mutation({
     jobId: v.string(),
     nodeId: v.string(),
     expectedRevision: v.number(),
-    now: v.number(),
     leaseDurationMs: v.number(),
   },
   returns: transitionResult,
@@ -527,7 +580,7 @@ export const renewLease = mutation({
     assertId(args.jobId, 'jobId')
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     assertPositiveInteger(
       args.leaseDurationMs,
       'leaseDurationMs',
@@ -537,7 +590,7 @@ export const renewLease = mutation({
       ctx,
       args.installationId,
       args.nodeId,
-      args.now,
+      now,
     )
     if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const job = await getJob(ctx, args.installationId, args.jobId)
@@ -549,12 +602,12 @@ export const renewLease = mutation({
     if (job.status !== 'leased' && job.status !== 'running') {
       return { ok: false as const, reason: 'invalid_state' as const }
     }
-    const failure = leaseFailure(job, args.nodeId, args.now)
+    const failure = leaseFailure(job, args.nodeId, now)
     if (failure !== null) return { ok: false as const, reason: failure }
     await ctx.db.patch(job._id, {
-      leaseExpiresAt: args.now + args.leaseDurationMs,
+      leaseExpiresAt: now + args.leaseDurationMs,
       revision: job.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return { ok: true as const, revision: job.revision + 1 }
   },
@@ -566,7 +619,6 @@ export const startRun = mutation({
     jobId: v.string(),
     nodeId: v.string(),
     expectedJobRevision: v.number(),
-    now: v.number(),
   },
   returns: startRunResult,
   handler: async (ctx, args) => {
@@ -574,12 +626,12 @@ export const startRun = mutation({
     assertId(args.jobId, 'jobId')
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedJobRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const nodeFailure = await validateNode(
       ctx,
       args.installationId,
       args.nodeId,
-      args.now,
+      now,
     )
     if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const job = await getJob(ctx, args.installationId, args.jobId)
@@ -611,7 +663,7 @@ export const startRun = mutation({
     }
     if (job.status !== 'leased')
       return { ok: false as const, reason: 'invalid_state' as const }
-    const failure = leaseFailure(job, args.nodeId, args.now)
+    const failure = leaseFailure(job, args.nodeId, now)
     if (failure !== null) return { ok: false as const, reason: failure }
     const runId = `run:${job.jobId}:${job.attempt}`
     assertId(runId, 'derived runId')
@@ -619,7 +671,7 @@ export const startRun = mutation({
       ...withoutSystemFields(job),
       status: 'running' as const,
       revision: job.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     }
     const run = {
       installationId: args.installationId,
@@ -629,7 +681,7 @@ export const startRun = mutation({
       nodeId: args.nodeId,
       status: 'running' as const,
       revision: 0,
-      startedAt: args.now,
+      startedAt: now,
     }
     await ctx.db.patch(job._id, updatedJob)
     await ctx.db.insert('runs', run)
@@ -646,7 +698,6 @@ export const appendRunEvents = mutation({
     expectedJobRevision: v.number(),
     expectedRunRevision: v.number(),
     events: v.array(eventInput),
-    now: v.number(),
   },
   returns: eventBatchResult,
   handler: async (ctx, args) => {
@@ -656,7 +707,7 @@ export const appendRunEvents = mutation({
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedJobRevision)
     assertExpectedRevision(args.expectedRunRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     assertPositiveInteger(
       args.events.length,
       'events.length',
@@ -667,7 +718,6 @@ export const appendRunEvents = mutation({
       assertId(event.eventId, 'eventId')
       assertPositiveInteger(event.sequence, 'sequence', Number.MAX_SAFE_INTEGER)
       assertEventData(event.data)
-      assertTimestamp(event.createdAt, 'createdAt')
       totalData += event.data.length
     }
     if (totalData > MAX_EVENT_BATCH_DATA) {
@@ -679,7 +729,7 @@ export const appendRunEvents = mutation({
       ctx,
       args.installationId,
       args.nodeId,
-      args.now,
+      now,
     )
     if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const job = await getJob(ctx, args.installationId, args.jobId)
@@ -698,7 +748,7 @@ export const appendRunEvents = mutation({
     }
     if (run.nodeId !== args.nodeId)
       return { ok: false as const, reason: 'not_lease_owner' as const }
-    const lease = leaseFailure(job, args.nodeId, args.now)
+    const lease = leaseFailure(job, args.nodeId, now)
     if (lease !== null) return { ok: false as const, reason: lease }
 
     const duplicates: Doc<'runEvents'>[] = []
@@ -716,8 +766,7 @@ export const appendRunEvents = mutation({
           duplicate.runId !== args.runId ||
           duplicate.sequence !== event.sequence ||
           duplicate.type !== event.type ||
-          duplicate.data !== event.data ||
-          duplicate.createdAt !== event.createdAt
+          duplicate.data !== event.data
         ) {
           throw new Error('eventId conflicts with an existing event')
         }
@@ -758,6 +807,7 @@ export const appendRunEvents = mutation({
       installationId: args.installationId,
       runId: args.runId,
       ...event,
+      createdAt: now,
     }))
     for (const event of events) await ctx.db.insert('runEvents', event)
     await ctx.db.patch(run._id, { revision: run.revision + events.length })
@@ -779,7 +829,6 @@ async function finishRun(
     nodeId: string
     expectedJobRevision: number
     expectedRunRevision: number
-    now: number
   },
   outcome:
     | { status: 'succeeded' }
@@ -797,11 +846,12 @@ async function finishRun(
         | NodeFailure
     }
 > {
+  const now = Date.now()
   const activeFailure = await validateNode(
     ctx,
     args.installationId,
     args.nodeId,
-    args.now,
+    now,
   )
   if (activeFailure !== null)
     return { ok: false as const, reason: activeFailure }
@@ -831,29 +881,29 @@ async function finishRun(
   }
   if (run.nodeId !== args.nodeId)
     return { ok: false as const, reason: 'not_lease_owner' as const }
-  const lease = leaseFailure(job, args.nodeId, args.now)
+  const lease = leaseFailure(job, args.nodeId, now)
   if (lease !== null) return { ok: false as const, reason: lease }
   if (outcome.status === 'succeeded') {
     await ctx.db.patch(run._id, {
       status: 'succeeded',
       revision: run.revision + 1,
-      finishedAt: args.now,
+      finishedAt: now,
     })
     await ctx.db.patch(job._id, {
       status: 'succeeded',
       leaseOwnerNodeId: undefined,
       leaseExpiresAt: undefined,
       revision: job.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
-    await updateCommandStatus(ctx, job, 'completed', args.now)
+    await updateCommandStatus(ctx, job, 'completed', now)
   } else {
     const shouldRetry = outcome.retryable && job.attempt < job.maxAttempts
     await ctx.db.patch(run._id, {
       status: 'failed',
       error: outcome.error,
       revision: run.revision + 1,
-      finishedAt: args.now,
+      finishedAt: now,
     })
     await ctx.db.patch(job._id, {
       status: shouldRetry ? 'queued' : 'failed',
@@ -861,13 +911,13 @@ async function finishRun(
       leaseOwnerNodeId: undefined,
       leaseExpiresAt: undefined,
       revision: job.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     await updateCommandStatus(
       ctx,
       job,
       shouldRetry ? 'accepted' : 'failed',
-      args.now,
+      now,
     )
   }
   return { ok: true as const, revision: job.revision + 1 }
@@ -881,7 +931,6 @@ export const completeRun = mutation({
     nodeId: v.string(),
     expectedJobRevision: v.number(),
     expectedRunRevision: v.number(),
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
@@ -891,7 +940,6 @@ export const completeRun = mutation({
     assertId(args.nodeId, 'nodeId')
     assertExpectedRevision(args.expectedJobRevision)
     assertExpectedRevision(args.expectedRunRevision)
-    assertTimestamp(args.now, 'now')
     return await finishRun(ctx, args, { status: 'succeeded' })
   },
 })
@@ -906,7 +954,6 @@ export const failRun = mutation({
     retryable: v.boolean(),
     expectedJobRevision: v.number(),
     expectedRunRevision: v.number(),
-    now: v.number(),
   },
   returns: transitionResult,
   handler: async (ctx, args) => {
@@ -917,7 +964,6 @@ export const failRun = mutation({
     assertError(args.error)
     assertExpectedRevision(args.expectedJobRevision)
     assertExpectedRevision(args.expectedRunRevision)
-    assertTimestamp(args.now, 'now')
     return await finishRun(ctx, args, {
       status: 'failed',
       error: args.error,

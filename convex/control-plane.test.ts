@@ -1,5 +1,5 @@
 import { convexTest } from 'convex-test'
-import { describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { api } from './_generated/api'
 import schema from './schema'
@@ -11,6 +11,15 @@ function backend() {
 }
 
 const paginationOpts = { numItems: 100, cursor: null }
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(1_000)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 async function readJobs(
   t: ReturnType<typeof backend>,
@@ -66,7 +75,6 @@ async function registerNode(
     displayName: nodeId,
     capabilities: ['reminders'],
     protocolVersion: '1',
-    now: 2,
   })
 }
 
@@ -142,7 +150,6 @@ describe('leases and runs', () => {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: registration.node.revision,
-        now: 3,
       }),
     ).toEqual({ ok: true, revision: 1 })
     expect(
@@ -150,7 +157,6 @@ describe('leases and runs', () => {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: 0,
-        now: 4,
       }),
     ).toEqual({ ok: false, reason: 'stale_revision' })
     expect(
@@ -158,15 +164,18 @@ describe('leases and runs', () => {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: 1,
-        now: 5,
       }),
-    ).toEqual({ ok: true, revision: 2 })
+    ).toEqual({
+      ok: true,
+      revision: 2,
+      releasedWork: 0,
+      cleanupPending: false,
+    })
     expect(
       await t.mutation(api.worker.heartbeatNode, {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: 2,
-        now: 6,
       }),
     ).toEqual({ ok: false, reason: 'inactive_node' })
   })
@@ -182,13 +191,11 @@ describe('leases and runs', () => {
       t.mutation(api.worker.claimJob, {
         installationId: 'installation-a',
         nodeId: 'node-a',
-        now: 10,
         leaseDurationMs: 100,
       }),
       t.mutation(api.worker.claimJob, {
         installationId: 'installation-a',
         nodeId: 'node-b',
-        now: 10,
         leaseDurationMs: 100,
       }),
     ])
@@ -211,18 +218,17 @@ describe('leases and runs', () => {
     const claim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 10,
     })
     expect(claim).not.toBeNull()
     if (claim === null) throw new Error('expected claim')
 
+    vi.setSystemTime(1_005)
     const renewed = await t.mutation(api.worker.renewLease, {
       installationId: 'installation-a',
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedRevision: claim.job.revision,
-      now: 15,
       leaseDurationMs: 10,
     })
     expect(renewed).toEqual({ ok: true, revision: 2 })
@@ -232,17 +238,16 @@ describe('leases and runs', () => {
         jobId: claim.job.jobId,
         nodeId: 'node-a',
         expectedRevision: claim.job.revision,
-        now: 16,
         leaseDurationMs: 10,
       }),
     ).toEqual({ ok: false, reason: 'stale_revision' })
+    vi.setSystemTime(1_015)
     expect(
       await t.mutation(api.worker.renewLease, {
         installationId: 'installation-a',
         jobId: claim.job.jobId,
         nodeId: 'node-a',
         expectedRevision: 2,
-        now: 25,
         leaseDurationMs: 10,
       }),
     ).toEqual({ ok: false, reason: 'lease_expired' })
@@ -256,7 +261,6 @@ describe('leases and runs', () => {
     const claim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 10,
     })
     if (claim === null) throw new Error('expected claim')
@@ -265,7 +269,6 @@ describe('leases and runs', () => {
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: claim.job.revision,
-      now: 11,
     })
     if (!started.ok) throw new Error('expected run')
     const shared = {
@@ -275,8 +278,8 @@ describe('leases and runs', () => {
       nodeId: 'node-a',
       expectedJobRevision: started.job.revision,
       expectedRunRevision: started.run.revision,
-      now: 20,
     }
+    vi.setSystemTime(1_010)
     expect(await t.mutation(api.worker.completeRun, shared)).toEqual({
       ok: false,
       reason: 'lease_expired',
@@ -299,7 +302,6 @@ describe('leases and runs', () => {
     const firstClaim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 10,
     })
     if (firstClaim === null) throw new Error('expected first claim')
@@ -308,14 +310,13 @@ describe('leases and runs', () => {
       jobId: firstClaim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: firstClaim.job.revision,
-      now: 11,
     })
     expect(started.ok).toBe(true)
 
+    vi.setSystemTime(1_010)
     const reclaimed = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-b',
-      now: 20,
       leaseDurationMs: 10,
     })
     expect(reclaimed).toMatchObject({
@@ -338,7 +339,6 @@ describe('leases and runs', () => {
     const claim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 100,
     })
     if (claim === null) throw new Error('expected claim')
@@ -347,7 +347,6 @@ describe('leases and runs', () => {
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: claim.job.revision,
-      now: 11,
     })
     if (!started.ok) throw new Error(`start failed: ${started.reason}`)
     const duplicateStart = await t.mutation(api.worker.startRun, {
@@ -355,7 +354,6 @@ describe('leases and runs', () => {
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: claim.job.revision,
-      now: 11,
     })
     expect(duplicateStart).toMatchObject({ ok: true, created: false })
 
@@ -372,17 +370,14 @@ describe('leases and runs', () => {
           sequence: 1,
           type: 'status' as const,
           data: 'started',
-          createdAt: 12,
         },
         {
           eventId: 'event-2',
           sequence: 2,
           type: 'message' as const,
           data: 'done',
-          createdAt: 13,
         },
       ],
-      now: 12,
     }
     await expect(
       t.mutation(api.worker.appendRunEvents, {
@@ -392,7 +387,6 @@ describe('leases and runs', () => {
           sequence: index + 1,
           type: 'status' as const,
           data: '',
-          createdAt: 12,
         })),
       }),
     ).rejects.toThrow('events.length must be an integer between 1 and 32')
@@ -419,7 +413,6 @@ describe('leases and runs', () => {
             sequence: 4,
             type: 'status',
             data: 'skipped',
-            createdAt: 14,
           },
         ],
         expectedRunRevision: 2,
@@ -433,7 +426,6 @@ describe('leases and runs', () => {
       nodeId: 'node-a',
       expectedJobRevision: started.job.revision,
       expectedRunRevision: 2,
-      now: 14,
     }
     expect(await t.mutation(api.worker.completeRun, completionArgs)).toEqual({
       ok: true,
@@ -461,7 +453,6 @@ describe('terminal transitions and projections', () => {
     const claim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 100,
     })
     if (claim === null) throw new Error('expected claim')
@@ -470,7 +461,6 @@ describe('terminal transitions and projections', () => {
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: claim.job.revision,
-      now: 11,
     })
     if (!started.ok) throw new Error('expected run')
     await t.mutation(api.worker.failRun, {
@@ -482,7 +472,6 @@ describe('terminal transitions and projections', () => {
       retryable: false,
       expectedJobRevision: started.job.revision,
       expectedRunRevision: started.run.revision,
-      now: 12,
     })
     const [failedJob] = await readJobs(t)
     if (failedJob === undefined) throw new Error('expected failed job')
@@ -493,7 +482,6 @@ describe('terminal transitions and projections', () => {
         commandId: submission.command.commandId,
         expectedCommandRevision: 1,
         expectedJobRevision: failedJob.revision,
-        now: 13,
       }),
     ).toEqual({
       ok: true,
@@ -513,7 +501,6 @@ describe('terminal transitions and projections', () => {
       const claim = await t.mutation(api.worker.claimJob, {
         installationId: 'installation-a',
         nodeId: 'node-a',
-        now: attempt * 10,
         leaseDurationMs: 100,
       })
       if (claim === null) throw new Error('expected claim')
@@ -522,7 +509,6 @@ describe('terminal transitions and projections', () => {
         jobId: claim.job.jobId,
         nodeId: 'node-a',
         expectedJobRevision: claim.job.revision,
-        now: attempt * 10 + 1,
       })
       if (!started.ok) throw new Error('expected run')
       const failed = await t.mutation(api.worker.failRun, {
@@ -534,7 +520,6 @@ describe('terminal transitions and projections', () => {
         retryable: true,
         expectedJobRevision: started.job.revision,
         expectedRunRevision: started.run.revision,
-        now: attempt * 10 + 2,
       })
       expect(failed.ok).toBe(true)
     }
@@ -547,7 +532,6 @@ describe('terminal transitions and projections', () => {
         commandId: submission.command.commandId,
         expectedCommandRevision: 1,
         expectedJobRevision: job.revision,
-        now: 30,
       }),
     ).toEqual({ ok: false, reason: 'attempts_exhausted' })
   })
@@ -655,7 +639,6 @@ describe('round 1 rejection regressions', () => {
     const claim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 100,
     })
     if (claim === null) throw new Error('expected claim')
@@ -664,7 +647,6 @@ describe('round 1 rejection regressions', () => {
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: claim.job.revision,
-      now: 11,
     })
     if (!started.ok) throw new Error('expected run')
 
@@ -673,16 +655,19 @@ describe('round 1 rejection regressions', () => {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: registration.node.revision,
-        now: 12,
       }),
-    ).toEqual({ ok: true, revision: 1 })
+    ).toEqual({
+      ok: true,
+      revision: 1,
+      releasedWork: 1,
+      cleanupPending: false,
+    })
     expect(
       await t.mutation(api.worker.renewLease, {
         installationId: 'installation-a',
         jobId: started.job.jobId,
         nodeId: 'node-a',
         expectedRevision: started.job.revision,
-        now: 13,
         leaseDurationMs: 100,
       }),
     ).toEqual({ ok: false, reason: 'inactive_node' })
@@ -696,7 +681,7 @@ describe('round 1 rejection regressions', () => {
     expect((await readRuns(t, started.job.jobId))[0]).toMatchObject({
       status: 'failed',
       error: 'node revoked',
-      finishedAt: 12,
+      finishedAt: 1_000,
     })
   })
 
@@ -710,21 +695,18 @@ describe('round 1 rejection regressions', () => {
       displayName: 'node-without-capability',
       capabilities: [],
       protocolVersion: '1',
-      now: 2,
     })
     await submit(t, 'heartbeat-command')
     await expect(
       t.mutation(api.worker.claimJob, {
         installationId: 'installation-a',
         nodeId: 'node-without-capability',
-        now: 3,
         leaseDurationMs: 100,
       }),
     ).rejects.toThrow('missing_capability')
     const claim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 30_000,
     })
     if (claim === null) throw new Error('expected claim')
@@ -733,16 +715,15 @@ describe('round 1 rejection regressions', () => {
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: claim.job.revision,
-      now: 11,
     })
     if (!started.ok) throw new Error('expected run')
+    vi.setSystemTime(61_001)
     expect(
       await t.mutation(api.worker.renewLease, {
         installationId: 'installation-a',
         jobId: started.job.jobId,
         nodeId: 'node-a',
         expectedRevision: started.job.revision,
-        now: 60_003,
         leaseDurationMs: 100,
       }),
     ).toEqual({ ok: false, reason: 'stale_heartbeat' })
@@ -770,7 +751,6 @@ describe('round 1 rejection regressions', () => {
     const claim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 5,
     })
     if (claim === null) throw new Error('expected claim')
@@ -779,15 +759,14 @@ describe('round 1 rejection regressions', () => {
       jobId: claim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: claim.job.revision,
-      now: 11,
     })
     if (!started.ok) throw new Error('expected run')
 
+    vi.setSystemTime(1_005)
     expect(
       await t.mutation(api.worker.claimJob, {
         installationId: 'installation-a',
         nodeId: 'node-b',
-        now: 16,
         leaseDurationMs: 5,
       }),
     ).toBeNull()
@@ -798,7 +777,7 @@ describe('round 1 rejection regressions', () => {
     })
     expect((await readRuns(t, started.job.jobId))[0]).toMatchObject({
       status: 'failed',
-      finishedAt: 16,
+      finishedAt: 1_005,
     })
     expect(
       await t.query(api.commands.get, {
@@ -821,7 +800,6 @@ describe('round 1 rejection regressions', () => {
     const firstClaim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 10,
       leaseDurationMs: 100,
     })
     if (firstClaim === null) throw new Error('expected claim')
@@ -830,7 +808,6 @@ describe('round 1 rejection regressions', () => {
       jobId: firstClaim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: firstClaim.job.revision,
-      now: 11,
     })
     if (!firstRun.ok) throw new Error('expected run')
     await t.mutation(api.worker.failRun, {
@@ -842,7 +819,6 @@ describe('round 1 rejection regressions', () => {
       retryable: false,
       expectedJobRevision: firstRun.job.revision,
       expectedRunRevision: firstRun.run.revision,
-      now: 12,
     })
     const [failedJob] = await readJobs(t)
     if (failedJob === undefined) throw new Error('expected failed job')
@@ -852,13 +828,11 @@ describe('round 1 rejection regressions', () => {
         commandId: submission.command.commandId,
         expectedCommandRevision: 1,
         expectedJobRevision: failedJob.revision,
-        now: 13,
       }),
     ).toMatchObject({ ok: true })
     const secondClaim = await t.mutation(api.worker.claimJob, {
       installationId: 'installation-a',
       nodeId: 'node-a',
-      now: 14,
       leaseDurationMs: 100,
     })
     if (secondClaim === null) throw new Error('expected retry claim')
@@ -867,7 +841,6 @@ describe('round 1 rejection regressions', () => {
       jobId: secondClaim.job.jobId,
       nodeId: 'node-a',
       expectedJobRevision: secondClaim.job.revision,
-      now: 15,
     })
     if (!secondRun.ok) throw new Error('expected retry run')
     expect(
@@ -878,7 +851,6 @@ describe('round 1 rejection regressions', () => {
         nodeId: 'node-a',
         expectedJobRevision: secondRun.job.revision,
         expectedRunRevision: secondRun.run.revision,
-        now: 16,
       }),
     ).toMatchObject({ ok: true })
     expect(
@@ -1057,5 +1029,152 @@ describe('reactive projection API', () => {
         now: 13,
       }),
     ).toEqual({ ok: true, revision: 3 })
+  })
+})
+
+describe('round 2 rejection regressions', () => {
+  test('uses the Convex clock for worker events and rejects completion after server-time lease expiry', async () => {
+    const t = backend()
+    await createInstallation(t)
+    await registerNode(t, 'node-a')
+    await submit(t, 'server-clock-command')
+    vi.setSystemTime(2_000)
+    const claim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation-a',
+      nodeId: 'node-a',
+      leaseDurationMs: 20,
+    })
+    if (claim === null) throw new Error('expected claim')
+    const started = await t.mutation(api.worker.startRun, {
+      installationId: 'installation-a',
+      jobId: claim.job.jobId,
+      nodeId: 'node-a',
+      expectedJobRevision: claim.job.revision,
+    })
+    if (!started.ok) throw new Error('expected run')
+
+    vi.setSystemTime(2_010)
+    const appended = await t.mutation(api.worker.appendRunEvents, {
+      installationId: 'installation-a',
+      jobId: started.job.jobId,
+      runId: started.run.runId,
+      nodeId: 'node-a',
+      expectedJobRevision: started.job.revision,
+      expectedRunRevision: started.run.revision,
+      events: [
+        {
+          eventId: 'server-clock-event',
+          sequence: 1,
+          type: 'status',
+          data: 'server timestamp only',
+        },
+      ],
+    })
+    if (!appended.ok) throw new Error('expected event append')
+    expect(appended.events[0]?.createdAt).toBe(2_010)
+
+    vi.setSystemTime(2_020)
+    expect(
+      await t.mutation(api.worker.completeRun, {
+        installationId: 'installation-a',
+        jobId: started.job.jobId,
+        runId: started.run.runId,
+        nodeId: 'node-a',
+        expectedJobRevision: started.job.revision,
+        expectedRunRevision: appended.revision,
+      }),
+    ).toEqual({ ok: false, reason: 'lease_expired' })
+  })
+
+  test('never returns an empty tombstone-only page while live projections remain', async () => {
+    const t = backend()
+    await createInstallation(t)
+    for (const suffix of ['a', 'b']) {
+      await t.mutation(api.projections.createTask, {
+        installationId: 'installation-a',
+        taskId: `task-${suffix}`,
+        idempotencyKey: `task-key-${suffix}`,
+        title: `Task ${suffix}`,
+        status: 'open',
+        now: 10,
+      })
+      await t.mutation(api.projections.createReminder, {
+        installationId: 'installation-a',
+        reminderId: `reminder-${suffix}`,
+        idempotencyKey: `reminder-key-${suffix}`,
+        message: `Reminder ${suffix}`,
+        remindAt: 100,
+        timezone: 'UTC',
+        status: 'scheduled',
+        now: 10,
+      })
+    }
+    await t.mutation(api.projections.tombstoneTask, {
+      installationId: 'installation-a',
+      taskId: 'task-a',
+      expectedRevision: 0,
+      now: 11,
+    })
+    await t.mutation(api.projections.tombstoneReminder, {
+      installationId: 'installation-a',
+      reminderId: 'reminder-a',
+      expectedRevision: 0,
+      now: 11,
+    })
+
+    const taskPage = await t.query(api.projections.listTasks, {
+      installationId: 'installation-a',
+      paginationOpts: { numItems: 1, cursor: null },
+    })
+    expect(taskPage.page.map((task) => task.taskId)).toEqual(['task-b'])
+    expect(taskPage.isDone).toBe(true)
+    const reminderPage = await t.query(api.projections.listReminders, {
+      installationId: 'installation-a',
+      paginationOpts: { numItems: 1, cursor: null },
+    })
+    expect(reminderPage.page.map((reminder) => reminder.reminderId)).toEqual([
+      'reminder-b',
+    ])
+    expect(reminderPage.isDone).toBe(true)
+  })
+
+  test('revokes large owned-work sets in bounded resumable transactions', async () => {
+    const t = backend()
+    await createInstallation(t)
+    const registration = await registerNode(t, 'node-a')
+    for (let index = 0; index < 40; index += 1) {
+      await submit(t, `cleanup-command-${index}`)
+      const claim = await t.mutation(api.worker.claimJob, {
+        installationId: 'installation-a',
+        nodeId: 'node-a',
+        leaseDurationMs: 30_000,
+      })
+      if (claim === null) throw new Error(`expected claim ${index}`)
+    }
+
+    expect(
+      await t.mutation(api.worker.revokeNode, {
+        installationId: 'installation-a',
+        nodeId: 'node-a',
+        expectedRevision: registration.node.revision,
+      }),
+    ).toEqual({
+      ok: true,
+      revision: 1,
+      releasedWork: 32,
+      cleanupPending: true,
+    })
+    expect(
+      (await readJobs(t)).filter((job) => job.leaseOwnerNodeId === 'node-a'),
+    ).toHaveLength(8)
+    expect(
+      await t.mutation(api.worker.continueNodeRevocationCleanup, {
+        installationId: 'installation-a',
+        nodeId: 'node-a',
+      }),
+    ).toEqual({ ok: true, releasedWork: 8, cleanupPending: false })
+    expect(
+      (await readJobs(t)).filter((job) => job.leaseOwnerNodeId === 'node-a'),
+    ).toHaveLength(0)
   })
 })

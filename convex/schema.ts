@@ -127,7 +127,23 @@ export default defineSchema({
     .index('by_installation_task', ['installationId', 'taskId'])
     .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
     .index('by_installation_status_due', ['installationId', 'status', 'dueAt'])
-    .index('by_installation_due', ['installationId', 'dueAt']),
+    .index('by_installation_due', ['installationId', 'dueAt'])
+    .index('by_installation_live_task', [
+      'installationId',
+      'deletedAt',
+      'taskId',
+    ])
+    .index('by_installation_live_status_due', [
+      'installationId',
+      'deletedAt',
+      'status',
+      'dueAt',
+    ])
+    .index('by_installation_live_due', [
+      'installationId',
+      'deletedAt',
+      'dueAt',
+    ]),
 
   reminders: defineTable({
     installationId: v.string(),
@@ -149,5 +165,21 @@ export default defineSchema({
       'status',
       'remindAt',
     ])
-    .index('by_installation_time', ['installationId', 'remindAt']),
+    .index('by_installation_time', ['installationId', 'remindAt'])
+    .index('by_installation_live_reminder', [
+      'installationId',
+      'deletedAt',
+      'reminderId',
+    ])
+    .index('by_installation_live_status_time', [
+      'installationId',
+      'deletedAt',
+      'status',
+      'remindAt',
+    ])
+    .index('by_installation_live_time', [
+      'installationId',
+      'deletedAt',
+      'remindAt',
+    ]),
 })

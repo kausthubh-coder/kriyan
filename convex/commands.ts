@@ -190,7 +190,6 @@ export const retry = mutation({
     commandId: v.string(),
     expectedCommandRevision: v.number(),
     expectedJobRevision: v.number(),
-    now: v.number(),
   },
   returns: v.union(
     v.object({
@@ -213,7 +212,7 @@ export const retry = mutation({
     assertId(args.commandId, 'commandId')
     assertExpectedRevision(args.expectedCommandRevision)
     assertExpectedRevision(args.expectedJobRevision)
-    assertTimestamp(args.now, 'now')
+    const now = Date.now()
     const command = await ctx.db
       .query('commands')
       .withIndex('by_installation_command', (q) =>
@@ -247,7 +246,7 @@ export const retry = mutation({
     await ctx.db.patch(command._id, {
       status: 'accepted',
       revision: command.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     await ctx.db.patch(job._id, {
       status: 'queued',
@@ -255,7 +254,7 @@ export const retry = mutation({
       leaseOwnerNodeId: undefined,
       leaseExpiresAt: undefined,
       revision: job.revision + 1,
-      updatedAt: args.now,
+      updatedAt: now,
     })
     return {
       ok: true as const,
