@@ -1,3 +1,5 @@
+import { canonicalJson } from '@kriyan/contracts'
+
 const LIMITS = {
   id: 128,
   shortText: 256,
@@ -79,18 +81,8 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function canonicalize(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value)
-  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
-  return `{${Object.entries(value as Record<string, unknown>)
-    .filter(([, entry]) => entry !== undefined)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalize(entry)}`)
-    .join(',')}}`
-}
-
 export function valuesEqual(left: unknown, right: unknown): boolean {
-  return canonicalize(left) === canonicalize(right)
+  return canonicalJson(left) === canonicalJson(right)
 }
 
 function assertTipTapNode(value: unknown, depth: number): void {

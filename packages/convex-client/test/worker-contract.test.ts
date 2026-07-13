@@ -1,4 +1,4 @@
-import { WORKER_OPERATIONS } from '@kriyan/contracts'
+import { WORKER_OPERATIONS, WORKER_OPERATION_VALID_INPUTS } from '@kriyan/contracts'
 import { expect, test } from 'bun:test'
 import { getFunctionName } from 'convex/server'
 
@@ -12,7 +12,7 @@ test('binds and invokes every frozen worker operation', async () => {
     async query(reference: unknown) { calls.push(`query:${getFunctionName(reference as never)}`); return { ok: true } },
   }
   const client = createWorkerContractClient(transport as never)
-  for (const operation of WORKER_OPERATIONS) await client.invoke(operation, { installationId: 'installation:test' })
+  for (const operation of WORKER_OPERATIONS) await client.invoke(operation, WORKER_OPERATION_VALID_INPUTS[operation] as never)
   expect(calls).toHaveLength(WORKER_OPERATIONS.length)
   expect(calls).toContain('query:commands:get')
   expect(calls).toContain('mutation:worker:finalizeAssistantRun')

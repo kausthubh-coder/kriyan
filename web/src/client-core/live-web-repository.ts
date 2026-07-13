@@ -2,7 +2,7 @@
 
 import {
   createClientId,
-  createReactiveSnapshotStore,
+  deriveActivity,
   normalizeTransitionReason,
   PAGE_SIZE,
   type ActionResult,
@@ -13,6 +13,8 @@ import {
   type SourceRefItem,
   type TaskItem,
   type ReactiveClientRepository,
+  type ClientSnapshot,
+  type SnapshotSubscriptionTransport,
 } from '@kriyan/client-core'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
@@ -22,6 +24,27 @@ import type { KriyanWebConfiguration } from '@/lib/convex'
 
 import { useConvexRepository } from './convex-repository'
 import type { WebRepository } from './web-repository'
+import { createWebReactiveRepository } from './reactive-web-adapter'
+
+function createSnapshotBridge(): {
+  repository: ReactiveClientRepository
+  publish(snapshot: ClientSnapshot): void
+  fail(error: Error): void
+} {
+  const listeners = new Set<{ next: (snapshot: ClientSnapshot) => void; error: (error: Error) => void }>()
+  const transport: SnapshotSubscriptionTransport = {
+    subscribe(next, error) {
+      const listener = { next, error }; listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    close() { listeners.clear() },
+  }
+  return {
+    repository: createWebReactiveRepository(transport),
+    publish(snapshot) { for (const listener of [...listeners]) listener.next(snapshot) },
+    fail(error) { for (const listener of [...listeners]) listener.error(error) },
+  }
+}
 
 function failure(reason: unknown, error?: unknown): ActionResult<never> {
   const normalized = normalizeTransitionReason(reason)
@@ -199,17 +222,25 @@ export function useLiveWebRepository(
     },
   }
 
-  const reactive = useMemo(() => createReactiveSnapshotStore(), [])
+  const reactive = useMemo(() => createSnapshotBridge(), [])
   useEffect(() => {
-    reactive.replace({
-      productivity: { tasks: repository.tasks, reminders: repository.reminders, calendarEvents: repository.calendarEvents, notes: repository.notes, notificationIntents: [] },
-      agents: contractSnapshot?.agents ?? { threads: [], messages: [] },
-      knowledge: { sources: repository.sourceRefs, documents: repository.knowledgeDocuments, artifacts: contractSnapshot?.knowledge.artifacts ?? [] },
-      nodes: { items: repository.nodes, activity: repository.activity },
+    if (!contractSnapshot) return
+    reactive.publish({
+      transactionRevision: contractSnapshot.transactionRevision,
+      productivity: {
+        tasks: contractSnapshot.productivity.tasks,
+        reminders: contractSnapshot.productivity.reminders,
+        calendarEvents: contractSnapshot.productivity.calendarEvents.map(mapEvent),
+        notes: contractSnapshot.productivity.notes,
+        notificationIntents: contractSnapshot.productivity.notificationIntents,
+      },
+      agents: contractSnapshot.agents,
+      knowledge: contractSnapshot.knowledge,
+      nodes: { items: contractSnapshot.nodes.items, activity: deriveActivity(contractSnapshot.nodes.activity) },
       connection: base.connectionMode,
     })
-  }, [base.connectionMode, contractSnapshot?.agents, contractSnapshot?.knowledge.artifacts, reactive, repository.activity, repository.calendarEvents, repository.knowledgeDocuments, repository.nodes, repository.notes, repository.reminders, repository.sourceRefs, repository.tasks])
-  useEffect(() => () => reactive.dispose(), [reactive])
+  }, [base.connectionMode, contractSnapshot, reactive])
+  useEffect(() => () => reactive.repository.dispose(), [reactive])
 
-  return { repository, reactiveRepository: reactive, connectionMode: base.connectionMode, connectionRecoveryRequired: base.connectionRecoveryRequired }
+  return { repository, reactiveRepository: reactive.repository, connectionMode: base.connectionMode, connectionRecoveryRequired: base.connectionRecoveryRequired }
 }

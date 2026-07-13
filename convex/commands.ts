@@ -5,6 +5,7 @@ import {
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
+import { finalizeAgentTurn } from './agent-turns'
 import {
   assertId,
   assertInput,
@@ -254,6 +255,10 @@ export const retry = mutation({
       revision: job.revision + 1,
       updatedAt: now,
     })
+    if (job.turnId !== undefined) {
+      const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', args.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
+      for (const message of messages) await ctx.db.patch(message._id, { state: 'queued', finalizedAt: undefined, updatedAt: now })
+    }
     return {
       ok: true as const,
       commandRevision: command.revision + 1,
@@ -340,12 +345,7 @@ export const cancel = mutation({
         finishedAt: now,
       })
     }
-    if (job.threadId !== undefined && job.turnId !== undefined) {
-      const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', job.threadId!)).unique()
-      if (thread?.activeTurnId === job.turnId) await ctx.db.patch(thread._id, { activeTurnId: undefined, updatedAt: now })
-      const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', args.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
-      for (const message of messages) await ctx.db.patch(message._id, { state: 'cancelled', updatedAt: now, finalizedAt: now })
-    }
+    await finalizeAgentTurn(ctx, job, 'cancelled', now)
     return { ok: true as const, revision: command.revision + 1 }
   },
 })

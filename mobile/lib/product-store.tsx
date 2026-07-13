@@ -2,7 +2,7 @@ import type {
   AppNoteItem, CalendarEventItem, ClientSnapshot, KnowledgeDocumentItem, ProductMutationResult, ProductRepository, ReactiveClientRepository,
   ReminderItem, SourceRefItem, TaskItem,
 } from '@kriyan/client-core'
-import React, { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import React, { createContext, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getDemoRepository } from '@/lib/demo-repository'
 import { createConvexRepository } from '@/lib/convex-repository'
@@ -30,7 +30,31 @@ function isReactive(repository: ProductRepository): repository is ProductReposit
   return 'getSnapshot' in repository && 'subscribe' in repository && 'dispose' in repository
 }
 
-export function ProductStoreProvider({ children }: { children: ReactNode }) {
+export async function settleRepositorySetup(
+  setup: Promise<ProductRepository>,
+  isCurrent: () => boolean,
+  accept: (repository: ProductRepository) => void,
+  reject: (cause: unknown) => void,
+): Promise<void> {
+  try {
+    const next = await setup
+    if (!isCurrent()) {
+      if (isReactive(next)) next.dispose()
+      return
+    }
+    accept(next)
+  } catch (cause) {
+    if (isCurrent()) reject(cause)
+  }
+}
+
+export function ProductStoreProvider({
+  children,
+  repositoryFactory,
+}: {
+  children: ReactNode
+  repositoryFactory?: () => Promise<ProductRepository>
+}) {
   const [repository, setRepository] = useState<ProductRepository>()
   const [connection, setConnection] = useState<ProductState['connection']>('connecting')
   const [error, setError] = useState<string>()
@@ -40,6 +64,7 @@ export function ProductStoreProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<AppNoteItem[]>([])
   const [sources, setSources] = useState<SourceRefItem[]>([])
   const [knowledge, setKnowledge] = useState<KnowledgeDocumentItem[]>([])
+  const setupGeneration = useRef(0)
   const mode: ProductState['mode'] = process.env.EXPO_PUBLIC_CONVEX_URL ? 'convex' : 'demo'
 
   const refresh = useCallback(async () => {
@@ -69,13 +94,27 @@ export function ProductStoreProvider({ children }: { children: ReactNode }) {
   }, [repository])
 
   useEffect(() => {
-    const setup = process.env.EXPO_PUBLIC_CONVEX_URL
-      ? createConvexRepository(process.env.EXPO_PUBLIC_CONVEX_URL)
-      : getDemoRepository()
-    setup.then(setRepository).catch((cause: unknown) => {
-      setConnection('offline'); setError(cause instanceof Error ? cause.message : 'Data setup failed')
-    })
-  }, [])
+    const generation = setupGeneration.current + 1
+    setupGeneration.current = generation
+    let resolved: ProductRepository | undefined
+    let active = true
+    const setup = repositoryFactory
+      ? repositoryFactory()
+      : process.env.EXPO_PUBLIC_CONVEX_URL
+        ? createConvexRepository(process.env.EXPO_PUBLIC_CONVEX_URL)
+        : getDemoRepository()
+    void settleRepositorySetup(
+      setup,
+      () => active && setupGeneration.current === generation,
+      (next) => { resolved = next; setRepository(next) },
+      (cause) => { setConnection('offline'); setError(cause instanceof Error ? cause.message : 'Data setup failed') },
+    )
+    return () => {
+      active = false
+      if (setupGeneration.current === generation) setupGeneration.current += 1
+      if (resolved && isReactive(resolved)) resolved.dispose()
+    }
+  }, [repositoryFactory])
   useEffect(() => {
     if (!repository) return
     if (!isReactive(repository)) { void refresh(); return }

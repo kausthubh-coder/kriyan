@@ -103,10 +103,21 @@ export const submitMessage = mutation({
     assertBoundedString(args.content, 'content', 65_536); assertPositiveInteger(args.maxAttempts, 'maxAttempts', 10)
     const existingCommand = await ctx.db.query('commands').withIndex('by_installation_idempotency', (q) => q.eq('installationId', args.installationId).eq('idempotencyKey', args.idempotencyKey)).unique()
     if (existingCommand !== null) {
-      if (existingCommand.threadId !== args.threadId || existingCommand.input !== args.content) throw new Error('idempotency key conflicts with an existing turn')
+      if (
+        existingCommand.commandId !== args.commandId
+        || existingCommand.threadId !== args.threadId
+        || existingCommand.input !== args.content
+      ) throw new Error('idempotency key conflicts with an existing turn')
       const existingJob = await ctx.db.query('jobs').withIndex('by_installation_command', (q) => q.eq('installationId', args.installationId).eq('commandId', existingCommand.commandId)).unique()
-      const existingMessage = await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) => q.eq('installationId', args.installationId).eq('messageId', args.messageId)).unique()
-      if (existingJob === null || existingMessage === null) throw new Error('existing turn is incomplete')
+      if (existingJob === null || existingJob.turnId === undefined) throw new Error('existing turn is incomplete')
+      const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', args.installationId).eq('turnId', existingJob.turnId!).eq('role', 'user')).collect()
+      const existingMessage = messages[0]
+      if (
+        existingMessage === undefined
+        || existingMessage.messageId !== args.messageId
+        || existingMessage.content !== args.content
+        || existingJob.maxAttempts !== args.maxAttempts
+      ) throw new Error('idempotency key conflicts with an existing turn')
       return { created: false, message: withoutSystemFields(existingMessage), command: withoutSystemFields(existingCommand), job: withoutSystemFields(existingJob) }
     }
     const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', args.threadId)).unique()
@@ -120,6 +131,9 @@ export const submitMessage = mutation({
     const ordinal = thread.nextTurnOrdinal
     const turnId = deterministicTurnId(args.threadId, ordinal)
     const assistantMessageId = deterministicAssistantMessageId(args.threadId, ordinal)
+    if (args.messageId === assistantMessageId) throw new Error('messageId is reserved for the deterministic assistant result')
+    const assistantCollision = await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) => q.eq('installationId', args.installationId).eq('messageId', assistantMessageId)).unique()
+    if (assistantCollision !== null) throw new Error('deterministic assistant messageId already exists')
     const now = Date.now()
     const common = { installationId: args.installationId, contractVersion: CONTRACT_VERSION, kind: JOB_KINDS.agentTurn, threadId: args.threadId, turnId, turnOrdinal: ordinal, agentRevisionId: pinnedRevisionId }
     const message = { installationId: args.installationId, messageId: args.messageId, threadId: args.threadId, turnId, turnOrdinal: ordinal, role: 'user' as const, state: 'queued' as const, content: args.content, origin: 'client', agentRevisionId: pinnedRevisionId, createdAt: now, updatedAt: now }

@@ -404,8 +404,16 @@ export const artifactValue = v.object({
   installationId: v.string(), artifactId: v.string(), noteId: v.string(),
   noteVersionId: v.string(), slug: v.string(), projectionState,
   projectedHash: v.optional(v.string()), projectedPath: v.optional(v.string()),
+  priorProjectedHash: v.optional(v.string()), priorProjectedPath: v.optional(v.string()),
   lastError: v.optional(v.string()), revision: v.number(), createdAt: v.number(),
   updatedAt: v.number(), deletedAt: v.optional(v.number()),
+})
+
+export const noteLinkValue = v.object({
+  installationId: v.string(), noteLinkId: v.string(), noteId: v.string(),
+  idempotencyKey: v.string(), targetKind: v.string(), targetId: v.string(),
+  relation: v.string(), provenanceIds: v.array(v.string()), revision: v.number(),
+  createdAt: v.number(), updatedAt: v.number(), deletedAt: v.optional(v.number()),
 })
 
 export const memoryCorrectionValue = v.object({

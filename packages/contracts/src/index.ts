@@ -3,6 +3,11 @@ export const CONTRACT_VERSION = 'kriyan.contracts.v1' as const
 export const LEGACY_PROTOCOL_VERSION = '1' as const
 export const REMINDER_CAPABILITY = 'reminders' as const
 export const AGENT_CHAT_CAPABILITY = 'agent.chat.v1' as const
+export const ARTIFACT_MATERIALIZATION_CAPABILITY = 'artifact.materialization.v1' as const
+
+export * from './canonical-vectors'
+export * from './worker-operations'
+export * from './worker-fixtures'
 
 export const JOB_KINDS = Object.freeze({
   legacyCommand: 'command.v1',
@@ -98,9 +103,14 @@ export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
   return `{${Object.entries(value as Record<string, unknown>)
     .filter(([, item]) => item !== undefined)
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => compareCanonicalKeys(left, right))
     .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
     .join(',')}}`
+}
+
+/** Locale-independent UTF-16 code-unit order, matching ECMAScript relational comparison. */
+export function compareCanonicalKeys(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
 }
 
 const SHA256_CONSTANTS = [

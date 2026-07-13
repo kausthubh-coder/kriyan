@@ -15,7 +15,7 @@ import {
   type TaskItem,
 } from '@kriyan/client-core'
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 
 import { useConvexClientControls } from '@/lib/convex'
 import { useRuntimeSettings, type KriyanWebConfiguration } from '@/lib/runtime-settings'
@@ -105,7 +105,23 @@ function LiveTodayApp({ initialSection, configuration, displayName }: { initialS
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const convexClient = useConvexClientControls()
   const runtime = useLiveWebRepository(configuration, selectedRunId, convexClient.generation)
-  return <RepositoryTodayApp initialSection={initialSection} repository={runtime.repository} connectionMode={runtime.connectionMode} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} displayName={displayName} demoMode={false} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+  const snapshot = useSyncExternalStore(
+    runtime.reactiveRepository.subscribe,
+    runtime.reactiveRepository.getSnapshot,
+    runtime.reactiveRepository.getSnapshot,
+  )
+  const repository = useMemo(() => ({
+    ...runtime.repository,
+    tasks: snapshot.productivity.tasks,
+    reminders: snapshot.productivity.reminders,
+    calendarEvents: snapshot.productivity.calendarEvents,
+    notes: snapshot.productivity.notes,
+    sourceRefs: snapshot.knowledge.sources,
+    knowledgeDocuments: snapshot.knowledge.documents,
+    nodes: snapshot.nodes.items,
+    activity: snapshot.nodes.activity,
+  }), [runtime.repository, snapshot])
+  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode={snapshot.connection} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} displayName={displayName} demoMode={false} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
 }
 
 function DemoTodayApp({ initialSection, displayName }: { initialSection: Section; displayName: string }) {

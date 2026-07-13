@@ -5,7 +5,7 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit --strict --skipLibCheck --module ESNext --moduleResolution Bundler --target ES2022 src/index.ts"
+    "typecheck": "tsc --noEmit --strict --skipLibCheck --module ESNext --moduleResolution Bundler --target ES2022 src/index.ts src/worker-negative-probes.ts"
   },
   "dependencies": {
     "@kriyan/contracts": "workspace:*"

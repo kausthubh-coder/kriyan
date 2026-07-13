@@ -24,6 +24,8 @@ export interface KnowledgeSnapshot {
 }
 
 export interface ClientSnapshot {
+  /** Monotonic transaction barrier supplied by one atomic backend snapshot. */
+  transactionRevision: number
   productivity: {
     tasks: TaskItem[]
     reminders: ReminderItem[]
@@ -44,7 +46,13 @@ export interface ReactiveClientRepository {
   dispose(): void
 }
 
+export interface SnapshotSubscriptionTransport {
+  subscribe(onSnapshot: (snapshot: ClientSnapshot) => void, onError: (error: Error) => void): () => void
+  close(): void | Promise<void>
+}
+
 export const EMPTY_CLIENT_SNAPSHOT: ClientSnapshot = Object.freeze({
+  transactionRevision: 0,
   productivity: { tasks: [], reminders: [], calendarEvents: [], notes: [], notificationIntents: [] },
   agents: { threads: [], messages: [] },
   knowledge: { sources: [], documents: [], artifacts: [] },
@@ -69,6 +77,7 @@ export function createReactiveSnapshotStore(
     },
     replace(next) {
       if (disposed) return
+      if (next.transactionRevision < snapshot.transactionRevision) return
       snapshot = next
       if (queued) return
       queued = true
@@ -81,5 +90,79 @@ export function createReactiveSnapshotStore(
       disposed = true
       listeners.clear()
     },
+  }
+}
+
+
+export function createReactiveRepositoryFromTransport(
+  transport: SnapshotSubscriptionTransport,
+  initial: ClientSnapshot = EMPTY_CLIENT_SNAPSHOT,
+): ReactiveClientRepository {
+  const store = createReactiveSnapshotStore(initial)
+  let disposed = false
+  const unsubscribe = transport.subscribe(
+    (snapshot) => store.replace({ ...snapshot, error: undefined }),
+    (error) => store.replace({ ...store.getSnapshot(), connection: 'reconnecting', error: error.message }),
+  )
+  return {
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
+    dispose() {
+      if (disposed) return
+      disposed = true
+      unsubscribe()
+      store.dispose()
+      void transport.close()
+    },
+  }
+}
+
+export interface DeterministicSnapshotServer {
+  connect(): SnapshotSubscriptionTransport
+  mutate(update: (current: ClientSnapshot) => Omit<ClientSnapshot, 'transactionRevision'>): ClientSnapshot
+  fail(error: Error): void
+  reconnect(): void
+  getSnapshot(): ClientSnapshot
+  activeConnections(): number
+}
+
+/** In-memory transaction/subscription harness used by both Web and Expo adapter contracts. */
+export function createDeterministicSnapshotServer(initial: ClientSnapshot = EMPTY_CLIENT_SNAPSHOT): DeterministicSnapshotServer {
+  let snapshot = initial
+  let connected = true
+  const clients = new Set<{ next: (snapshot: ClientSnapshot) => void; error: (error: Error) => void }>()
+  return {
+    connect() {
+      let closed = false
+      let listener: { next: (snapshot: ClientSnapshot) => void; error: (error: Error) => void } | undefined
+      return {
+        subscribe(next, error) {
+          listener = { next, error }
+          clients.add(listener)
+          if (connected) queueMicrotask(() => { if (!closed) next(snapshot) })
+          return () => { if (listener) clients.delete(listener) }
+        },
+        close() {
+          if (closed) return
+          closed = true
+          if (listener) clients.delete(listener)
+        },
+      }
+    },
+    mutate(update) {
+      snapshot = { ...update(snapshot), transactionRevision: snapshot.transactionRevision + 1 }
+      if (connected) for (const client of [...clients]) client.next(snapshot)
+      return snapshot
+    },
+    fail(error) {
+      connected = false
+      for (const client of [...clients]) client.error(error)
+    },
+    reconnect() {
+      connected = true
+      for (const client of [...clients]) client.next(snapshot)
+    },
+    getSnapshot: () => snapshot,
+    activeConnections: () => clients.size,
   }
 }

@@ -242,7 +242,12 @@ export const clientSnapshot = query({
       const run = job === null || job.attempt === 0 ? null : await ctx.db.query('runs').withIndex('by_installation_job_attempt', (q) => q.eq('installationId', args.installationId).eq('jobId', job.jobId).eq('attempt', job.attempt)).unique()
       return { command: withoutSystemFields(command), job: job === null ? undefined : withoutSystemFields(job), run: run === null ? undefined : withoutSystemFields(run) }
     }))
+    const transactionRevision = Math.max(0, ...[
+      ...tasks, ...reminders, ...calendarEvents, ...notes, ...notificationIntents,
+      ...sources, ...knowledge, ...nodes, ...commands, ...threads, ...messages, ...artifacts,
+    ].map((item) => (item as { updatedAt?: number }).updatedAt ?? 0))
     return {
+      transactionRevision,
       productivity: { tasks: tasks.map(withoutSystemFields), reminders: reminders.map(withoutSystemFields), calendarEvents: calendarEvents.map(withoutSystemFields), notes: notes.map(withoutSystemFields), notificationIntents: notificationIntents.map(withoutSystemFields) },
       agents: { threads: threads.map(withoutSystemFields), messages: messages.map(withoutSystemFields) },
       knowledge: { sources: sources.map(withoutSystemFields), documents: knowledge.map(withoutSystemFields), artifacts: artifacts.filter((item) => item.deletedAt === undefined).map(withoutSystemFields) },

@@ -336,6 +336,7 @@ export default defineSchema({
     installationId: v.string(), artifactId: v.string(), noteId: v.string(),
     noteVersionId: v.string(), slug: v.string(), projectionState,
     projectedHash: v.optional(v.string()), projectedPath: v.optional(v.string()),
+    priorProjectedHash: v.optional(v.string()), priorProjectedPath: v.optional(v.string()),
     lastError: v.optional(v.string()), revision: v.number(), createdAt: v.number(),
     updatedAt: v.number(), deletedAt: v.optional(v.number()),
   })
@@ -344,10 +345,13 @@ export default defineSchema({
 
   noteLinks: defineTable({
     installationId: v.string(), noteLinkId: v.string(), noteId: v.string(),
+    idempotencyKey: v.string(),
     targetKind: v.string(), targetId: v.string(), relation: v.string(),
-    provenanceIds: v.array(v.string()), createdAt: v.number(), deletedAt: v.optional(v.number()),
+    provenanceIds: v.array(v.string()), revision: v.number(), createdAt: v.number(),
+    updatedAt: v.number(), deletedAt: v.optional(v.number()),
   })
     .index('by_installation_link', ['installationId', 'noteLinkId'])
+    .index('by_installation_link_idempotency', ['installationId', 'idempotencyKey'])
     .index('by_installation_note', ['installationId', 'noteId']),
 
   agents: defineTable({
@@ -448,6 +452,8 @@ export default defineSchema({
   projectionCursors: defineTable({
     installationId: v.string(), cursorId: v.string(), vaultId: v.string(),
     cursor: v.number(), documentHash: v.optional(v.string()), mode: v.string(),
+    pageCursor: v.optional(v.string()), scanned: v.optional(v.number()),
+    createdCount: v.optional(v.number()), manifestHash: v.optional(v.string()),
     revision: v.number(), createdAt: v.number(), updatedAt: v.number(),
   }).index('by_installation_cursor', ['installationId', 'cursorId']),
 

@@ -1,4 +1,10 @@
-import { WORKER_OPERATIONS, type WorkerOperation } from '@kriyan/contracts'
+import {
+  WORKER_OPERATIONS,
+  assertWorkerOperationInput,
+  type WorkerOperation,
+  type WorkerOperationInputMap,
+  type WorkerOperationResultMap,
+} from '@kriyan/contracts'
 import type { ConvexClient } from 'convex/browser'
 import { makeFunctionReference } from 'convex/server'
 
@@ -42,16 +48,20 @@ export const workerOperationBindings: Readonly<Record<WorkerOperation, Binding>>
 )
 
 export interface WorkerContractClient {
-  invoke<TInput extends Record<string, unknown>, TResult>(operation: WorkerOperation, input: TInput): Promise<TResult>
+  invoke<Operation extends WorkerOperation>(
+    operation: Operation,
+    input: WorkerOperationInputMap[Operation],
+  ): Promise<WorkerOperationResultMap[Operation]>
 }
 
 export function createWorkerContractClient(client: Transport): WorkerContractClient {
   return {
-    async invoke<TInput extends Record<string, unknown>, TResult>(operation: WorkerOperation, input: TInput): Promise<TResult> {
+    async invoke<Operation extends WorkerOperation>(operation: Operation, input: WorkerOperationInputMap[Operation]): Promise<WorkerOperationResultMap[Operation]> {
+      assertWorkerOperationInput(operation, input)
       const binding = workerOperationBindings[operation]
       return binding.kind === 'query'
-        ? await client.query(binding.reference as never, input as never) as TResult
-        : await client.mutation(binding.reference as never, input as never) as TResult
+        ? await client.query(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
+        : await client.mutation(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
     },
   }
 }

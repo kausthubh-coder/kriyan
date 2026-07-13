@@ -1,11 +1,13 @@
 import { v } from 'convex/values'
-import {
-  deterministicAssistantMessageId,
-  REMINDER_CAPABILITY,
-} from '@kriyan/contracts'
+import { REMINDER_CAPABILITY } from '@kriyan/contracts'
 
 import type { Doc } from './_generated/dataModel'
 import { mutation, type MutationCtx } from './_generated/server'
+import {
+  fenceQueuedThreadJobs,
+  finalizeAgentTurn,
+  releaseAgentTurnForRetry,
+} from './agent-turns'
 import {
   assertCapabilities,
   assertError,
@@ -242,6 +244,8 @@ async function releaseOwnedWork(
       updatedAt: now,
     })
     await updateCommandStatus(ctx, job, exhausted ? 'failed' : 'accepted', now)
+    if (exhausted) await finalizeAgentTurn(ctx, job, 'failed', now)
+    else await releaseAgentTurnForRetry(ctx, job, now)
   }
   return {
     releasedWork: batch.length,
@@ -326,6 +330,7 @@ async function terminalizeExhaustedJob(
     updatedAt: now,
   })
   await updateCommandStatus(ctx, job, 'failed', now)
+  await finalizeAgentTurn(ctx, job, 'failed', now)
 }
 
 async function agentJobIsHeadOfLine(
@@ -334,12 +339,13 @@ async function agentJobIsHeadOfLine(
   nodeId: string,
 ): Promise<boolean> {
   if (job.threadId === undefined || job.turnId === undefined || job.turnOrdinal === undefined) return true
-  if (job.preferredNodeId !== undefined && job.preferredNodeId !== nodeId) {
+  const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
+  const preferredNodeId = thread?.preferredNodeId ?? job.preferredNodeId
+  if (preferredNodeId !== undefined && preferredNodeId !== nodeId) {
     const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
     for (const message of messages) if (message.state === 'queued') await ctx.db.patch(message._id, { state: 'waiting_for_node', updatedAt: Date.now() })
     return false
   }
-  const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
   if (thread === null || thread.deletedAt !== undefined) return false
   if (thread.activeTurnId !== undefined && thread.activeTurnId !== job.turnId) return false
   const turns = await ctx.db.query('jobs').withIndex('by_installation_thread_ordinal', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId)).collect()
@@ -907,10 +913,7 @@ async function finishRun(
     job.status === 'succeeded' &&
     run.status === 'succeeded'
   ) {
-    if (job.assistantMessageId !== undefined && args.assistantContent !== undefined) {
-      const assistant = await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) => q.eq('installationId', args.installationId).eq('messageId', job.assistantMessageId!)).unique()
-      if (assistant?.content !== args.assistantContent) throw new Error('assistant finalization conflicts with the completed turn')
-    }
+    if (job.threadId !== undefined) await finalizeAgentTurn(ctx, job, 'completed', now, args.assistantContent)
     return { ok: true as const, revision: job.revision }
   }
   if (
@@ -932,11 +935,7 @@ async function finishRun(
   if (lease !== null) return { ok: false as const, reason: lease }
   if (outcome.status === 'succeeded') {
     if (job.threadId !== undefined && args.assistantContent === undefined) return { ok: false as const, reason: 'invalid_state' as const }
-    if (job.threadId !== undefined && job.turnId !== undefined && job.turnOrdinal !== undefined && job.agentRevisionId !== undefined) {
-      const messageId = job.assistantMessageId ?? deterministicAssistantMessageId(job.threadId, job.turnOrdinal)
-      const existing = await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) => q.eq('installationId', job.installationId).eq('messageId', messageId)).unique()
-      if (existing === null) await ctx.db.insert('agentMessages', { installationId: job.installationId, messageId, threadId: job.threadId, turnId: job.turnId, turnOrdinal: job.turnOrdinal, role: 'assistant', state: 'completed', content: args.assistantContent!, origin: 'node', agentRevisionId: job.agentRevisionId, createdAt: now, updatedAt: now, finalizedAt: now })
-    }
+    await finalizeAgentTurn(ctx, job, 'completed', now, args.assistantContent)
     await ctx.db.patch(run._id, {
       status: 'succeeded',
       revision: run.revision + 1,
@@ -973,11 +972,9 @@ async function finishRun(
       now,
     )
   }
-  if (job.threadId !== undefined && job.turnId !== undefined && (outcome.status === 'succeeded' || !outcome.retryable || job.attempt >= job.maxAttempts)) {
-    const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
-    if (thread?.activeTurnId === job.turnId) await ctx.db.patch(thread._id, { activeTurnId: undefined, updatedAt: now })
-    const users = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
-    for (const message of users) await ctx.db.patch(message._id, { state: outcome.status === 'succeeded' ? 'completed' : 'failed', updatedAt: now, finalizedAt: now })
+  if (outcome.status === 'failed') {
+    if (!outcome.retryable || job.attempt >= job.maxAttempts) await finalizeAgentTurn(ctx, job, 'failed', now)
+    else await releaseAgentTurnForRetry(ctx, job, now)
   }
   return { ok: true as const, revision: job.revision + 1 }
 }
@@ -1066,6 +1063,7 @@ export const checkpointSession = mutation({
     const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', job.threadId!)).unique()
     if (thread === null) return { ok: false as const, reason: 'not_found' as const }
     await ctx.db.patch(thread._id, { piSessionRef: args.piSessionRef, preferredNodeId: args.nodeId, sessionRevision: thread.sessionRevision + 1, updatedAt: now })
+    await fenceQueuedThreadJobs(ctx, args.installationId, job.threadId, args.nodeId, now)
     await ctx.db.patch(job._id, { sessionCheckpoint: args.piSessionRef, revision: job.revision + 1, updatedAt: now })
     return { ok: true as const, revision: job.revision + 1 }
   },
