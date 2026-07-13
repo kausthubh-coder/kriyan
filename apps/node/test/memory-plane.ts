@@ -9,6 +9,7 @@ import type {
 } from '@kriyan/convex-client'
 
 interface CommandRecord {
+  idempotencyKey: string
   input: string
   status: 'accepted' | 'completed' | 'failed' | 'cancelled'
 }
@@ -216,6 +217,23 @@ export class MemoryControlPlane implements ControlPlane {
     input: string
     maxAttempts: number
   }) {
+    const existing = [...this.commands.entries()].find(
+      ([, command]) => command.idempotencyKey === input.idempotencyKey,
+    )
+    if (existing !== undefined) {
+      const [existingCommandId, command] = existing
+      if (
+        existingCommandId !== input.commandId ||
+        command.input !== input.input ||
+        command.status === 'cancelled'
+      ) {
+        throw new Error('idempotency key conflicts with an existing command')
+      }
+      const existingJob = this.jobs.get(`job:${existingCommandId}`)
+      if (existingJob === undefined) throw new Error('existing command is missing its job')
+      return { created: false, job: { ...existingJob } }
+    }
+    if (this.commands.has(input.commandId)) throw new Error('commandId already exists')
     const job: Job = {
       installationId: input.installationId,
       jobId: `job:${input.commandId}`,
@@ -226,7 +244,11 @@ export class MemoryControlPlane implements ControlPlane {
       revision: 0,
     }
     this.jobs.set(job.jobId, job)
-    this.commands.set(input.commandId, { input: input.input, status: 'accepted' })
+    this.commands.set(input.commandId, {
+      idempotencyKey: input.idempotencyKey,
+      input: input.input,
+      status: 'accepted',
+    })
     return { created: true, job: { ...job } }
   }
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -166,6 +167,18 @@ function parseCommand(args: string[]): ParsedCommand {
 
 function json(io: CliIo, value: unknown): void {
   io.out(JSON.stringify(value))
+}
+
+function commandIdForSubmission(
+  installationId: string,
+  idempotencyKey: string,
+): string {
+  const digest = createHash('sha256')
+    .update(installationId)
+    .update('\0')
+    .update(idempotencyKey)
+    .digest('hex')
+  return `command:cli:${digest}`
 }
 
 const HELP = `kriyan <command>
@@ -399,7 +412,7 @@ export async function runCli(args: string[], dependencies: CliDependencies = {})
       }
       if (parsed.name !== 'submit') throw new UsageError('unknown command')
       const idempotencyKey = parsed.idempotencyKey ?? `cli:${crypto.randomUUID()}`
-      const commandId = `command:${now()}:${crypto.randomUUID()}`
+      const commandId = commandIdForSubmission(config.installationId, idempotencyKey)
       const result = await plane.submit({
         installationId: config.installationId,
         commandId,

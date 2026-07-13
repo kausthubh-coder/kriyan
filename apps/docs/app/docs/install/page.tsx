@@ -60,12 +60,12 @@ export default function InstallPage(): JSX.Element {
     <article className="prose docs-article">
       <header className="docs-hero">
         <p className="doc-path">Docs / Install & CLI</p>
-        <h1>Two install paths. Only one is available at this checkpoint.</h1>
+        <h1>Two install paths, with one live reference deployment.</h1>
         <p>
           The integrated repository can be installed and exercised from source.
           Standalone Linux x64 binaries, immutable release archives, and systemd
-          scripts exist as packaging work, but this checkpoint publishes no
-          download URL and claims no clean-host release proof.
+          scripts also power the verified Ubuntu reference deployment. This site
+          does not publish a general download URL or advertise a signed release.
         </p>
       </header>
 
@@ -81,8 +81,8 @@ export default function InstallPage(): JSX.Element {
       <section id="source-install">
         <h2>Install from reviewed source</h2>
         <p>
-          Source installation is the honest path for developers at the current
-          boundary. It requires Bun and a checkout you trust. These commands do
+          Source installation remains the available path for developers who do
+          not possess the verified reference archive. It requires Bun and a checkout you trust. These commands do
           not create a Convex project or mutate a provider account by themselves.
         </p>
         <pre className="code-block" aria-label="Source installation commands">

@@ -14,9 +14,9 @@ export default function StatusPage(): JSX.Element {
         <p className="doc-path">Docs / Current status</p>
         <h1>Implemented, locally verified, live-proven, and released are different states.</h1>
         <p>
-          This page describes the baseline used to build these docs on July 13,
-          2026. It deliberately does not anticipate results from the separate
-          CLI artifact, cloud integration, VPS, desktop, or docs deployment lanes.
+          This page describes the verified reference deployment as of July 13,
+          2026. It separates that exact live path from public distribution,
+          mobile platforms, alternative providers, and provider-runtime claims.
         </p>
       </header>
 
@@ -32,31 +32,39 @@ export default function StatusPage(): JSX.Element {
       </section>
 
       <section id="verified">
-        <h2>Locally verified on the baseline</h2>
+        <h2>Locally verified on the exact source</h2>
         <p>
           The recorded integration contract reports a frozen install, TypeScript
-          checks across the product, 147 unique deterministic tests, web and mobile
-          lint, Next.js production and desktop exports, an Android JS export, Rust
-          checks, and a debug Tauri app build. Demo-mode browser and desktop
-          interaction were also exercised with explicit limitations.
+          checks and deterministic tests across the product, web and mobile lint,
+          Next.js production and desktop exports, an Android JS export, Rust
+          checks, exact standalone release verification, and a debug Tauri app build.
         </p>
         <p>
-          Those results prove the recorded local checkout and deterministic
-          fixtures. They do not prove a public download, production deployment,
-          Linux host, physical mobile device, or real provider session.
+          Those checks prove the named source and artifacts. Live-provider and host
+          claims additionally require the correlated evidence below; neither layer
+          proves a physical mobile device or a real Pi provider session.
         </p>
       </section>
 
-      <section id="pending">
-        <h2>Not claimed by this checkpoint</h2>
+      <section id="live-reference">
+        <h2>Live reference deployment verified</h2>
         <ul className="check-list">
-          <li>No fresh production Convex Cloud deployment or live two-client cloud proof.</li>
-          <li>No public standalone CLI/node release, checksum URL, signing, or clean-Ubuntu install proof.</li>
-          <li>No running DigitalOcean or Hetzner Kriyan node, host reboot proof, or provider support claim.</li>
-          <li>No real Tauri desktop → Convex → VPS → Convex → desktop round trip.</li>
+          <li>A fresh owner-controlled Convex Cloud production deployment runs the exact accepted source.</li>
+          <li>A standalone Linux x64 node runs on Ubuntu 24.04 without Bun installed on the host.</li>
+          <li>The systemd service is enabled and active, and recovered after service restart and host reboot with a new process heartbeat.</li>
+          <li>An exact-release Tauri desktop command completed through production Convex and the Ubuntu VPS, created a reminder, and returned it to the desktop.</li>
+          <li>The public documentation is deployed at its canonical production origin with indexable metadata.</li>
+        </ul>
+      </section>
+
+      <section id="boundaries">
+        <h2>Boundaries not claimed</h2>
+        <ul className="check-list">
+          <li>No general public standalone CLI/node download, checksum URL, signed release, or notarized desktop distribution.</li>
           <li>No real Codex or Claude provider session through Pi.</li>
-          <li>No production deployment claim for this documentation site.</li>
           <li>No iOS runtime proof, Android emulator/physical-device proof, or self-hosted Convex proof.</li>
+          <li>No Hetzner host proof or verified DigitalOcean Cloud Firewall resource; Kriyan opened no inbound application port and did not weaken SSH policy.</li>
+          <li>No deployed live web workspace or two-session production web reactivity proof; the public production site is documentation only.</li>
         </ul>
       </section>
 

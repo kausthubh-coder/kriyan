@@ -6,7 +6,7 @@ export function SiteFooter(): JSX.Element {
     <footer className="site-footer">
       <div>
         <p className="footer-wordmark">kriyan</p>
-        <p>Owner-operated personal software. Integrated source; live release proof pending.</p>
+        <p>Owner-operated personal software. Reference deployment live and verified.</p>
       </div>
       <nav aria-label="Footer navigation">
         <Link href="/docs">Docs</Link>

@@ -235,6 +235,40 @@ try {
   }
   console.log('PASS doctor copy and Ubuntu filesystem checks')
 
+  const operationalCopy = [...renderedPages.values()]
+    .map(visibleText)
+    .join(' ')
+  for (const requiredCopy of [
+    'fresh owner-controlled Convex Cloud production deployment',
+    'systemd service is enabled and active',
+    'recovered after service restart and host reboot',
+    'exact-release Tauri desktop command completed through production Convex and the Ubuntu VPS',
+    'public documentation is deployed at its canonical production origin',
+    'No iOS runtime proof, Android emulator/physical-device proof, or self-hosted Convex proof.',
+    'No Hetzner host proof or verified DigitalOcean Cloud Firewall resource',
+  ]) {
+    if (!operationalCopy.includes(requiredCopy)) {
+      throw new Error(`Docs are missing verified operational copy: ${requiredCopy}`)
+    }
+  }
+  for (const staleCopy of [
+    'live deployment proof pending',
+    'live release proof pending',
+    'No fresh Convex Cloud + Ubuntu VPS round trip is claimed yet.',
+    'No production docs deployment',
+    'pending fresh-cloud, host-restart, and real desktop-to-node proof',
+    'No running DigitalOcean',
+    'This checkpoint does not claim that live proof.',
+    'None of those live claims are made by this docs checkpoint.',
+    'a production Convex deployment, a verified VPS, and a desktop round trip are not claimed here.',
+    'claims no clean-host release proof',
+  ]) {
+    if (operationalCopy.includes(staleCopy)) {
+      throw new Error(`Docs contain stale operational copy: ${staleCopy}`)
+    }
+  }
+  console.log('PASS verified deployment truth and stale-copy regression guard')
+
   const missingResponse = await fetch(`${baseUrl}/outside-the-constellation`)
   const missingHtml = await missingResponse.text()
   if (

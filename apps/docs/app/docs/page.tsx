@@ -24,11 +24,12 @@ export default function DocsOverviewPage(): JSX.Element {
       </header>
 
       <aside className="notice notice-cinnabar" aria-label="Release status">
-        <strong>Integrated source; live release proof pending</strong>
+        <strong>Reference deployment live and verified</strong>
         <p>
-          The clients, CLI/node, Convex functions, vault/index, and packaging
-          scripts exist in source. Public binaries, a production Convex deployment,
-          a verified VPS, and a desktop round trip are not claimed here.
+          The current reference path uses fresh Convex Cloud production, an Ubuntu
+          VPS node, and an exact-release Tauri desktop. A command completed through
+          that path, created a reminder, returned to the desktop, and recovered
+          after service restart and host reboot. This documentation is deployed publicly.
         </p>
       </aside>
 
@@ -110,11 +111,11 @@ export default function DocsOverviewPage(): JSX.Element {
           </Link>
           <Link href="/docs/install">
             <span>Install & standalone CLI</span>
-            Separate the source workflow from the pending public artifact path.
+            Separate the verified reference archive from public distribution.
           </Link>
           <Link href="/docs/status">
             <span>Current status</span>
-            See what is implemented, locally verified, and still unproven.
+            See what is live-proven and which boundaries remain unverified.
           </Link>
         </div>
       </section>

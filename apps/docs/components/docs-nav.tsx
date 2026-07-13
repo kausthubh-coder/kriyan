@@ -81,8 +81,8 @@ export function DocsNav(): JSX.Element {
           <div className="docs-status">
             <span className="status-light" aria-hidden="true" />
             <div>
-              <strong>Source integrated · live proof pending</strong>
-              <p>Public binaries and a verified production deployment are not released.</p>
+              <strong>Reference deployment live and verified</strong>
+              <p>Convex Cloud, Ubuntu recovery, desktop round trip, and public docs passed.</p>
             </div>
           </div>
         </div>

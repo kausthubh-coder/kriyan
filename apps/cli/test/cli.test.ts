@@ -157,3 +157,48 @@ test('submit emits JSON and accepts fully validated options', async () => {
   )).toBe(0)
   expect(JSON.parse(output.stdout[0]!)).toMatchObject({ ok: true, command: 'submit', created: true })
 })
+
+test('submit reuses the existing command for a standalone idempotency-key retry', async () => {
+  const config = await setupConfig()
+  const plane = new MemoryControlPlane()
+  const args = [
+    'submit',
+    '--text', 'remind me to practice Korean',
+    '--idempotency-key', 'idem:standalone-retry',
+    '--config', config,
+  ]
+  const first = capture()
+  const second = capture()
+
+  expect(await runCli(args, { io: first.io, plane: () => plane })).toBe(0)
+  expect(await runCli(args, { io: second.io, plane: () => plane })).toBe(0)
+
+  const firstResult = JSON.parse(first.stdout[0]!)
+  const secondResult = JSON.parse(second.stdout[0]!)
+  expect(firstResult).toMatchObject({ created: true })
+  expect(secondResult).toMatchObject({ created: false })
+  expect(secondResult.commandId).toBe(firstResult.commandId)
+  expect(secondResult.jobId).toBe(firstResult.jobId)
+  expect(plane.commands.size).toBe(1)
+  expect(plane.jobs.size).toBe(1)
+})
+
+test('submit keeps conflicting content fail-closed for a reused idempotency key', async () => {
+  const config = await setupConfig()
+  const plane = new MemoryControlPlane()
+  const first = capture()
+  const conflict = capture()
+
+  expect(await runCli([
+    'submit', '--text', 'first intent', '--idempotency-key', 'idem:conflict', '--config', config,
+  ], { io: first.io, plane: () => plane })).toBe(0)
+  expect(await runCli([
+    'submit', '--text', 'different intent', '--idempotency-key', 'idem:conflict', '--config', config,
+  ], { io: conflict.io, plane: () => plane })).toBe(1)
+
+  expect(JSON.parse(conflict.stderr[0]!)).toMatchObject({
+    error: { code: 'RUNTIME_ERROR', message: 'command failed' },
+  })
+  expect(plane.commands.size).toBe(1)
+  expect(plane.jobs.size).toBe(1)
+})

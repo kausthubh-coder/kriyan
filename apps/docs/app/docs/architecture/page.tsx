@@ -187,8 +187,10 @@ export default function ArchitecturePage(): JSX.Element {
         </ul>
         <p>
           Deterministic tests cover lease, retry, cancellation, durable-effect,
-          signal, redaction, vault, and rebuild behavior. They do not replace the
-          pending fresh-cloud, host-restart, and real desktop-to-node proof.
+          signal, redaction, vault, and rebuild behavior. The reference deployment
+          adds fresh Convex Cloud production, Ubuntu systemd restart and reboot
+          recovery, and an exact-release desktop-to-node round trip; neither layer
+          proves untested mobile or alternative-provider targets.
         </p>
       </section>
     </article>

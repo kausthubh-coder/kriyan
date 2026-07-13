@@ -6,7 +6,11 @@ import { MemoryControlPlane } from './memory-plane'
 
 interface PersistedPlane {
   jobs: Job[]
-  commands: Array<[string, { input: string; status: 'accepted' | 'completed' | 'failed' | 'cancelled' }]>
+  commands: Array<[string, {
+    idempotencyKey: string
+    input: string
+    status: 'accepted' | 'completed' | 'failed' | 'cancelled'
+  }]>
   runs: Run[]
   events: RunEventInput[]
   reminders: Array<[string, { message: string; remindAt: number; timezone: string }]>

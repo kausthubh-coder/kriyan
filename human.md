@@ -47,7 +47,10 @@ bun run dev:mobile
 bun run --cwd apps/desktop dev
 ```
 
-The current checkout has no configured `CONVEX_DEPLOYMENT`. Run `bunx convex dev` only when an isolated development deployment is intentionally being configured. Do not treat the credential-free tests as live Convex proof.
+The default credential-free shell does not select a `CONVEX_DEPLOYMENT`.
+Live integration uses only the ignored mode-0600 `.env.integration.local`; do
+not treat credential-free tests as live Convex proof or source that file outside
+the serialized live runbook.
 
 ## Build outputs
 
@@ -73,6 +76,12 @@ The isolated live project is `kriyan-live-20260713`, with dev deployment `bold-c
 
 ## Product-integration boundary
 
-This checkpoint integrates the accepted product, standalone CLI/node, and public-docs chains and provides a guarded live runbook. Repository support is not itself proof that a particular Convex deployment, VPS service, Vercel production alias, or desktop round trip is healthy; those claims require exact-SHA provider and interactive evidence from `test.md`.
+This checkpoint integrates the accepted product, standalone CLI/node, and
+public-docs chains. The reference deployment has exact-SHA evidence for fresh
+Convex Cloud development and production deployments, the preserved Ubuntu VPS,
+systemd and host-reboot recovery, the Tauri desktop → Convex → VPS → reminder →
+desktop path, and the public Vercel docs origin. Android/iOS runtime, Hetzner,
+self-hosted Convex, real Pi provider sessions, and provider cloud-firewall state
+remain separate boundaries.
 
 See `test.md` for the exact credential-free verification matrix and interactive boundaries.

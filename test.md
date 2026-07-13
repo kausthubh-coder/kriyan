@@ -122,14 +122,30 @@ Verified Computer Use results against `apps/desktop/src-tauri/target/debug/bundl
 - Knowledge-vault tests use temporary fixtures, never a user's real vault, and cover stable IDs, cleanup, atomic write recovery, stale-hash rejection, cited retrieval, and rebuild.
 - Mobile acceptance in this lane is lint, TypeScript, deterministic tests, and Android JS export. Do not retry the known broken emulator install in this integration lane.
 
-## Known untested boundaries
+## Credential-free baseline boundaries
 
-- No `CONVEX_DEPLOYMENT` is configured, so there is no codegen refresh, live Convex metadata proof, reactive two-client cloud proof, or live worker smoke.
+- Without explicitly sourcing the ignored integration environment, no `CONVEX_DEPLOYMENT` is configured and the credential-free matrix alone provides no codegen refresh, live Convex metadata proof, reactive cloud proof, or live worker smoke.
 - No Android emulator or physical Android device run was attempted; the Android boundary is source checks plus JS export.
 - iOS build/runtime behavior is untested.
 - No real provider/model session was started and no external account was changed.
-- No Linux binary, installer, deployment, VPS, systemd host, release, signing/notarization, or distribution claim is made by this product-integration checkpoint.
-- No deploy, push, remote mutation, auth change, billing change, or external-account action is part of this contract.
+- The credential-free matrix alone makes no Linux binary, installer, deployment, VPS, systemd host, release, signing/notarization, or distribution claim.
+- Live deployment authority exists only in the serialized live integration runbook below. No GitHub push, auth change, billing change, or unrelated external-account action is authorized.
+
+## Verified live reference boundary
+
+The July 13 live integration evidence established a fresh Convex Cloud
+production deployment, an Ubuntu 24.04 x64 standalone node with Bun absent,
+systemd restart and host-reboot recovery, an exact-release Tauri desktop →
+production Convex → VPS → reminder → desktop round trip, and the public Vercel
+documentation origin. These claims must be re-established after every source SHA
+change before promotion. Android/iOS runtime, Hetzner, self-hosted Convex, a real
+Pi provider session, a deployed live web workspace, and provider cloud-firewall
+configuration remain unverified.
+
+Round 4 passed 186 unique deterministic tests at the source gate: 33 Convex,
+35 client core, 94 node/CLI/agent-runtime/tools, 14 web, 5 mobile, 4 knowledge
+vault, and 1 Convex projection-client test. The standalone 4-test tools suite
+also passed but is already included in the 94-test composite.
 
 ## Live integration writer runbook
 
@@ -190,6 +206,15 @@ packaging/scripts/verify-operator-build.sh \
 ```
 
 Follow `packaging/README.md` for archive construction and `kriyan vps install|status|doctor|restart|update|rollback`. The Ubuntu host must prove `command -v bun` fails before install, the release/archive hashes match locally and remotely, the service is enabled and active, the process-health release equals the Git SHA, and Convex shows a fresh heartbeat for the same node. Repeat install, restart, update, rollback, and host reboot must all preserve health.
+
+Repeat-install proof is exactly one standalone `kriyan vps install` invocation
+with a 15-minute wall-clock deadline. Start no competing install process. If the
+terminal yields before completion, continue polling that same terminal session;
+do not launch a replacement. Count the proof only after the original process
+exits zero, emits its final `ok:true` JSON with the expected release and healthy
+service checks, and a process audit finds no remaining local operator invocation.
+Record elapsed time and the settled host state. Concurrent or overlapping
+installs are explicitly not idempotency evidence.
 
 Build the fresh live Tauri handoff without committing private values:
 

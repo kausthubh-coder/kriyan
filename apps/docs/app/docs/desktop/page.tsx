@@ -58,7 +58,11 @@ export default function DesktopPage(): JSX.Element {
           <li>A duplicate idempotency key does not duplicate durable work.</li>
           <li>A temporary node stop leaves queued work visible and recovery completes it.</li>
         </ul>
-        <p>This checkpoint does not claim that live proof. Check <Link href="/docs/status">current status</Link> for the latest boundary.</p>
+        <p>
+          The reference deployment passed this exact Tauri desktop → production
+          Convex → Ubuntu VPS → reminder → desktop path, including a new command
+          after service restart and host reboot. Check <Link href="/docs/status">current status</Link> for the remaining boundaries.
+        </p>
       </section>
     </article>
   )

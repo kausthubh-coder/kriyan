@@ -87,9 +87,10 @@ export default function ConvexPage(): JSX.Element {
           <li>Cleanup is scoped to that deployment and installation, then a second cleanup removes zero rows.</li>
         </ul>
         <p>
-          None of those live claims are made by this docs checkpoint. See the
-          <Link href="/docs/status"> current status</Link> before treating this
-          runbook as release evidence.
+          The reference deployment passed these production coordination checks
+          with a fresh Convex Cloud project, a UUID-scoped installation, and a
+          correlated desktop-to-VPS command. See the <Link href="/docs/status"> current status</Link>
+          for the exact release boundary and unverified targets.
         </p>
       </section>
     </article>

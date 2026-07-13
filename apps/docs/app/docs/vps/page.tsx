@@ -44,7 +44,7 @@ export default function VpsPage(): JSX.Element {
         <div className="mode-comparison">
           <div>
             <h3>DigitalOcean</h3>
-            <p>The accepted first proof uses a fresh Ubuntu Droplet. Provider API access is not SSH, service, reboot, or application proof.</p>
+            <p>The accepted reference proof uses a fresh Ubuntu Droplet and passed standalone install, systemd health, host reboot recovery, and a correlated application command.</p>
           </div>
           <div>
             <h3>Hetzner</h3>
@@ -52,6 +52,15 @@ export default function VpsPage(): JSX.Element {
           </div>
         </div>
       </section>
+
+      <aside className="notice notice-saffron">
+        <strong>Host proof is not cloud-firewall proof.</strong>
+        <p>
+          Kriyan opened no inbound application port and did not weaken SSH policy.
+          The reference run did not have an authenticated provider firewall API,
+          so it does not claim a verified DigitalOcean Cloud Firewall resource.
+        </p>
+      </aside>
 
       <section id="operate">
         <h2>Inspect the running service</h2>

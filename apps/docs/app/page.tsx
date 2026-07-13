@@ -34,7 +34,7 @@ export default function HomePage(): JSX.Element {
         <div className="hero-copy">
           <div className="release-signal">
             <span aria-hidden="true" />
-            Integrated source · live deployment proof pending
+            Reference deployment · live and verified
           </div>
           <h1>
             Your days, your knowledge, <em>your infrastructure.</em>
@@ -121,9 +121,9 @@ export default function HomePage(): JSX.Element {
             <h2 id="status-heading">Implemented source is not the same as a live release.</h2>
           </div>
           <p>
-            The integrated checkout has real clients, contracts, CLI/node code,
-            a Markdown vault, SQLite retrieval, and packaging scripts. Fresh cloud,
-            host, and desktop-to-node evidence is still a separate gate.
+            The reference deployment has passed its fresh Convex Cloud production,
+            Ubuntu VPS, reboot recovery, desktop round-trip, and public-docs gates.
+            Distribution and mobile-platform claims remain separate.
           </p>
         </div>
 
@@ -132,16 +132,17 @@ export default function HomePage(): JSX.Element {
             <h3><span className="status-mark current" />Current</h3>
             <ul>
               <li>Web, Expo mobile, and Tauri desktop clients share product contracts.</li>
-              <li>The CLI/node, Convex coordination plane, vault, and index exist in source.</li>
-              <li>Credential-free integration checks passed on the recorded baseline.</li>
+              <li>A fresh owner-controlled Convex Cloud production deployment coordinates the live installation.</li>
+              <li>An exact-release Tauri desktop command completed through the Ubuntu VPS and returned its reminder to the desktop.</li>
+              <li>The systemd node recovered after service restart and host reboot; these docs are deployed publicly.</li>
             </ul>
           </section>
           <section>
-            <h3><span className="status-mark planned" />Not yet claimed</h3>
+            <h3><span className="status-mark planned" />Boundaries</h3>
             <ul>
-              <li>No public standalone binary or install URL is published by this checkpoint.</li>
-              <li>No fresh Convex Cloud + Ubuntu VPS round trip is claimed yet.</li>
-              <li>No production docs deployment, signed release, or dual-provider support is claimed.</li>
+              <li>No public standalone download URL, signed release, or notarized desktop distribution is advertised.</li>
+              <li>Android emulator, physical Android, and iOS runtime behavior remain unverified.</li>
+              <li>Hetzner, self-hosted Convex, and provider cloud-firewall configuration require separate proof.</li>
             </ul>
           </section>
         </div>
