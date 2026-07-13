@@ -65,3 +65,20 @@ test('event commit response loss accepts an exact retry but rejects revision dri
     [{ ...event, eventId: 'event:2', sequence: 2 }],
   )).toMatchObject({ ok: false, reason: 'stale_revision' })
 })
+
+test('idempotency keys are scoped to an installation like production', async () => {
+  const plane = new MemoryControlPlane()
+  const first = await plane.submit({
+    installationId: 'installation:a', commandId: 'command:a',
+    idempotencyKey: 'idem:shared', input: 'same intent', maxAttempts: 3,
+  })
+  const second = await plane.submit({
+    installationId: 'installation:b', commandId: 'command:b',
+    idempotencyKey: 'idem:shared', input: 'same intent', maxAttempts: 3,
+  })
+
+  expect(first.created).toBe(true)
+  expect(second.created).toBe(true)
+  expect(plane.commands.size).toBe(2)
+  expect(plane.jobs.size).toBe(2)
+})

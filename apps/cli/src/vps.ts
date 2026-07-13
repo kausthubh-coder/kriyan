@@ -256,19 +256,24 @@ async function verifyRelease(
   archive: string,
   checksumPath: string,
   expectedCommit: string,
-): Promise<string> {
+): Promise<{ hash: string; trustedIdentity: string }> {
   const expected = await expectedChecksum(checksumPath, archive)
   const actual = await sha256(archive)
   if (actual !== expected) throw new VpsUsageError('release archive checksum does not match')
-  await withTrustedReleaseVerifier(runner, async (verifier) => {
-    await checked(
-      runner,
-      'bash',
-      [verifier, archive, expectedCommit],
-      'release provenance verification',
-    )
-  })
-  return actual
+  const trustedIdentity = await withTrustedReleaseVerifier(
+    runner,
+    async (verifier, verifierOptions, exportedIdentityPath) => {
+      await checked(
+        runner,
+        'bash',
+        [verifier, archive, expectedCommit],
+        'release provenance verification',
+        verifierOptions,
+      )
+      return await readFile(exportedIdentityPath, 'utf8')
+    },
+  )
+  return { hash: actual, trustedIdentity }
 }
 
 function executableReleaseRoot(executablePath: string): string {
@@ -344,12 +349,6 @@ async function ensureLocalHost(dependencies: VpsDependencies): Promise<void> {
   }
 }
 
-async function installConfig(runner: CommandRunner, source: string, paths: VpsPaths): Promise<void> {
-  await loadInstalledConfig(source, paths.stateRoot)
-  await checked(runner, 'install', ['-d', '-o', 'root', '-g', 'kriyan', '-m', '0750', dirname(paths.configPath)], 'config directory creation')
-  await checked(runner, 'install', ['-o', 'root', '-g', 'kriyan', '-m', '0640', source, paths.configPath], 'config installation')
-}
-
 async function loadInstalledConfig(path: string, stateRoot: string): Promise<NodeConfig> {
   const config = await loadConfig(path)
   const root = resolve(stateRoot)
@@ -382,27 +381,55 @@ async function localReleaseAction(
   const archive = resolve(required(options, '--release'))
   const checksumPath = resolve(required(options, '--checksum'))
   const version = releaseVersion(options)
-  const hash = await verifyRelease(runner, archive, checksumPath, version)
+  const verified = await verifyRelease(runner, archive, checksumPath, version)
   const executablePath = dependencies.executablePath ?? process.execPath
   const root = executableReleaseRoot(await realpath(executablePath))
-  const script = join(root, 'packaging', 'scripts', action === 'install' ? 'install.sh' : 'update.sh')
+  const script = join(
+    root,
+    'packaging',
+    'scripts',
+    action === 'install' ? 'install-transaction.sh' : 'update.sh',
+  )
   const sourceConfig = action === 'install' ? resolve(required(options, '--config')) : undefined
   if (sourceConfig === undefined) await loadInstalledConfig(paths.configPath, paths.stateRoot)
-  else await loadInstalledConfig(sourceConfig, paths.stateRoot)
-  await checked(
-    runner,
-    'bash',
-    [script, archive],
-    `local ${action}`,
-    { env: packagingEnvironment(paths, version) },
-  )
-  if (sourceConfig !== undefined) await installConfig(runner, sourceConfig, paths)
-  await installCommandLink(runner, paths)
-  if (action === 'install') {
-    await checked(runner, 'systemctl', ['enable', '--now', 'kriyan-node'], 'service enable')
+  else {
+    await loadInstalledConfig(sourceConfig, paths.stateRoot)
+    if (await currentRelease(paths) !== null) {
+      try {
+        await loadInstalledConfig(paths.configPath, paths.stateRoot)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      }
+    }
   }
+  const trustedRoot = await mkdtemp(join(tmpdir(), 'kriyan-install-identity-'))
+  try {
+    const trustedIdentityPath = join(trustedRoot, 'trusted-release-identity.manifest')
+    await writeFile(trustedIdentityPath, verified.trustedIdentity, { mode: 0o600 })
+    await checked(
+      runner,
+      'bash',
+      [script, archive, ...(sourceConfig === undefined ? [] : [sourceConfig])],
+      `local ${action}`,
+      {
+        env: {
+          ...packagingEnvironment(paths, version),
+          KRIYAN_TRUSTED_IDENTITY_FILE: trustedIdentityPath,
+        },
+      },
+    )
+  } finally {
+    await rm(trustedRoot, { recursive: true, force: true })
+  }
+  if (action === 'update') await installCommandLink(runner, paths)
   const status = await localStatus('doctor', runner, paths)
-  return { ...status, command: `vps ${action}`, artifact: { sha256: hash }, release: { version } }
+  if (status.ok !== true) throw new VpsRuntimeError(`local ${action} health verification failed`)
+  return {
+    ...status,
+    command: `vps ${action}`,
+    artifact: { sha256: verified.hash },
+    release: { version },
+  }
 }
 
 async function localSimpleAction(
@@ -484,7 +511,7 @@ async function remoteArtifactAction(
   const archive = resolve(required(options, '--release'))
   const checksumPath = resolve(required(options, '--checksum'))
   const version = releaseVersion(options)
-  const hash = await verifyRelease(runner, archive, checksumPath, version)
+  const verified = await verifyRelease(runner, archive, checksumPath, version)
   if (action === 'install') {
     await loadInstalledConfig(resolve(required(options, '--config')), DEFAULT_PATHS.stateRoot)
   }
@@ -494,9 +521,12 @@ async function remoteArtifactAction(
   const remoteArchive = `${remoteRoot}/release.tar.gz`
   const remoteChecksum = `${remoteRoot}/release.sha256`
   const remoteConfig = `${remoteRoot}/node.json`
+  const remoteIdentity = `${remoteRoot}/trusted-release-identity.manifest`
   const localTemporary = await mkdtemp(join(tmpdir(), 'kriyan-transfer-'))
   const localChecksum = join(localTemporary, 'release.sha256')
-  await writeFile(localChecksum, `${hash}  release.tar.gz\n`, { mode: 0o600 })
+  const localIdentity = join(localTemporary, 'trusted-release-identity.manifest')
+  await writeFile(localChecksum, `${verified.hash}  release.tar.gz\n`, { mode: 0o600 })
+  await writeFile(localIdentity, verified.trustedIdentity, { mode: 0o600 })
   let primaryError: unknown
   try {
     await ssh(runner, sshOptions, ['mkdir', '-m', '0700', remoteRoot], 'remote staging creation')
@@ -504,6 +534,7 @@ async function remoteArtifactAction(
     for (const [source, target] of [
       [archive, remoteArchive],
       [localChecksum, remoteChecksum],
+      [localIdentity, remoteIdentity],
       ...(action === 'install' ? [[resolve(required(options, '--config')), remoteConfig]] : []),
     ] as Array<[string, string]>) {
       await checked(
@@ -531,14 +562,35 @@ async function remoteArtifactAction(
       ['tar', '-xzf', remoteArchive, '-C', `${remoteRoot}/bootstrap`],
       'remote release extraction',
     )
-    const remote = [
-      'sudo', `${remoteRoot}/bootstrap/bin/kriyan`, 'vps', action, '--local',
-      '--release', remoteArchive, '--checksum', remoteChecksum, '--version', version,
-      ...(action === 'install' ? ['--config', remoteConfig] : []),
-    ]
-    const result = await ssh(runner, sshOptions, remote, `remote vps ${action}`)
+    const lifecycleScript = action === 'install' ? 'install-transaction.sh' : 'update.sh'
+    const lifecycleArguments = [
+      'env', `KRIYAN_TRUSTED_IDENTITY_FILE=${remoteIdentity}`,
+      `KRIYAN_VERSION=${version}`,
+      'bash', `${remoteRoot}/bootstrap/packaging/scripts/${lifecycleScript}`,
+      remoteArchive,
+      ...(action === 'install' ? [remoteConfig] : []),
+    ].map(shellQuote).join(' ')
+    await ssh(
+      runner,
+      sshOptions,
+      ['sudo', 'bash', '-c', lifecycleArguments],
+      `remote vps ${action}`,
+    )
+    const result = await ssh(
+      runner,
+      sshOptions,
+      ['sudo', '/usr/local/bin/kriyan', 'vps', 'doctor', '--local'],
+      `remote vps ${action} doctor`,
+    )
+    const doctor = parseRemoteJson(result, 'doctor')
+    if (doctor.ok !== true) {
+      throw new VpsRuntimeError(`remote vps ${action} health verification failed`)
+    }
     return {
-      ...parseRemoteJson(result, action),
+      ...doctor,
+      command: `vps ${action}`,
+      artifact: { sha256: verified.hash },
+      release: { version },
       host: sshOptions.host,
       transport: {
         user: sshOptions.user,

@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, readlink, realpath, readdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readlink, realpath, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -410,6 +410,19 @@ test('repeat install executes archive verification and refreshes one immutable r
     commit, join(sourceRelease, 'provenance', 'build.manifest'),
   ])
   expect(built.exitCode, built.stderr.toString()).toBe(0)
+  const bootstrap = join(root, 'bare-host-bootstrap')
+  await mkdir(bootstrap)
+  expect(Bun.spawnSync(['tar', '-xzf', archive, '-C', bootstrap]).exitCode).toBe(0)
+  const trustedIdentity = join(root, 'trusted-release-identity.manifest')
+  await writeFile(trustedIdentity, [
+    `source_commit=${commit}`,
+    `source_tree=${tree}`,
+    `source_date_epoch=${epoch}`,
+    `lock_sha256=${hash(await readFile('bun.lock'))}`,
+    `bun_version=${Bun.version}`,
+    '',
+  ].join('\n'))
+  await chmod(trustedIdentity, 0o600)
 
   for (const directory of ['installed-opt', 'installed-etc', 'installed-state', 'installed-systemd', 'fake']) {
     await mkdir(join(root, directory))
@@ -446,11 +459,12 @@ install_main 0 "$@"
     KRIYAN_SYSTEMCTL: systemctl,
     KRIYAN_RELEASE_ENV_OWNER: '',
     KRIYAN_VERSION: commit,
+    KRIYAN_TRUSTED_IDENTITY_FILE: trustedIdentity,
   }
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const installed = Bun.spawnSync([
-      harness, join(process.cwd(), 'packaging', 'scripts', 'install.sh'), archive,
-    ], { env })
+      harness, join(bootstrap, 'packaging', 'scripts', 'install.sh'), archive,
+    ], { cwd: root, env })
     expect(installed.exitCode, installed.stderr.toString()).toBe(0)
   }
   expect(await realpath(join(root, 'installed-opt', 'current'))).toBe(
@@ -459,6 +473,322 @@ install_main 0 "$@"
   expect(await readdir(join(root, 'installed-opt', 'releases'))).toEqual([commit])
   expect(await Array.fromAsync(new Bun.Glob('**/.current.*').scan({ cwd: root, onlyFiles: false }))).toEqual([])
 }, 30_000)
+
+type InstallFailure =
+  | 'config'
+  | 'link'
+  | 'daemon-reload'
+  | 'restart'
+  | 'health'
+  | 'install-early'
+  | 'none'
+
+type InstallRecoveryFailure =
+  | 'time-read'
+  | 'path'
+  | 'daemon-reload'
+  | 'enable'
+  | 'disable'
+  | 'restart'
+  | 'health'
+  | 'none'
+
+interface InstallTransactionFixture {
+  root: string
+  env: Record<string, string>
+  oldRelease: string | null
+  newRelease: string
+  config: string
+  oldConfig: string
+  command: string
+  current: string
+  enabledState: string
+  activeState: string
+  healthLog: string
+}
+
+async function installTransactionFixture(options: {
+  prior: boolean
+  active?: boolean
+  enabled?: boolean
+  failure: InstallFailure
+  recoveryFailure?: InstallRecoveryFailure
+}): Promise<InstallTransactionFixture> {
+  const root = await mkdtemp(join(tmpdir(), 'kriyan-install-transaction-'))
+  roots.push(root)
+  for (const directory of ['opt/releases', 'etc', 'systemd', 'bin', 'fake', 'state', 'lock']) {
+    await mkdir(join(root, directory), { recursive: true })
+  }
+  const oldRelease = options.prior ? await release(root, OLD_SHA) : null
+  const target = await release(root, NEW_SHA)
+  const template = join(root, 'new-release-template')
+  await cp(target, template, { recursive: true })
+  await rm(target, { recursive: true })
+  const current = join(root, 'opt', 'current')
+  const config = join(root, 'etc', 'node.json')
+  const command = join(root, 'bin', 'kriyan')
+  const oldConfig = '{"node":"old"}\n'
+  if (oldRelease !== null) {
+    await symlink(oldRelease, current)
+    await writeFile(config, oldConfig, { mode: 0o600 })
+    await writeFile(join(root, 'etc', 'release.env'), `KRIYAN_RELEASE_VERSION=${OLD_SHA}\n`)
+    await writeFile(join(root, 'systemd', 'kriyan-node.service'), `unit-${OLD_SHA}\n`)
+    await symlink('../opt/current/bin/kriyan', command)
+  }
+  const newConfig = join(root, 'changed-node.json')
+  await writeFile(newConfig, '{"node":"new"}\n')
+  const enabledState = join(root, 'enabled')
+  const activeState = join(root, 'active')
+  if (options.enabled ?? options.prior) await writeFile(enabledState, '')
+  if (options.active ?? options.prior) await writeFile(activeState, '')
+  const systemctlLog = join(root, 'systemctl.log')
+  const healthLog = join(root, 'health.log')
+  const fakeSystemctl = join(root, 'fake', 'systemctl')
+  await executable(fakeSystemctl, `#!/usr/bin/env bash
+set -euo pipefail
+command=$1
+current=none
+[[ -L $KRIYAN_OPT_ROOT/current ]] && current=$(basename "$(readlink "$KRIYAN_OPT_ROOT/current")")
+printf '%s %s\n' "$command" "$current" >>"$KRIYAN_SYSTEMCTL_LOG"
+if [[ $current == "$KRIYAN_TARGET_RELEASE" && $command == "$KRIYAN_FORWARD_FAILURE_STAGE" ]]; then exit 31; fi
+if [[ $command == "$KRIYAN_RECOVERY_FAILURE_STAGE" && ( $current == "$KRIYAN_PREVIOUS_RELEASE" || $command == disable ) ]]; then exit 41; fi
+case $command in
+  is-enabled) [[ -f $KRIYAN_ENABLED_STATE ]] ;;
+  is-active) [[ -f $KRIYAN_ACTIVE_STATE ]] || exit 3 ;;
+  enable) touch "$KRIYAN_ENABLED_STATE" ;;
+  disable)
+    rm -f "$KRIYAN_ENABLED_STATE"
+    [[ -f $KRIYAN_SYSTEMD_ROOT/kriyan-node.service ]] || exit 5
+    ;;
+  restart) touch "$KRIYAN_ACTIVE_STATE" ;;
+  stop)
+    rm -f "$KRIYAN_ACTIVE_STATE"
+    [[ -f $KRIYAN_SYSTEMD_ROOT/kriyan-node.service ]] || exit 5
+    ;;
+  daemon-reload) ;;
+  *) exit 64 ;;
+esac
+`)
+  await executable(join(root, 'fake', 'install'), `#!/usr/bin/env bash
+set -euo pipefail
+arguments=()
+while (($#)); do
+  case $1 in -o|-g) shift 2 ;; *) arguments+=("$1"); shift ;; esac
+done
+destination=''
+for argument in "${'${arguments[@]}'}"; do destination=$argument; done
+if [[ $KRIYAN_FORWARD_FAILURE_STAGE == config && $destination == *.partial.* ]]; then exit 32; fi
+exec /usr/bin/install "${'${arguments[@]}'}"
+`)
+  await executable(join(root, 'fake', 'ln'), `#!/usr/bin/env bash
+set -euo pipefail
+destination=${'${!#}'}
+source=''
+previous=''
+for argument in "$@"; do previous=$source; source=$argument; done
+source=$previous
+if [[ $KRIYAN_FORWARD_FAILURE_STAGE == link && $destination == "$KRIYAN_COMMAND_PATH" && $source == /* ]]; then exit 33; fi
+if [[ $KRIYAN_RECOVERY_FAILURE_STAGE == path && $destination == "$KRIYAN_OPT_ROOT/current" && $source == "$KRIYAN_OLD_RELEASE_PATH" ]]; then exit 43; fi
+exec /bin/ln "$@"
+`)
+  await executable(join(root, 'fake', 'date'), '#!/usr/bin/env bash\nprintf "not-a-time\\n"\n')
+  await executable(join(root, 'fake', 'perl'), `#!/usr/bin/env bash
+set -euo pipefail
+current=none
+[[ -L $KRIYAN_OPT_ROOT/current ]] && current=$(basename "$(readlink "$KRIYAN_OPT_ROOT/current")")
+if [[ $current == "$KRIYAN_PREVIOUS_RELEASE" && $KRIYAN_RECOVERY_FAILURE_STAGE == time-read ]]; then exit 42; fi
+exec /usr/bin/perl "$@"
+`)
+  const waitForHealth = join(root, 'fake', 'wait-for-health')
+  await executable(waitForHealth, `#!/usr/bin/env bash
+set -euo pipefail
+expected=$3
+printf '%s\n' "$expected" >>"$KRIYAN_HEALTH_LOG"
+current=$(basename "$(readlink "$KRIYAN_OPT_ROOT/current")")
+[[ $current == "$expected" ]]
+if [[ $expected == "$KRIYAN_TARGET_RELEASE" ]]; then
+  grep -q '"node":"new"' "$2"
+  [[ $KRIYAN_FORWARD_FAILURE_STAGE != health ]] || exit 34
+else
+  grep -q '"node":"old"' "$2"
+  [[ $KRIYAN_RECOVERY_FAILURE_STAGE != health ]] || exit 44
+fi
+`)
+  const processHealth = join(root, 'fake', 'process-health')
+  await executable(processHealth, '#!/usr/bin/env bash\nprintf "instance-old\\told\\t1\\n"\n')
+  const validateRelease = join(root, 'fake', 'validate-release')
+  await executable(validateRelease, '#!/usr/bin/env bash\nexit 0\n')
+  const installRelease = join(root, 'fake', 'install-release')
+  await executable(installRelease, `#!/usr/bin/env bash
+set -euo pipefail
+if [[ $KRIYAN_FORWARD_FAILURE_STAGE == install-early ]]; then exit 30; fi
+source "$KRIYAN_LIFECYCLE_LIB"
+target=$(release_path "$KRIYAN_VERSION")
+[[ -d $target ]] || cp -R "$KRIYAN_NEW_TEMPLATE" "$target"
+activate_release_state "$target" "$KRIYAN_VERSION"
+`)
+  return {
+    root,
+    oldRelease,
+    newRelease: join(await realpath(join(root, 'opt', 'releases')), NEW_SHA),
+    config,
+    oldConfig,
+    command,
+    current,
+    enabledState,
+    activeState,
+    healthLog,
+    env: {
+      ...process.env,
+      PATH: `${join(root, 'fake')}:${process.env.PATH ?? ''}`,
+      KRIYAN_OPT_ROOT: join(root, 'opt'),
+      KRIYAN_ETC_ROOT: join(root, 'etc'),
+      KRIYAN_STATE_ROOT: join(root, 'state'),
+      KRIYAN_SYSTEMD_ROOT: join(root, 'systemd'),
+      KRIYAN_BIN_ROOT: join(root, 'bin'),
+      KRIYAN_INSTALL_LOCK: join(root, 'lock', 'transaction'),
+      KRIYAN_SYSTEMCTL: fakeSystemctl,
+      KRIYAN_SYSTEMCTL_LOG: systemctlLog,
+      KRIYAN_ENABLED_STATE: enabledState,
+      KRIYAN_ACTIVE_STATE: activeState,
+      KRIYAN_HEALTH_LOG: healthLog,
+      KRIYAN_WAIT_FOR_HEALTH: waitForHealth,
+      KRIYAN_PROCESS_HEALTH_READER: processHealth,
+      KRIYAN_VALIDATE_INSTALLED_RELEASE: validateRelease,
+      KRIYAN_RELEASE_ENV_OWNER: '',
+      KRIYAN_INSTALL_SCRIPT: installRelease,
+      KRIYAN_LIFECYCLE_LIB: join(process.cwd(), 'packaging', 'scripts', 'lifecycle-lib.sh'),
+      KRIYAN_NEW_TEMPLATE: template,
+      KRIYAN_COMMAND_PATH: command,
+      KRIYAN_OLD_RELEASE_PATH: oldRelease ?? '',
+      KRIYAN_TARGET_RELEASE: NEW_SHA,
+      KRIYAN_PREVIOUS_RELEASE: OLD_SHA,
+      KRIYAN_FORWARD_FAILURE_STAGE: options.failure,
+      KRIYAN_RECOVERY_FAILURE_STAGE: options.recoveryFailure ?? 'none',
+      KRIYAN_VERSION: NEW_SHA,
+      KRIYAN_SOURCE_CONFIG: newConfig,
+    },
+  }
+}
+
+function runInstallTransaction(item: InstallTransactionFixture): ReturnType<typeof Bun.spawnSync> {
+  return Bun.spawnSync([
+    'bash', '-c',
+    'source "$1"; shift; install_transaction_main 0 "$@"', '--',
+    join(process.cwd(), 'packaging', 'scripts', 'install-transaction.sh'),
+    join(item.root, 'release.tar.gz'), item.env.KRIYAN_SOURCE_CONFIG!,
+  ], { env: item.env })
+}
+
+function spawnStderr(result: ReturnType<typeof Bun.spawnSync>): string {
+  return result.stderr?.toString() ?? ''
+}
+
+async function expectActiveInstallStateRestored(item: InstallTransactionFixture): Promise<void> {
+  expect(await readlink(item.current)).toBe(item.oldRelease!)
+  expect(await readFile(item.config, 'utf8')).toBe(item.oldConfig)
+  expect((await lstat(item.config)).mode & 0o777).toBe(0o600)
+  expect(await readFile(join(item.root, 'etc', 'release.env'), 'utf8')).toBe(
+    `KRIYAN_RELEASE_VERSION=${OLD_SHA}\n`,
+  )
+  expect(await readFile(join(item.root, 'systemd', 'kriyan-node.service'), 'utf8')).toBe(
+    `unit-${OLD_SHA}\n`,
+  )
+  expect(await readlink(item.command)).toBe('../opt/current/bin/kriyan')
+  expect(await Bun.file(item.enabledState).exists()).toBe(true)
+  expect(await Bun.file(item.activeState).exists()).toBe(true)
+  expect((await readFile(item.healthLog, 'utf8')).trim().split('\n').at(-1)).toBe(OLD_SHA)
+}
+
+for (const failure of ['config', 'link', 'daemon-reload', 'restart', 'health'] as const) {
+  test(`install transaction restores changed active installation after ${failure} failure`, async () => {
+    const item = await installTransactionFixture({ prior: true, failure })
+    const result = runInstallTransaction(item)
+    const expectedStatus = { config: 32, link: 33, 'daemon-reload': 31, restart: 31, health: 34 }
+    expect(result.exitCode, spawnStderr(result)).toBe(expectedStatus[failure])
+    await expectActiveInstallStateRestored(item)
+    expect(await Bun.file(item.newRelease).exists()).toBe(false)
+  })
+}
+
+test('install transaction restores an inactive and disabled prior installation exactly', async () => {
+  const item = await installTransactionFixture({
+    prior: true,
+    active: false,
+    enabled: false,
+    failure: 'health',
+  })
+  const result = runInstallTransaction(item)
+  expect(result.exitCode).not.toBe(0)
+  expect(await readlink(item.current)).toBe(item.oldRelease!)
+  expect(await readFile(item.config, 'utf8')).toBe(item.oldConfig)
+  expect(await Bun.file(item.enabledState).exists()).toBe(false)
+  expect(await Bun.file(item.activeState).exists()).toBe(false)
+})
+
+test('fresh early failure is clean and a later install completes under the same lock contract', async () => {
+  const item = await installTransactionFixture({ prior: false, failure: 'install-early' })
+  const failed = runInstallTransaction(item)
+  expect(failed.exitCode, spawnStderr(failed)).toBe(30)
+  for (const path of [
+    item.current,
+    item.config,
+    join(item.root, 'etc', 'release.env'),
+    join(item.root, 'systemd', 'kriyan-node.service'),
+    item.command,
+    item.newRelease,
+    item.enabledState,
+    item.activeState,
+  ]) expect(await Bun.file(path).exists()).toBe(false)
+
+  item.env.KRIYAN_FORWARD_FAILURE_STAGE = 'none'
+  const installed = runInstallTransaction(item)
+  expect(installed.exitCode, spawnStderr(installed)).toBe(0)
+  expect(await readlink(item.current)).toBe(item.newRelease)
+  expect(await readFile(item.config, 'utf8')).toBe('{"node":"new"}\n')
+  expect(await Bun.file(item.enabledState).exists()).toBe(true)
+  expect(await Bun.file(item.activeState).exists()).toBe(true)
+})
+
+test('install transaction refuses an overlapping writer before mutation', async () => {
+  const item = await installTransactionFixture({ prior: true, failure: 'none' })
+  await mkdir(item.env.KRIYAN_INSTALL_LOCK!)
+  const result = runInstallTransaction(item)
+  expect(result.exitCode, spawnStderr(result)).toBe(75)
+  expect(spawnStderr(result)).toContain('another install transaction holds')
+  expect(await readlink(item.current)).toBe(item.oldRelease!)
+  expect(await readFile(item.config, 'utf8')).toBe(item.oldConfig)
+})
+
+for (const recoveryFailure of [
+  'time-read', 'path', 'daemon-reload', 'enable', 'restart', 'health',
+] as const) {
+  test(`install transaction preserves primary error and reports ${recoveryFailure} recovery failure`, async () => {
+    const item = await installTransactionFixture({
+      prior: true,
+      failure: 'health',
+      recoveryFailure,
+    })
+    const result = runInstallTransaction(item)
+    expect(result.exitCode, spawnStderr(result)).toBe(70)
+    expect(spawnStderr(result)).toContain('install transaction failed')
+    expect(spawnStderr(result)).toContain('recovery failed')
+  })
+}
+
+test('install transaction reports disabled-state recovery failure explicitly', async () => {
+  const item = await installTransactionFixture({
+    prior: true,
+    active: false,
+    enabled: false,
+    failure: 'health',
+    recoveryFailure: 'disable',
+  })
+  const result = runInstallTransaction(item)
+  expect(result.exitCode, spawnStderr(result)).toBe(70)
+  expect(spawnStderr(result)).toContain('install transaction failed')
+  expect(spawnStderr(result)).toContain('recovery failed')
+})
 
 async function uninstallFixture(mode: 'active' | 'unknown' | 'absent'): Promise<{
   root: string

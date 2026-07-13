@@ -18,12 +18,28 @@ output=$(cd "${output}" && pwd -P)
 
 git archive --format=tar --output="${source_archive}" "${commit}"
 tar -xf "${source_archive}" -C "${source_dir}"
+source "${root}/packaging/scripts/provenance-lib.sh"
+lock_hash=$(sha256_file "${source_dir}/bun.lock")
+[[ -f ${source_dir}/.bun-version && ! -L ${source_dir}/.bun-version ]] || {
+  echo "exact commit is missing .bun-version toolchain policy" >&2
+  exit 2
+}
+trusted_bun=$(tr -d '\r\n' <"${source_dir}/.bun-version")
+[[ ${trusted_bun} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $(bun --version) == "${trusted_bun}" ]] || {
+  echo "active Bun does not match the exact commit toolchain policy" >&2
+  exit 2
+}
 (
   cd "${source_dir}"
   bun install --frozen-lockfile >/dev/null
   bun build --target=bun --minify --sourcemap=none \
     --outfile "${build_dir}/node.bundle.js" ./apps/node/src/main.ts >/dev/null
   bun build --target=bun --minify --sourcemap=none \
+    --define "KRIYAN_TRUSTED_SOURCE_COMMIT=\"${commit}\"" \
+    --define "KRIYAN_TRUSTED_SOURCE_TREE=\"${tree}\"" \
+    --define "KRIYAN_TRUSTED_SOURCE_EPOCH=\"${epoch}\"" \
+    --define "KRIYAN_TRUSTED_LOCK_SHA256=\"${lock_hash}\"" \
+    --define "KRIYAN_TRUSTED_BUN_VERSION=\"${trusted_bun}\"" \
     --outfile "${build_dir}/cli.bundle.js" ./apps/cli/src/main.ts >/dev/null
 )
 
@@ -137,13 +153,12 @@ source "${root}/packaging/scripts/provenance-lib.sh"
 node_hash=$(sha256_file "${output}/kriyan-node-linux-x64")
 cli_hash=$(sha256_file "${output}/kriyan-linux-x64")
 operator_hash=$(sha256_file "${output}/kriyan-darwin-arm64")
-lock_hash=$(sha256_file "${source_dir}/bun.lock")
 cat >"${output}/provenance.manifest" <<EOF
 manifest_version=1
 source_commit=${commit}
 source_tree=${tree}
 source_date_epoch=${epoch}
-bun_version=$(bun --version)
+bun_version=${trusted_bun}
 target=bun-linux-x64-baseline
 lock_sha256=${lock_hash}
 node_sha256=${node_hash}
@@ -157,7 +172,7 @@ manifest_version=1
 source_commit=${commit}
 source_tree=${tree}
 source_date_epoch=${epoch}
-bun_version=$(bun --version)
+bun_version=${trusted_bun}
 target=bun-darwin-arm64
 lock_sha256=${lock_hash}
 cli_sha256=${operator_hash}

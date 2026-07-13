@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import type { JSX } from 'react'
 import { useRef } from 'react'
 
@@ -27,12 +28,26 @@ function BrandMark(): JSX.Element {
   )
 }
 
-function NavigationLinks({ onNavigate }: { onNavigate?: () => void }): JSX.Element {
+function NavigationLinks({
+  pathname,
+  onNavigate,
+}: {
+  pathname: string
+  onNavigate?: () => void
+}): JSX.Element {
   return (
     <>
       {navigation.map((item) => (
-        <Link href={item.href} key={item.href} onClick={onNavigate}>
+        <Link
+          aria-current={pathname === item.href ? 'page' : undefined}
+          href={item.href}
+          key={item.href}
+          onClick={onNavigate}
+        >
           {item.label}
+          {pathname === item.href && (
+            <span aria-hidden="true" className="current-route-label">Current</span>
+          )}
         </Link>
       ))}
     </>
@@ -41,6 +56,7 @@ function NavigationLinks({ onNavigate }: { onNavigate?: () => void }): JSX.Eleme
 
 export function SiteHeader(): JSX.Element {
   const mobileMenuRef = useRef<HTMLDetailsElement>(null)
+  const pathname = usePathname()
 
   function closeMobileMenu(): void {
     if (mobileMenuRef.current) mobileMenuRef.current.open = false
@@ -49,19 +65,27 @@ export function SiteHeader(): JSX.Element {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link className="brand-link" href="/" aria-label="Kriyan home">
+        <Link
+          aria-current={pathname === '/' ? 'page' : undefined}
+          aria-label="Kriyan home"
+          className="brand-link"
+          href="/"
+        >
           <BrandMark />
           <span>kriyan</span>
+          {pathname === '/' && (
+            <span aria-hidden="true" className="current-route-label">Current</span>
+          )}
         </Link>
 
         <nav aria-label="Primary navigation" className="desktop-nav">
-          <NavigationLinks />
+          <NavigationLinks pathname={pathname} />
         </nav>
 
         <details className="mobile-nav" ref={mobileMenuRef}>
           <summary>Menu</summary>
           <nav aria-label="Mobile navigation">
-            <NavigationLinks onNavigate={closeMobileMenu} />
+            <NavigationLinks pathname={pathname} onNavigate={closeMobileMenu} />
           </nav>
         </details>
       </div>

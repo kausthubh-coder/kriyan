@@ -9,6 +9,7 @@ import type {
 } from '@kriyan/convex-client'
 
 interface CommandRecord {
+  installationId: string
   idempotencyKey: string
   input: string
   status: 'accepted' | 'completed' | 'failed' | 'cancelled'
@@ -218,7 +219,9 @@ export class MemoryControlPlane implements ControlPlane {
     maxAttempts: number
   }) {
     const existing = [...this.commands.entries()].find(
-      ([, command]) => command.idempotencyKey === input.idempotencyKey,
+      ([, command]) =>
+        command.installationId === input.installationId &&
+        command.idempotencyKey === input.idempotencyKey,
     )
     if (existing !== undefined) {
       const [existingCommandId, command] = existing
@@ -245,6 +248,7 @@ export class MemoryControlPlane implements ControlPlane {
     }
     this.jobs.set(job.jobId, job)
     this.commands.set(input.commandId, {
+      installationId: input.installationId,
       idempotencyKey: input.idempotencyKey,
       input: input.input,
       status: 'accepted',

@@ -171,8 +171,9 @@ export default function ArchitecturePage(): JSX.Element {
         </div>
         <p>
           The source is organized around one coordination contract, but source
-          compatibility is not provider proof. Convex Cloud on DigitalOcean is
-          first; Hetzner and self-hosted Convex each require later evidence.
+          compatibility is not provider proof. Convex Cloud with a DigitalOcean
+          Ubuntu node is the first verified path. Hetzner and self-hosted Convex
+          each require later evidence.
         </p>
       </section>
 

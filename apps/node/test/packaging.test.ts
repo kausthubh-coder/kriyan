@@ -1,4 +1,4 @@
-import { chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises'
+import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -50,6 +50,22 @@ async function writeProvenance(
   await writeFile(path, `${Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n')}\n`)
 }
 
+async function normalizeTreeMtime(root: string, epoch: number): Promise<void> {
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    const path = join(root, entry.name)
+    if (entry.isDirectory()) await normalizeTreeMtime(path, epoch)
+    await utimes(path, new Date(epoch * 1000), new Date(epoch * 1000))
+  }
+  await utimes(root, new Date(epoch * 1000), new Date(epoch * 1000))
+}
+
+async function replaceManifestValue(path: string, key: string, value: string): Promise<void> {
+  const source = await readFile(path, 'utf8')
+  const pattern = new RegExp(`^${key}=.*$`, 'm')
+  expect(pattern.test(source)).toBe(true)
+  await writeFile(path, source.replace(pattern, `${key}=${value}`))
+}
+
 function canonicalArchive(source: string, output: string, epoch: string, options = ''): ReturnType<typeof Bun.spawnSync> {
   return Bun.spawnSync([
     'bash', '-c',
@@ -92,6 +108,7 @@ test('systemd service is unprivileged, hardened, and drains on SIGTERM', async (
 
 test('packaging scripts wire provenance and health transaction primitives', async () => {
   const install = await readFile('packaging/scripts/install.sh', 'utf8')
+  const installTransaction = await readFile('packaging/scripts/install-transaction.sh', 'utf8')
   const update = await readFile('packaging/scripts/update.sh', 'utf8')
   const lifecycle = await readFile('packaging/scripts/lifecycle-lib.sh', 'utf8')
   const health = await readFile('packaging/scripts/wait-for-health.sh', 'utf8')
@@ -102,6 +119,13 @@ test('packaging scripts wire provenance and health transaction primitives', asyn
   expect(install).toContain('verify-release-archive.sh" "${archive}" "${version}"')
   expect(install).toContain('activate_release_state')
   expect(install).not.toContain('rm -rf "${release_dir}"')
+  expect(installTransaction).toContain('KRIYAN_INSTALL_LOCK')
+  expect(installTransaction).toContain('snapshot_regular_file "${config}"')
+  expect(installTransaction).toContain('snapshot_path "${command_link}"')
+  expect(installTransaction).toContain('snapshot_path "${current}"')
+  expect(installTransaction).toContain('mv -f "${config}.partial.$$" "${config}"')
+  expect(installTransaction).toContain('"${systemctl_cmd}" restart kriyan-node')
+  expect(installTransaction).toContain('install transaction recovery failed')
   expect(update).toContain('previous=$(readlink -f')
   expect(update).toContain('snapshot_release_state')
   expect(update).toContain('restore_release_state')
@@ -201,6 +225,128 @@ test('release construction binds provenance, rescans ELFs, and emits canonical d
     const extracted = join(directory, 'extracted')
     await mkdir(extracted)
     expect(Bun.spawnSync(['tar', '-xzf', first, '-C', extracted]).exitCode).toBe(0)
+    const forgedArchives = new Map<string, string>()
+    for (const name of ['lock', 'epoch', 'tree', 'bun'] as const) {
+      const forged = join(directory, `forged-${name}`)
+      await cp(extracted, forged, { recursive: true })
+      const forgedManifest = join(forged, 'provenance', 'build.manifest')
+      let forgedEpoch = Number(epoch)
+      if (name === 'lock') {
+        await writeFile(join(forged, 'bun.lock'), `${await readFile(join(forged, 'bun.lock'), 'utf8')}\n# forged\n`)
+        await replaceManifestValue(
+          forgedManifest,
+          'lock_sha256',
+          await sha256(join(forged, 'bun.lock')),
+        )
+      } else if (name === 'epoch') {
+        forgedEpoch += 1
+        await replaceManifestValue(forgedManifest, 'source_date_epoch', String(forgedEpoch))
+      } else if (name === 'tree') {
+        await replaceManifestValue(forgedManifest, 'source_tree', '1'.repeat(40))
+        await replaceManifestValue(
+          join(forged, 'provenance', 'source.manifest'),
+          'source_tree',
+          '1'.repeat(40),
+        )
+      } else {
+        await replaceManifestValue(forgedManifest, 'bun_version', '9.9.9')
+      }
+      await normalizeTreeMtime(forged, forgedEpoch)
+      const forgedArchive = join(directory, `forged-${name}.tar.gz`)
+      expect(canonicalArchive(forged, forgedArchive, String(forgedEpoch)).exitCode).toBe(0)
+      forgedArchives.set(name, forgedArchive)
+      const rejected = Bun.spawnSync([
+        'bash', 'packaging/scripts/verify-release-archive.sh', forgedArchive, commit, tree,
+      ])
+      expect(
+        rejected.exitCode,
+        `${name}: ${rejected.stdout.toString()}\n${rejected.stderr.toString()}`,
+      ).not.toBe(0)
+    }
+    const callerWrongTree = Bun.spawnSync([
+      'bash', 'packaging/scripts/verify-release-archive.sh', first, commit, '2'.repeat(40),
+    ])
+    expect(callerWrongTree.exitCode).not.toBe(0)
+    expect(callerWrongTree.stderr.toString()).toContain('caller-supplied tree')
+    const policylessCommit = commandOutput(['git', 'rev-parse', `${commit}^`])
+    const policyless = Bun.spawnSync([
+      'bash', 'packaging/scripts/verify-release-archive.sh', first, policylessCommit,
+    ])
+    expect(policyless.exitCode).not.toBe(0)
+    expect(policyless.stderr.toString()).toContain('missing .bun-version')
+
+    const operator = join(directory, 'trusted-operator')
+    const lockHash = await sha256('bun.lock')
+    const operatorBuild = Bun.spawnSync([
+      process.execPath,
+      'build',
+      '--compile',
+      '--target=bun-darwin-arm64',
+      '--no-compile-autoload-dotenv',
+      '--define', `KRIYAN_TRUSTED_SOURCE_COMMIT="${commit}"`,
+      '--define', `KRIYAN_TRUSTED_SOURCE_TREE="${tree}"`,
+      '--define', `KRIYAN_TRUSTED_SOURCE_EPOCH="${epoch}"`,
+      '--define', `KRIYAN_TRUSTED_LOCK_SHA256="${lockHash}"`,
+      '--define', `KRIYAN_TRUSTED_BUN_VERSION="${Bun.version}"`,
+      join(process.cwd(), 'apps', 'cli', 'src', 'main.ts'),
+      '--outfile', operator,
+    ], { cwd: directory })
+    expect(operatorBuild.exitCode, operatorBuild.stderr.toString()).toBe(0)
+    const outside = join(directory, 'outside-checkout')
+    const fakeTools = join(outside, 'bin')
+    await mkdir(fakeTools, { recursive: true })
+    await writeFile(join(fakeTools, 'scp'), '#!/usr/bin/env bash\nexit 0\n')
+    await chmod(join(fakeTools, 'scp'), 0o755)
+    await writeFile(join(fakeTools, 'ssh'), `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"${join(outside, 'ssh.log')}"
+if [[ $* == *"/usr/local/bin/kriyan"*"doctor"* ]]; then
+  printf '%s\n' '{"ok":true,"command":"vps doctor","service":{"enabled":true,"active":true},"doctor":{"config":"pass","processHealth":"pass","releaseIdentity":"pass"}}'
+fi
+`)
+    await chmod(join(fakeTools, 'ssh'), 0o755)
+    const knownHosts = join(outside, 'known-hosts')
+    const config = join(outside, 'node.json')
+    const poisonedIdentity = join(outside, 'poisoned-identity')
+    await writeFile(knownHosts, '')
+    await writeFile(poisonedIdentity, 'source_commit=poisoned\nsource_commit=duplicate\n')
+    await writeFile(config, JSON.stringify({
+      convexUrl: 'https://example.convex.cloud',
+      installationId: 'installation:bare-host',
+      nodeId: 'node:bare-host',
+      displayName: 'Bare host',
+      protocolVersion: '1',
+      dataDir: '/var/lib/kriyan/node',
+      timezone: 'UTC',
+      locale: 'en-US',
+      runtime: 'fake',
+    }))
+    const operatorEnvironment = {
+      ...process.env,
+      PATH: `${fakeTools}:${process.env.PATH ?? ''}`,
+      KRIYAN_TRUSTED_IDENTITY_FILE: poisonedIdentity,
+    }
+    const validOperatorInstall = Bun.spawnSync([
+      operator, 'vps', 'install',
+      '--host', '203.0.113.10', '--user', 'ubuntu',
+      '--known-hosts', knownHosts, '--host-key-policy', 'strict',
+      '--release', first, '--checksum', `${first}.sha256`,
+      '--version', commit, '--config', config,
+    ], { cwd: outside, env: operatorEnvironment })
+    expect(
+      validOperatorInstall.exitCode,
+      `${validOperatorInstall.stdout.toString()}\n${validOperatorInstall.stderr.toString()}`,
+    ).toBe(0)
+    const forgedLock = forgedArchives.get('lock')!
+    const forgedChecksum = `${forgedLock}.sha256`
+    await writeFile(forgedChecksum, `${await sha256(forgedLock)}  ${forgedLock.split('/').at(-1)}\n`)
+    const forgedOperatorUpdate = Bun.spawnSync([
+      operator, 'vps', 'update',
+      '--host', '203.0.113.10', '--user', 'ubuntu',
+      '--known-hosts', knownHosts, '--host-key-policy', 'strict',
+      '--release', forgedLock, '--checksum', forgedChecksum, '--version', commit,
+    ], { cwd: outside, env: operatorEnvironment })
+    expect(forgedOperatorUpdate.exitCode).not.toBe(0)
     for (const variant of ['owner', 'reverse'] as const) {
       const archive = join(directory, `${variant}.tar.gz`)
       expect(canonicalArchive(extracted, archive, epoch, variant).exitCode).toBe(0)

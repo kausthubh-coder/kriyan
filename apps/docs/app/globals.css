@@ -200,6 +200,23 @@ section[id] {
   color: oklch(var(--primary-foreground));
 }
 
+.site-header a[aria-current='page'] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.35rem;
+}
+
+.current-route-label {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin-left: 0.45rem;
+  padding: 0.08rem 0.3rem;
+  text-transform: uppercase;
+}
+
 .mobile-nav {
   display: none;
   position: relative;
@@ -777,6 +794,11 @@ tbody td {
 
 .docs-nav nav a:hover span {
   color: oklch(var(--primary-foreground));
+}
+
+.docs-nav nav a[aria-current='page'] {
+  border-left: 3px solid currentColor;
+  padding-left: 0.65rem;
 }
 
 .docs-status {

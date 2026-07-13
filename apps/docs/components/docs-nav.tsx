@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import type { JSX } from 'react'
 import { useRef } from 'react'
 
@@ -59,6 +60,7 @@ const docsNavigation = [
 
 export function DocsNav(): JSX.Element {
   const panelRef = useRef<HTMLDetailsElement>(null)
+  const pathname = usePathname()
 
   function closePanel(): void {
     if (panelRef.current) panelRef.current.open = false
@@ -72,8 +74,18 @@ export function DocsNav(): JSX.Element {
           <p className="docs-nav-title">Documentation</p>
           <nav>
             {docsNavigation.map((item) => (
-              <Link href={item.href} key={item.href} onClick={closePanel}>
-                <span>{item.label}</span>
+              <Link
+                aria-current={pathname === item.href ? 'page' : undefined}
+                href={item.href}
+                key={item.href}
+                onClick={closePanel}
+              >
+                <span>
+                  {item.label}
+                  {pathname === item.href && (
+                    <span aria-hidden="true" className="current-route-label">Current</span>
+                  )}
+                </span>
                 <small>{item.description}</small>
               </Link>
             ))}

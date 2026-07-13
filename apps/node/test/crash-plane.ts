@@ -7,6 +7,7 @@ import { MemoryControlPlane } from './memory-plane'
 interface PersistedPlane {
   jobs: Job[]
   commands: Array<[string, {
+    installationId: string
     idempotencyKey: string
     input: string
     status: 'accepted' | 'completed' | 'failed' | 'cancelled'

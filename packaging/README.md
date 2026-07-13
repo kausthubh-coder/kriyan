@@ -73,10 +73,16 @@ dist/kriyan-darwin-arm64 vps uninstall \
 Help is the explicit plaintext exception. Every operational command writes one
 JSON object. Usage/config errors exit `2`, transfer or service failures exit `1`,
 and healthy success exits `0`. Install and update verify the archive checksum
-and bind `--version` to the embedded `source_commit` locally, transfer the
-archive plus a normalized checksum, verify the checksum again on the host, and
-then use the transferred standalone Linux CLI for root maintenance. Temporary
-transfer material is removed on success and failure.
+and bind `--version` to the exact commit identity embedded in the separately
+obtained operator. That identity includes the commit, tree, commit epoch,
+lockfile hash, and Bun policy from the trusted build. The operator transfers the
+archive, its SHA-256, and the independently derived identity over authenticated
+SSH. The host checks the SHA-256 before extracting and passes the transferred
+identity to the archive verifier inside the lifecycle transaction. The
+bootstrap files from the archive are therefore never their own trust root: the
+trusted operator approves the exact bytes first, and SSH plus SHA-256 binds
+those same bytes to the host. Temporary transfer material is removed on success
+and failure.
 
 The Linux executable owns the same lifecycle with `vps <action> --local`.
 Local maintenance requires root and rejects all SSH-only flags. Installed
@@ -86,13 +92,21 @@ systemd writable-state confinement; ordinary developer configs remain flexible.
 `--preserve-data` or `--purge-data`; preserve mode never removes
 `/var/lib/kriyan`.
 
+Direct local release verification outside a Git checkout is accepted only when
+the executing CLI was obtained separately and embeds the requested trusted
+identity. A source-mode CLI instead derives all identity fields from the
+requested commit in its trusted local repository. If neither source is
+available, verification fails closed. `KRIYAN_TRUSTED_IDENTITY_FILE` is an
+internal lifecycle handoff; ambient values cannot replace a compiled
+operator's wrapper-owned mode-`0600` identity.
+
 The CLI above is the normal install path. For low-level recovery, place the
 verified release archive in `/tmp`, then:
 
 ```sh
-sudo KRIYAN_VERSION=SHA packaging/scripts/install.sh /tmp/kriyan-node-SHA.tar.gz
-sudo install -o root -g kriyan -m 0640 node.json /etc/kriyan/node.json
-sudo systemctl enable --now kriyan-node
+sudo KRIYAN_VERSION=SHA \
+  KRIYAN_TRUSTED_IDENTITY_FILE=/secure/operator-derived-identity.manifest \
+  packaging/scripts/install-transaction.sh /tmp/kriyan-node-SHA.tar.gz node.json
 sudo systemctl status kriyan-node --no-pager
 sudo journalctl -u kriyan-node --since '10 minutes ago' --no-pager
 sudo -u kriyan /opt/kriyan/current/bin/kriyan doctor --config /etc/kriyan/node.json

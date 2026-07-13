@@ -25,11 +25,16 @@ awk -F= '
 ' "${manifest}" || { echo "operator provenance manifest is invalid" >&2; exit 2; }
 
 lock_hash=$(git show "${commit}:bun.lock" | sha256_file /dev/stdin)
+trusted_bun=$(git show "${commit}:.bun-version" 2>/dev/null) || {
+  echo "exact commit is missing .bun-version toolchain policy" >&2
+  exit 2
+}
+[[ ${trusted_bun} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $(bun --version) == "${trusted_bun}" ]]
 [[ $(manifest_value "${manifest}" manifest_version) == 1 ]]
 [[ $(manifest_value "${manifest}" source_commit) == "${commit}" ]]
 [[ $(manifest_value "${manifest}" source_tree) == "${tree}" ]]
 [[ $(manifest_value "${manifest}" source_date_epoch) == "${epoch}" ]]
-[[ $(manifest_value "${manifest}" bun_version) == "$(bun --version)" ]]
+[[ $(manifest_value "${manifest}" bun_version) == "${trusted_bun}" ]]
 [[ $(manifest_value "${manifest}" target) == bun-darwin-arm64 ]]
 [[ $(manifest_value "${manifest}" lock_sha256) == "${lock_hash}" ]]
 [[ $(manifest_value "${manifest}" cli_sha256) == "$(sha256_file "${binary}")" ]]

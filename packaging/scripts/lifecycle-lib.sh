@@ -126,6 +126,50 @@ restore_regular_file() {
   esac
 }
 
+snapshot_path() {
+  local source=$1
+  local backup=$2
+  local state=$3
+  if [[ -L ${source} ]]; then
+    readlink "${source}" >"${backup}"
+    printf 'symlink\n' >"${state}"
+  elif [[ -f ${source} ]]; then
+    cp -p "${source}" "${backup}"
+    printf 'regular\n' >"${state}"
+  elif [[ -e ${source} ]]; then
+    echo "transaction state is not a regular file or symlink: ${source}" >&2
+    return 2
+  else
+    printf 'absent\n' >"${state}"
+  fi
+}
+
+restore_path() {
+  local destination=$1
+  local backup=$2
+  local state=$3
+  if [[ -e ${destination} && ! -f ${destination} && ! -L ${destination} ]]; then
+    echo "transaction destination is not replaceable: ${destination}" >&2
+    return 2
+  fi
+  rm -f -- "${destination}"
+  case $(cat "${state}") in
+    regular)
+      cp -p "${backup}" "${destination}.restore.$$"
+      mv -f "${destination}.restore.$$" "${destination}"
+      ;;
+    symlink)
+      ln -s "$(cat "${backup}")" "${destination}"
+      ;;
+    absent)
+      ;;
+    *)
+      echo "transaction snapshot state is invalid" >&2
+      return 2
+      ;;
+  esac
+}
+
 snapshot_release_state() {
   local snapshot=$1
   local etc_root=${KRIYAN_ETC_ROOT:-/etc/kriyan}

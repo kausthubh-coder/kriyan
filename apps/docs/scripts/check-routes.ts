@@ -101,6 +101,17 @@ try {
 
     const html = await response.text()
     renderedPages.set(route, html)
+    const currentLinks = [...html.matchAll(/<a\b[^>]*>/gi)]
+      .map((match) => match[0])
+      .filter((tag) => attribute(tag, 'aria-current') === 'page')
+    if (
+      currentLinks.length === 0 ||
+      currentLinks.some((tag) => attribute(tag, 'href') !== route) ||
+      !html.includes('current-route-label') ||
+      !html.includes('>Current<')
+    ) {
+      throw new Error(`${route} does not expose its current route semantically and visibly`)
+    }
     const canonical = metadataValue(html, 'rel', 'canonical', 'href')
     const expectedCanonical = route === '/' ? siteUrl : siteHref(route)
     if (canonical !== expectedCanonical) {
@@ -170,6 +181,7 @@ try {
   console.log(
     `PASS ${discoveredLinks.size} unique internal links and ${samePageAnchorCount} same-page anchors`,
   )
+  console.log('PASS aria-current and visible current-route labels')
 
   for (const route of metadataRoutes) {
     const response = await fetch(`${baseUrl}${route.path}`)

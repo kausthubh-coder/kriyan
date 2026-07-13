@@ -25,17 +25,35 @@ class FakeRunner implements CommandRunner {
   readonly calls: Array<{ command: string; args: string[] }> = []
   failScp = false
 
-  async run(command: string, args: string[]): Promise<CommandResult> {
+  async run(
+    command: string,
+    args: string[],
+    options: { env?: Record<string, string> } = {},
+  ): Promise<CommandResult> {
     this.calls.push({ command, args })
+    if (command === 'bash' && args[0]?.endsWith('/verify-release-archive.sh')) {
+      const exported = options.env?.KRIYAN_EXPORT_TRUSTED_IDENTITY_FILE
+      if (exported !== undefined) {
+        await writeFile(exported, [
+          `source_commit=${RELEASE_SHA}`,
+          `source_tree=${'a'.repeat(40)}`,
+          'source_date_epoch=1',
+          `lock_sha256=${'b'.repeat(64)}`,
+          `bun_version=${Bun.version}`,
+          '',
+        ].join('\n'))
+      }
+      return { exitCode: 0, stdout: '', stderr: '' }
+    }
     if (command === 'scp' && this.failScp) {
       return { exitCode: 1, stdout: '', stderr: 'transfer detail must stay private' }
     }
-    if (command === 'ssh' && args.at(-1)?.includes("'vps' 'install'")) {
+    if (command === 'ssh' && args.at(-1)?.includes("'vps' 'doctor' '--local'")) {
       return {
         exitCode: 0,
         stdout: `${JSON.stringify({
           ok: true,
-          command: 'vps install',
+          command: 'vps doctor',
           release: { version: RELEASE_SHA },
           service: { enabled: true, active: true },
           doctor: { config: 'pass', processHealth: 'pass', releaseIdentity: 'pass' },
@@ -127,9 +145,12 @@ test('remote install verifies locally, transfers checksum and config, verifies r
     release: { version: RELEASE_SHA },
     service: { enabled: true, active: true },
   })
-  expect(runner.calls.filter((call) => call.command === 'scp')).toHaveLength(3)
+  expect(runner.calls.filter((call) => call.command === 'scp')).toHaveLength(4)
   expect(runner.calls.find((call) => call.command === 'bash')?.args.at(2)).toBe(RELEASE_SHA)
   expect(runner.calls.some((call) => call.args.at(-1)?.includes('sha256sum -c'))).toBe(true)
+  expect(runner.calls.some((call) => call.args.at(-1)?.includes('install-transaction.sh'))).toBe(true)
+  expect(runner.calls.some((call) => call.args.at(-1)?.includes('KRIYAN_TRUSTED_IDENTITY_FILE='))).toBe(true)
+  expect(runner.calls.some((call) => call.args.at(-1)?.includes('/bootstrap/bin/kriyan'))).toBe(false)
   expect(runner.calls.at(-1)?.args.at(-1)).toContain("'rm' '-rf' '--' '/tmp/kriyan-transfer-deterministic-id'")
   const renderedCalls = JSON.stringify(runner.calls)
   expect(renderedCalls).not.toContain('installation:vps-test')
@@ -203,6 +224,17 @@ test('local repeat install, update, rollback, restart, and explicit uninstall mo
   const optRelease = join(item.root, 'opt', 'releases', RELEASE_SHA)
   await mkdir(join(optRelease, 'bin'), { recursive: true })
   await symlink(optRelease, join(item.root, 'opt', 'current'))
+  await writeProcessHealth(item.dataDir, {
+    schemaVersion: 1,
+    installationId: 'installation:vps-test',
+    nodeId: 'node:vps-test',
+    processInstanceId: 'process:repeat',
+    releaseId: RELEASE_SHA,
+    pid: 42,
+    startedAt: 1,
+    heartbeatAt: Date.now(),
+    ready: true,
+  })
   const paths = {
     optRoot: join(item.root, 'opt'),
     configPath: item.config,
@@ -231,7 +263,7 @@ test('local repeat install, update, rollback, restart, and explicit uninstall mo
     ok: true,
     data: 'purged',
   })
-  expect(runner.calls.filter((call) => call.command === 'bash' && call.args[0]?.endsWith('/install.sh'))).toHaveLength(2)
+  expect(runner.calls.filter((call) => call.command === 'bash' && call.args[0]?.endsWith('/install-transaction.sh'))).toHaveLength(2)
   expect(runner.calls.some((call) => call.args[0]?.endsWith('/update.sh'))).toBe(true)
   expect(runner.calls.some((call) => call.args[0]?.endsWith('/rollback.sh'))).toBe(true)
   expect(runner.calls.some((call) => call.args[0]?.endsWith('/restart.sh'))).toBe(true)
