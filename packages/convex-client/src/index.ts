@@ -2,6 +2,16 @@ import { ConvexClient } from 'convex/browser'
 
 import { api } from '../../../convex/_generated/api'
 
+import {
+  createKnowledgeProjectionPlane,
+  type KnowledgeDocumentProjectionInput,
+  type KnowledgeProjectionPlane,
+  type ProjectionUpsertResult,
+  type SourceRefProjectionInput,
+} from './knowledge-projections'
+
+export * from './knowledge-projections'
+
 export type JobStatus =
   | 'queued'
   | 'leased'
@@ -154,11 +164,15 @@ function requireUrl(value: string): string {
   return url.toString().replace(/\/$/, '')
 }
 
-export class ConvexControlPlane implements ControlPlane {
+export class ConvexControlPlane
+  implements ControlPlane, KnowledgeProjectionPlane
+{
   private readonly client: ConvexClient
+  private readonly knowledge: KnowledgeProjectionPlane
 
   constructor(url: string) {
     this.client = new ConvexClient(requireUrl(url))
+    this.knowledge = createKnowledgeProjectionPlane(this.client)
   }
 
   async registerNode(input: NodeRegistration) {
@@ -308,6 +322,18 @@ export class ConvexControlPlane implements ControlPlane {
       paginationOpts: { numItems: 100, cursor: null },
     })
     return result.page
+  }
+
+  async upsertSourceRef(
+    input: SourceRefProjectionInput,
+  ): Promise<ProjectionUpsertResult> {
+    return await this.knowledge.upsertSourceRef(input)
+  }
+
+  async upsertKnowledgeDocument(
+    input: KnowledgeDocumentProjectionInput,
+  ): Promise<ProjectionUpsertResult> {
+    return await this.knowledge.upsertKnowledgeDocument(input)
   }
 
   async close(): Promise<void> {

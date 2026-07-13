@@ -1,5 +1,161 @@
 import { createHash } from 'node:crypto'
 
+export type SourceProjectionKind =
+  | 'audio'
+  | 'video'
+  | 'document'
+  | 'web'
+  | 'git'
+  | 'calendar'
+  | 'email'
+  | 'chat'
+  | 'other'
+
+export type KnowledgeProjectionKind =
+  | 'person'
+  | 'project'
+  | 'topic'
+  | 'organization'
+  | 'place'
+  | 'event'
+  | 'other'
+
+export type ProjectionSyncState = 'pending' | 'synced' | 'failed' | 'stale'
+export type ProjectionIndexState = 'pending' | 'indexed' | 'failed' | 'stale'
+
+export interface SourceRefProjectionDto {
+  installationId: string
+  sourceRefId: string
+  idempotencyKey: string
+  kind: SourceProjectionKind
+  displayName: string
+  sourceUrl?: string
+  externalId?: string
+  contentHash?: string
+  syncState: ProjectionSyncState
+  indexState: ProjectionIndexState
+  provenanceIds: string[]
+  lastSyncedAt?: number
+  expectedRevision?: number
+}
+
+export interface KnowledgeDocumentProjectionDto {
+  installationId: string
+  knowledgeDocumentId: string
+  idempotencyKey: string
+  kind: KnowledgeProjectionKind
+  title: string
+  summary: string
+  tags: string[]
+  sourceRefIds: string[]
+  provenanceIds: string[]
+  syncState: ProjectionSyncState
+  indexState: ProjectionIndexState
+  expectedRevision?: number
+}
+
+export interface CitedRetrievalCitation {
+  citationId: string
+  sourceRefId: string
+  knowledgeDocumentId?: string
+  displayName: string
+  sourceUrl?: string
+  provenanceIds: string[]
+}
+
+export interface CitedRetrievalResult {
+  resultId: string
+  query: string
+  answer: string
+  citations: CitedRetrievalCitation[]
+  generatedAt: number
+}
+
+const CITED_RESULT_KEYS = new Set([
+  'resultId',
+  'query',
+  'answer',
+  'citations',
+  'generatedAt',
+])
+const CITATION_KEYS = new Set([
+  'citationId',
+  'sourceRefId',
+  'knowledgeDocumentId',
+  'displayName',
+  'sourceUrl',
+  'provenanceIds',
+])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  allowed: Set<string>,
+): boolean {
+  return Object.keys(value).every((key) => allowed.has(key))
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isNonEmptyString)
+}
+
+function isOptionalHttpUrl(value: unknown): boolean {
+  if (value === undefined) return true
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
+function isCitedRetrievalCitation(
+  value: unknown,
+): value is CitedRetrievalCitation {
+  if (!isRecord(value) || !hasOnlyKeys(value, CITATION_KEYS)) return false
+  return (
+    isNonEmptyString(value.citationId) &&
+    isNonEmptyString(value.sourceRefId) &&
+    (value.knowledgeDocumentId === undefined ||
+      isNonEmptyString(value.knowledgeDocumentId)) &&
+    isNonEmptyString(value.displayName) &&
+    isOptionalHttpUrl(value.sourceUrl) &&
+    isStringArray(value.provenanceIds) &&
+    new Set(value.provenanceIds).size === value.provenanceIds.length
+  )
+}
+
+/**
+ * Accepts only the compact citation projection intended for Convex publication.
+ * Unknown fields are rejected so raw bodies, excerpts, paths, and credentials
+ * cannot accidentally hitch a ride in this shared result envelope.
+ */
+export function isCitedRetrievalResult(
+  value: unknown,
+): value is CitedRetrievalResult {
+  if (!isRecord(value) || !hasOnlyKeys(value, CITED_RESULT_KEYS)) return false
+  if (
+    !isNonEmptyString(value.resultId) ||
+    !isNonEmptyString(value.query) ||
+    typeof value.answer !== 'string' ||
+    !Number.isFinite(value.generatedAt) ||
+    !Array.isArray(value.citations) ||
+    !value.citations.every(isCitedRetrievalCitation)
+  ) {
+    return false
+  }
+  const citationIds = value.citations.map((citation) => citation.citationId)
+  return new Set(citationIds).size === citationIds.length
+}
+
 export interface ReminderProduct {
   kind: 'reminder'
   message: string

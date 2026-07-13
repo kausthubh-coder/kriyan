@@ -6,8 +6,16 @@ import {
   jobStatus,
   nodeStatus,
   reminderStatus,
+  reminderDeliveryPolicy,
   runEventType,
   runStatus,
+  calendarEventStatus,
+  indexState,
+  knowledgeKind,
+  notificationIntentLifecycle,
+  sourceKind,
+  syncState,
+  taskPriority,
   taskStatus,
 } from './validators'
 
@@ -118,8 +126,14 @@ export default defineSchema({
     taskId: v.string(),
     idempotencyKey: v.string(),
     title: v.string(),
+    description: v.optional(v.string()),
+    tags: v.array(v.string()),
+    priority: v.optional(taskPriority),
     status: taskStatus,
+    startAt: v.optional(v.number()),
     dueAt: v.optional(v.number()),
+    projectId: v.optional(v.string()),
+    entityId: v.optional(v.string()),
     revision: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -152,8 +166,17 @@ export default defineSchema({
     idempotencyKey: v.string(),
     message: v.string(),
     remindAt: v.number(),
+    nextFireAt: v.optional(v.number()),
     timezone: v.string(),
+    deliveryPolicy: reminderDeliveryPolicy,
     status: reminderStatus,
+    scheduleKey: v.string(),
+    fireCount: v.number(),
+    acknowledgedAt: v.optional(v.number()),
+    snoozedUntil: v.optional(v.number()),
+    lastFiredAt: v.optional(v.number()),
+    linkedTaskId: v.optional(v.string()),
+    entityId: v.optional(v.string()),
     revision: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -161,6 +184,7 @@ export default defineSchema({
   })
     .index('by_installation_reminder', ['installationId', 'reminderId'])
     .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
+    .index('by_installation_schedule_key', ['installationId', 'scheduleKey'])
     .index('by_installation_status_time', [
       'installationId',
       'status',
@@ -182,5 +206,128 @@ export default defineSchema({
       'installationId',
       'deletedAt',
       'remindAt',
+    ])
+    .index('by_installation_live_next_fire', [
+      'installationId',
+      'deletedAt',
+      'nextFireAt',
     ]),
+
+  calendarEvents: defineTable({
+    installationId: v.string(),
+    calendarEventId: v.string(),
+    idempotencyKey: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    startAt: v.number(),
+    endAt: v.number(),
+    timezone: v.string(),
+    allDay: v.boolean(),
+    location: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    status: calendarEventStatus,
+    sourceProvider: v.optional(v.string()),
+    externalCalendarId: v.optional(v.string()),
+    externalEventId: v.optional(v.string()),
+    recurrenceRule: v.optional(v.string()),
+    recurringEventId: v.optional(v.string()),
+    originalStartAt: v.optional(v.number()),
+    sourceRefId: v.optional(v.string()),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_event', ['installationId', 'calendarEventId'])
+    .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
+    .index('by_installation_live_start', ['installationId', 'deletedAt', 'startAt'])
+    .index('by_installation_live_status_start', ['installationId', 'deletedAt', 'status', 'startAt'])
+    .index('by_installation_external_event', ['installationId', 'sourceProvider', 'externalEventId']),
+
+  notificationIntents: defineTable({
+    installationId: v.string(),
+    notificationIntentId: v.string(),
+    reminderId: v.string(),
+    scheduledFor: v.number(),
+    deliveryPolicy: reminderDeliveryPolicy,
+    dedupeKey: v.string(),
+    lifecycle: notificationIntentLifecycle,
+    attempt: v.number(),
+    escalationLevel: v.number(),
+    targetDeviceId: v.optional(v.string()),
+    lastAttemptAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_intent', ['installationId', 'notificationIntentId'])
+    .index('by_installation_dedupe', ['installationId', 'dedupeKey'])
+    .index('by_installation_live_schedule', ['installationId', 'deletedAt', 'scheduledFor'])
+    .index('by_installation_live_lifecycle_schedule', ['installationId', 'deletedAt', 'lifecycle', 'scheduledFor']),
+
+  notes: defineTable({
+    installationId: v.string(),
+    noteId: v.string(),
+    idempotencyKey: v.string(),
+    title: v.optional(v.string()),
+    contentJson: v.string(),
+    plainTextPreview: v.string(),
+    wordCount: v.number(),
+    tags: v.array(v.string()),
+    entityId: v.optional(v.string()),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_note', ['installationId', 'noteId'])
+    .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
+    .index('by_installation_live_updated', ['installationId', 'deletedAt', 'updatedAt']),
+
+  sourceRefs: defineTable({
+    installationId: v.string(),
+    sourceRefId: v.string(),
+    idempotencyKey: v.string(),
+    kind: sourceKind,
+    displayName: v.string(),
+    sourceUrl: v.optional(v.string()),
+    externalId: v.optional(v.string()),
+    contentHash: v.optional(v.string()),
+    syncState,
+    indexState,
+    provenanceIds: v.array(v.string()),
+    lastSyncedAt: v.optional(v.number()),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_source', ['installationId', 'sourceRefId'])
+    .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
+    .index('by_installation_live_kind', ['installationId', 'deletedAt', 'kind'])
+    .index('by_installation_live_sync', ['installationId', 'deletedAt', 'syncState']),
+
+  knowledgeDocuments: defineTable({
+    installationId: v.string(),
+    knowledgeDocumentId: v.string(),
+    idempotencyKey: v.string(),
+    kind: knowledgeKind,
+    title: v.string(),
+    summary: v.string(),
+    tags: v.array(v.string()),
+    sourceRefIds: v.array(v.string()),
+    provenanceIds: v.array(v.string()),
+    syncState,
+    indexState,
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_knowledge', ['installationId', 'knowledgeDocumentId'])
+    .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
+    .index('by_installation_live_kind', ['installationId', 'deletedAt', 'kind'])
+    .index('by_installation_live_sync', ['installationId', 'deletedAt', 'syncState']),
 })

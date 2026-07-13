@@ -2,5 +2,8 @@
   "name": "@kriyan/tools",
   "type": "module",
   "private": true,
-  "exports": { ".": "./src/index.ts" }
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "test": "bun test"
+  }
 }

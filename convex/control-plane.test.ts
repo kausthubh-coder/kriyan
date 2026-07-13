@@ -1477,7 +1477,7 @@ describe('round 4 rejection regressions', () => {
     ])
   })
 
-  test('internal dev cleanup is bounded, resumable, and idempotent across all eight tables', async () => {
+  test('internal dev cleanup is bounded, resumable, and idempotent across populated tables', async () => {
     const t = backend()
     vi.stubEnv('KRIYAN_DEV_DEPLOYMENT', 'qualified-sandpiper-726')
     await createInstallation(t)

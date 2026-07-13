@@ -11,6 +11,11 @@ const cleanupTables = [
   'commands',
   'tasks',
   'reminders',
+  'calendarEvents',
+  'notificationIntents',
+  'notes',
+  'sourceRefs',
+  'knowledgeDocuments',
   'nodes',
   'installations',
 ] as const
@@ -22,6 +27,11 @@ const cleanupTable = v.union(
   v.literal('commands'),
   v.literal('tasks'),
   v.literal('reminders'),
+  v.literal('calendarEvents'),
+  v.literal('notificationIntents'),
+  v.literal('notes'),
+  v.literal('sourceRefs'),
+  v.literal('knowledgeDocuments'),
   v.literal('nodes'),
   v.literal('installations'),
 )
@@ -148,6 +158,56 @@ export const resetInstallation = internalMutation({
             await ctx.db
               .query('reminders')
               .withIndex('by_installation_reminder', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'calendarEvents':
+          documentIds = (
+            await ctx.db
+              .query('calendarEvents')
+              .withIndex('by_installation_event', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'notificationIntents':
+          documentIds = (
+            await ctx.db
+              .query('notificationIntents')
+              .withIndex('by_installation_intent', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'notes':
+          documentIds = (
+            await ctx.db
+              .query('notes')
+              .withIndex('by_installation_note', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'sourceRefs':
+          documentIds = (
+            await ctx.db
+              .query('sourceRefs')
+              .withIndex('by_installation_source', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'knowledgeDocuments':
+          documentIds = (
+            await ctx.db
+              .query('knowledgeDocuments')
+              .withIndex('by_installation_knowledge', (q) =>
                 q.eq('installationId', args.installationId),
               )
               .take(args.batchSize + 1)

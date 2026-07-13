@@ -1,7 +1,15 @@
 export type ConnectionMode = 'connecting' | 'online' | 'reconnecting' | 'offline'
 export type ConnectionRecovery = 'initial' | 'confirmed' | 'awaiting-ready' | 'awaiting-subscription' | 'unconfirmed'
 export type TaskStatus = 'open' | 'completed' | 'cancelled'
-export type ReminderStatus = 'scheduled' | 'fired' | 'dismissed' | 'cancelled'
+export type ReminderStatus = 'scheduled' | 'fired' | 'acknowledged' | 'dismissed' | 'cancelled'
+export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type ReminderDeliveryPolicy = 'normal' | 'persistent' | 'critical'
+export type NotificationIntentLifecycle = 'queued' | 'dispatched' | 'acknowledged' | 'failed' | 'cancelled'
+export type CalendarEventLifecycle = 'confirmed' | 'tentative' | 'cancelled'
+export type SourceKind = 'audio' | 'video' | 'document' | 'web' | 'git' | 'calendar' | 'email' | 'chat' | 'other'
+export type KnowledgeKind = 'person' | 'project' | 'topic' | 'organization' | 'place' | 'event' | 'other'
+export type ProjectionSyncState = 'pending' | 'synced' | 'failed' | 'stale'
+export type ProjectionIndexState = 'pending' | 'indexed' | 'failed' | 'stale'
 export type JobStatus = 'queued' | 'leased' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
 export type HonestRunState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
@@ -26,9 +34,16 @@ export interface TaskItem {
   title: string
   status: TaskStatus
   dueAt?: number
+  description?: string
+  tags?: string[]
+  priority?: TaskPriority
+  startAt?: number
+  projectId?: string
+  entityId?: string
   revision: number
   createdAt: number
   updatedAt: number
+  deletedAt?: number
   optimistic?: boolean
 }
 
@@ -38,10 +53,108 @@ export interface ReminderItem {
   remindAt: number
   timezone: string
   status: ReminderStatus
+  deliveryPolicy?: ReminderDeliveryPolicy
+  acknowledgedAt?: number
+  snoozedUntil?: number
+  nextFireAt?: number
+  linkedTaskId?: string
+  entityId?: string
+  scheduleKey?: string
   revision: number
   createdAt: number
   updatedAt: number
+  deletedAt?: number
   optimistic?: boolean
+}
+
+export interface NotificationIntentItem {
+  notificationIntentId: string
+  reminderId: string
+  scheduledFor: number
+  deliveryPolicy: ReminderDeliveryPolicy
+  dedupeKey: string
+  lifecycle: NotificationIntentLifecycle
+  attempt: number
+  escalationLevel: number
+  targetDeviceId?: string
+  lastAttemptAt?: number
+  lastError?: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+export interface CalendarRecurrenceMetadata {
+  rule?: string
+  seriesId?: string
+  recurrenceId?: string
+  providerUpdatedAt?: number
+}
+
+export interface CalendarEventItem {
+  calendarEventId: string
+  title: string
+  description?: string
+  startAt: number
+  endAt: number
+  timezone: string
+  allDay: boolean
+  location?: string
+  sourceUrl?: string
+  lifecycle: CalendarEventLifecycle
+  recurrence?: CalendarRecurrenceMetadata
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+export interface AppNoteItem {
+  noteId: string
+  title?: string
+  contentJson: string
+  plainTextPreview: string
+  wordCount: number
+  tags: string[]
+  entityId?: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+export interface SourceRefItem {
+  sourceRefId: string
+  kind: SourceKind
+  displayName: string
+  sourceUrl?: string
+  externalId?: string
+  contentHash?: string
+  syncState: ProjectionSyncState
+  indexState: ProjectionIndexState
+  provenanceIds: string[]
+  lastSyncedAt?: number
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+export interface KnowledgeDocumentItem {
+  knowledgeDocumentId: string
+  kind: KnowledgeKind
+  title: string
+  summary: string
+  tags: string[]
+  sourceRefIds: string[]
+  provenanceIds: string[]
+  syncState: ProjectionSyncState
+  indexState: ProjectionIndexState
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
 }
 
 export interface CommandItem {

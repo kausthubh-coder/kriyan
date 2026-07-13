@@ -9,9 +9,13 @@
  */
 
 import type * as commands from "../commands.js";
+import type * as calendar from "../calendar.js";
 import type * as dev from "../dev.js";
 import type * as installations from "../installations.js";
 import type * as lib from "../lib.js";
+import type * as knowledge from "../knowledge.js";
+import type * as notes from "../notes.js";
+import type * as notifications from "../notifications.js";
 import type * as projections from "../projections.js";
 import type * as read from "../read.js";
 import type * as validators from "../validators.js";
@@ -25,9 +29,13 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   commands: typeof commands;
+  calendar: typeof calendar;
   dev: typeof dev;
   installations: typeof installations;
   lib: typeof lib;
+  knowledge: typeof knowledge;
+  notes: typeof notes;
+  notifications: typeof notifications;
   projections: typeof projections;
   read: typeof read;
   validators: typeof validators;

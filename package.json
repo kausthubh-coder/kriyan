@@ -18,7 +18,7 @@
     "typecheck:convex": "bunx tsc -p convex/tsconfig.json --noEmit",
     "typecheck:client-core": "bun run --cwd packages/client-core typecheck",
     "typecheck:smoke": "bunx tsc --noEmit --strict --skipLibCheck --module ESNext --moduleResolution Bundler --target ES2022 --types bun scripts/convex-worker-smoke.ts scripts/assert-convex-function-spec.ts scripts/check-convex-metadata.ts",
-    "test:convex": "bunx vitest run convex/control-plane.test.ts",
+    "test:convex": "bunx vitest run convex/*.test.ts",
     "test:client-core": "bun run --cwd packages/client-core test",
     "check:convex-metadata": "bash scripts/check-convex-metadata.sh",
     "check:convex-metadata:secure": "bun scripts/check-convex-metadata.ts",

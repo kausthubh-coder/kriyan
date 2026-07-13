@@ -44,7 +44,13 @@ through an installation-prefixed index. Its `processedTable`, `nextTable`, and
 `done` result supports explicit resumable cleanup; calling it again after
 completion safely returns zero deletions.
 
-Ordinary task and reminder list queries use live-record indexes before Convex
+Ordinary product list queries use live-record indexes before Convex
 pagination, so a cursor advances over visible records and cannot yield an empty
 tombstone-only intermediate page. `includeDeleted: true` intentionally switches
 to the complete-history indexes while retaining the same bounded cursor API.
+
+Notification intents coordinate future native delivery attempts; they do not
+send push notifications or prove OS delivery. Convex stores compact source and
+knowledge projections only. Raw source or transcript bodies, entity Markdown,
+embeddings, credentials, browser state, and local secret paths remain outside
+this control plane.

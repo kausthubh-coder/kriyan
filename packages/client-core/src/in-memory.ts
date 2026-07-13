@@ -1,4 +1,5 @@
 import { createActivityAdapter, type ActivityAdapter } from './activity-adapter'
+import { InMemoryProductRepository } from './in-memory-product'
 import type { ClientRepository } from './repository'
 import type {
   ActionResult,
@@ -37,7 +38,7 @@ function stale(): ActionResult<never> {
   }
 }
 
-export class InMemoryClientRepository implements ClientRepository {
+export class InMemoryClientRepository extends InMemoryProductRepository implements ClientRepository {
   installation: InstallationItem
   tasks: TaskItem[] = []
   reminders: ReminderItem[] = []
@@ -58,6 +59,7 @@ export class InMemoryClientRepository implements ClientRepository {
   private sequence = 0
 
   constructor(installation?: Partial<InstallationItem>) {
+    super()
     this.installation = {
       installationId: 'installation:memory',
       timezone: 'UTC',
