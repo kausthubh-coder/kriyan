@@ -17,32 +17,52 @@ import {
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { KRIYAN_CONFIG, useConvexClientControls } from '@/lib/convex'
-import { useConvexRepository } from '@/src/client-core/convex-repository'
+import { KRIYAN_CONFIG, KRIYAN_DEMO, useConvexClientControls } from '@/lib/convex'
+import { useDemoRepository } from '@/src/client-core/demo-repository'
+import { useLiveWebRepository } from '@/src/client-core/live-web-repository'
 import { useVisibilityClock } from '@/src/client-core/use-visibility-clock'
+import type { WebRepository } from '@/src/client-core/web-repository'
+
+import {
+  CalendarWorkspace,
+  EntitiesWorkspace,
+  NotesWorkspace,
+  ProductReminderWorkspace,
+  ProductTaskWorkspace,
+  SourcesWorkspace,
+  type ResultHandler,
+} from '@/components/productivity/workspaces'
 
 import {
   ActivityIcon,
   BellIcon,
+  CalendarIcon,
   CheckIcon,
   ChevronIcon,
   CloseIcon,
   EditIcon,
+  EntityIcon,
   NodeIcon,
+  NoteIcon,
   PlusIcon,
   RetryIcon,
   SendIcon,
+  SourceIcon,
   TaskIcon,
   TodayIcon,
 } from './icons'
 
-type Section = 'today' | 'tasks' | 'reminders'
+export type Section = 'today' | 'tasks' | 'reminders' | 'calendar' | 'notes' | 'sources' | 'entities'
 type NoticeValue = { tone: 'error' | 'success'; text: string }
 
 const NAV_ITEMS: Array<{ key: Section; label: string; href: string; icon: typeof TodayIcon }> = [
   { key: 'today', label: 'Today', href: '/', icon: TodayIcon },
   { key: 'tasks', label: 'Tasks', href: '/tasks', icon: TaskIcon },
   { key: 'reminders', label: 'Reminders', href: '/reminders', icon: BellIcon },
+  { key: 'calendar', label: 'Calendar', href: '/calendar', icon: CalendarIcon },
+  { key: 'notes', label: 'Notes', href: '/notes', icon: NoteIcon },
+  { key: 'sources', label: 'Sources', href: '/sources', icon: SourceIcon },
+  { key: 'entities', label: 'Entities', href: '/entities', icon: EntityIcon },
 ]
 
 function eventData(data: string): string {
@@ -66,23 +86,50 @@ function noticeFrom(result: ActionResult<unknown>, success?: string): NoticeValu
   return success ? { tone: 'success', text: success } : null
 }
 
+function handleResult(setNotice: (notice: NoticeValue | null) => void): ResultHandler {
+  return (result, success) => setNotice(noticeFrom(result, success))
+}
+
 export function TodayApp({ initialSection }: { initialSection: Section }) {
-  const [notice, setNotice] = useState<NoticeValue | null>(null)
-  const [composer, setComposer] = useState('')
-  const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null)
+  return KRIYAN_DEMO
+    ? <DemoTodayApp initialSection={initialSection} />
+    : <LiveTodayApp initialSection={initialSection} />
+}
+
+function LiveTodayApp({ initialSection }: { initialSection: Section }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const configuration = KRIYAN_CONFIG!
   const convexClient = useConvexClientControls()
-  const { repository, connectionMode, connectionRecoveryRequired } = useConvexRepository(
-    configuration,
-    selectedRunId,
-    convexClient.generation,
-  )
+  const runtime = useLiveWebRepository(configuration, selectedRunId, convexClient.generation)
+  return <RepositoryTodayApp initialSection={initialSection} repository={runtime.repository} connectionMode={runtime.connectionMode} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+}
+
+function DemoTodayApp({ initialSection }: { initialSection: Section }) {
+  const [selectedRunId, setSelectedRunId] = useState<string | null>('run:demo-retrieval')
+  const repository = useDemoRepository(selectedRunId)
+  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode="online" connectionRecoveryRequired={false} onRecreate={() => undefined} installationId="installation:memory" selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+}
+
+function RepositoryTodayApp({ initialSection, repository, connectionMode, connectionRecoveryRequired, onRecreate, installationId, selectedRunId, setSelectedRunId }: {
+  initialSection: Section
+  repository: WebRepository
+  connectionMode: ConnectionMode
+  connectionRecoveryRequired: boolean
+  onRecreate: () => void
+  installationId: string
+  selectedRunId: string | null
+  setSelectedRunId: (runId: string | null) => void
+}) {
+  const [notice, setNotice] = useState<NoticeValue | null>(null)
+  const [renderNow] = useState(() => Date.now())
+  const [composer, setComposer] = useState('')
+  const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null)
   const heartbeatTimestamps = useMemo(
     () => repository.nodes.map((node) => node.lastHeartbeatAt),
     [repository.nodes],
   )
   const now = useVisibilityClock(heartbeatTimestamps)
+  const effectiveNow = now ?? renderNow
 
   const activity = repository.activity
   const selectedActivity = activity.find((item) => item.command.commandId === selectedCommandId) ?? activity[0]
@@ -93,7 +140,7 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
     if (nextRunId === selectedRunId) return
     const update = setTimeout(() => setSelectedRunId(nextRunId), 0)
     return () => clearTimeout(update)
-  }, [selectedActivity?.run?.runId, selectedRunId])
+  }, [selectedActivity?.run?.runId, selectedRunId, setSelectedRunId])
 
   function selectActivity(item: ActivityItem): void {
     setSelectedCommandId(item.command.commandId)
@@ -118,7 +165,7 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
   }
 
   if (repository.installation === null) {
-    return <EnrollmentRequired installationId={configuration.installationId} />
+    return <EnrollmentRequired installationId={installationId} />
   }
 
   return (
@@ -142,7 +189,7 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
           <ConnectionBanner
             mode={connectionMode}
             recoveryRequired={connectionRecoveryRequired}
-            onRecreate={convexClient.recreate}
+            onRecreate={onRecreate}
           />
         )}
         {notice && <Notice notice={notice} onClose={() => setNotice(null)} />}
@@ -171,20 +218,25 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
         )}
 
         {initialSection === 'tasks' && (
-          <TaskWorkspace
+          <ProductTaskWorkspace
             repository={repository}
-            now={now}
-            onNotice={setNotice}
+            now={effectiveNow}
+            onResult={handleResult(setNotice)}
           />
         )}
 
         {initialSection === 'reminders' && (
-          <ReminderWorkspace
+          <ProductReminderWorkspace
             repository={repository}
-            now={now}
-            onNotice={setNotice}
+            now={effectiveNow}
+            onResult={handleResult(setNotice)}
           />
         )}
+
+        {initialSection === 'calendar' && <CalendarWorkspace repository={repository} now={effectiveNow} onResult={handleResult(setNotice)} />}
+        {initialSection === 'notes' && <NotesWorkspace repository={repository} onResult={handleResult(setNotice)} />}
+        {initialSection === 'sources' && <SourcesWorkspace repository={repository} now={effectiveNow} />}
+        {initialSection === 'entities' && <EntitiesWorkspace repository={repository} onResult={handleResult(setNotice)} />}
       </main>
 
       <aside className="activity-rail" aria-label="Run activity">
@@ -265,6 +317,10 @@ export function PageHeader({ section, now }: { section: Section; now: number | n
     today: ['Today', 'See what needs you, what is scheduled, and what Kriyan is doing.'],
     tasks: ['Tasks', 'Keep the next actions small, current, and visible.'],
     reminders: ['Reminders', 'Time-bound intentions, synchronized through your installation.'],
+    calendar: ['Calendar', 'Browse the day or week, then edit time where work actually happens.'],
+    notes: ['Notes', 'Durable writing stored as validated TipTap JSON with a searchable preview.'],
+    sources: ['Knowledge sources', 'See what your node has synchronized and indexed without exposing the private vault.'],
+    entities: ['Entities', 'Compact project, person, and topic projections with traceable provenance.'],
   }[section]
   const dateLabel = now === null
     ? 'Your current day'
@@ -383,6 +439,7 @@ function LoadMore({ page, onLoadMore, label }: { page: PageState; onLoadMore: ()
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TaskWorkspace({ repository, now, onNotice }: { repository: ClientRepository; now: number | null; onNotice: (notice: NoticeValue | null) => void }) {
   const [showCompleted, setShowCompleted] = useState(false)
   const visible = repository.tasks.filter((task) => task.status === (showCompleted ? 'completed' : 'open'))
@@ -418,6 +475,7 @@ export function TaskRow({ task, now = null, compact = false, pending = false, on
   return <div className={`task-row ${task.status === 'completed' ? 'completed' : ''} ${task.optimistic ? 'optimistic' : ''}`} aria-busy={pending || task.optimistic}><button className="task-check" onClick={() => void onToggle(task)} aria-label={task.status === 'completed' ? `Reopen ${task.title}` : `Complete ${task.title}`} disabled={pending || task.optimistic}>{task.status === 'completed' && <CheckIcon/>}</button><div><strong>{task.title}</strong><span>{task.optimistic || pending ? 'Saving…' : relative}</span></div>{!compact && <div className="row-actions"><button ref={editButton} className="icon-button" aria-label={`Edit ${task.title}`} onClick={() => setEditing(true)} disabled={pending || task.optimistic}><EditIcon/></button><button className="icon-button danger" aria-label={`Cancel ${task.title}`} onClick={() => void onCancel?.(task)} disabled={pending || task.optimistic}><CloseIcon/></button></div>}</div>
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ReminderWorkspace({ repository, now, onNotice }: { repository: ClientRepository; now: number | null; onNotice: (notice: NoticeValue | null) => void }) {
   const visible = repository.reminders.filter((reminder) => reminder.status !== 'cancelled')
   return <section className="workspace"><CreateReminderForm busy={repository.pending.has('reminder:create')} onCreate={async (message, remindAt) => { const result = await repository.createReminder({ message, remindAt, timezone: repository.installation?.timezone ?? 'UTC' }); onNotice(noticeFrom(result)); return result.ok }}/><div className="workspace-toolbar"><strong>Scheduled and recent</strong><span>{visible.length} {visible.length === 1 ? 'reminder' : 'reminders'}</span></div>{repository.loading ? <SkeletonList rows={4}/> : visible.length === 0 ? <EmptyState icon={BellIcon} title="Nothing scheduled" body="Add a specific time so Kriyan can keep the intention durable."/> : <div className="ruled-list workspace-list">{visible.map((reminder) => <ReminderRow key={reminder.reminderId} reminder={reminder} now={now} pending={repository.pending.has(`reminder:${reminder.reminderId}`)} onUpdate={async (item, message, remindAt) => { const result = await repository.updateReminder(item, { message, remindAt }); onNotice(noticeFrom(result)); return result }} onDismiss={async (item) => onNotice(noticeFrom(await repository.setReminderStatus(item, 'dismissed')))} onCancel={async (item) => onNotice(noticeFrom(await repository.cancelReminder(item)))}/>)}</div>}<LoadMore page={repository.pages.reminders} onLoadMore={() => repository.loadMore('reminders')} label="Load more reminders" /></section>

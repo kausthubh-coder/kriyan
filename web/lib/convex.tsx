@@ -17,6 +17,10 @@ export interface KriyanWebConfiguration {
   installationId: string
 }
 
+export function isKriyanDemoMode(environment: Record<string, string | undefined>): boolean {
+  return environment.NEXT_PUBLIC_KRIYAN_DEMO === '1'
+}
+
 export function resolveKriyanConfiguration(environment: Record<string, string | undefined>): KriyanWebConfiguration | null {
   return environment.NEXT_PUBLIC_CONVEX_URL && environment.NEXT_PUBLIC_KRIYAN_INSTALLATION_ID
     ? {
@@ -29,6 +33,10 @@ export function resolveKriyanConfiguration(environment: Record<string, string | 
 export const KRIYAN_CONFIG = resolveKriyanConfiguration({
   NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
   NEXT_PUBLIC_KRIYAN_INSTALLATION_ID: process.env.NEXT_PUBLIC_KRIYAN_INSTALLATION_ID,
+})
+
+export const KRIYAN_DEMO = isKriyanDemoMode({
+  NEXT_PUBLIC_KRIYAN_DEMO: process.env.NEXT_PUBLIC_KRIYAN_DEMO,
 })
 
 interface ConvexClientControls {
@@ -53,6 +61,7 @@ export function useRecreateConvexClient(): () => void {
 }
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
+  if (KRIYAN_DEMO) return children
   if (!KRIYAN_CONFIG) return <ConfigurationRequired />
   return <ConfiguredProvider configuration={KRIYAN_CONFIG}>{children}</ConfiguredProvider>
 }

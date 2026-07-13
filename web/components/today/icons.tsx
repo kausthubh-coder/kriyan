@@ -18,3 +18,7 @@ export function EditIcon(props: IconProps) { return <IconBase {...props}><path s
 export function RetryIcon(props: IconProps) { return <IconBase {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 8.5A7 7 0 0 1 18.5 7M17.9 15.5A7 7 0 0 1 5.5 17"/></IconBase> }
 export function NodeIcon(props: IconProps) { return <IconBase {...props}><rect x="4" y="5" width="16" height="14" rx="2"/><path strokeLinecap="round" d="M8 9h8M8 13h3M16.5 15.5h.01"/></IconBase> }
 export function ChevronIcon(props: IconProps) { return <IconBase {...props}><path strokeLinecap="round" strokeLinejoin="round" d="m9 6 6 6-6 6"/></IconBase> }
+export function CalendarIcon(props: IconProps) { return <IconBase {...props}><rect x="4" y="5" width="16" height="15" rx="2"/><path strokeLinecap="round" d="M8 3v4M16 3v4M4 9h16M8 13h2M14 13h2M8 17h2"/></IconBase> }
+export function NoteIcon(props: IconProps) { return <IconBase {...props}><path strokeLinejoin="round" d="M6 3.5h9l3 3V20H6zM15 3.5V7h3M9 11h6M9 15h6"/></IconBase> }
+export function SourceIcon(props: IconProps) { return <IconBase {...props}><path strokeLinecap="round" d="M7.5 7.5 4 11a3.5 3.5 0 0 0 5 5l3-3M16.5 16.5 20 13a3.5 3.5 0 0 0-5-5l-3 3M9 15l6-6"/></IconBase> }
+export function EntityIcon(props: IconProps) { return <IconBase {...props}><circle cx="12" cy="8" r="3.5"/><path strokeLinecap="round" d="M5.5 20a6.5 6.5 0 0 1 13 0M4 5h2M18 5h2"/></IconBase> }
