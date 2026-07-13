@@ -9,7 +9,7 @@ import { KriyanWorker } from '../src/worker'
 const convexUrl = Bun.env.CONVEX_URL
 if (convexUrl === undefined) throw new Error('CONVEX_URL is required')
 
-const fixture = `node-r1-${crypto.randomUUID()}`
+const fixture = `node-r2-${crypto.randomUUID()}`
 const installationId = `installation:${fixture}`
 let commandId = `command:${fixture}`
 const nodeId = `node:${fixture}`
@@ -17,6 +17,7 @@ let runId = `run:job:${commandId}:1`
 const dataDir = `/tmp/kriyan-${fixture}`
 const configPath = `${dataDir}/node.json`
 const deploymentName = 'qualified-sandpiper-726'
+const envFile = Bun.env.KRIYAN_ENV_FILE ?? '.env.local'
 const plane = new ConvexControlPlane(convexUrl)
 
 async function cleanup(): Promise<number> {
@@ -29,7 +30,7 @@ async function cleanup(): Promise<number> {
       batchSize: 64,
     })
     const process = Bun.spawn(
-      ['bunx', 'convex', 'run', '--env-file', '.env.local', 'dev:resetInstallation', input],
+      ['bunx', 'convex', 'run', '--env-file', envFile, 'dev:resetInstallation', input],
       { stdout: 'pipe', stderr: 'pipe' },
     )
     const output = await new Response(process.stdout).text()
@@ -55,7 +56,7 @@ try {
       [
         'setup', '--convex-url', convexUrl,
         '--installation-id', installationId, '--node-id', nodeId,
-        '--display-name', 'Round 1 live fixture', '--data-dir', dataDir,
+        '--display-name', 'Round 2 live fixture', '--data-dir', dataDir,
         '--config', configPath,
       ],
       { io },

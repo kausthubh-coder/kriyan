@@ -21,8 +21,14 @@ export class MemoryControlPlane implements ControlPlane {
   readonly reminderRecords = new Map<string, { message: string; remindAt: number; timezone: string }>()
   readonly nodeRecords = new Map<string, NodeRecord>()
   completeFailures = 0
+  completeResponseLosses = 0
+  eventResponseLosses = 0
+  reminderResponseLosses = 0
   renewFailure: string | null = null
   claimFailures = 0
+  readonly publicErrors: string[] = []
+
+  constructor(readonly now: () => number = Date.now) {}
 
   async registerNode(input: NodeRegistration) {
     const existing = this.nodeRecords.get(input.nodeId)
@@ -30,7 +36,7 @@ export class MemoryControlPlane implements ControlPlane {
     const node: NodeRecord = {
       ...input,
       status: 'online',
-      lastHeartbeatAt: Date.now(),
+      lastHeartbeatAt: this.now(),
       revision: 0,
     }
     this.nodeRecords.set(input.nodeId, node)
@@ -42,13 +48,13 @@ export class MemoryControlPlane implements ControlPlane {
     if (node === undefined) return { ok: false as const, reason: 'not_found' }
     if (node.revision !== revision) return { ok: false as const, reason: 'stale_revision' }
     node.revision += 1
-    node.lastHeartbeatAt = Date.now()
+    node.lastHeartbeatAt = this.now()
     return { ok: true as const, revision: node.revision }
   }
 
   async claimJob(_installationId: string, nodeId: string, leaseDurationMs: number) {
     if (this.claimFailures-- > 0) throw new Error('network unavailable')
-    const now = Date.now()
+    const now = this.now()
     const candidate = [...this.jobs.values()].find(
       (job) =>
         job.status === 'queued' ||
@@ -78,13 +84,18 @@ export class MemoryControlPlane implements ControlPlane {
     if (job.leaseOwnerNodeId !== nodeId) return { ok: false as const, reason: 'not_lease_owner' }
     if (job.revision !== input.revision) return { ok: false as const, reason: 'stale_revision' }
     job.revision += 1
-    job.leaseExpiresAt = Date.now() + leaseDurationMs
+    if ((job.leaseExpiresAt ?? 0) <= this.now()) return { ok: false as const, reason: 'lease_expired' }
+    job.leaseExpiresAt = this.now() + leaseDurationMs
     return { ok: true as const, revision: job.revision }
   }
 
   async startRun(_installationId: string, nodeId: string, input: Job) {
     const job = this.jobs.get(input.jobId)
     if (job === undefined) return { ok: false as const, reason: 'not_found' }
+    const node = this.nodeRecords.get(nodeId)
+    if (node === undefined || node.revision === 0 || this.now() - node.lastHeartbeatAt > 60_000) {
+      return { ok: false as const, reason: 'stale_heartbeat' }
+    }
     if (job.revision !== input.revision || job.status !== 'leased') {
       return { ok: false as const, reason: 'stale_revision' }
     }
@@ -113,11 +124,18 @@ export class MemoryControlPlane implements ControlPlane {
     const job = this.jobs.get(inputJob.jobId)
     const run = this.runs.get(inputRun.runId)
     if (job?.leaseOwnerNodeId !== nodeId) return { ok: false as const, reason: 'not_lease_owner' }
+    const duplicates = events.every((event) =>
+      this.events.some((existing) => JSON.stringify(existing) === JSON.stringify(event)),
+    )
+    if (duplicates) {
+      return { ok: true as const, duplicate: true, revision: run?.revision ?? inputRun.revision }
+    }
     if (job.revision !== inputJob.revision || run?.revision !== inputRun.revision) {
       return { ok: false as const, reason: 'stale_revision' }
     }
     this.events.push(...events)
     run.revision += events.length
+    if (this.eventResponseLosses-- > 0) throw new Error('response lost after event commit')
     return { ok: true as const, duplicate: false, revision: run.revision }
   }
 
@@ -127,7 +145,7 @@ export class MemoryControlPlane implements ControlPlane {
     inputJob: Job,
     inputRun: Run,
   ): Promise<Transition> {
-    if (this.completeFailures-- > 0) throw new Error('network disconnected at completion')
+    if (this.completeFailures-- > 0) throw new Error('network disconnected before completion')
     const job = this.jobs.get(inputJob.jobId)
     const run = this.runs.get(inputRun.runId)
     if (job?.leaseOwnerNodeId !== nodeId) return { ok: false, reason: 'not_lease_owner' }
@@ -141,6 +159,7 @@ export class MemoryControlPlane implements ControlPlane {
     run.revision += 1
     const command = this.commands.get(job.commandId)
     if (command !== undefined) command.status = 'completed'
+    if (this.completeResponseLosses-- > 0) throw new Error('response lost after completion commit')
     return { ok: true, revision: job.revision }
   }
 
@@ -149,12 +168,13 @@ export class MemoryControlPlane implements ControlPlane {
     _nodeId: string,
     inputJob: Job,
     inputRun: Run,
-    _error: string,
+    error: string,
     retryable: boolean,
   ): Promise<Transition> {
     const job = this.jobs.get(inputJob.jobId)
     const run = this.runs.get(inputRun.runId)
     if (job === undefined || run === undefined) return { ok: false, reason: 'not_found' }
+    this.publicErrors.push(error)
     job.status = retryable && job.attempt < job.maxAttempts ? 'queued' : 'failed'
     job.revision += 1
     job.leaseOwnerNodeId = undefined
@@ -181,6 +201,7 @@ export class MemoryControlPlane implements ControlPlane {
         timezone: input.timezone,
       })
     }
+    if (this.reminderResponseLosses-- > 0) throw new Error('response lost after reminder commit')
     return { created }
   }
 

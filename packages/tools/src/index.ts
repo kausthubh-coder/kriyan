@@ -16,12 +16,19 @@ export interface StructuredToolResult<T = unknown> {
   error?: { code: string; message: string; retryable: boolean }
 }
 
+export interface PreparedEffect<T = unknown> {
+  effectId: string
+  idempotencyKey: string
+  kind: 'reminder'
+  payload: T
+}
+
 export interface CapabilityTool<TInput = unknown, TOutput = unknown> {
   name: string
-  execute(
+  prepare(
     input: TInput,
     context: ToolContext,
-  ): Promise<StructuredToolResult<TOutput>>
+  ): Promise<StructuredToolResult<PreparedEffect<TOutput>>>
 }
 
 export class CapabilityRegistry {
@@ -36,7 +43,7 @@ export class CapabilityRegistry {
     return [...this.tools.keys()].sort()
   }
 
-  async execute(
+  async prepare(
     name: string,
     input: unknown,
     context: ToolContext,
@@ -49,7 +56,7 @@ export class CapabilityRegistry {
       }
     }
     try {
-      return await tool.execute(input, context)
+      return await tool.prepare(input, context)
     } catch (error) {
       return {
         ok: false,
@@ -66,7 +73,7 @@ export class CapabilityRegistry {
 export function reminderTool(): CapabilityTool<ReminderProduct, ReminderProduct> {
   return {
     name: 'create_reminder',
-    async execute(input, context) {
+    async prepare(input, context) {
       if (context.signal.aborted) {
         return {
           ok: false,
@@ -85,7 +92,15 @@ export function reminderTool(): CapabilityTool<ReminderProduct, ReminderProduct>
           error: { code: 'invalid_reminder', message: 'invalid reminder product', retryable: false },
         }
       }
-      return { ok: true, value: input }
+      return {
+        ok: true,
+        value: {
+          effectId: `reminder:${context.runId}`,
+          idempotencyKey: `effect:${context.runId}:reminder`,
+          kind: 'reminder',
+          payload: input,
+        },
+      }
     },
   }
 }

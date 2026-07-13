@@ -3,9 +3,7 @@ set -euo pipefail
 
 archive=${1:?usage: install.sh RELEASE_ARCHIVE}
 version=${KRIYAN_VERSION:?KRIYAN_VERSION is required}
-release_dir="/opt/kriyan/releases/${version}"
-staging_dir="${release_dir}.partial.$$"
-bun_bin=${BUN_BIN:-/usr/local/bin/bun}
+source "$(dirname "$0")/release-path.sh"
 
 if [[ ${EUID} -ne 0 ]]; then
   echo "install must run as root" >&2
@@ -16,17 +14,26 @@ id kriyan >/dev/null 2>&1 || useradd --system --home /var/lib/kriyan --shell /us
 install -d -o kriyan -g kriyan -m 0700 /var/lib/kriyan
 install -d -o root -g kriyan -m 0750 /etc/kriyan
 install -d -o root -g root -m 0755 /opt/kriyan/releases
-[[ -x ${bun_bin} ]] || { echo "Bun not found at ${bun_bin}" >&2; exit 2; }
+release_dir=$(release_path "${version}")
+assert_direct_release_child "${release_dir}"
+[[ ! -e ${release_dir} && ! -L ${release_dir} ]] || {
+  echo "release already exists; immutable releases are never replaced" >&2
+  exit 2
+}
+staging_dir="${release_dir}.partial.$$"
+assert_direct_release_child "${staging_dir}"
 rm -rf "${staging_dir}"
 trap 'rm -rf "${staging_dir}"' EXIT
 install -d -o root -g root -m 0755 "${staging_dir}"
-tar -tzf "${archive}" >/dev/null
+"$(dirname "$0")/verify-release-archive.sh" "${archive}"
 tar -xzf "${archive}" -C "${staging_dir}"
-(cd "${staging_dir}" && "${bun_bin}" install --frozen-lockfile --production)
-rm -rf "${release_dir}"
+[[ -x ${staging_dir}/bin/kriyan-node && -x ${staging_dir}/bin/kriyan ]] || {
+  echo "standalone binaries missing" >&2
+  exit 2
+}
 mv "${staging_dir}" "${release_dir}"
 trap - EXIT
-ln -sfn "${release_dir}" /opt/kriyan/current
+switch_current_release "${release_dir}"
 install -m 0644 "${release_dir}/packaging/systemd/kriyan-node.service" /etc/systemd/system/kriyan-node.service
 systemctl daemon-reload
 echo "installed ${version}; add /etc/kriyan/node.json before enabling the service"

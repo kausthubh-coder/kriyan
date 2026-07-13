@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 
 import { MemoryControlPlane } from '../../node/test/memory-plane'
 import { runCli } from '../src/cli'
@@ -22,64 +22,127 @@ function capture() {
   }
 }
 
-test('setup is noninteractive and writes a validated private config', async () => {
+async function setupConfig(extra: string[] = []): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'kriyan-cli-'))
   directories.push(directory)
   const config = join(directory, 'node.json')
   const output = capture()
-  const code = await runCli(
-    [
-      'setup',
-      '--convex-url',
-      'https://example.convex.cloud',
-      '--installation-id',
-      'installation:test',
-      '--node-id',
-      'node:test',
-      '--data-dir',
-      join(directory, 'data'),
-      '--config',
-      config,
-    ],
-    { io: output.io },
-  )
-  expect(code).toBe(0)
-  expect(JSON.parse(output.stdout[0]!)).toMatchObject({ ok: true, command: 'setup' })
+  expect(await runCli([
+    'setup',
+    '--convex-url', 'https://example.convex.cloud',
+    '--installation-id', 'installation:test',
+    '--node-id', 'node:test',
+    '--data-dir', join(directory, 'data'),
+    '--timezone', 'America/New_York',
+    '--locale', 'en-US',
+    '--config', config,
+    ...extra,
+  ], { io: output.io })).toBe(0)
+  return config
+}
+
+test('setup is noninteractive and writes explicit locale/timezone to a private config', async () => {
+  const config = await setupConfig()
+  const value = await Bun.file(config).json()
+  expect(value).toMatchObject({ timezone: 'America/New_York', locale: 'en-US' })
   expect((await Bun.file(config).stat()).mode & 0o777).toBe(0o600)
 })
 
-test('invalid setup uses stderr and stable usage exit code', async () => {
-  const output = capture()
-  const code = await runCli(['setup', '--convex-url', 'http://public.example'], { io: output.io })
-  expect(code).toBe(2)
-  expect(output.stdout).toEqual([])
-  expect(JSON.parse(output.stderr[0]!)).toMatchObject({ ok: false })
+describe('exit contract and parse-before-I/O', () => {
+  const cases: Array<[string, string[], number]> = [
+    ['help', ['help'], 0],
+    ['unknown command', ['wat'], 2],
+    ['unknown flag', ['status', '--wat', 'x'], 2],
+    ['extra arg', ['pair', 'extra'], 2],
+    ['missing flag value', ['submit', '--text'], 2],
+    ['empty text', ['submit', '--text', '   '], 2],
+    ['invalid URL', ['setup', '--convex-url', 'http://public.example'], 2],
+  ]
+  for (const [name, args, expected] of cases) {
+    test(name, async () => {
+      const output = capture()
+      let networkCalls = 0
+      const code = await runCli(args, {
+        io: output.io,
+        plane: () => {
+          networkCalls += 1
+          return new MemoryControlPlane()
+        },
+      })
+      expect(code).toBe(expected)
+      expect(networkCalls).toBe(0)
+    })
+  }
+
+  test('missing config is a stable config exit 2', async () => {
+    const output = capture()
+    const code = await runCli(['doctor', '--config', '/definitely/missing/kriyan.json'], { io: output.io })
+    expect(code).toBe(2)
+    expect(JSON.parse(output.stderr[0]!)).toMatchObject({
+      error: { code: 'CONFIG_INVALID' },
+    })
+  })
+
+  test('network/runtime failures are generic exit 1', async () => {
+    const config = await setupConfig()
+    const output = capture()
+    const code = await runCli(['status', '--config', config], {
+      io: output.io,
+      plane: () => {
+        throw new Error('Bearer fake-detail')
+      },
+    })
+    expect(code).toBe(1)
+    expect(output.stderr.join('')).not.toContain('fake-detail')
+    expect(JSON.parse(output.stderr[0]!)).toMatchObject({
+      error: { code: 'RUNTIME_ERROR', message: 'command failed' },
+    })
+  })
 })
 
-test('pair, doctor, and submit emit JSON without prompts', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'kriyan-cli-'))
-  directories.push(directory)
-  const config = join(directory, 'node.json')
-  const setup = capture()
-  await runCli(
-    [
-      'setup', '--convex-url', 'https://example.convex.cloud',
-      '--installation-id', 'installation:test', '--node-id', 'node:test',
-      '--data-dir', join(directory, 'data'), '--config', config,
-    ],
-    { io: setup.io },
-  )
+test('pair leaves registration pending until a real worker heartbeat', async () => {
+  const config = await setupConfig()
   const plane = new MemoryControlPlane()
   const pair = capture()
   expect(await runCli(['pair', '--config', config], { io: pair.io, plane: () => plane })).toBe(0)
+  expect(plane.nodeRecords.size).toBe(0)
+  expect(JSON.parse(pair.stdout[0]!)).toMatchObject({
+    node: 'pending_first_heartbeat',
+    timezone: 'America/New_York',
+  })
   const doctor = capture()
-  expect(await runCli(['doctor', '--config', config], { io: doctor.io, plane: () => plane })).toBe(0)
-  const submit = capture()
-  expect(
-    await runCli(
-      ['submit', '--text', 'remind me to practice Korean', '--config', config],
-      { io: submit.io, plane: () => plane, now: () => 42 },
-    ),
-  ).toBe(0)
-  expect(JSON.parse(submit.stdout[0]!)).toMatchObject({ ok: true, command: 'submit', created: true })
+  expect(await runCli(['doctor', '--config', config], { io: doctor.io, plane: () => plane })).toBe(1)
+})
+
+test('doctor and status use heartbeat revision and freshness consistently', async () => {
+  let now = 1_000
+  const config = await setupConfig()
+  const plane = new MemoryControlPlane(() => now)
+  const registration = await plane.registerNode({
+    installationId: 'installation:test',
+    nodeId: 'node:test',
+    displayName: 'Kriyan node',
+    capabilities: ['reminders'],
+    protocolVersion: '1',
+  })
+  const pending = capture()
+  expect(await runCli(['doctor', '--config', config], { io: pending.io, plane: () => plane, now: () => now })).toBe(1)
+  await plane.heartbeatNode('installation:test', 'node:test', registration.node.revision)
+  const healthy = capture()
+  expect(await runCli(['doctor', '--config', config], { io: healthy.io, plane: () => plane, now: () => now })).toBe(0)
+  now += 60_001
+  const status = capture()
+  expect(await runCli(['status', '--config', config], { io: status.io, plane: () => plane, now: () => now })).toBe(0)
+  expect(JSON.parse(status.stdout[0]!).nodes[0].health).toMatchObject({ status: 'offline', reason: 'stale' })
+})
+
+test('submit emits JSON and accepts fully validated options', async () => {
+  const config = await setupConfig()
+  const output = capture()
+  const plane = new MemoryControlPlane()
+  expect(await runCli(
+    ['submit', '--text', 'remind me to practice Korean', '--idempotency-key', 'idem:cli', '--config', config],
+    { io: output.io, plane: () => plane, now: () => 42 },
+  )).toBe(0)
+  expect(JSON.parse(output.stdout[0]!)).toMatchObject({ ok: true, command: 'submit', created: true })
 })

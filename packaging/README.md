@@ -1,6 +1,6 @@
 # Kriyan node deployment
 
-Round 1 runs the source release with an installed Bun runtime on Ubuntu 24.04 x64. It does not claim a universal standalone binary. The service runs as the unprivileged `kriyan` user, keeps config in `/etc/kriyan/node.json` (`0600`, owned by `root:kriyan`) and private state in `/var/lib/kriyan`.
+The primary Ubuntu 24.04 x64 artifact is a Bun standalone Linux x64 executable. The source archive is supplemental for audit/debugging. The service runs as the unprivileged `kriyan` user, keeps config in `/etc/kriyan/node.json` (`0640`, owned by `root:kriyan`) and private state in `/var/lib/kriyan`.
 
 ## Build and stage
 
@@ -8,10 +8,11 @@ Round 1 runs the source release with an installed Bun runtime on Ubuntu 24.04 x6
 bun install --frozen-lockfile
 bun run typecheck:node
 bun run test:node
-packaging/scripts/build-release.sh /tmp/kriyan-node-SHA.tar.gz
+packaging/scripts/build-standalone.sh /tmp/kriyan-node-linux-x64 /tmp/kriyan-linux-x64
+packaging/scripts/build-release.sh /tmp/kriyan-node-SHA.tar.gz /tmp/kriyan-node-linux-x64 /tmp/kriyan-linux-x64
 ```
 
-On the VPS, install Bun from its official installer as root into a version-pinned shared path, place the release archive in `/tmp`, then:
+Place the verified release archive in `/tmp`, then:
 
 ```sh
 sudo KRIYAN_VERSION=SHA packaging/scripts/install.sh /tmp/kriyan-node-SHA.tar.gz
@@ -19,10 +20,10 @@ sudo install -o root -g kriyan -m 0640 node.json /etc/kriyan/node.json
 sudo systemctl enable --now kriyan-node
 sudo systemctl status kriyan-node --no-pager
 sudo journalctl -u kriyan-node --since '10 minutes ago' --no-pager
-sudo -u kriyan /usr/local/bin/bun /opt/kriyan/current/apps/cli/src/main.ts doctor --config /etc/kriyan/node.json
+sudo -u kriyan /opt/kriyan/current/bin/kriyan doctor --config /etc/kriyan/node.json
 ```
 
-`node.json` contains identifiers and the Convex development URL, never provider credentials. Pi credentials remain in the service user's local Pi auth store. Do not copy `.env.local`, transcripts, or raw workspaces into a release.
+`node.json` contains identifiers, explicit IANA `timezone` and BCP 47 `locale`, and the Convex development URL, never provider credentials. Pi credentials remain in the service user's local Pi auth store. Do not copy `.env.local`, transcripts, or raw workspaces into a release.
 
 ## Update, rollback, health, and recovery
 

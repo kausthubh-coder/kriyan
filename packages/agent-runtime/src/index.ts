@@ -1,3 +1,5 @@
+import { readFile, stat } from 'node:fs/promises'
+
 import {
   AuthStorage,
   createAgentSession,
@@ -33,6 +35,7 @@ export interface RuntimeResult {
 }
 
 export interface AgentRuntimeSession {
+  readonly sessionFile?: string
   run(
     request: RuntimeRequest,
     emit: (event: NormalizedRuntimeEvent) => Promise<void>,
@@ -41,7 +44,7 @@ export interface AgentRuntimeSession {
 }
 
 export interface AgentRuntime {
-  createSession(runId: string, workspace: string): Promise<AgentRuntimeSession>
+  createSession(runId: string, workspace: string, resumeSessionFile?: string): Promise<AgentRuntimeSession>
 }
 
 export interface FakeRuntimeOptions {
@@ -87,7 +90,7 @@ export class FakeAgentRuntime implements AgentRuntime {
 }
 
 export interface PiSessionFactory {
-  create(workspace: string): Promise<AgentSession>
+  create(workspace: string, resumeSessionFile?: string): Promise<AgentSession>
 }
 
 function normalizePiEvent(event: AgentSessionEvent): NormalizedRuntimeEvent | null {
@@ -130,17 +133,35 @@ function extractReminder(text: string): ReminderProduct[] {
 export class PiAgentRuntime implements AgentRuntime {
   constructor(private readonly sessions: PiSessionFactory) {}
 
-  async createSession(_runId: string, workspace: string): Promise<AgentRuntimeSession> {
-    const session = await this.sessions.create(workspace)
+  async createSession(
+    _runId: string,
+    workspace: string,
+    resumeSessionFile?: string,
+  ): Promise<AgentRuntimeSession> {
+    const session = await this.sessions.create(workspace, resumeSessionFile)
     return {
+      sessionFile: session.sessionFile,
       async run(request, emit) {
         const chunks: string[] = []
+        let textBuffer = ''
         let pending = Promise.resolve()
+        const flushText = (): void => {
+          if (textBuffer.length === 0) return
+          const data = textBuffer
+          textBuffer = ''
+          pending = pending.then(() => emit({ type: 'message', data }))
+        }
         const unsubscribe = session.subscribe((event) => {
           const normalized = normalizePiEvent(event)
           if (normalized !== null) {
-            if (normalized.type === 'message') chunks.push(normalized.data)
-            pending = pending.then(() => emit(normalized))
+            if (normalized.type === 'message') {
+              chunks.push(normalized.data)
+              textBuffer += normalized.data
+              if (textBuffer.length >= 512) flushText()
+            } else {
+              flushText()
+              pending = pending.then(() => emit(normalized))
+            }
           }
         })
         const onAbort = (): void => void session.abort()
@@ -149,6 +170,7 @@ export class PiAgentRuntime implements AgentRuntime {
           await session.prompt(
             `${request.input}\nReturn product output only as <kriyan-reminder>{"kind":"reminder","message":"...","remindAt":0,"timezone":"UTC"}</kriyan-reminder>. Never include private reasoning.`,
           )
+          flushText()
           await pending
           const text = chunks.join('')
           return { products: extractReminder(text), summary: 'Pi run completed' }
@@ -165,14 +187,18 @@ export class PiAgentRuntime implements AgentRuntime {
 }
 
 export class LocalPiSessionFactory implements PiSessionFactory {
-  async create(workspace: string): Promise<AgentSession> {
+  async create(workspace: string, resumeSessionFile?: string): Promise<AgentSession> {
     const authStorage = AuthStorage.create()
     const modelRegistry = ModelRegistry.create(authStorage)
+    if (resumeSessionFile !== undefined) await validatePiSession(resumeSessionFile)
     const { session } = await createAgentSession({
       cwd: workspace,
       authStorage,
       modelRegistry,
-      sessionManager: SessionManager.create(workspace),
+      sessionManager:
+        resumeSessionFile === undefined
+          ? SessionManager.create(workspace)
+          : SessionManager.open(resumeSessionFile, undefined, workspace),
       tools: [],
     })
     return session
@@ -183,6 +209,28 @@ export interface FauxPiFactory {
   factory: PiSessionFactory
   provider: FauxProviderHandle
   dispose(): void
+}
+
+export class PiSessionRecoveryError extends Error {
+  readonly code = 'PI_SESSION_CORRUPT'
+}
+
+async function validatePiSession(path: string): Promise<void> {
+  try {
+    const info = await stat(path)
+    if (!info.isFile() || info.size === 0 || info.size > 50 * 1024 * 1024) {
+      throw new Error('invalid size')
+    }
+    const raw = await readFile(path, 'utf8')
+    if (!raw.endsWith('\n')) throw new Error('truncated final record')
+    for (const line of raw.split('\n')) {
+      if (line.length > 0) JSON.parse(line)
+    }
+  } catch {
+    throw new PiSessionRecoveryError(
+      'persisted Pi session is missing or corrupt; automatic replay is disabled',
+    )
+  }
 }
 
 export function createFauxPiFactory(response: ReminderProduct): FauxPiFactory {

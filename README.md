@@ -22,3 +22,7 @@ Development fixture cleanup is internal-only. Call
 `dev:resetInstallation` with the guarded deployment name, confirmation literal,
 installation ID, and a `batchSize` from 1-64 until `done` is true. Each call is
 installation-indexed and bounded; repeating a completed cleanup is safe.
+
+Node configuration is JSON-only (there is no environment-variable config mode).
+Create it with `bun run kriyan setup`; `timezone` and `locale` are persisted
+explicitly so pairing an existing installation never assumes UTC.

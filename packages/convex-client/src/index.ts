@@ -46,6 +46,37 @@ export interface NodeRecord extends NodeRegistration {
   revision: number
 }
 
+export const NODE_HEARTBEAT_TIMEOUT_MS = 60_000
+
+export interface NodeHealth {
+  status: 'pending' | 'online' | 'offline' | 'revoked'
+  reason: 'first_heartbeat_pending' | 'fresh' | 'stale' | 'clock_skew' | 'revoked'
+  ageMs: number | null
+}
+
+/**
+ * Derives effective health from the server-stamped heartbeat. Consumers must
+ * never treat the persisted `status` field alone as evidence of a live worker.
+ */
+export function deriveNodeHealth(
+  node: NodeRecord,
+  observedAt: number,
+  timeoutMs = NODE_HEARTBEAT_TIMEOUT_MS,
+): NodeHealth {
+  if (node.status === 'revoked') {
+    return { status: 'revoked', reason: 'revoked', ageMs: null }
+  }
+  if (node.revision === 0) {
+    return { status: 'pending', reason: 'first_heartbeat_pending', ageMs: null }
+  }
+  const ageMs = observedAt - node.lastHeartbeatAt
+  if (ageMs < 0) return { status: 'offline', reason: 'clock_skew', ageMs }
+  if (ageMs > timeoutMs || node.status === 'offline') {
+    return { status: 'offline', reason: 'stale', ageMs }
+  }
+  return { status: 'online', reason: 'fresh', ageMs }
+}
+
 export interface RunEventInput {
   eventId: string
   sequence: number
