@@ -8,6 +8,17 @@ const OLD_SHA = '1111111111111111111111111111111111111111'
 const NEW_SHA = '2222222222222222222222222222222222222222'
 const roots: string[] = []
 
+type ForwardFailure = 'daemon-reload' | 'restart' | 'health' | 'none'
+type RecoveryFailure =
+  | 'pointer'
+  | 'environment'
+  | 'unit'
+  | 'daemon-reload'
+  | 'restart'
+  | 'active-state'
+  | 'health'
+  | 'none'
+
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
@@ -72,7 +83,10 @@ interface LifecycleFixture {
   oldUnit: string
 }
 
-async function lifecycleFixture(failure: 'daemon-reload' | 'restart' | 'health' | 'none'): Promise<LifecycleFixture> {
+async function lifecycleFixture(
+  forwardFailure: ForwardFailure,
+  recoveryFailure: RecoveryFailure = 'none',
+): Promise<LifecycleFixture> {
   const root = await mkdtemp(join(tmpdir(), 'kriyan-lifecycle-'))
   roots.push(root)
   const oldRelease = await release(root, OLD_SHA)
@@ -91,13 +105,55 @@ async function lifecycleFixture(failure: 'daemon-reload' | 'restart' | 'health' 
   await writeFile(join(systemdRoot, 'kriyan-node.service'), oldUnit)
   const systemctlLog = join(root, 'systemctl.log')
   const healthLog = join(root, 'health.log')
+  const fakeMv = join(fakeRoot, 'mv')
+  await executable(fakeMv, `#!/usr/bin/env bash
+set -euo pipefail
+source=''
+destination=''
+for argument in "$@"; do
+  source=$destination
+  destination=$argument
+done
+if [[ $# -ge 3 && $KRIYAN_RECOVERY_FAILURE_STAGE == pointer && $destination == "$KRIYAN_OPT_ROOT/current" && -L $source ]]; then
+  target=$(readlink "$source")
+  if [[ $(basename "$target") == "$KRIYAN_PREVIOUS_RELEASE" ]]; then
+    echo "injected recovery pointer failure" >&2
+    exit 81
+  fi
+fi
+exec /bin/mv "$@"
+`)
+  const fakeCp = join(fakeRoot, 'cp')
+  await executable(fakeCp, `#!/usr/bin/env bash
+set -euo pipefail
+source=''
+destination=''
+for argument in "$@"; do
+  source=$destination
+  destination=$argument
+done
+if [[ $KRIYAN_RECOVERY_FAILURE_STAGE == environment && $source == */state/release.env ]]; then
+  echo "injected recovery environment failure" >&2
+  exit 82
+fi
+if [[ $KRIYAN_RECOVERY_FAILURE_STAGE == unit && $source == */state/kriyan-node.service ]]; then
+  echo "injected recovery unit failure" >&2
+  exit 83
+fi
+exec /bin/cp "$@"
+`)
   const fakeSystemctl = join(fakeRoot, 'systemctl')
   await executable(fakeSystemctl, `#!/usr/bin/env bash
 set -euo pipefail
 command=$1
 current=$(basename "$(readlink "$KRIYAN_OPT_ROOT/current")")
 printf '%s %s\n' "$command" "$current" >>"$KRIYAN_SYSTEMCTL_LOG"
-if [[ $current == "$KRIYAN_TARGET_RELEASE" && $command == "$KRIYAN_FAILURE_STAGE" ]]; then
+stage=$command
+[[ $command == is-active ]] && stage=active-state
+if [[ $current == "$KRIYAN_TARGET_RELEASE" && $stage == "$KRIYAN_FORWARD_FAILURE_STAGE" ]]; then
+  exit 1
+fi
+if [[ $current == "$KRIYAN_PREVIOUS_RELEASE" && $stage == "$KRIYAN_RECOVERY_FAILURE_STAGE" ]]; then
   exit 1
 fi
 case $command in
@@ -115,7 +171,10 @@ current=$(basename "$(readlink "$KRIYAN_OPT_ROOT/current")")
 [[ $current == "$expected" ]]
 grep -q "^KRIYAN_RELEASE_VERSION=$expected$" "$KRIYAN_ETC_ROOT/release.env"
 grep -q "^unit-$expected$" "$KRIYAN_SYSTEMD_ROOT/kriyan-node.service"
-if [[ $expected == "$KRIYAN_TARGET_RELEASE" && $KRIYAN_FAILURE_STAGE == health ]]; then
+if [[ $expected == "$KRIYAN_TARGET_RELEASE" && $KRIYAN_FORWARD_FAILURE_STAGE == health ]]; then
+  exit 1
+fi
+if [[ $expected == "$KRIYAN_PREVIOUS_RELEASE" && $KRIYAN_RECOVERY_FAILURE_STAGE == health ]]; then
   exit 1
 fi
 `)
@@ -142,6 +201,7 @@ activate_release_state "$KRIYAN_UPDATE_TARGET" "$KRIYAN_VERSION"
     oldUnit,
     env: {
       ...process.env,
+      PATH: `${fakeRoot}:${process.env.PATH ?? ''}`,
       KRIYAN_OPT_ROOT: join(root, 'opt'),
       KRIYAN_ETC_ROOT: etcRoot,
       KRIYAN_STATE_ROOT: join(root, 'state'),
@@ -158,7 +218,9 @@ activate_release_state "$KRIYAN_UPDATE_TARGET" "$KRIYAN_VERSION"
       KRIYAN_INSTALL_SCRIPT: install,
       KRIYAN_UPDATE_TARGET: await realpath(newRelease),
       KRIYAN_TARGET_RELEASE: NEW_SHA,
-      KRIYAN_FAILURE_STAGE: failure,
+      KRIYAN_PREVIOUS_RELEASE: OLD_SHA,
+      KRIYAN_FORWARD_FAILURE_STAGE: forwardFailure,
+      KRIYAN_RECOVERY_FAILURE_STAGE: recoveryFailure,
       KRIYAN_VERSION: NEW_SHA,
     },
   }
@@ -186,6 +248,48 @@ async function expectFailureStageReached(
       `${failure} ${NEW_SHA}`,
     )
   }
+}
+
+async function expectFailedRecoveryState(
+  item: LifecycleFixture,
+  failure: Exclude<RecoveryFailure, 'none'>,
+): Promise<void> {
+  const expectedPointer = failure === 'pointer' ? item.newRelease : item.oldRelease
+  const expectedEnvironment = ['pointer', 'environment'].includes(failure)
+    ? `KRIYAN_RELEASE_VERSION=${NEW_SHA}\n`
+    : item.oldEnvironment
+  const expectedUnit = ['pointer', 'environment', 'unit'].includes(failure)
+    ? `unit-${NEW_SHA}\n`
+    : item.oldUnit
+
+  expect(await realpath(join(item.root, 'opt', 'current'))).toBe(await realpath(expectedPointer))
+  expect(await readFile(join(item.root, 'etc', 'release.env'), 'utf8')).toBe(expectedEnvironment)
+  expect(await readFile(join(item.root, 'systemd', 'kriyan-node.service'), 'utf8')).toBe(expectedUnit)
+
+  const systemctlEntries = (await readFile(item.systemctlLog, 'utf8')).trim().split('\n')
+  const recoveryEntries = systemctlEntries.filter((entry) => entry.endsWith(` ${OLD_SHA}`))
+  const expectedRecoveryEntries: Record<Exclude<RecoveryFailure, 'none'>, string[]> = {
+    pointer: [],
+    environment: [],
+    unit: [],
+    'daemon-reload': [`daemon-reload ${OLD_SHA}`],
+    restart: [`daemon-reload ${OLD_SHA}`, `restart ${OLD_SHA}`],
+    'active-state': [
+      `daemon-reload ${OLD_SHA}`,
+      `restart ${OLD_SHA}`,
+      `is-active ${OLD_SHA}`,
+    ],
+    health: [
+      `daemon-reload ${OLD_SHA}`,
+      `restart ${OLD_SHA}`,
+      `is-active ${OLD_SHA}`,
+    ],
+  }
+  expect(recoveryEntries).toEqual(expectedRecoveryEntries[failure])
+
+  const healthEntries = (await readFile(item.healthLog, 'utf8')).trim().split('\n')
+  expect(healthEntries).toContain(NEW_SHA)
+  expect(healthEntries.includes(OLD_SHA)).toBe(failure === 'health')
 }
 
 test('current pointer replacement is atomic and leaves no nested temporary link', async () => {
@@ -225,6 +329,33 @@ for (const failure of ['daemon-reload', 'restart', 'health'] as const) {
     await expectFailureStageReached(item, failure)
     await expectPreviousStateRestored(item)
   })
+}
+
+for (const recoveryFailure of [
+  'pointer',
+  'environment',
+  'unit',
+  'daemon-reload',
+  'restart',
+  'active-state',
+  'health',
+] as const) {
+  for (const operation of ['update', 'rollback'] as const) {
+    test(`${operation} reports ${recoveryFailure} failure while recovering the previous release`, async () => {
+      const item = await lifecycleFixture('health', recoveryFailure)
+      const command = operation === 'update'
+        ? ['bash', 'packaging/scripts/update.sh', join(item.root, 'release.tar.gz')]
+        : ['bash', 'packaging/scripts/rollback.sh', NEW_SHA]
+      const result = Bun.spawnSync(command, { env: item.env })
+      const stderr = result.stderr.toString()
+
+      expect(result.exitCode).toBe(1)
+      expect(stderr).toContain(`previous release recovery failed at ${recoveryFailure} stage`)
+      expect(stderr).toContain(`${operation} failed; previous release recovery also failed`)
+      expect(stderr).not.toContain('complete previous release state restored and healthy')
+      await expectFailedRecoveryState(item, recoveryFailure)
+    })
+  }
 }
 
 test('update and rollback complete healthy release transitions', async () => {

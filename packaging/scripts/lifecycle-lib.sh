@@ -173,18 +173,51 @@ restore_release_state() {
   local systemd_root=${KRIYAN_SYSTEMD_ROOT:-/etc/systemd/system}
   local systemctl_cmd=${KRIYAN_SYSTEMCTL:-systemctl}
   local restarted_at
+  local status
 
-  switch_current_release "${previous}"
+  switch_current_release "${previous}" || {
+    status=$?
+    echo "previous release recovery failed at pointer stage (status ${status})" >&2
+    return "${status}"
+  }
   restore_regular_file \
-    "${etc_root}/release.env" "${snapshot}/release.env" "${snapshot}/release.env.state"
+    "${etc_root}/release.env" "${snapshot}/release.env" "${snapshot}/release.env.state" || {
+    status=$?
+    echo "previous release recovery failed at environment stage (status ${status})" >&2
+    return "${status}"
+  }
   restore_regular_file \
     "${systemd_root}/kriyan-node.service" \
-    "${snapshot}/kriyan-node.service" "${snapshot}/kriyan-node.service.state"
-  "${systemctl_cmd}" daemon-reload
-  restarted_at=$(milliseconds_now)
-  "${systemctl_cmd}" restart kriyan-node
-  "${systemctl_cmd}" is-active --quiet kriyan-node
+    "${snapshot}/kriyan-node.service" "${snapshot}/kriyan-node.service.state" || {
+    status=$?
+    echo "previous release recovery failed at unit stage (status ${status})" >&2
+    return "${status}"
+  }
+  "${systemctl_cmd}" daemon-reload || {
+    status=$?
+    echo "previous release recovery failed at daemon-reload stage (status ${status})" >&2
+    return "${status}"
+  }
+  restarted_at=$(milliseconds_now) || {
+    status=$?
+    echo "previous release recovery failed while recording restart time (status ${status})" >&2
+    return "${status}"
+  }
+  "${systemctl_cmd}" restart kriyan-node || {
+    status=$?
+    echo "previous release recovery failed at restart stage (status ${status})" >&2
+    return "${status}"
+  }
+  "${systemctl_cmd}" is-active --quiet kriyan-node || {
+    status=$?
+    echo "previous release recovery failed at active-state stage (status ${status})" >&2
+    return "${status}"
+  }
   wait_for_release_health \
     "${previous}" "${etc_root}/node.json" "${previous_version}" \
-    "${previous_instance}" "${restarted_at}"
+    "${previous_instance}" "${restarted_at}" || {
+    status=$?
+    echo "previous release recovery failed at health stage (status ${status})" >&2
+    return "${status}"
+  }
 }
