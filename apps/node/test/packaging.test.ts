@@ -268,7 +268,12 @@ test('release construction binds provenance, rescans ELFs, and emits canonical d
     ])
     expect(callerWrongTree.exitCode).not.toBe(0)
     expect(callerWrongTree.stderr.toString()).toContain('caller-supplied tree')
-    const policylessCommit = commandOutput(['git', 'rev-parse', `${commit}^`])
+    let policylessCommit = commandOutput(['git', 'rev-parse', `${commit}^`])
+    while (
+      Bun.spawnSync(['git', 'cat-file', '-e', `${policylessCommit}:.bun-version`]).exitCode === 0
+    ) {
+      policylessCommit = commandOutput(['git', 'rev-parse', `${policylessCommit}^`])
+    }
     const policyless = Bun.spawnSync([
       'bash', 'packaging/scripts/verify-release-archive.sh', first, policylessCommit,
     ])
