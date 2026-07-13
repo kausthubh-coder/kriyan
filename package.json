@@ -2,31 +2,32 @@
   "name": "kriyan",
   "type": "module",
   "private": true,
-  "workspaces": ["web", "mobile"],
+  "workspaces": [
+    "web",
+    "mobile"
+  ],
   "scripts": {
     "dev": "concurrently -n convex,web,mobile -c blue,green,magenta \"bun run dev:convex\" \"bun run dev:web\" \"bun run dev:mobile\"",
     "dev:convex": "bunx convex dev",
     "dev:web": "cd web && bun run dev",
     "dev:mobile": "cd mobile && bun run android",
     "deploy:convex": "bunx convex deploy",
+    "codegen:convex": "bunx convex codegen --typecheck enable",
+    "typecheck:convex": "bunx tsc -p convex/tsconfig.json --noEmit",
+    "test:convex": "bunx vitest run convex",
     "lint": "bun run lint:web && bun run lint:mobile",
     "lint:web": "cd web && bun run lint",
     "lint:mobile": "cd mobile && bun run lint"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "convex-test": "^0.0.54",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.10",
-    "@ai-sdk/provider-utils": "^3.0.7",
-    "@convex-dev/agent": "^0.3.2",
-    "@convex-dev/prosemirror-sync": "^0.2.0",
-    "@convex-dev/rag": "^0.6.1",
-    "ai": "^5.0.29",
     "btca": "^1.0.41",
-    "convex": "^1.31.4",
-    "convex-helpers": "^0.1.103",
-    "convex-timeline": "^0.1.2"
+    "convex": "^1.42.1"
   }
 }
