@@ -74,6 +74,15 @@ describe('exit contract and parse-before-I/O', () => {
     })
   }
 
+  test('help preserves existing commands and documents the VPS lifecycle', async () => {
+    const output = capture()
+    expect(await runCli(['help'], { io: output.io })).toBe(0)
+    expect(output.stdout[0]).toContain('vps install')
+    expect(output.stdout[0]).toContain('vps uninstall')
+    expect(output.stdout[0]).toContain('setup --convex-url')
+    expect(output.stdout[0]).toContain('source register')
+  })
+
   test('missing config is a stable config exit 2', async () => {
     const output = capture()
     const code = await runCli(['doctor', '--config', '/definitely/missing/kriyan.json'], { io: output.io })

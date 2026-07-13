@@ -17,7 +17,66 @@ packaging/scripts/build-release.sh /tmp/kriyan-node-SHA.tar.gz \
   /tmp/kriyan-build-1/provenance.manifest
 ```
 
-Place the verified release archive in `/tmp`, then:
+The release builder uses Bun's compatibility target `bun-linux-x64-baseline` for
+both Linux executables and `bun-darwin-arm64` for the operator CLI. All three
+are standalone executables with dotenv, bunfig, tsconfig, and package metadata
+autoload disabled. The VPS does not need Bun or Node installed.
+
+For a convenience build from one exact Git checkpoint:
+
+```sh
+bun run build:standalone
+file dist/kriyan-node-linux-x64 dist/kriyan-linux-x64 dist/kriyan-darwin-arm64
+```
+
+## Operator CLI
+
+The macOS operator uses system `ssh` and `scp`; it never accepts cloud-provider
+tokens or Convex deploy keys. A strict known-hosts file is required for remote
+operations. `--host-key-policy accept-new` is an explicit opt-in for a newly
+created host; `StrictHostKeyChecking=no` is never used.
+
+```sh
+dist/kriyan-darwin-arm64 vps install \
+  --host 203.0.113.10 --user ubuntu --port 22 \
+  --identity ~/.ssh/id_ed25519 --known-hosts ~/.ssh/known_hosts \
+  --host-key-policy strict \
+  --release /tmp/kriyan-release.tar.gz \
+  --checksum /tmp/kriyan-release.tar.gz.sha256 \
+  --version CHECKPOINT_ID --config /tmp/node.json
+
+dist/kriyan-darwin-arm64 vps status \
+  --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts
+dist/kriyan-darwin-arm64 vps doctor \
+  --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts
+dist/kriyan-darwin-arm64 vps update \
+  --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts \
+  --release /tmp/kriyan-release.tar.gz \
+  --checksum /tmp/kriyan-release.tar.gz.sha256 --version CHECKPOINT_ID
+dist/kriyan-darwin-arm64 vps rollback \
+  --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts \
+  --version PREVIOUS_CHECKPOINT_ID
+dist/kriyan-darwin-arm64 vps restart \
+  --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts
+dist/kriyan-darwin-arm64 vps uninstall \
+  --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts \
+  --preserve-data
+```
+
+Every command writes one JSON object. Usage/config errors exit `2`, transfer or
+service failures exit `1`, and healthy success exits `0`. Install and update
+verify the archive checksum and embedded provenance locally, transfer the
+archive plus a normalized checksum, verify the checksum again on the host, and
+then use the transferred standalone Linux CLI for root maintenance. Temporary
+transfer material is removed on success and failure.
+
+The Linux executable owns the same lifecycle with `vps <action> --local`.
+Local maintenance requires root. `vps uninstall` always requires exactly one of
+`--preserve-data` or `--purge-data`; preserve mode never removes
+`/var/lib/kriyan`.
+
+The CLI above is the normal install path. For low-level recovery, place the
+verified release archive in `/tmp`, then:
 
 ```sh
 sudo KRIYAN_VERSION=SHA packaging/scripts/install.sh /tmp/kriyan-node-SHA.tar.gz

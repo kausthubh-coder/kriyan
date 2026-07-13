@@ -22,6 +22,7 @@ import {
 } from '../../node/src/config'
 import { runNode } from '../../node/src/main'
 import { KnowledgeService } from '../../node/src/knowledge'
+import { runVpsCommand, VpsRuntimeError, VpsUsageError } from './vps'
 
 export interface CliIo {
   out(value: string): void
@@ -46,6 +47,7 @@ const defaultIo: CliIo = {
 
 type ParsedCommand =
   | { name: 'help' }
+  | { name: 'vps'; action: string; args: string[] }
   | { name: 'setup'; options: Map<string, string> }
   | { name: 'pair' | 'status' | 'doctor'; configPath: string }
   | { name: 'node-run'; configPath: string }
@@ -123,6 +125,11 @@ function parseCommand(args: string[]): ParsedCommand {
   if (args.includes('--help')) throw new UsageError('--help must be used by itself')
   const command = args[0]
   if (command === undefined) return { name: 'help' }
+  if (command === 'vps') {
+    const action = args[1]
+    if (action === undefined) throw new UsageError('vps requires a command')
+    return { name: 'vps', action, args: args.slice(2) }
+  }
   if (command === 'node') {
     if (args[1] !== 'run') throw new UsageError(`unknown command: ${args.slice(0, 2).join(' ')}`)
     const options = parseOptions(args.slice(2), 'node run')
@@ -164,6 +171,12 @@ function json(io: CliIo, value: unknown): void {
 const HELP = `kriyan <command>
 
 Commands:
+  vps install --host HOST --user USER --known-hosts PATH --release ARCHIVE --checksum SHA256_FILE --version ID --config PATH [SSH OPTIONS]
+  vps status|doctor|restart [--host HOST --user USER --known-hosts PATH] [SSH OPTIONS]
+  vps update --host HOST --user USER --known-hosts PATH --release ARCHIVE --checksum SHA256_FILE --version ID [SSH OPTIONS]
+  vps rollback --host HOST --user USER --known-hosts PATH --version ID [SSH OPTIONS]
+  vps uninstall --host HOST --user USER --known-hosts PATH (--preserve-data|--purge-data) [SSH OPTIONS]
+  vps <command> --local ...  (Linux root node setup and maintenance)
   setup --convex-url URL --installation-id ID --node-id ID --data-dir PATH [--timezone IANA] [--locale BCP47] [--config PATH]
   pair [--config PATH]
   node run [--config PATH]
@@ -221,6 +234,12 @@ function stableError(error: unknown): { code: string; message: string; exitCode:
   if (error instanceof ConfigError) {
     return { code: error.code, message: error.message, exitCode: 2 }
   }
+  if (error instanceof VpsUsageError) {
+    return { code: error.code, message: error.message, exitCode: 2 }
+  }
+  if (error instanceof VpsRuntimeError) {
+    return { code: error.code, message: error.message, exitCode: 1 }
+  }
   return { code: 'RUNTIME_ERROR', message: 'command failed', exitCode: 1 }
 }
 
@@ -235,6 +254,11 @@ export async function runCli(args: string[], dependencies: CliDependencies = {})
     if (parsed.name === 'help') {
       io.out(HELP)
       return 0
+    }
+    if (parsed.name === 'vps') {
+      const result = await runVpsCommand(parsed.action, parsed.args)
+      json(io, result)
+      return result.ok === false ? 1 : 0
     }
     if (parsed.name === 'setup') {
       const options = parsed.options

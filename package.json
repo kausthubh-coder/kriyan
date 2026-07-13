@@ -27,6 +27,7 @@
     "test:node": "bun test apps/node/test packages/agent-runtime/test packages/tools/test apps/cli/test",
     "test:node:live": "bun --env-file=.env.local apps/node/test/live-convex.ts",
     "build:node:linux-x64": "bash packaging/scripts/build-standalone.sh dist/kriyan-node-linux-x64 dist/kriyan-linux-x64",
+    "build:standalone": "bash packaging/scripts/build-standalone.sh dist/kriyan-node-linux-x64 dist/kriyan-linux-x64 dist/kriyan-darwin-arm64",
     "kriyan": "bun apps/cli/src/main.ts",
     "lint": "bun run lint:web && bun run lint:mobile",
     "lint:web": "cd web && bun run lint",

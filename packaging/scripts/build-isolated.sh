@@ -82,7 +82,7 @@ normalize_and_compile() {
   normalize_root "${normalized}" "${HOME:-}" /opt/kriyan/build/home
   (
     cd "${build_dir}"
-    bun build --compile --target=bun-linux-x64 --no-compile-autoload-dotenv \
+    bun build --compile --target=bun-linux-x64-baseline --no-compile-autoload-dotenv \
       --no-compile-autoload-bunfig --no-compile-autoload-tsconfig \
       --no-compile-autoload-package-json "./${entry}" --outfile "${target}" >/dev/null
   )
@@ -90,6 +90,32 @@ normalize_and_compile() {
   # shellcheck source=packaging/scripts/provenance-lib.sh
   source "${root}/packaging/scripts/provenance-lib.sh"
   require_linux_x64_elf "${target}"
+  "${root}/packaging/scripts/scan-binary-content.sh" "${target}" "${forbidden_literals[@]}"
+}
+
+normalize_and_compile_operator() {
+  local bundle=$1
+  local entry=$2
+  local target=$3
+  local normalized="${build_dir}/${entry}"
+
+  cp "${bundle}" "${normalized}"
+  normalize_root "${normalized}" "${source_dir}" /opt/kriyan/build/source
+  normalize_root "${normalized}" "${build_dir}" /opt/kriyan/build/work
+  normalize_root "${normalized}" "${output}" /opt/kriyan/build/output
+  normalize_root "${normalized}" "${root}" /opt/kriyan/build/repo
+  normalize_root "${normalized}" "${temporary_root}" /opt/kriyan/build/tmp
+  normalize_root "${normalized}" "${HOME:-}" /opt/kriyan/build/home
+  (
+    cd "${build_dir}"
+    bun build --compile --target=bun-darwin-arm64 --no-compile-autoload-dotenv \
+      --no-compile-autoload-bunfig --no-compile-autoload-tsconfig \
+      --no-compile-autoload-package-json "./${entry}" --outfile "${target}" >/dev/null
+  )
+  chmod 0755 "${target}"
+  # shellcheck source=packaging/scripts/provenance-lib.sh
+  source "${root}/packaging/scripts/provenance-lib.sh"
+  require_darwin_arm64_macho "${target}"
   "${root}/packaging/scripts/scan-binary-content.sh" "${target}" "${forbidden_literals[@]}"
 }
 
@@ -105,10 +131,12 @@ done
 
 normalize_and_compile "${build_dir}/node.bundle.js" node.bundle.normalized.js "${output}/kriyan-node-linux-x64"
 normalize_and_compile "${build_dir}/cli.bundle.js" cli.bundle.normalized.js "${output}/kriyan-linux-x64"
+normalize_and_compile_operator "${build_dir}/cli.bundle.js" operator.bundle.normalized.js "${output}/kriyan-darwin-arm64"
 
 source "${root}/packaging/scripts/provenance-lib.sh"
 node_hash=$(sha256_file "${output}/kriyan-node-linux-x64")
 cli_hash=$(sha256_file "${output}/kriyan-linux-x64")
+operator_hash=$(sha256_file "${output}/kriyan-darwin-arm64")
 lock_hash=$(sha256_file "${source_dir}/bun.lock")
 cat >"${output}/provenance.manifest" <<EOF
 manifest_version=1
@@ -116,7 +144,7 @@ source_commit=${commit}
 source_tree=${tree}
 source_date_epoch=${epoch}
 bun_version=$(bun --version)
-target=bun-linux-x64
+target=bun-linux-x64-baseline
 lock_sha256=${lock_hash}
 node_sha256=${node_hash}
 cli_sha256=${cli_hash}
@@ -124,7 +152,22 @@ source_method=git-archive-file
 bundle_entry=node.bundle.normalized.js,cli.bundle.normalized.js
 normalized_build_prefix=/opt/kriyan/build
 EOF
+cat >"${output}/operator-provenance.manifest" <<EOF
+manifest_version=1
+source_commit=${commit}
+source_tree=${tree}
+source_date_epoch=${epoch}
+bun_version=$(bun --version)
+target=bun-darwin-arm64
+lock_sha256=${lock_hash}
+cli_sha256=${operator_hash}
+source_method=git-archive-file
+bundle_entry=operator.bundle.normalized.js
+normalized_build_prefix=/opt/kriyan/build
+EOF
 "${root}/packaging/scripts/verify-build-inputs.sh" \
   "${output}/kriyan-node-linux-x64" "${output}/kriyan-linux-x64" \
   "${commit}" "${output}/provenance.manifest"
+"${root}/packaging/scripts/verify-operator-build.sh" \
+  "${output}/kriyan-darwin-arm64" "${commit}" "${output}/operator-provenance.manifest"
 echo "isolated exact-SHA build verified: ${commit}"

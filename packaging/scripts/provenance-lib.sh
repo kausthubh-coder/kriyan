@@ -29,6 +29,20 @@ require_linux_x64_elf() {
   }
 }
 
+require_darwin_arm64_macho() {
+  local binary=$1
+  local description
+  [[ -f ${binary} && -x ${binary} && ! -L ${binary} ]] || {
+    echo "operator CLI is missing, non-executable, or a symlink" >&2
+    return 2
+  }
+  description=$(file -b "${binary}")
+  [[ ${description} == *Mach-O* && ${description} == *arm64* ]] || {
+    echo "operator CLI is not a macOS arm64 Mach-O executable" >&2
+    return 2
+  }
+}
+
 manifest_value() {
   local manifest=$1
   local key=$2
@@ -80,7 +94,7 @@ validate_provenance_manifest() {
   [[ $(manifest_value "${manifest}" lock_sha256) =~ ^[0-9a-f]{64}$ ]]
   [[ $(manifest_value "${manifest}" node_sha256) =~ ^[0-9a-f]{64}$ ]]
   [[ $(manifest_value "${manifest}" cli_sha256) =~ ^[0-9a-f]{64}$ ]]
-  [[ $(manifest_value "${manifest}" target) == bun-linux-x64 ]]
+  [[ $(manifest_value "${manifest}" target) == bun-linux-x64-baseline ]]
   [[ $(manifest_value "${manifest}" source_method) == git-archive-file ]]
   [[ $(manifest_value "${manifest}" bundle_entry) == node.bundle.normalized.js,cli.bundle.normalized.js ]]
   [[ $(manifest_value "${manifest}" normalized_build_prefix) == /opt/kriyan/build ]]

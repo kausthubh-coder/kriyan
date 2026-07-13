@@ -38,7 +38,7 @@ async function writeProvenance(
     source_tree: commandOutput(['git', 'rev-parse', `${commit}^{tree}`]),
     source_date_epoch: commandOutput(['git', 'show', '-s', '--format=%ct', commit]),
     bun_version: Bun.version,
-    target: 'bun-linux-x64',
+    target: 'bun-linux-x64-baseline',
     lock_sha256: await sha256('bun.lock'),
     node_sha256: await sha256(node),
     cli_sha256: await sha256(cli),
@@ -82,6 +82,8 @@ test('systemd service is unprivileged, hardened, and drains on SIGTERM', async (
   expect(unit).toContain('Group=kriyan')
   expect(unit).toContain('NoNewPrivileges=true')
   expect(unit).toContain('ProtectSystem=strict')
+  expect(unit).toContain('ProtectKernelTunables=true')
+  expect(unit).toContain('RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6')
   expect(unit).toContain('KillSignal=SIGTERM')
   expect(unit).toContain('TimeoutStopSec=45s')
   expect(unit).not.toContain('User=root')
@@ -94,7 +96,9 @@ test('install and update paths are interruption-safe and rollback-capable', asyn
   const health = await readFile('packaging/scripts/wait-for-health.sh', 'utf8')
   expect(install).toContain('.partial.$$')
   expect(install).toContain("trap 'rm -rf")
-  expect(install).toContain('immutable releases are never replaced')
+  expect(install).toContain('release identifier already exists with different provenance')
+  expect(install).toContain('release ${version} already verified; current pointer refreshed')
+  expect(install).toContain('validate_provenance_manifest')
   expect(install).toContain('verify-release-archive.sh')
   expect(install).not.toContain('rm -rf "${release_dir}"')
   expect(update).toContain('previous=$(readlink -f')
@@ -279,6 +283,15 @@ test('release construction binds provenance, rescans ELFs, and emits canonical d
     expect(Bun.spawnSync([
       'bash', 'packaging/scripts/scan-binary-content.sh', secretFile,
     ], { env: { ...process.env, KRIYAN_API_KEY: 'known-secret-value-123' } }).exitCode).not.toBe(0)
+
+    const bunToolchainPath = join(directory, 'bun-toolchain-path')
+    await writeFile(
+      bunToolchainPath,
+      '/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/crate/lib.rs',
+    )
+    expect(Bun.spawnSync([
+      'bash', 'packaging/scripts/scan-binary-content.sh', bunToolchainPath,
+    ]).exitCode).toBe(0)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

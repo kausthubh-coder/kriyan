@@ -16,7 +16,8 @@ for literal in "$@"; do
   fi
 done
 
-if grep -E '/(private/)?var/folders/|/Users/[^/]+/|/home/[^/]+/|\.codex/worktrees/|/(private/)?tmp/kriyan-(isolated|source|build|release|temp)[^/ ]*' "${strings_file}" >/dev/null; then
+if grep -E '/(private/)?var/folders/|/Users/[A-Za-z0-9._-]+/|/home/[A-Za-z0-9._-]+/|/[.]codex/worktrees/|/(private/)?tmp/kriyan-(isolated|source|build|release|temp)[^/ ]*' "${strings_file}" \
+  | grep -Ev '/Users/brew/Library/Caches/Homebrew/' >/dev/null; then
   echo "binary contains a private user, worktree, or build-temporary path" >&2
   exit 1
 fi

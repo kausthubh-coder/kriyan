@@ -22,6 +22,21 @@ export class ConfigError extends Error {
 }
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,255}$/
+const ALLOWED_CONFIG_KEYS = new Set([
+  'convexUrl',
+  'installationId',
+  'nodeId',
+  'displayName',
+  'protocolVersion',
+  'dataDir',
+  'leaseDurationMs',
+  'pollIntervalMs',
+  'heartbeatIntervalMs',
+  'shutdownGraceMs',
+  'timezone',
+  'locale',
+  'runtime',
+])
 
 function required(value: unknown, name: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -42,6 +57,10 @@ export function validateConfig(input: unknown): NodeConfig {
     throw new ConfigError('config must be a JSON object')
   }
   const value = input as Record<string, unknown>
+  const unknown = Object.keys(value).filter((key) => !ALLOWED_CONFIG_KEYS.has(key))
+  if (unknown.length > 0) {
+    throw new ConfigError(`config contains unsupported fields: ${unknown.sort().join(', ')}`)
+  }
   const convexUrl = required(value.convexUrl, 'convexUrl')
   let parsedUrl: URL
   try {
