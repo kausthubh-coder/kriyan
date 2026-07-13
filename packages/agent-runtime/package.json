@@ -4,6 +4,7 @@
   "private": true,
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
+    "@kriyan/knowledge-vault": "workspace:*",
     "@kriyan/tools": "workspace:*"
   }
 }

@@ -5,6 +5,7 @@
   "bin": { "kriyan": "./src/main.ts" },
   "dependencies": {
     "@kriyan/convex-client": "workspace:*",
+    "@kriyan/knowledge-vault": "workspace:*",
     "@kriyan/node": "workspace:*"
   }
 }

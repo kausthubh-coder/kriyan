@@ -15,6 +15,38 @@ import {
 } from '@earendil-works/pi-ai/providers/faux'
 
 import type { ReminderProduct } from '@kriyan/tools'
+import type { CitationMetadata, SearchMode, SearchResponse } from '@kriyan/knowledge-vault'
+
+export interface KnowledgeRetriever {
+  search(query: string, mode?: SearchMode, limit?: number): Promise<SearchResponse>
+}
+
+export interface RetrievedContext {
+  query: string
+  text: string
+  citations: CitationMetadata[]
+  retrieval: SearchResponse['effectiveMode']
+}
+
+export class KnowledgeContextAssembler {
+  constructor(private readonly retriever: KnowledgeRetriever) {}
+
+  async assemble(query: string, options: { mode?: SearchMode; limit?: number } = {}): Promise<RetrievedContext> {
+    const response = await this.retriever.search(query, options.mode ?? 'hybrid', options.limit ?? 5)
+    const citationMap = new Map<string, CitationMetadata>()
+    const sections = response.results.map((result) => {
+      for (const citation of result.citations) citationMap.set(citation.citationId, citation)
+      const labels = result.citations.map((citation) => citation.citationId).join(', ')
+      return `[${labels}] ${result.title}\n${result.excerpt}`
+    })
+    return {
+      query,
+      text: sections.join('\n\n'),
+      citations: [...citationMap.values()].sort((left, right) => left.citationId.localeCompare(right.citationId)),
+      retrieval: response.effectiveMode,
+    }
+  }
+}
 
 export type NormalizedRuntimeEvent =
   | { type: 'status'; data: string }

@@ -25,6 +25,7 @@
       },
       "dependencies": {
         "@kriyan/convex-client": "workspace:*",
+        "@kriyan/knowledge-vault": "workspace:*",
         "@kriyan/node": "workspace:*",
       },
     },
@@ -36,6 +37,7 @@
       "dependencies": {
         "@kriyan/agent-runtime": "workspace:*",
         "@kriyan/convex-client": "workspace:*",
+        "@kriyan/knowledge-vault": "workspace:*",
         "@kriyan/tools": "workspace:*",
       },
     },
@@ -86,6 +88,7 @@
     "packages/agent-runtime": {
       "name": "@kriyan/agent-runtime",
       "dependencies": {
+        "@kriyan/knowledge-vault": "workspace:*",
         "@kriyan/tools": "workspace:*",
       },
     },
@@ -99,6 +102,9 @@
     },
     "packages/convex-client": {
       "name": "@kriyan/convex-client",
+    },
+    "packages/knowledge-vault": {
+      "name": "@kriyan/knowledge-vault",
     },
     "packages/tools": {
       "name": "@kriyan/tools",
@@ -628,6 +634,8 @@
     "@kriyan/client-core": ["@kriyan/client-core@workspace:packages/client-core"],
 
     "@kriyan/convex-client": ["@kriyan/convex-client@workspace:packages/convex-client"],
+
+    "@kriyan/knowledge-vault": ["@kriyan/knowledge-vault@workspace:packages/knowledge-vault"],
 
     "@kriyan/node": ["@kriyan/node@workspace:apps/node"],
 

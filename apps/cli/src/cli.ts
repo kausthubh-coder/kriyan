@@ -6,6 +6,13 @@ import {
   deriveNodeHealth,
   type ControlPlane,
 } from '@kriyan/convex-client'
+import {
+  OllamaEmbeddingProvider,
+  type EmbeddingProvider,
+  type EntityKind,
+  type SearchMode,
+  type SourceKind,
+} from '@kriyan/knowledge-vault'
 
 import {
   ConfigError,
@@ -14,6 +21,7 @@ import {
   validateConfig,
 } from '../../node/src/config'
 import { runNode } from '../../node/src/main'
+import { KnowledgeService } from '../../node/src/knowledge'
 
 export interface CliIo {
   out(value: string): void
@@ -42,6 +50,7 @@ type ParsedCommand =
   | { name: 'pair' | 'status' | 'doctor'; configPath: string }
   | { name: 'node-run'; configPath: string }
   | { name: 'submit'; configPath: string; text: string; idempotencyKey?: string }
+  | { name: 'source-register' | 'ingest' | 'search' | 'index-rebuild'; options: Map<string, string> }
 
 const DEFAULT_CONFIG = (): string => join(homedir(), '.config', 'kriyan', 'node.json')
 
@@ -62,6 +71,20 @@ const COMMAND_OPTIONS: Record<string, ReadonlySet<string>> = {
   doctor: new Set(['--config']),
   submit: new Set(['--text', '--idempotency-key', '--config']),
   'node run': new Set(['--config']),
+  'source register': new Set(['--vault', '--kind', '--location', '--name', '--source-version']),
+  ingest: new Set([
+    '--vault',
+    '--source-id',
+    '--entity-kind',
+    '--entity-slug',
+    '--title',
+    '--summary',
+    '--tags',
+    '--ollama-url',
+    '--embedding-model',
+  ]),
+  search: new Set(['--vault', '--query', '--mode', '--limit', '--ollama-url', '--embedding-model']),
+  'index rebuild': new Set(['--vault', '--ollama-url', '--embedding-model']),
 }
 
 function parseOptions(args: string[], command: string): Map<string, string> {
@@ -105,11 +128,20 @@ function parseCommand(args: string[]): ParsedCommand {
     const options = parseOptions(args.slice(2), 'node run')
     return { name: 'node-run', configPath: configPath(options) }
   }
+  if (command === 'source') {
+    if (args[1] !== 'register') throw new UsageError(`unknown command: ${args.slice(0, 2).join(' ')}`)
+    return { name: 'source-register', options: parseOptions(args.slice(2), 'source register') }
+  }
+  if (command === 'index') {
+    if (args[1] !== 'rebuild') throw new UsageError(`unknown command: ${args.slice(0, 2).join(' ')}`)
+    return { name: 'index-rebuild', options: parseOptions(args.slice(2), 'index rebuild') }
+  }
   if (!(command in COMMAND_OPTIONS) || command === 'node run') {
     throw new UsageError(`unknown command: ${args.join(' ')}`)
   }
   const options = parseOptions(args.slice(1), command)
   if (command === 'setup') return { name: 'setup', options }
+  if (command === 'ingest' || command === 'search') return { name: command, options }
   if (command === 'submit') {
     const text = required(options, '--text').trim()
     if (text.length === 0 || text.length > 16_384) {
@@ -138,8 +170,49 @@ Commands:
   status [--config PATH]
   doctor [--config PATH]
   submit --text TEXT [--idempotency-key KEY] [--config PATH]
+  source register --vault PATH --kind git|github|drive|local|web --location LOCATION --name NAME [--source-version VERSION]
+  ingest --vault PATH --source-id ID --entity-kind person|project|topic --entity-slug SLUG --title TITLE [--summary TEXT] [--tags CSV]
+  search --vault PATH --query TEXT [--mode lexical|hybrid] [--limit N] [--ollama-url URL] [--embedding-model MODEL]
+  index rebuild --vault PATH [--ollama-url URL] [--embedding-model MODEL]
 
 Output is newline-delimited JSON. Usage/config errors exit 2; runtime/health errors exit 1.`
+
+function sourceKind(value: string): SourceKind {
+  if (!['git', 'github', 'drive', 'local', 'web'].includes(value)) {
+    throw new UsageError('--kind must be git, github, drive, local, or web')
+  }
+  return value as SourceKind
+}
+
+function entityKind(value: string): EntityKind {
+  if (!['person', 'project', 'topic'].includes(value)) {
+    throw new UsageError('--entity-kind must be person, project, or topic')
+  }
+  return value as EntityKind
+}
+
+function searchMode(value: string | undefined): SearchMode {
+  if (value === undefined) return 'lexical'
+  if (value !== 'lexical' && value !== 'hybrid') throw new UsageError('--mode must be lexical or hybrid')
+  return value
+}
+
+function searchLimit(value: string | undefined): number {
+  if (value === undefined) return 10
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 50) {
+    throw new UsageError('--limit must be an integer between 1 and 50')
+  }
+  return parsed
+}
+
+function embeddingProvider(options: Map<string, string>, requiredForHybrid = false): EmbeddingProvider | undefined {
+  if (!requiredForHybrid && !options.has('--ollama-url') && !options.has('--embedding-model')) return undefined
+  return new OllamaEmbeddingProvider({
+    baseUrl: options.get('--ollama-url'),
+    model: options.get('--embedding-model'),
+  })
+}
 
 function stableError(error: unknown): { code: string; message: string; exitCode: 1 | 2 } {
   if (error instanceof UsageError) {
@@ -186,6 +259,70 @@ export async function runCli(args: string[], dependencies: CliDependencies = {})
       return 0
     }
 
+    if (
+      parsed.name === 'source-register' ||
+      parsed.name === 'ingest' ||
+      parsed.name === 'search' ||
+      parsed.name === 'index-rebuild'
+    ) {
+      const options = parsed.options
+      const mode = parsed.name === 'search' ? searchMode(options.get('--mode')) : 'lexical'
+      const vaultRoot = required(options, '--vault')
+      if (parsed.name === 'source-register') {
+        sourceKind(required(options, '--kind'))
+        required(options, '--location')
+        required(options, '--name')
+      } else if (parsed.name === 'ingest') {
+        required(options, '--source-id')
+        entityKind(required(options, '--entity-kind'))
+        required(options, '--entity-slug')
+        required(options, '--title')
+      } else if (parsed.name === 'search') {
+        required(options, '--query')
+        searchLimit(options.get('--limit'))
+      }
+      const service = new KnowledgeService({
+        vaultRoot,
+        embeddingProvider: embeddingProvider(options, parsed.name === 'search' && mode === 'hybrid'),
+      })
+      await service.initialize()
+      if (parsed.name === 'source-register') {
+        const source = await service.registerSource({
+          kind: sourceKind(required(options, '--kind')),
+          displayName: required(options, '--name'),
+          location: required(options, '--location'),
+          sourceVersion: options.get('--source-version'),
+        })
+        json(io, { ok: true, command: 'source register', source })
+        return 0
+      }
+      if (parsed.name === 'ingest') {
+        const result = await service.ingest({
+          sourceRefId: required(options, '--source-id'),
+          entityKind: entityKind(required(options, '--entity-kind')),
+          entitySlug: required(options, '--entity-slug'),
+          title: required(options, '--title'),
+          summary: options.get('--summary'),
+          tags: options.get('--tags')?.split(','),
+        })
+        json(io, { ok: true, command: 'ingest', ...result })
+        return 0
+      }
+      if (parsed.name === 'search') {
+        const response = await service.search(
+          required(options, '--query'),
+          mode,
+          searchLimit(options.get('--limit')),
+        )
+        json(io, { ok: true, command: 'search', ...response })
+        return 0
+      }
+      const result = await service.rebuildIndex()
+      json(io, { ok: true, command: 'index rebuild', ...result })
+      return 0
+    }
+
+    if ('options' in parsed) throw new UsageError('unknown command')
     const config = await loadConfig(parsed.configPath)
     if (parsed.name === 'node-run') {
       await nodeRunner(parsed.configPath)

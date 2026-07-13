@@ -6,6 +6,7 @@
   "dependencies": {
     "@kriyan/agent-runtime": "workspace:*",
     "@kriyan/convex-client": "workspace:*",
+    "@kriyan/knowledge-vault": "workspace:*",
     "@kriyan/tools": "workspace:*"
   }
 }
