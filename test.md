@@ -162,10 +162,21 @@ bun run test:node:live
 
 `test:node:live` refuses a dirty checkout, release-SHA mismatch, non-UUID installation, or missing deployment name/URL/env file/node ID. Its sanitized output correlates command, job, run, ordered event sequences, server timestamps, reminder, node heartbeat, and release SHA. Cleanup is guarded by the exact selected deployment plus installation fingerprint and must delete zero rows on its second pass.
 
+This phase intentionally has no central account or authorization service. The installation ID scopes records and queries but is not an authentication credential. The owner-controlled Convex deployment plus owner-controlled clients and VPS are the current self-hosted trust boundary; tests must not describe installation-ID filtering as user authentication.
+
 Production deployment is explicit and happens only from the frozen integration SHA:
 
 ```sh
 bunx convex deploy --env-file "$KRIYAN_ENV_FILE" --typecheck enable --message "Kriyan live integration $KRIYAN_RELEASE_ID"
+```
+
+Deploy docs preview and production from the same clean Git archive. Preview metadata must use its generated `VERCEL_URL`; production canonical, `og:url`, Open Graph image, `robots.txt`, and every sitemap location must use `https://kriyan-docs.vercel.app`. The production alias and canonical origin must both omit `x-robots-tag: noindex`:
+
+```sh
+bun run verify:docs
+curl -fsSI https://kriyan-docs.vercel.app | rg -iv '^x-robots-tag:.*noindex'
+curl -fsS https://kriyan-docs.vercel.app/robots.txt
+curl -fsS https://kriyan-docs.vercel.app/sitemap.xml
 ```
 
 Build and verify the exact standalone release before touching the host:
@@ -173,7 +184,9 @@ Build and verify the exact standalone release before touching the host:
 ```sh
 bun run build:standalone
 file dist/kriyan-node-linux-x64 dist/kriyan-linux-x64 dist/kriyan-darwin-arm64
-packaging/scripts/verify-operator-build.sh dist/kriyan-darwin-arm64 "$KRIYAN_RELEASE_ID"
+packaging/scripts/verify-operator-build.sh \
+  dist/kriyan-darwin-arm64 "$KRIYAN_RELEASE_ID" \
+  dist/operator-provenance.manifest
 ```
 
 Follow `packaging/README.md` for archive construction and `kriyan vps install|status|doctor|restart|update|rollback`. The Ubuntu host must prove `command -v bun` fails before install, the release/archive hashes match locally and remotely, the service is enabled and active, the process-health release equals the Git SHA, and Convex shows a fresh heartbeat for the same node. Repeat install, restart, update, rollback, and host reboot must all preserve health.

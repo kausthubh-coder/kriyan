@@ -17,8 +17,12 @@ trap 'rm -rf "${output_dir}"' EXIT
 mkdir -p "$(dirname "${node_output}")" "$(dirname "${cli_output}")"
 install -m 0755 "${output_dir}/kriyan-node-linux-x64" "${node_output}"
 install -m 0755 "${output_dir}/kriyan-linux-x64" "${cli_output}"
+install -m 0644 "${output_dir}/provenance.manifest" \
+  "$(dirname "${node_output}")/provenance.manifest"
 if [[ -n ${operator_output} ]]; then
   mkdir -p "$(dirname "${operator_output}")"
   install -m 0755 "${output_dir}/kriyan-darwin-arm64" "${operator_output}"
+  install -m 0644 "${output_dir}/operator-provenance.manifest" \
+    "$(dirname "${operator_output}")/operator-provenance.manifest"
 fi
 echo "standalone executables verified: ${node_output} ${cli_output} ${operator_output}"

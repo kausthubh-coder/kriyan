@@ -1,4 +1,4 @@
-import { resolveSiteUrl } from '../lib/site'
+import { productionSiteUrl, resolveSiteUrl } from '../lib/site'
 
 function expectEqual(actual: string, expected: string, label: string): void {
   if (actual !== expected) {
@@ -16,9 +16,21 @@ expectEqual(
 )
 
 expectEqual(
-  resolveSiteUrl({ VERCEL_URL: 'current-preview.vercel.app' }),
+  resolveSiteUrl({
+    VERCEL_ENV: 'production',
+    VERCEL_URL: 'generated-project-host.vercel.app',
+  }),
+  productionSiteUrl,
+  'production public alias fallback',
+)
+
+expectEqual(
+  resolveSiteUrl({
+    VERCEL_ENV: 'preview',
+    VERCEL_URL: 'current-preview.vercel.app',
+  }),
   'https://current-preview.vercel.app',
-  'VERCEL_URL fallback',
+  'preview VERCEL_URL fallback',
 )
 
 expectEqual(

@@ -27,7 +27,14 @@ For a convenience build from one exact Git checkpoint:
 ```sh
 bun run build:standalone
 file dist/kriyan-node-linux-x64 dist/kriyan-linux-x64 dist/kriyan-darwin-arm64
+packaging/scripts/verify-operator-build.sh \
+  dist/kriyan-darwin-arm64 SHA dist/operator-provenance.manifest
 ```
+
+The convenience build retains `provenance.manifest` and
+`operator-provenance.manifest` beside the binaries so the exact-SHA verification
+commands remain independently executable after the isolated build directory is
+removed.
 
 ## Operator CLI
 

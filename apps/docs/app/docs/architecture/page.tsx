@@ -141,6 +141,12 @@ export default function ArchitecturePage(): JSX.Element {
           or device-authorization system. A future QR or short-lived enrollment
           flow must not be inferred from the existing <code>pair</code> command.
         </p>
+        <p>
+          This phase intentionally has no central account service. The installation
+          ID separates one owner installation’s records from another, but it is not
+          an authentication credential. The owner-controlled Convex deployment,
+          clients, and VPS are the current self-hosted trust boundary.
+        </p>
       </section>
 
       <section id="convex-modes">

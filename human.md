@@ -24,6 +24,7 @@ The root is a Git worktree and a Bun workspace. Use `bun`/`bunx`; npm, Vite, and
 
 - Convex is the coordination authority and reactive compact projection store. It is not the authority for raw files, full transcript bodies, provider credentials, or browser profiles.
 - The knowledge vault is the local authority for raw-source references, Markdown entities/transcripts, provenance, journals, and rebuildable SQLite indexes.
+- The current product deliberately has no central account or authorization layer. `installationId` is a routing and data-isolation key, not an authentication credential; the owner-controlled Convex deployment, owner clients, and owner VPS form the present self-hosted trust boundary.
 - The agent node owns provider sessions, execution, leases, durable-effect reconciliation, temporary workspaces, and vault access.
 - Web, mobile, and desktop depend on client repository contracts. They do not directly own leases, Pi sessions, vault files, or the local search index.
 - Offline/demo mode is explicit. Live mode requires an explicit Convex URL and installation identifier; missing configuration fails closed.
@@ -68,7 +69,7 @@ Live integration uses exactly one local file, `.env.integration.local`. It must 
 
 Required variable names are `CONVEX_DEPLOYMENT`, `CONVEX_URL`, `KRIYAN_DEPLOYMENT_NAME`, `KRIYAN_PROD_DEPLOYMENT`, `KRIYAN_PROD_CONVEX_URL`, `KRIYAN_INSTALLATION_ID`, `KRIYAN_NODE_ID`, `KRIYAN_RELEASE_ID`, `KRIYAN_ENV_FILE`, `KRIYAN_DROPLET_ID`, `KRIYAN_DROPLET_HOST`, `KRIYAN_SSH_USER`, and `KRIYAN_VERCEL_PROJECT_ID`.
 
-The isolated live project is `kriyan-live-20260713`, with dev deployment `bold-cat-986` and production deployment `robust-clownfish-387`. The replacement VPS resource is named `kriyan-live-node`; the original Droplet `584129331` is preserve-only. Public docs use the existing Vercel project `kriyan-docs`.
+The isolated live project is `kriyan-live-20260713`, with dev deployment `bold-cat-986` and production deployment `robust-clownfish-387`. The replacement VPS resource is named `kriyan-live-node`; the original Droplet `584129331` is preserve-only. Public docs use the existing Vercel project `kriyan-docs`; production metadata canonicalizes to the indexable alias `https://kriyan-docs.vercel.app`, while preview deployments use their generated `VERCEL_URL`.
 
 ## Product-integration boundary
 
