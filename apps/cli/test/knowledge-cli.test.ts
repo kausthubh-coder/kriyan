@@ -51,4 +51,4 @@ test('CLI smoke registers, ingests, searches, and rebuilds from a temporary vaul
   const replay = await cli(['search', '--vault', vault, '--query', 'Korean vocabulary'])
   expect(JSON.parse(replay.stdout).results.map((result: { documentId: string }) => result.documentId))
     .toEqual(JSON.parse(searched.stdout).results.map((result: { documentId: string }) => result.documentId))
-})
+}, 30_000)

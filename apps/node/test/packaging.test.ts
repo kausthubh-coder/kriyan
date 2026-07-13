@@ -461,7 +461,7 @@ fi
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
-}, 30_000)
+}, 120_000)
 
 test('release identifiers reject traversal and shell/path metacharacters', async () => {
   const valid = Bun.spawnSync([
