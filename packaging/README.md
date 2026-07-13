@@ -43,7 +43,7 @@ dist/kriyan-darwin-arm64 vps install \
   --host-key-policy strict \
   --release /tmp/kriyan-release.tar.gz \
   --checksum /tmp/kriyan-release.tar.gz.sha256 \
-  --version CHECKPOINT_ID --config /tmp/node.json
+  --version SOURCE_COMMIT --config /tmp/node.json
 
 dist/kriyan-darwin-arm64 vps status \
   --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts
@@ -52,10 +52,10 @@ dist/kriyan-darwin-arm64 vps doctor \
 dist/kriyan-darwin-arm64 vps update \
   --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts \
   --release /tmp/kriyan-release.tar.gz \
-  --checksum /tmp/kriyan-release.tar.gz.sha256 --version CHECKPOINT_ID
+  --checksum /tmp/kriyan-release.tar.gz.sha256 --version SOURCE_COMMIT
 dist/kriyan-darwin-arm64 vps rollback \
   --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts \
-  --version PREVIOUS_CHECKPOINT_ID
+  --version PREVIOUS_SOURCE_COMMIT
 dist/kriyan-darwin-arm64 vps restart \
   --host 203.0.113.10 --user ubuntu --known-hosts ~/.ssh/known_hosts
 dist/kriyan-darwin-arm64 vps uninstall \
@@ -63,15 +63,19 @@ dist/kriyan-darwin-arm64 vps uninstall \
   --preserve-data
 ```
 
-Every command writes one JSON object. Usage/config errors exit `2`, transfer or
-service failures exit `1`, and healthy success exits `0`. Install and update
-verify the archive checksum and embedded provenance locally, transfer the
+Help is the explicit plaintext exception. Every operational command writes one
+JSON object. Usage/config errors exit `2`, transfer or service failures exit `1`,
+and healthy success exits `0`. Install and update verify the archive checksum
+and bind `--version` to the embedded `source_commit` locally, transfer the
 archive plus a normalized checksum, verify the checksum again on the host, and
 then use the transferred standalone Linux CLI for root maintenance. Temporary
 transfer material is removed on success and failure.
 
 The Linux executable owns the same lifecycle with `vps <action> --local`.
-Local maintenance requires root. `vps uninstall` always requires exactly one of
+Local maintenance requires root and rejects all SSH-only flags. Installed
+`node.json` files must keep `dataDir` at or below `/var/lib/kriyan`, matching the
+systemd writable-state confinement; ordinary developer configs remain flexible.
+`vps uninstall` always requires exactly one of
 `--preserve-data` or `--purge-data`; preserve mode never removes
 `/var/lib/kriyan`.
 
@@ -91,7 +95,16 @@ sudo -u kriyan /opt/kriyan/current/bin/kriyan doctor --config /etc/kriyan/node.j
 
 ## Update, rollback, health, and recovery
 
-`update.sh` atomically switches `/opt/kriyan/current` and restores the previous symlink if restart/health fails. Health requires a heartbeat newer than the restart boundary from a different process instance running the expected release, followed by a stability window; an old fresh heartbeat cannot pass. `rollback.sh VERSION` applies the same identity gate to an already installed release. `backup.sh` creates and validates a private archive; `restore.sh` applies the same traversal, duplicate, link, and file-type safety checks as install before restoring into a caller-selected empty temporary directory.
+`update.sh` and `rollback.sh` transactionally switch `/opt/kriyan/current`, the
+release environment, and the versioned systemd unit. Any daemon-reload,
+restart, active-state, or health failure restores the complete prior state,
+reloads systemd, restarts it, and requires the prior release to become healthy.
+Health requires a heartbeat newer than the restart boundary from a different
+process instance running the provenance-derived release identity, followed by a
+stability window; an old fresh heartbeat cannot pass. `backup.sh` creates and
+validates a private archive; `restore.sh` applies the same traversal, duplicate,
+link, and file-type safety checks as install before restoring into a
+caller-selected empty temporary directory.
 
 The isolated builder writes `git archive` to a file before extracting it, avoiding the macOS `pipefail`/SIGPIPE exit-141 path. It installs from the exact commit's `bun.lock`, normalizes logical and physical aliases for the repository, source, build, output, `TMPDIR`, and `HOME`, and compiles regular stable-basename bundle files rather than `/dev/stdin`. Both Linux x64 ELFs are scanned for macOS `/var`/`/private/var` and `/tmp`/`/private/tmp` aliases, private user/home/worktree paths, builder literals, and known secret environment values.
 

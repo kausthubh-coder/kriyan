@@ -15,6 +15,7 @@ import {
 } from '../src/vps'
 
 const directories: string[] = []
+const RELEASE_SHA = '1234567890abcdef1234567890abcdef12345678'
 
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })))
@@ -35,7 +36,7 @@ class FakeRunner implements CommandRunner {
         stdout: `${JSON.stringify({
           ok: true,
           command: 'vps install',
-          release: { version: 'release-1' },
+          release: { version: RELEASE_SHA },
           service: { enabled: true, active: true },
           doctor: { config: 'pass', processHealth: 'pass', releaseIdentity: 'pass' },
         })}\n`,
@@ -53,7 +54,7 @@ class FakeRunner implements CommandRunner {
   }
 }
 
-async function fixture(): Promise<{
+async function fixture(dataDirOverride?: string): Promise<{
   root: string
   archive: string
   checksum: string
@@ -67,7 +68,7 @@ async function fixture(): Promise<{
   const hash = new Bun.CryptoHasher('sha256').update(await Bun.file(archive).bytes()).digest('hex')
   const checksum = `${archive}.sha256`
   await writeFile(checksum, `${hash}  ${archive.split('/').at(-1)}\n`)
-  const dataDir = join(root, 'data')
+  const dataDir = dataDirOverride ?? join(root, 'state', 'node')
   const config = join(root, 'node.json')
   await saveConfig(config, validateConfig({
     convexUrl: 'https://example.convex.cloud',
@@ -111,22 +112,23 @@ test('remote status makes SSH host-key and identity behavior explicit', async ()
 })
 
 test('remote install verifies locally, transfers checksum and config, verifies remotely, and cleans up', async () => {
-  const item = await fixture()
+  const item = await fixture('/var/lib/kriyan/node')
   const runner = new FakeRunner()
   const result = await runVpsCommand('install', [
     ...remoteOptions(),
     '--release', item.archive,
     '--checksum', item.checksum,
-    '--version', 'release-1',
+    '--version', RELEASE_SHA,
     '--config', item.config,
   ], { runner, randomId: () => 'deterministic-id' })
   expect(result).toMatchObject({
     ok: true,
     host: '203.0.113.10',
-    release: { version: 'release-1' },
+    release: { version: RELEASE_SHA },
     service: { enabled: true, active: true },
   })
   expect(runner.calls.filter((call) => call.command === 'scp')).toHaveLength(3)
+  expect(runner.calls.find((call) => call.command === 'bash')?.args.at(2)).toBe(RELEASE_SHA)
   expect(runner.calls.some((call) => call.args.at(-1)?.includes('sha256sum -c'))).toBe(true)
   expect(runner.calls.at(-1)?.args.at(-1)).toContain("'rm' '-rf' '--' '/tmp/kriyan-transfer-deterministic-id'")
   const renderedCalls = JSON.stringify(runner.calls)
@@ -135,14 +137,14 @@ test('remote install verifies locally, transfers checksum and config, verifies r
 })
 
 test('failed transfer returns a stable error and still cleans remote staging', async () => {
-  const item = await fixture()
+  const item = await fixture('/var/lib/kriyan/node')
   const runner = new FakeRunner()
   runner.failScp = true
   await expect(runVpsCommand('install', [
     ...remoteOptions(),
     '--release', item.archive,
     '--checksum', item.checksum,
-    '--version', 'release-1',
+    '--version', RELEASE_SHA,
     '--config', item.config,
   ], { runner, randomId: () => 'failed-transfer' })).rejects.toBeInstanceOf(VpsRuntimeError)
   expect(runner.calls.at(-1)?.command).toBe('ssh')
@@ -151,7 +153,7 @@ test('failed transfer returns a stable error and still cleans remote staging', a
 
 test('local status and doctor report release, systemd, and process identity without config contents', async () => {
   const item = await fixture()
-  const release = join(item.root, 'opt', 'releases', 'release-1')
+  const release = join(item.root, 'opt', 'releases', RELEASE_SHA)
   await mkdir(join(release, 'bin'), { recursive: true })
   await writeFile(join(release, 'bin', 'kriyan'), '')
   await chmod(join(release, 'bin', 'kriyan'), 0o755)
@@ -161,7 +163,7 @@ test('local status and doctor report release, systemd, and process identity with
     installationId: 'installation:vps-test',
     nodeId: 'node:vps-test',
     processInstanceId: 'process:one',
-    releaseId: 'release-1',
+    releaseId: RELEASE_SHA,
     pid: 42,
     startedAt: 1,
     heartbeatAt: 2,
@@ -184,7 +186,7 @@ test('local status and doctor report release, systemd, and process identity with
   })
   expect(result).toMatchObject({
     ok: true,
-    release: { version: 'release-1' },
+    release: { version: RELEASE_SHA },
     service: { enabled: true, active: true },
     doctor: { config: 'pass', processHealth: 'pass', releaseIdentity: 'pass' },
   })
@@ -198,7 +200,7 @@ test('local repeat install, update, rollback, restart, and explicit uninstall mo
   const executable = join(release, 'kriyan')
   await writeFile(executable, '')
   await chmod(executable, 0o755)
-  const optRelease = join(item.root, 'opt', 'releases', 'release-1')
+  const optRelease = join(item.root, 'opt', 'releases', RELEASE_SHA)
   await mkdir(join(optRelease, 'bin'), { recursive: true })
   await symlink(optRelease, join(item.root, 'opt', 'current'))
   const paths = {
@@ -212,14 +214,14 @@ test('local repeat install, update, rollback, restart, and explicit uninstall mo
   const dependencies = { runner, platform: 'linux' as const, isRoot: true, executablePath: executable, paths }
   const installArgs = [
     '--local', '--release', item.archive, '--checksum', item.checksum,
-    '--version', 'release-1', '--config', item.config,
+    '--version', RELEASE_SHA, '--config', item.config,
   ]
   await runVpsCommand('install', installArgs, dependencies)
   await runVpsCommand('install', installArgs, dependencies)
   await runVpsCommand('update', [
-    '--local', '--release', item.archive, '--checksum', item.checksum, '--version', 'release-1',
+    '--local', '--release', item.archive, '--checksum', item.checksum, '--version', RELEASE_SHA,
   ], dependencies)
-  await runVpsCommand('rollback', ['--local', '--version', 'release-1'], dependencies)
+  await runVpsCommand('rollback', ['--local', '--version', RELEASE_SHA], dependencies)
   await runVpsCommand('restart', ['--local'], dependencies)
   expect(await runVpsCommand('uninstall', ['--local', '--preserve-data'], dependencies)).toMatchObject({
     ok: true,
@@ -244,7 +246,49 @@ test('invalid local/remote inputs fail before any command execution', async () =
     .rejects.toBeInstanceOf(VpsUsageError)
   await expect(runVpsCommand('uninstall', ['--local', '--preserve-data', '--purge-data'], { runner }))
     .rejects.toBeInstanceOf(VpsUsageError)
+  for (const [flag, value] of [
+    ['--host', 'example.com'],
+    ['--user', 'ubuntu'],
+    ['--port', '2222'],
+    ['--identity', '/tmp/id'],
+    ['--known-hosts', '/tmp/known'],
+    ['--host-key-policy', 'accept-new'],
+  ]) {
+    await expect(runVpsCommand('status', ['--local', flag!, value!], {
+      runner,
+      platform: 'linux',
+      isRoot: true,
+    })).rejects.toThrow('--local cannot be combined with SSH options')
+  }
   expect(runner.calls).toHaveLength(0)
+})
+
+test('install rejects a dataDir outside the configured systemd state root', async () => {
+  const item = await fixture(join(tmpdir(), 'outside-kriyan-state'))
+  const runner = new FakeRunner()
+  const release = join(item.root, 'release', 'bin')
+  await mkdir(release, { recursive: true })
+  const executable = join(release, 'kriyan')
+  await writeFile(executable, '')
+  await chmod(executable, 0o755)
+
+  await expect(runVpsCommand('install', [
+    '--local', '--release', item.archive, '--checksum', item.checksum,
+    '--version', RELEASE_SHA, '--config', item.config,
+  ], {
+    runner,
+    platform: 'linux',
+    isRoot: true,
+    executablePath: executable,
+    paths: {
+      optRoot: join(item.root, 'opt'),
+      configPath: join(item.root, 'etc', 'node.json'),
+      stateRoot: join(item.root, 'state'),
+      systemdUnit: join(item.root, 'systemd', 'kriyan-node.service'),
+      commandPath: join(item.root, 'bin', 'kriyan'),
+    },
+  })).rejects.toThrow('installed config dataDir must be within')
+  expect(runner.calls.some((call) => call.args[0]?.endsWith('/install.sh'))).toBe(false)
 })
 
 test('node config rejects provider tokens, deploy keys, and every unknown field', () => {

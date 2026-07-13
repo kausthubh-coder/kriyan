@@ -81,6 +81,8 @@ describe('exit contract and parse-before-I/O', () => {
     expect(output.stdout[0]).toContain('vps uninstall')
     expect(output.stdout[0]).toContain('setup --convex-url')
     expect(output.stdout[0]).toContain('source register')
+    expect(output.stdout[0]).toContain('Help is plaintext')
+    expect(output.stdout[0]).toContain('Every operational command emits one newline-delimited JSON object')
   })
 
   test('missing config is a stable config exit 2', async () => {

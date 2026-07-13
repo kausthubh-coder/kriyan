@@ -90,26 +90,31 @@ test('systemd service is unprivileged, hardened, and drains on SIGTERM', async (
   expect(unit).toContain('ExecStart=/opt/kriyan/current/bin/kriyan-node')
 })
 
-test('install and update paths are interruption-safe and rollback-capable', async () => {
+test('packaging scripts wire provenance and health transaction primitives', async () => {
   const install = await readFile('packaging/scripts/install.sh', 'utf8')
   const update = await readFile('packaging/scripts/update.sh', 'utf8')
+  const lifecycle = await readFile('packaging/scripts/lifecycle-lib.sh', 'utf8')
   const health = await readFile('packaging/scripts/wait-for-health.sh', 'utf8')
   expect(install).toContain('.partial.$$')
   expect(install).toContain("trap 'rm -rf")
   expect(install).toContain('release identifier already exists with different provenance')
   expect(install).toContain('release ${version} already verified; current pointer refreshed')
-  expect(install).toContain('validate_provenance_manifest')
-  expect(install).toContain('verify-release-archive.sh')
+  expect(install).toContain('verify-release-archive.sh" "${archive}" "${version}"')
+  expect(install).toContain('activate_release_state')
   expect(install).not.toContain('rm -rf "${release_dir}"')
   expect(update).toContain('previous=$(readlink -f')
-  expect(update).toContain('wait-for-health.sh')
-  expect(update).toContain('--process-health-config')
+  expect(update).toContain('snapshot_release_state')
+  expect(update).toContain('restore_release_state')
+  expect(lifecycle).toContain('validate_provenance_manifest')
+  expect(lifecycle).toContain('kriyan-node.service')
+  expect(lifecycle).toContain('daemon-reload')
+  expect(lifecycle).toContain('wait_for_release_health')
   expect(health).toContain('--health-config')
   expect(health).toContain('--expected-release')
   expect(health).toContain('--not-instance')
   expect(health).toContain('--heartbeat-after')
   expect(health).toContain('--stability-ms')
-  expect(update).toContain('previous release restored')
+  expect(update).toContain('complete previous release state restored and healthy')
 })
 
 test('release construction binds provenance, rescans ELFs, and emits canonical deterministic archives', async () => {
@@ -139,6 +144,9 @@ test('release construction binds provenance, rescans ELFs, and emits canonical d
       ]).exitCode).toBe(0)
     }
     expect(await readFile(first)).toEqual(await readFile(second))
+    expect(Bun.spawnSync([
+      'bash', 'packaging/scripts/verify-release-archive.sh', first, '0'.repeat(40), tree,
+    ]).exitCode).not.toBe(0)
 
     for (const [name, overrides] of [
       ['wrong-commit', { source_commit: '0'.repeat(40) }],

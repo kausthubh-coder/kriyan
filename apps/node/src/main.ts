@@ -16,6 +16,7 @@ import {
   type ProcessHealthExpectation,
   type ProcessHealthRecord,
 } from './process-health'
+import { resolveReleaseIdentity } from './release-identity'
 import { KriyanWorker } from './worker'
 
 export interface ManagedWorker {
@@ -47,12 +48,13 @@ export async function runNode(configPath: string): Promise<void> {
       ? new FakeAgentRuntime()
       : new PiAgentRuntime(new LocalPiSessionFactory())
   const startedAt = Date.now()
+  const releaseId = await resolveReleaseIdentity()
   const health: ProcessHealthRecord = {
     schemaVersion: 1,
     installationId: config.installationId,
     nodeId: config.nodeId,
     processInstanceId: randomUUID(),
-    releaseId: process.env.KRIYAN_RELEASE_VERSION ?? 'development',
+    releaseId,
     pid: process.pid,
     startedAt,
     heartbeatAt: startedAt,

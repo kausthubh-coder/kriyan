@@ -60,5 +60,18 @@ switch_current_release() {
   fi
   rm -f "${temporary}"
   ln -s "${target}" "${temporary}"
-  mv -f "${temporary}" "${current}"
+  if mv --help >/dev/null 2>&1; then
+    # GNU mv: -T is required so an existing symlink-to-directory is replaced,
+    # rather than treated as a destination directory.
+    if ! mv -Tf "${temporary}" "${current}"; then
+      rm -f "${temporary}"
+      return 1
+    fi
+  else
+    # BSD mv uses -h for the same no-dereference destination behavior.
+    if ! mv -fh "${temporary}" "${current}"; then
+      rm -f "${temporary}"
+      return 1
+    fi
+  fi
 }

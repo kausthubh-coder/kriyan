@@ -9,9 +9,9 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
-import { loadConfig } from '../../node/src/config'
+import { loadConfig, type NodeConfig } from '../../node/src/config'
 import { readProcessHealth } from '../../node/src/process-health'
 
 import { withTrustedReleaseVerifier } from './release-verifier'
@@ -111,7 +111,7 @@ const ACTION_OPTIONS: Record<VpsAction, ReadonlySet<string>> = {
 }
 
 const BOOLEAN_OPTIONS = new Set(['--local', '--preserve-data', '--purge-data'])
-const RELEASE_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
+const RELEASE_VERSION = /^[0-9a-f]{40}$/
 const SHA256 = /^[0-9a-f]{64}$/
 const SSH_HOST = /^[A-Za-z0-9][A-Za-z0-9.:-]{0,252}$/
 const SSH_USER = /^[a-z_][a-z0-9_-]{0,31}$/i
@@ -165,8 +165,8 @@ function required(options: ParsedOptions, name: string): string {
 
 function releaseVersion(options: ParsedOptions): string {
   const version = required(options, '--version')
-  if (!RELEASE_VERSION.test(version) || version === '.' || version === '..') {
-    throw new VpsUsageError('--version must be a safe immutable release identifier')
+  if (!RELEASE_VERSION.test(version)) {
+    throw new VpsUsageError('--version must be the exact 40-character source commit')
   }
   return version
 }
@@ -255,12 +255,18 @@ async function verifyRelease(
   runner: CommandRunner,
   archive: string,
   checksumPath: string,
+  expectedCommit: string,
 ): Promise<string> {
   const expected = await expectedChecksum(checksumPath, archive)
   const actual = await sha256(archive)
   if (actual !== expected) throw new VpsUsageError('release archive checksum does not match')
   await withTrustedReleaseVerifier(runner, async (verifier) => {
-    await checked(runner, 'bash', [verifier, archive], 'release provenance verification')
+    await checked(
+      runner,
+      'bash',
+      [verifier, archive, expectedCommit],
+      'release provenance verification',
+    )
   })
   return actual
 }
@@ -339,9 +345,19 @@ async function ensureLocalHost(dependencies: VpsDependencies): Promise<void> {
 }
 
 async function installConfig(runner: CommandRunner, source: string, paths: VpsPaths): Promise<void> {
-  await loadConfig(source)
+  await loadInstalledConfig(source, paths.stateRoot)
   await checked(runner, 'install', ['-d', '-o', 'root', '-g', 'kriyan', '-m', '0750', dirname(paths.configPath)], 'config directory creation')
   await checked(runner, 'install', ['-o', 'root', '-g', 'kriyan', '-m', '0640', source, paths.configPath], 'config installation')
+}
+
+async function loadInstalledConfig(path: string, stateRoot: string): Promise<NodeConfig> {
+  const config = await loadConfig(path)
+  const root = resolve(stateRoot)
+  const child = relative(root, config.dataDir)
+  if (child === '..' || child.startsWith(`..${sep}`) || isAbsolute(child)) {
+    throw new VpsUsageError(`installed config dataDir must be within ${root}`)
+  }
+  return config
 }
 
 async function installCommandLink(runner: CommandRunner, paths: VpsPaths): Promise<void> {
@@ -366,13 +382,13 @@ async function localReleaseAction(
   const archive = resolve(required(options, '--release'))
   const checksumPath = resolve(required(options, '--checksum'))
   const version = releaseVersion(options)
-  const hash = await verifyRelease(runner, archive, checksumPath)
+  const hash = await verifyRelease(runner, archive, checksumPath, version)
   const executablePath = dependencies.executablePath ?? process.execPath
   const root = executableReleaseRoot(await realpath(executablePath))
   const script = join(root, 'packaging', 'scripts', action === 'install' ? 'install.sh' : 'update.sh')
   const sourceConfig = action === 'install' ? resolve(required(options, '--config')) : undefined
-  if (sourceConfig === undefined) await loadConfig(paths.configPath)
-  else await loadConfig(sourceConfig)
+  if (sourceConfig === undefined) await loadInstalledConfig(paths.configPath, paths.stateRoot)
+  else await loadInstalledConfig(sourceConfig, paths.stateRoot)
   await checked(
     runner,
     'bash',
@@ -468,8 +484,10 @@ async function remoteArtifactAction(
   const archive = resolve(required(options, '--release'))
   const checksumPath = resolve(required(options, '--checksum'))
   const version = releaseVersion(options)
-  const hash = await verifyRelease(runner, archive, checksumPath)
-  if (action === 'install') await loadConfig(resolve(required(options, '--config')))
+  const hash = await verifyRelease(runner, archive, checksumPath, version)
+  if (action === 'install') {
+    await loadInstalledConfig(resolve(required(options, '--config')), DEFAULT_PATHS.stateRoot)
+  }
   const randomId = (dependencies.randomId ?? randomUUID)()
   if (!/^[A-Za-z0-9-]+$/.test(randomId)) throw new VpsRuntimeError('temporary transfer identifier is invalid')
   const remoteRoot = `/tmp/kriyan-transfer-${randomId}`
@@ -583,7 +601,10 @@ export async function runVpsCommand(
   const runner = dependencies.runner ?? defaultRunner
   const paths = { ...DEFAULT_PATHS, ...dependencies.paths }
   if (options.flags.has('--local')) {
-    if (options.values.has('--host') || options.values.has('--user') || options.values.has('--known-hosts')) {
+    const sshOnlyOptions = [
+      '--host', '--user', '--port', '--identity', '--known-hosts', '--host-key-policy',
+    ]
+    if (sshOnlyOptions.some((option) => options.values.has(option))) {
       throw new VpsUsageError('--local cannot be combined with SSH options')
     }
     if (typedAction === 'install' || typedAction === 'update') {

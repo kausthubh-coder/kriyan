@@ -171,10 +171,10 @@ function json(io: CliIo, value: unknown): void {
 const HELP = `kriyan <command>
 
 Commands:
-  vps install --host HOST --user USER --known-hosts PATH --release ARCHIVE --checksum SHA256_FILE --version ID --config PATH [SSH OPTIONS]
+  vps install --host HOST --user USER --known-hosts PATH --release ARCHIVE --checksum SHA256_FILE --version SOURCE_COMMIT --config PATH [SSH OPTIONS]
   vps status|doctor|restart [--host HOST --user USER --known-hosts PATH] [SSH OPTIONS]
-  vps update --host HOST --user USER --known-hosts PATH --release ARCHIVE --checksum SHA256_FILE --version ID [SSH OPTIONS]
-  vps rollback --host HOST --user USER --known-hosts PATH --version ID [SSH OPTIONS]
+  vps update --host HOST --user USER --known-hosts PATH --release ARCHIVE --checksum SHA256_FILE --version SOURCE_COMMIT [SSH OPTIONS]
+  vps rollback --host HOST --user USER --known-hosts PATH --version SOURCE_COMMIT [SSH OPTIONS]
   vps uninstall --host HOST --user USER --known-hosts PATH (--preserve-data|--purge-data) [SSH OPTIONS]
   vps <command> --local ...  (Linux root node setup and maintenance)
   setup --convex-url URL --installation-id ID --node-id ID --data-dir PATH [--timezone IANA] [--locale BCP47] [--config PATH]
@@ -188,7 +188,8 @@ Commands:
   search --vault PATH --query TEXT [--mode lexical|hybrid] [--limit N] [--ollama-url URL] [--embedding-model MODEL]
   index rebuild --vault PATH [--ollama-url URL] [--embedding-model MODEL]
 
-Output is newline-delimited JSON. Usage/config errors exit 2; runtime/health errors exit 1.`
+Help is plaintext. Every operational command emits one newline-delimited JSON object.
+Usage/config errors exit 2; runtime/health errors exit 1.`
 
 function sourceKind(value: string): SourceKind {
   if (!['git', 'github', 'drive', 'local', 'web'].includes(value)) {
