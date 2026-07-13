@@ -130,3 +130,62 @@ Verified Computer Use results against `apps/desktop/src-tauri/target/debug/bundl
 - No real provider/model session was started and no external account was changed.
 - No Linux binary, installer, deployment, VPS, systemd host, release, signing/notarization, or distribution claim is made by this product-integration checkpoint.
 - No deploy, push, remote mutation, auth change, billing change, or external-account action is part of this contract.
+
+## Live integration writer runbook
+
+The live run uses the isolated project `kriyan-live-20260713`, dev deployment `bold-cat-986`, production deployment `robust-clownfish-387`, replacement host `kriyan-live-node`, and Vercel project `kriyan-docs`. Never put private URLs, the UUID installation, host addresses, keys, or provider sessions in tracked evidence.
+
+Preflight the single private environment before every live command:
+
+```sh
+test "$(stat -f '%Lp' .env.integration.local)" = 600
+git check-ignore .env.integration.local
+set -a
+source .env.integration.local
+set +a
+test "$KRIYAN_RELEASE_ID" = "$(git rev-parse HEAD)"
+test -z "$(git status --porcelain)"
+```
+
+Dev Convex validation and idempotent fixture cleanup:
+
+```sh
+set -a
+source .env.integration.local
+set +a
+bunx convex dev --once --env-file "$KRIYAN_ENV_FILE" --typecheck enable --tail-logs disable
+bunx convex codegen --typecheck enable
+bun run typecheck:convex
+bun run check:convex-metadata
+bun run test:node:live
+```
+
+`test:node:live` refuses a dirty checkout, release-SHA mismatch, non-UUID installation, or missing deployment name/URL/env file/node ID. Its sanitized output correlates command, job, run, ordered event sequences, server timestamps, reminder, node heartbeat, and release SHA. Cleanup is guarded by the exact selected deployment plus installation fingerprint and must delete zero rows on its second pass.
+
+Production deployment is explicit and happens only from the frozen integration SHA:
+
+```sh
+bunx convex deploy --env-file "$KRIYAN_ENV_FILE" --typecheck enable --message "Kriyan live integration $KRIYAN_RELEASE_ID"
+```
+
+Build and verify the exact standalone release before touching the host:
+
+```sh
+bun run build:standalone
+file dist/kriyan-node-linux-x64 dist/kriyan-linux-x64 dist/kriyan-darwin-arm64
+packaging/scripts/verify-operator-build.sh dist/kriyan-darwin-arm64 "$KRIYAN_RELEASE_ID"
+```
+
+Follow `packaging/README.md` for archive construction and `kriyan vps install|status|doctor|restart|update|rollback`. The Ubuntu host must prove `command -v bun` fails before install, the release/archive hashes match locally and remotely, the service is enabled and active, the process-health release equals the Git SHA, and Convex shows a fresh heartbeat for the same node. Repeat install, restart, update, rollback, and host reboot must all preserve health.
+
+Build the fresh live Tauri handoff without committing private values:
+
+```sh
+NEXT_PUBLIC_CONVEX_URL="$KRIYAN_PROD_CONVEX_URL" \
+NEXT_PUBLIC_KRIYAN_INSTALLATION_ID="$KRIYAN_INSTALLATION_ID" \
+NEXT_PUBLIC_KRIYAN_DISPLAY_NAME="Kriyan live" \
+bun run --cwd web build:desktop
+bun run --cwd apps/desktop build:debug
+```
+
+The writer may prove terminal and service behavior but does not self-accept desktop UX. A fresh Computer Use tester must launch that exact bundle with a dedicated profile and prove the desktop → production Convex → VPS → completed run/reminder → desktop loop, then service restart and host reboot recovery. Android device and iOS runtime coverage remain separate boundaries.

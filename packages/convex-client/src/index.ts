@@ -30,6 +30,8 @@ export interface Job {
   leaseOwnerNodeId?: string
   leaseExpiresAt?: number
   revision: number
+  createdAt?: number
+  updatedAt?: number
 }
 
 export interface Run {
@@ -54,6 +56,8 @@ export interface NodeRecord extends NodeRegistration {
   status: 'online' | 'offline' | 'revoked'
   lastHeartbeatAt: number
   revision: number
+  createdAt?: number
+  updatedAt?: number
 }
 
 export const NODE_HEARTBEAT_TIMEOUT_MS = 60_000
@@ -92,6 +96,9 @@ export interface RunEventInput {
   sequence: number
   type: 'status' | 'message' | 'tool' | 'error'
   data: string
+  installationId?: string
+  runId?: string
+  createdAt?: number
 }
 
 export type Transition =
@@ -127,7 +134,16 @@ export interface ControlPlane {
     retryable: boolean,
   ): Promise<Transition>
   command(installationId: string, commandId: string): Promise<
-    | { input: string; status: 'accepted' | 'completed' | 'failed' | 'cancelled' }
+    | {
+        installationId?: string
+        commandId?: string
+        idempotencyKey?: string
+        input: string
+        status: 'accepted' | 'completed' | 'failed' | 'cancelled'
+        revision?: number
+        createdAt?: number
+        updatedAt?: number
+      }
     | null
   >
   createReminder(input: {
@@ -151,7 +167,12 @@ export interface ControlPlane {
     maxAttempts: number
   }): Promise<{ created: boolean; job: Job }>
   nodes(installationId: string): Promise<NodeRecord[]>
-  reminders(installationId: string): Promise<Array<{ reminderId: string; message: string }>>
+  reminders(installationId: string): Promise<Array<{
+    reminderId: string
+    message: string
+    createdAt?: number
+    updatedAt?: number
+  }>>
   runEvents(installationId: string, runId: string): Promise<RunEventInput[]>
   close(): Promise<void>
 }

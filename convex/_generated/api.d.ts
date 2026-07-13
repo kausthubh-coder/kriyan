@@ -8,12 +8,12 @@
  * @module
  */
 
-import type * as commands from "../commands.js";
 import type * as calendar from "../calendar.js";
+import type * as commands from "../commands.js";
 import type * as dev from "../dev.js";
 import type * as installations from "../installations.js";
-import type * as lib from "../lib.js";
 import type * as knowledge from "../knowledge.js";
+import type * as lib from "../lib.js";
 import type * as notes from "../notes.js";
 import type * as notifications from "../notifications.js";
 import type * as projections from "../projections.js";
@@ -28,12 +28,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  commands: typeof commands;
   calendar: typeof calendar;
+  commands: typeof commands;
   dev: typeof dev;
   installations: typeof installations;
-  lib: typeof lib;
   knowledge: typeof knowledge;
+  lib: typeof lib;
   notes: typeof notes;
   notifications: typeof notifications;
   projections: typeof projections;

@@ -6,18 +6,58 @@ import type { NodeConfig } from '../src/config'
 import { loadConfig } from '../src/config'
 import { KriyanWorker } from '../src/worker'
 
-const convexUrl = Bun.env.CONVEX_URL
-if (convexUrl === undefined) throw new Error('CONVEX_URL is required')
+function requiredEnvironment(name: string): string {
+  const value = Bun.env[name]?.trim()
+  if (value === undefined || value.length === 0) throw new Error(`${name} is required`)
+  return value
+}
 
-const fixture = `qualified-sandpiper-726-node-r3-${crypto.randomUUID()}`
-const installationId = `installation:${fixture}`
+function requireUuid(value: string, name: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    throw new Error(`${name} must be a UUID`)
+  }
+  return value
+}
+
+function requireSourceCommit(value: string): string {
+  if (!/^[0-9a-f]{40}$/.test(value)) throw new Error('KRIYAN_RELEASE_ID must be a full Git SHA')
+  return value
+}
+
+function fingerprint(value: string): string {
+  return new Bun.CryptoHasher('sha256').update(value).digest('hex').slice(0, 16)
+}
+
+function exactRepositoryCommit(): string {
+  const status = Bun.spawnSync(['git', 'status', '--porcelain'])
+  if (status.exitCode !== 0) throw new Error('could not inspect the live fixture checkout')
+  if (status.stdout.toString().trim().length > 0) {
+    throw new Error('live fixture requires a clean Git checkout')
+  }
+  const revision = Bun.spawnSync(['git', 'rev-parse', 'HEAD'])
+  if (revision.exitCode !== 0) throw new Error('could not resolve the live fixture revision')
+  return requireSourceCommit(revision.stdout.toString().trim())
+}
+
+const convexUrl = requiredEnvironment('CONVEX_URL')
+const deploymentName = requiredEnvironment('KRIYAN_DEPLOYMENT_NAME')
+const envFile = requiredEnvironment('KRIYAN_ENV_FILE')
+const installationId = requireUuid(
+  requiredEnvironment('KRIYAN_INSTALLATION_ID'),
+  'KRIYAN_INSTALLATION_ID',
+)
+const nodeId = requiredEnvironment('KRIYAN_NODE_ID')
+const releaseId = requireSourceCommit(requiredEnvironment('KRIYAN_RELEASE_ID'))
+const repositoryCommit = exactRepositoryCommit()
+if (releaseId !== repositoryCommit) {
+  throw new Error('KRIYAN_RELEASE_ID does not match the clean checkout')
+}
+
+const fixture = `live-${crypto.randomUUID()}`
 let commandId = `command:${fixture}`
-const nodeId = `node:${fixture}`
 let runId = `run:job:${commandId}:1`
 const dataDir = `/tmp/kriyan-${fixture}`
 const configPath = `${dataDir}/node.json`
-const deploymentName = 'qualified-sandpiper-726'
-const envFile = Bun.env.KRIYAN_ENV_FILE ?? '.env.local'
 const plane = new ConvexControlPlane(convexUrl)
 
 async function cleanup(): Promise<number> {
@@ -82,25 +122,63 @@ try {
   const command = await plane.command(installationId, commandId)
   const reminders = await plane.reminders(installationId)
   const events = await plane.runEvents(installationId, runId)
+  const node = (await plane.nodes(installationId)).find((candidate) => candidate.nodeId === nodeId)
   if (command?.status !== 'completed') throw new Error(`unexpected command status: ${command?.status}`)
   if (reminders.length !== 1) throw new Error(`expected one reminder, received ${reminders.length}`)
+  if (node === undefined || node.status !== 'online') throw new Error('live node heartbeat was not observable')
   if (events.some((event, index) => event.sequence !== index + 1)) {
     throw new Error('live events were not ordered')
   }
+  if (
+    typeof command.createdAt !== 'number' ||
+    typeof command.updatedAt !== 'number' ||
+    typeof node.lastHeartbeatAt !== 'number' ||
+    events.some((event) => typeof event.createdAt !== 'number') ||
+    reminders.some((reminder) => typeof reminder.createdAt !== 'number')
+  ) {
+    throw new Error('live evidence is missing server timestamps')
+  }
   console.log(
     JSON.stringify({
+      evidenceVersion: 1,
       ok: true,
-      fixture,
-      installationId,
-      jobId: submission.jobId,
-      commandStatus: command.status,
-      reminderCount: reminders.length,
-      eventCount: events.length,
+      deploymentName,
+      installationFingerprint: fingerprint(installationId),
+      releaseId,
+      command: {
+        commandId,
+        jobId: submission.jobId,
+        runId,
+        status: command.status,
+        createdAt: command.createdAt,
+        updatedAt: command.updatedAt,
+      },
+      events: events.map((event) => ({
+        sequence: event.sequence,
+        type: event.type,
+        createdAt: event.createdAt,
+      })),
+      reminder: {
+        reminderId: reminders[0]!.reminderId,
+        createdAt: reminders[0]!.createdAt,
+      },
+      node: {
+        nodeFingerprint: fingerprint(nodeId),
+        status: node.status,
+        heartbeatAt: node.lastHeartbeatAt,
+      },
     }),
   )
 } finally {
   await plane.close()
   const deleted = await cleanup()
+  const deletedSecondPass = await cleanup()
+  if (deletedSecondPass !== 0) throw new Error('fixture cleanup was not idempotent')
   await Bun.$`rm -rf ${dataDir}`.quiet()
-  console.log(JSON.stringify({ cleanup: true, installationId, deleted }))
+  console.log(JSON.stringify({
+    cleanup: true,
+    installationFingerprint: fingerprint(installationId),
+    deleted,
+    deletedSecondPass,
+  }))
 }
