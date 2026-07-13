@@ -1,0 +1,32 @@
+{
+  "name": "@kriyan/docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3020",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "check:css": "bun scripts/check-css-regressions.ts",
+    "check:routes": "bun scripts/check-routes.ts",
+    "verify": "bun run check:css && bun run lint && bun run typecheck && bun run build && bun run check:routes"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "5.2.9",
+    "@fontsource-variable/hanken-grotesk": "5.2.8",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.10",
+    "typescript": "5.9.3"
+  }
+}
