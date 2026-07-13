@@ -1,4 +1,5 @@
-import type { CommandItem, JobItem, NodeItem, RunItem, TodaySnapshot } from './types'
+import { HEARTBEAT_FRESHNESS_MS } from './clock'
+import type { CommandItem, JobItem, NodeItem, RunItem, TodaySnapshot, TransitionReason } from './types'
 
 export type HonestRunState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 
@@ -10,10 +11,8 @@ export interface ActivityItem {
   isFake: boolean
 }
 
-const ACTIVE_HEARTBEAT_WINDOW_MS = 60_000
-
 export function isNodeAvailable(node: NodeItem, now = Date.now()): boolean {
-  return node.status === 'online' && now - node.lastHeartbeatAt <= ACTIVE_HEARTBEAT_WINDOW_MS
+  return node.status === 'online' && now - node.lastHeartbeatAt <= HEARTBEAT_FRESHNESS_MS
 }
 
 export function deriveActivity(snapshot: TodaySnapshot): ActivityItem[] {
@@ -41,11 +40,21 @@ export function deriveActivity(snapshot: TodaySnapshot): ActivityItem[] {
     .sort((a, b) => b.command.createdAt - a.command.createdAt)
 }
 
-export function conflictMessage(reason: string): string {
+export function conflictMessage(reason: TransitionReason): string {
   if (reason === 'stale_revision') return 'This changed somewhere else. Your edit was rolled back to the latest version.'
   if (reason === 'not_found') return 'This item no longer exists. The list has been refreshed.'
   if (reason === 'invalid_state') return 'That action is no longer available for this item.'
-  return 'The change could not be saved. Your previous value has been restored.'
+  if (reason === 'attempts_exhausted') return 'Retry is unavailable because this job used all of its attempts.'
+  if (reason === 'already_terminal') return 'This command already finished and can no longer be changed.'
+  return 'Kriyan could not reach the installation. Your previous value has been restored.'
+}
+
+export function retryEligibility(item: ActivityItem): { eligible: boolean; reason: string } {
+  if (item.state !== 'failed' || !item.job) return { eligible: false, reason: 'Only failed jobs can be retried.' }
+  if (item.job.attempt >= item.job.maxAttempts) {
+    return { eligible: false, reason: `All ${item.job.maxAttempts} attempts have been used.` }
+  }
+  return { eligible: true, reason: `${item.job.maxAttempts - item.job.attempt} attempts remaining.` }
 }
 
 export function formatRelativeTime(timestamp: number, now = Date.now()): string {

@@ -15,7 +15,7 @@ bun run test
 bun --bun run build
 ```
 
-The default development target is `qualified-sandpiper-726` with the isolated installation `installation:oracle-reactive-web-20260712`. Override either value when testing with a paired node:
+The client fails closed unless both deployment and installation are explicitly configured. For a namespaced development smoke, use an installation created by the local setup flow:
 
 ```bash
 NEXT_PUBLIC_CONVEX_URL=https://<deployment>.convex.cloud \
@@ -23,13 +23,17 @@ NEXT_PUBLIC_KRIYAN_INSTALLATION_ID=installation:<shared-id> \
 bun run dev
 ```
 
-These values identify a development deployment and installation; they are not credentials. The browser never claims jobs or executes a runner. A command remains visibly queued while no node is online.
+These values identify a development deployment and one owner-controlled installation; they are not credentials. Do not put one shared development installation ID into a public deployment. The browser does not create installations, claim jobs, or execute a runner. A command remains visibly queued while no node is online.
 
 ## Client architecture
 
-Framework-neutral repository contracts, optimistic overlay/reconciliation helpers, and Today view models live under `src/client-core`. They remain inside `web` for this round because the parallel node lane owns root workspaces, `package.json`, `bun.lock`, and TypeScript registration. Integration can move the directory to `packages/client-core` once the root workspace owner registers it.
+Framework-neutral subscription descriptors, repository contracts, optimistic overlay/reconciliation helpers, connection state machine, clock boundaries, and Today view models live under `src/client-core`. The Convex repository adapter is the only module that owns generated query/mutation hooks. Components consume the repository interface and never own the generated API lifecycle.
 
-Convex subscriptions are composed in `components/today/today-app.tsx`. There is no polling and no legacy Convex API use. Revision-checked task/reminder mutations show optimistic state, then reconcile on a newer subscription revision or roll back with a conflict message.
+There is no polling and no legacy Convex API use. Revision-checked task/reminder mutations show one stable-ID optimistic row, then reconcile synchronously with a subscription or roll back with a typed conflict message. Entity/command locks prevent conflicting double submits.
+
+## Pagination boundary
+
+Tasks use the accepted status/due index and reminders use the accepted status/time index, so loaded pages have deterministic due/time order. Run events use the run/sequence index. The current Convex contract has no installation-wide `createdAt` index for commands and no targeted job-by-command read query. The adapter therefore sorts the loaded command window newest-first, loads commands/jobs/runs together, and visibly reports when more activity is available. It does not claim that the initial page is a globally newest page. A backend follow-up can add a created-time command index and targeted job read without changing the repository/UI contract.
 
 ## Browser-test handoff
 

@@ -3,6 +3,21 @@ export type TaskStatus = 'open' | 'completed' | 'cancelled'
 export type ReminderStatus = 'scheduled' | 'fired' | 'dismissed' | 'cancelled'
 export type JobStatus = 'queued' | 'leased' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
+export type TransitionReason =
+  | 'not_found'
+  | 'stale_revision'
+  | 'invalid_state'
+  | 'attempts_exhausted'
+  | 'already_terminal'
+  | 'transport_error'
+
+export interface InstallationItem {
+  installationId: string
+  timezone: string
+  protocolVersion: string
+  createdAt: number
+  updatedAt: number
+}
 
 export interface TaskItem {
   taskId: string
@@ -86,9 +101,16 @@ export interface TodaySnapshot {
   nodes: NodeItem[]
 }
 
-export interface TransitionFailure {
-  ok: false
-  reason: 'not_found' | 'stale_revision' | 'invalid_state' | string
+export interface PageState {
+  canLoadMore: boolean
+  loadingMore: boolean
+  loadedCount: number
 }
 
-export type TransitionResult = { ok: true; revision: number } | TransitionFailure
+export type TransitionResult =
+  | { ok: true; revision: number }
+  | { ok: false; reason: TransitionReason }
+
+export type ActionResult<T = void> =
+  | { ok: true; value: T }
+  | { ok: false; reason: TransitionReason; message: string }
