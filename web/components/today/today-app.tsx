@@ -1,29 +1,25 @@
 'use client'
 
-import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
-
-import { KRIYAN_CONFIG } from '@/lib/convex'
-import { useVisibilityClock } from '@/src/client-core/clock'
-import { useConvexRepository } from '@/src/client-core/convex-repository'
-import type { ClientRepository } from '@/src/client-core/repository'
-import type {
-  ActionResult,
-  ConnectionMode,
-  NodeItem,
-  PageState,
-  ReminderItem,
-  RunEventItem,
-  TaskItem,
-  TodaySnapshot,
-} from '@/src/client-core/types'
 import {
-  deriveActivity,
   formatRelativeTime,
   isNodeAvailable,
   retryEligibility,
+  type ActionResult,
   type ActivityItem,
-} from '@/src/client-core/view-model'
+  type ClientRepository,
+  type ConnectionMode,
+  type NodeItem,
+  type PageState,
+  type ReminderItem,
+  type RunEventItem,
+  type TaskItem,
+} from '@kriyan/client-core'
+import Link from 'next/link'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { KRIYAN_CONFIG, useRecreateConvexClient } from '@/lib/convex'
+import { useConvexRepository } from '@/src/client-core/convex-repository'
+import { useVisibilityClock } from '@/src/client-core/use-visibility-clock'
 
 import {
   ActivityIcon,
@@ -76,24 +72,17 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
   const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null)
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const configuration = KRIYAN_CONFIG!
-  const { repository, connectionMode } = useConvexRepository(configuration, selectedRunId)
+  const recreateConvexClient = useRecreateConvexClient()
+  const { repository, connectionMode, connectionRecoveryRequired } = useConvexRepository(configuration, selectedRunId)
   const heartbeatTimestamps = useMemo(
     () => repository.nodes.map((node) => node.lastHeartbeatAt),
     [repository.nodes],
   )
   const now = useVisibilityClock(heartbeatTimestamps)
 
-  const snapshot: TodaySnapshot = useMemo(() => ({
-    tasks: repository.tasks,
-    reminders: repository.reminders,
-    commands: repository.commands,
-    jobs: repository.jobs,
-    runs: repository.runs,
-    nodes: repository.nodes,
-  }), [repository.commands, repository.jobs, repository.nodes, repository.reminders, repository.runs, repository.tasks])
-  const activity = useMemo(() => deriveActivity(snapshot), [snapshot])
+  const activity = repository.activity
   const selectedActivity = activity.find((item) => item.command.commandId === selectedCommandId) ?? activity[0]
-  const liveNodes = now === null ? [] : snapshot.nodes.filter((node) => isNodeAvailable(node, now))
+  const liveNodes = now === null ? [] : repository.nodes.filter((node) => isNodeAvailable(node, now))
 
   useEffect(() => {
     const nextRunId = selectedActivity?.run?.runId ?? null
@@ -135,17 +124,23 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
         <nav className="primary-nav">
           {NAV_ITEMS.map((item) => <NavItem key={item.key} item={item} active={item.key === initialSection} />)}
         </nav>
-        <NodeSummary nodes={snapshot.nodes} liveNodes={liveNodes} now={now} />
+        <NodeSummary nodes={repository.nodes} liveNodes={liveNodes} now={now} />
       </aside>
 
       <header className="mobile-header">
         <Brand connectionMode={connectionMode} compact />
-        <NodeSummary nodes={snapshot.nodes} liveNodes={liveNodes} now={now} compact />
+        <NodeSummary nodes={repository.nodes} liveNodes={liveNodes} now={now} compact />
       </header>
 
       <main className="main-content" id="main-content">
         <PageHeader section={initialSection} now={now} />
-        {connectionMode !== 'online' && <ConnectionBanner mode={connectionMode} />}
+        {connectionMode !== 'online' && (
+          <ConnectionBanner
+            mode={connectionMode}
+            recoveryRequired={connectionRecoveryRequired}
+            onRecreate={recreateConvexClient}
+          />
+        )}
         {notice && <Notice notice={notice} onClose={() => setNotice(null)} />}
 
         {initialSection === 'today' && (
@@ -161,16 +156,12 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
               loading={repository.loading}
               tasks={repository.tasks}
               reminders={repository.reminders}
-              activity={activity}
-              activityPage={repository.pages.activity}
               now={now}
               pending={repository.pending}
-              onLoadMoreActivity={() => repository.loadMore('activity')}
               onToggleTask={async (task) => {
                 const result = await repository.setTaskStatus(task, task.status === 'completed' ? 'open' : 'completed')
                 setNotice(noticeFrom(result))
               }}
-              onSelectActivity={selectActivity}
             />
           </>
         )}
@@ -277,13 +268,15 @@ export function PageHeader({ section, now }: { section: Section; now: number | n
   return <header className="page-header"><p>{dateLabel}</p><h1>{copy[0]}</h1><span>{copy[1]}</span></header>
 }
 
-function ConnectionBanner({ mode }: { mode: ConnectionMode }) {
+function ConnectionBanner({ mode, recoveryRequired, onRecreate }: { mode: ConnectionMode; recoveryRequired: boolean; onRecreate: () => void }) {
   const copy = mode === 'offline'
     ? 'You are offline. Live changes are paused; unsent changes will show an error instead of pretending to save.'
-    : mode === 'reconnecting'
+    : recoveryRequired
+      ? 'Kriyan opened a new connection but could not confirm its subscriptions. Recreate this tab’s live connection to retry safely.'
+      : mode === 'reconnecting'
       ? 'Reconnecting to Kriyan. Existing data stays visible until Convex confirms the new transport.'
       : 'Connecting to your Kriyan installation…'
-  return <div className={`connection-banner ${mode}`} role="status" aria-live="polite"><span className="status-dot" />{copy}</div>
+  return <div className={`connection-banner ${mode}`} role="status" aria-live="polite"><span className="status-dot" /><span>{copy}</span>{recoveryRequired && <button className="quiet-button" onClick={onRecreate}>Recreate connection</button>}</div>
 }
 
 function Notice({ notice, onClose }: { notice: NoticeValue; onClose: () => void }) {
@@ -303,19 +296,20 @@ function CommandComposer({ value, onChange, onSubmit, busy, nodeOnline }: { valu
   )
 }
 
-function TodayOverview({ loading, tasks, reminders, activity, activityPage, now, pending, onLoadMoreActivity, onToggleTask, onSelectActivity }: { loading: boolean; tasks: TaskItem[]; reminders: ReminderItem[]; activity: ActivityItem[]; activityPage: PageState; now: number | null; pending: ReadonlySet<string>; onLoadMoreActivity: () => void; onToggleTask: (task: TaskItem) => Promise<void>; onSelectActivity: (item: ActivityItem) => void }) {
-  const openTasks = tasks.filter((task) => task.status === 'open').slice(0, 5)
-  const scheduled = reminders.filter((reminder) => reminder.status === 'scheduled').slice(0, 4)
+function TodayOverview({ loading, tasks, reminders, now, pending, onToggleTask }: { loading: boolean; tasks: TaskItem[]; reminders: ReminderItem[]; now: number | null; pending: ReadonlySet<string>; onToggleTask: (task: TaskItem) => Promise<void> }) {
+  const allOpenTasks = tasks.filter((task) => task.status === 'open')
+  const allScheduled = reminders.filter((reminder) => reminder.status === 'scheduled')
+  const openTasks = allOpenTasks.slice(0, 5)
+  const scheduled = allScheduled.slice(0, 4)
   return (
     <div className="today-grid">
-      <section className="content-section"><SectionHeading title="Next actions" href="/tasks" count={openTasks.length} />{loading ? <SkeletonList /> : openTasks.length === 0 ? <EmptyState icon={CheckIcon} title="Nothing is pressing" body="Add a task when you know the next concrete action." href="/tasks" action="Add a task" /> : <div className="ruled-list">{openTasks.map((task) => <TaskRow key={task.taskId} task={task} now={now} compact pending={pending.has(`task:${task.taskId}`)} onToggle={onToggleTask} />)}</div>}</section>
-      <section className="content-section"><SectionHeading title="Coming up" href="/reminders" count={scheduled.length} />{loading ? <SkeletonList rows={2} /> : scheduled.length === 0 ? <EmptyState icon={BellIcon} title="No reminders scheduled" body="Ask Kriyan or schedule one directly." href="/reminders" action="Schedule reminder" /> : <div className="ruled-list">{scheduled.map((reminder) => <ReminderRow key={reminder.reminderId} reminder={reminder} now={now} compact />)}</div>}</section>
-      <section className="content-section mobile-activity"><SectionHeading title="Live activity" count={activity.length} />{activity.length === 0 ? <EmptyState icon={ActivityIcon} title="No activity yet" body="Queued commands and node runs will appear here." /> : <div className="ruled-list">{activity.map((item) => <ActivityRow key={item.command.commandId} item={item} now={now} onClick={() => onSelectActivity(item)} />)}</div>}<LoadMore page={activityPage} onLoadMore={onLoadMoreActivity} label="Load older activity" /></section>
+      <section className="content-section"><SectionHeading title="Next actions" href="/tasks" count={`${openTasks.length} shown · ${allOpenTasks.length} loaded`} />{loading ? <SkeletonList /> : openTasks.length === 0 ? <EmptyState icon={CheckIcon} title="Nothing is pressing" body="Add a task when you know the next concrete action." href="/tasks" action="Add a task" /> : <div className="ruled-list">{openTasks.map((task) => <TaskRow key={task.taskId} task={task} now={now} compact pending={pending.has(`task:${task.taskId}`)} onToggle={onToggleTask} />)}</div>}</section>
+      <section className="content-section"><SectionHeading title="Coming up" href="/reminders" count={`${scheduled.length} shown · ${allScheduled.length} loaded`} />{loading ? <SkeletonList rows={2} /> : scheduled.length === 0 ? <EmptyState icon={BellIcon} title="No reminders scheduled" body="Ask Kriyan or schedule one directly." href="/reminders" action="Schedule reminder" /> : <div className="ruled-list">{scheduled.map((reminder) => <ReminderRow key={reminder.reminderId} reminder={reminder} now={now} compact />)}</div>}</section>
     </div>
   )
 }
 
-function SectionHeading({ title, count, href }: { title: string; count: number; href?: string }) {
+export function SectionHeading({ title, count, href }: { title: string; count: number | string; href?: string }) {
   return <div className="section-heading"><h2>{title}</h2><div><span>{count}</span>{href && <Link href={href}>View all <ChevronIcon /></Link>}</div></div>
 }
 

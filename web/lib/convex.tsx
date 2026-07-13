@@ -1,7 +1,15 @@
 'use client'
 
 import { ConvexProvider, ConvexReactClient } from 'convex/react'
-import { useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 
 export interface KriyanWebConfiguration {
   convexUrl: string
@@ -22,14 +30,46 @@ export const KRIYAN_CONFIG = resolveKriyanConfiguration({
   NEXT_PUBLIC_KRIYAN_INSTALLATION_ID: process.env.NEXT_PUBLIC_KRIYAN_INSTALLATION_ID,
 })
 
+const RecreateConvexClientContext = createContext<(() => void) | null>(null)
+
+export function useRecreateConvexClient(): () => void {
+  const recreate = useContext(RecreateConvexClientContext)
+  if (recreate === null) throw new Error('Convex client controls require ConvexClientProvider')
+  return recreate
+}
+
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
   if (!KRIYAN_CONFIG) return <ConfigurationRequired />
   return <ConfiguredProvider configuration={KRIYAN_CONFIG}>{children}</ConfiguredProvider>
 }
 
 function ConfiguredProvider({ children, configuration }: { children: ReactNode; configuration: KriyanWebConfiguration }) {
-  const [client] = useState(() => new ConvexReactClient(configuration.convexUrl))
-  return <ConvexProvider client={client}>{children}</ConvexProvider>
+  const [clientState, setClientState] = useState(() => ({
+    client: new ConvexReactClient(configuration.convexUrl),
+    generation: 0,
+  }))
+  const activeClient = useRef(clientState.client)
+  const recreate = useCallback((): void => {
+    setClientState((current) => ({
+      client: new ConvexReactClient(configuration.convexUrl),
+      generation: current.generation + 1,
+    }))
+  }, [configuration.convexUrl])
+
+  useEffect(() => {
+    if (activeClient.current === clientState.client) return
+    const replacedClient = activeClient.current
+    activeClient.current = clientState.client
+    void replacedClient.close()
+  }, [clientState.client])
+
+  return (
+    <RecreateConvexClientContext.Provider value={recreate}>
+      <ConvexProvider key={clientState.generation} client={clientState.client}>
+        {children}
+      </ConvexProvider>
+    </RecreateConvexClientContext.Provider>
+  )
 }
 
 function ConfigurationRequired() {

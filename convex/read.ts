@@ -12,12 +12,94 @@ import {
   withoutSystemFields,
 } from './lib'
 import {
+  activityValue,
   jobStatus,
   jobValue,
   nodeValue,
   runEventValue,
   runValue,
 } from './validators'
+
+export const activity = query({
+  args: {
+    installationId: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: paginationResultValidator(activityValue),
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    assertPositiveInteger(
+      args.paginationOpts.numItems,
+      'paginationOpts.numItems',
+      MAX_PAGE_SIZE,
+    )
+    const commands = await ctx.db
+      .query('commands')
+      .withIndex('by_installation_created', (q) =>
+        q.eq('installationId', args.installationId),
+      )
+      .order('desc')
+      .paginate(args.paginationOpts)
+    const page = await Promise.all(commands.page.map(async (command) => {
+      const job = await ctx.db
+        .query('jobs')
+        .withIndex('by_installation_command', (q) =>
+          q
+            .eq('installationId', args.installationId)
+            .eq('commandId', command.commandId),
+        )
+        .unique()
+      const run = job === null || job.attempt === 0
+        ? null
+        : await ctx.db
+            .query('runs')
+            .withIndex('by_installation_job_attempt', (q) =>
+              q
+                .eq('installationId', args.installationId)
+                .eq('jobId', job.jobId)
+                .eq('attempt', job.attempt),
+            )
+            .unique()
+      return {
+        command: withoutSystemFields(command),
+        job: job === null ? undefined : withoutSystemFields(job),
+        run: run === null ? undefined : withoutSystemFields(run),
+      }
+    }))
+    return { ...commands, page }
+  },
+})
+
+export const connectionProbe = query({
+  args: {
+    installationId: v.string(),
+    connectionCount: v.number(),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({ connectionCount: v.number(), installationUpdatedAt: v.number() }),
+  ),
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    assertPositiveInteger(
+      args.connectionCount,
+      'connectionCount',
+      Number.MAX_SAFE_INTEGER,
+    )
+    const installation = await ctx.db
+      .query('installations')
+      .withIndex('by_installation_id', (q) =>
+        q.eq('installationId', args.installationId),
+      )
+      .unique()
+    return installation === null
+      ? null
+      : {
+          connectionCount: args.connectionCount,
+          installationUpdatedAt: installation.updatedAt,
+        }
+  },
+})
 
 export const nodes = query({
   args: {

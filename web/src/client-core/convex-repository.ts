@@ -1,5 +1,33 @@
 'use client'
 
+import {
+  beginPending,
+  conflictMessage,
+  createClientId,
+  deriveActivity,
+  deriveConnectionMode,
+  endPending,
+  INITIAL_CONNECTION_TRACKER,
+  mergeOptimistic,
+  needsConnectionRecreate,
+  normalizeTransitionReason,
+  PAGE_SIZE,
+  reconcileEntities,
+  reconcilePatches,
+  RECONNECT_CONFIRMATION_TIMEOUT_MS,
+  updateConnectionTracker,
+  type ActionResult,
+  type ActivityProjectionItem,
+  type ClientRepository,
+  type ConnectionMode,
+  type EntityPatch,
+  type PageState,
+  type ReminderItem,
+  type ReminderStatus,
+  type RunEventItem,
+  type TaskItem,
+  type TaskStatus,
+} from '@kriyan/client-core'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import {
   useConvexConnectionState,
@@ -11,33 +39,7 @@ import {
 import { api } from '@convex/_generated/api'
 import type { KriyanWebConfiguration } from '@/lib/convex'
 
-import {
-  deriveConnectionMode,
-  INITIAL_CONNECTION_TRACKER,
-  updateConnectionTracker,
-} from './connection'
-import {
-  mergeOptimistic,
-  normalizeTransitionReason,
-  reconcileEntities,
-  reconcilePatches,
-  type EntityPatch,
-} from './optimistic'
-import { createClientId, SUBSCRIPTIONS, type ClientRepository } from './repository'
-import type {
-  ActionResult,
-  CommandItem,
-  ConnectionMode,
-  JobItem,
-  PageState,
-  ReminderItem,
-  ReminderStatus,
-  RunEventItem,
-  RunItem,
-  TaskItem,
-  TaskStatus,
-} from './types'
-import { conflictMessage } from './view-model'
+import { observeConvexConnection } from './convex-connection-adapter'
 
 type PaginationStatus = 'LoadingFirstPage' | 'CanLoadMore' | 'LoadingMore' | 'Exhausted'
 
@@ -60,6 +62,7 @@ function failure(reason: unknown, error?: unknown): ActionResult<never> {
 export interface ConvexRepositoryResult {
   repository: ClientRepository
   connectionMode: ConnectionMode
+  connectionRecoveryRequired: boolean
 }
 
 export function useConvexRepository(
@@ -68,7 +71,15 @@ export function useConvexRepository(
 ): ConvexRepositoryResult {
   const { installationId } = configuration
   const connection = useConvexConnectionState()
-  const initialSocketConnected = useRef(connection.isWebSocketConnected)
+  const connectionObservation = useMemo(
+    () => observeConvexConnection({
+      connectionCount: connection.connectionCount,
+      hasEverConnected: connection.hasEverConnected,
+      isWebSocketConnected: connection.isWebSocketConnected,
+    }),
+    [connection.connectionCount, connection.hasEverConnected, connection.isWebSocketConnected],
+  )
+  const initialConnection = useRef(connectionObservation)
   const [connectionTracker, dispatchConnection] = useReducer(
     updateConnectionTracker,
     INITIAL_CONNECTION_TRACKER,
@@ -81,55 +92,51 @@ export function useConvexRepository(
   const pendingRef = useRef(new Set<string>())
 
   const installation = useQuery(api.installations.get, { installationId })
+  const connectionProbe = useQuery(
+    api.read.connectionProbe,
+    connection.isWebSocketConnected && connection.connectionCount > 0
+      ? { installationId, connectionCount: connection.connectionCount }
+      : 'skip',
+  )
   const openTasksPage = usePaginatedQuery(
     api.projections.listTasks,
     { installationId, status: 'open', includeDeleted: false },
-    { initialNumItems: SUBSCRIPTIONS.openTasks.pageSize },
+    { initialNumItems: PAGE_SIZE },
   )
   const completedTasksPage = usePaginatedQuery(
     api.projections.listTasks,
     { installationId, status: 'completed', includeDeleted: false },
-    { initialNumItems: SUBSCRIPTIONS.completedTasks.pageSize },
+    { initialNumItems: PAGE_SIZE },
   )
   const scheduledRemindersPage = usePaginatedQuery(
     api.projections.listReminders,
     { installationId, status: 'scheduled', includeDeleted: false },
-    { initialNumItems: SUBSCRIPTIONS.scheduledReminders.pageSize },
+    { initialNumItems: PAGE_SIZE },
   )
   const firedRemindersPage = usePaginatedQuery(
     api.projections.listReminders,
     { installationId, status: 'fired', includeDeleted: false },
-    { initialNumItems: SUBSCRIPTIONS.recentReminders.pageSize },
+    { initialNumItems: PAGE_SIZE },
   )
   const dismissedRemindersPage = usePaginatedQuery(
     api.projections.listReminders,
     { installationId, status: 'dismissed', includeDeleted: false },
-    { initialNumItems: SUBSCRIPTIONS.recentReminders.pageSize },
+    { initialNumItems: PAGE_SIZE },
   )
-  const commandsPage = usePaginatedQuery(
-    api.commands.list,
+  const activityPage = usePaginatedQuery(
+    api.read.activity,
     { installationId },
-    { initialNumItems: SUBSCRIPTIONS.commands.pageSize },
-  )
-  const jobsPage = usePaginatedQuery(
-    api.read.jobs,
-    { installationId },
-    { initialNumItems: SUBSCRIPTIONS.jobs.pageSize },
-  )
-  const runsPage = usePaginatedQuery(
-    api.read.runs,
-    { installationId },
-    { initialNumItems: SUBSCRIPTIONS.runs.pageSize },
+    { initialNumItems: PAGE_SIZE },
   )
   const nodesPage = usePaginatedQuery(
     api.read.nodes,
     { installationId },
-    { initialNumItems: SUBSCRIPTIONS.nodes.pageSize },
+    { initialNumItems: PAGE_SIZE },
   )
   const runEventsPage = usePaginatedQuery(
     api.read.runEvents,
     selectedRunId ? { installationId, runId: selectedRunId } : 'skip',
-    { initialNumItems: SUBSCRIPTIONS.runEvents.pageSize },
+    { initialNumItems: 50 },
   )
 
   const submitCommandMutation = useMutation(api.commands.submit)
@@ -148,10 +155,11 @@ export function useConvexRepository(
     dispatchConnection({
       type: 'mounted',
       browserOnline: navigator.onLine,
-      socketConnected: initialSocketConnected.current,
+      observation: initialConnection.current,
+      now: Date.now(),
     })
-    const online = (): void => dispatchConnection({ type: 'online' })
-    const offline = (): void => dispatchConnection({ type: 'offline' })
+    const online = (): void => dispatchConnection({ type: 'browser-online' })
+    const offline = (): void => dispatchConnection({ type: 'browser-offline', now: Date.now() })
     window.addEventListener('online', online)
     window.addEventListener('offline', offline)
     return () => {
@@ -161,8 +169,44 @@ export function useConvexRepository(
   }, [])
 
   useEffect(() => {
-    dispatchConnection({ type: 'socket', connected: connection.isWebSocketConnected })
-  }, [connection.isWebSocketConnected])
+    dispatchConnection({
+      type: 'observed',
+      observation: connectionObservation,
+      now: Date.now(),
+    })
+  }, [connectionObservation])
+
+  useEffect(() => {
+    if (connectionProbe?.connectionCount !== connection.connectionCount) return
+    dispatchConnection({
+      type: 'subscription-confirmed',
+      connectionCount: connectionProbe.connectionCount,
+    })
+  }, [connection.connectionCount, connectionProbe])
+
+  useEffect(() => {
+    if (
+      connectionTracker.recovery !== 'awaiting-subscription'
+      || connectionTracker.confirmationDeadlineAt === null
+    ) return
+    const connectionCount = connectionTracker.readyCount
+    const remaining = Math.max(
+      0,
+      connectionTracker.confirmationDeadlineAt - Date.now(),
+    )
+    const timer = setTimeout(() => {
+      dispatchConnection({
+        type: 'confirmation-timeout',
+        connectionCount,
+        now: Date.now(),
+      })
+    }, Math.min(remaining, RECONNECT_CONFIRMATION_TIMEOUT_MS))
+    return () => clearTimeout(timer)
+  }, [
+    connectionTracker.confirmationDeadlineAt,
+    connectionTracker.readyCount,
+    connectionTracker.recovery,
+  ])
 
   const remoteTasks = useMemo(
     () => [...openTasksPage.results, ...completedTasksPage.results] as TaskItem[],
@@ -204,17 +248,23 @@ export function useConvexRepository(
     )
   }, [pendingReminders, remoteReminders, reminderPatches])
 
+  const activity = useMemo(
+    () => deriveActivity(activityPage.results as ActivityProjectionItem[]),
+    [activityPage.results],
+  )
+
   async function exclusive<T>(key: string, operation: () => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
-    if (pendingRef.current.has(key)) {
+    const started = beginPending(pendingRef.current, key)
+    if (!started.acquired) {
       return { ok: false, reason: 'invalid_state', message: 'That action is already in progress.' }
     }
-    pendingRef.current.add(key)
-    setPending(new Set(pendingRef.current))
+    pendingRef.current = started.keys
+    setPending(started.keys)
     try {
       return await operation()
     } finally {
-      pendingRef.current.delete(key)
-      setPending(new Set(pendingRef.current))
+      pendingRef.current = endPending(pendingRef.current, key)
+      setPending(pendingRef.current)
     }
   }
 
@@ -279,11 +329,7 @@ export function useConvexRepository(
     installation,
     tasks,
     reminders,
-    commands: [...commandsPage.results as CommandItem[]].sort(
-      (a, b) => b.createdAt - a.createdAt || a.commandId.localeCompare(b.commandId),
-    ),
-    jobs: jobsPage.results as JobItem[],
-    runs: runsPage.results as RunItem[],
+    activity,
     nodes: nodesPage.results,
     runEvents: [...runEventsPage.results as RunEventItem[]].sort((a, b) => a.sequence - b.sequence),
     loading: [
@@ -292,9 +338,7 @@ export function useConvexRepository(
       scheduledRemindersPage.status,
       firedRemindersPage.status,
       dismissedRemindersPage.status,
-      commandsPage.status,
-      jobsPage.status,
-      runsPage.status,
+      activityPage.status,
       nodesPage.status,
     ].some((status) => status === 'LoadingFirstPage'),
     loadingRunEvents: runEventsPage.status === 'LoadingFirstPage',
@@ -310,27 +354,22 @@ export function useConvexRepository(
         loadedCount: remoteReminders.length,
       },
       activity: {
-        canLoadMore: [commandsPage, jobsPage, runsPage, nodesPage].some((page) => page.status === 'CanLoadMore'),
-        loadingMore: [commandsPage, jobsPage, runsPage, nodesPage].some((page) => page.status === 'LoadingMore'),
-        loadedCount: commandsPage.results.length,
+        canLoadMore: activityPage.status === 'CanLoadMore',
+        loadingMore: activityPage.status === 'LoadingMore',
+        loadedCount: activityPage.results.length,
       },
       runEvents: pageState(runEventsPage.status, runEventsPage.results.length),
     },
     loadMore(name): void {
-      if (name === 'openTasks' && openTasksPage.status === 'CanLoadMore') openTasksPage.loadMore(SUBSCRIPTIONS.openTasks.pageSize)
-      if (name === 'completedTasks' && completedTasksPage.status === 'CanLoadMore') completedTasksPage.loadMore(SUBSCRIPTIONS.completedTasks.pageSize)
+      if (name === 'openTasks' && openTasksPage.status === 'CanLoadMore') openTasksPage.loadMore(PAGE_SIZE)
+      if (name === 'completedTasks' && completedTasksPage.status === 'CanLoadMore') completedTasksPage.loadMore(PAGE_SIZE)
       if (name === 'reminders') {
-        if (scheduledRemindersPage.status === 'CanLoadMore') scheduledRemindersPage.loadMore(SUBSCRIPTIONS.scheduledReminders.pageSize)
-        if (firedRemindersPage.status === 'CanLoadMore') firedRemindersPage.loadMore(SUBSCRIPTIONS.recentReminders.pageSize)
-        if (dismissedRemindersPage.status === 'CanLoadMore') dismissedRemindersPage.loadMore(SUBSCRIPTIONS.recentReminders.pageSize)
+        if (scheduledRemindersPage.status === 'CanLoadMore') scheduledRemindersPage.loadMore(PAGE_SIZE)
+        if (firedRemindersPage.status === 'CanLoadMore') firedRemindersPage.loadMore(PAGE_SIZE)
+        if (dismissedRemindersPage.status === 'CanLoadMore') dismissedRemindersPage.loadMore(PAGE_SIZE)
       }
-      if (name === 'activity') {
-        if (commandsPage.status === 'CanLoadMore') commandsPage.loadMore(SUBSCRIPTIONS.commands.pageSize)
-        if (jobsPage.status === 'CanLoadMore') jobsPage.loadMore(SUBSCRIPTIONS.jobs.pageSize)
-        if (runsPage.status === 'CanLoadMore') runsPage.loadMore(SUBSCRIPTIONS.runs.pageSize)
-        if (nodesPage.status === 'CanLoadMore') nodesPage.loadMore(SUBSCRIPTIONS.nodes.pageSize)
-      }
-      if (name === 'runEvents' && runEventsPage.status === 'CanLoadMore') runEventsPage.loadMore(SUBSCRIPTIONS.runEvents.pageSize)
+      if (name === 'activity' && activityPage.status === 'CanLoadMore') activityPage.loadMore(PAGE_SIZE)
+      if (name === 'runEvents' && runEventsPage.status === 'CanLoadMore') runEventsPage.loadMore(50)
     },
     selectRun(): void {
       // Selection is owned by the consuming view; this method preserves the portable repository contract.
@@ -472,5 +511,9 @@ export function useConvexRepository(
     },
   }
 
-  return { repository, connectionMode: deriveConnectionMode(connectionTracker) }
+  return {
+    repository,
+    connectionMode: deriveConnectionMode(connectionTracker),
+    connectionRecoveryRequired: needsConnectionRecreate(connectionTracker),
+  }
 }

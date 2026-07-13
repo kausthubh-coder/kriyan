@@ -1,5 +1,4 @@
-import type { ReminderItem, TaskItem } from '@/src/client-core/types'
-import type { ActivityItem } from '@/src/client-core/view-model'
+import type { ActivityItem, ReminderItem, TaskItem } from '@kriyan/client-core'
 
 export const taskFixture: TaskItem = {
   taskId: 'task:fixture', title: 'Practice Korean', status: 'open', dueAt: 1_800_000_000_000,

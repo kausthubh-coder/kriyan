@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "lib": ["ES2022", "DOM"],
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts", "testing/**/*.ts"]
+}

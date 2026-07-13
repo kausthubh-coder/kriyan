@@ -1,43 +1,48 @@
-import { HEARTBEAT_FRESHNESS_MS } from './clock'
-import type { CommandItem, JobItem, NodeItem, RunItem, TodaySnapshot, TransitionReason } from './types'
+import type {
+  ActivityItem,
+  ActivityProjectionItem,
+  NodeItem,
+  TransitionReason,
+} from './types'
 
-export type HonestRunState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+export const HEARTBEAT_FRESHNESS_MS = 60_000
+const MIN_TIMER_MS = 50
 
-export interface ActivityItem {
-  command: CommandItem
-  job?: JobItem
-  run?: RunItem
-  state: HonestRunState
-  isFake: boolean
+export function nextClockDelay(now: number, heartbeatTimestamps: readonly number[]): number {
+  const nextMinute = now + (60_000 - (now % 60_000))
+  const heartbeatBoundaries = heartbeatTimestamps
+    .map((timestamp) => timestamp + HEARTBEAT_FRESHNESS_MS + 1)
+    .filter((timestamp) => timestamp > now)
+  const next = Math.min(nextMinute, ...heartbeatBoundaries)
+  return Math.max(MIN_TIMER_MS, next - now)
 }
 
 export function isNodeAvailable(node: NodeItem, now = Date.now()): boolean {
   return node.status === 'online' && now - node.lastHeartbeatAt <= HEARTBEAT_FRESHNESS_MS
 }
 
-export function deriveActivity(snapshot: TodaySnapshot): ActivityItem[] {
-  return snapshot.commands
-    .map((command) => {
-      const job = snapshot.jobs.find((candidate) => candidate.commandId === command.commandId)
-      const run = job
-        ? snapshot.runs
-            .filter((candidate) => candidate.jobId === job.jobId)
-            .sort((a, b) => b.startedAt - a.startedAt)[0]
-        : undefined
-      let state: HonestRunState = 'queued'
-      if (command.status === 'cancelled' || job?.status === 'cancelled' || run?.status === 'cancelled') state = 'cancelled'
-      else if (command.status === 'failed' || job?.status === 'failed' || run?.status === 'failed') state = 'failed'
-      else if (command.status === 'completed' || job?.status === 'succeeded' || run?.status === 'succeeded') state = 'completed'
-      else if (job?.status === 'running' || job?.status === 'leased' || run?.status === 'running') state = 'running'
-      return {
-        command,
-        job,
-        run,
-        state,
-        isFake: Boolean(run?.nodeId.toLowerCase().includes('fake')),
-      }
-    })
-    .sort((a, b) => b.command.createdAt - a.command.createdAt)
+export function deriveActivityItem(item: ActivityProjectionItem): ActivityItem {
+  const { command, job, run } = item
+  let state: ActivityItem['state'] = 'queued'
+  if (command.status === 'cancelled' || job?.status === 'cancelled') state = 'cancelled'
+  else if (command.status === 'failed' || job?.status === 'failed') state = 'failed'
+  else if (command.status === 'completed' || job?.status === 'succeeded') state = 'completed'
+  else if (job?.status === 'leased' || job?.status === 'running') state = 'running'
+
+  return {
+    command,
+    job,
+    run,
+    state,
+    isFake: Boolean(run?.nodeId.toLowerCase().includes('fake')),
+  }
+}
+
+export function deriveActivity(items: readonly ActivityProjectionItem[]): ActivityItem[] {
+  return items
+    .map(deriveActivityItem)
+    .sort((a, b) => b.command.createdAt - a.command.createdAt
+      || b.command.commandId.localeCompare(a.command.commandId))
 }
 
 export function conflictMessage(reason: TransitionReason): string {

@@ -119,6 +119,12 @@ export const runEventValue = v.object({
   createdAt: v.number(),
 })
 
+export const activityValue = v.object({
+  command: commandValue,
+  job: v.optional(jobValue),
+  run: v.optional(runValue),
+})
+
 export const taskValue = v.object({
   installationId: v.string(),
   taskId: v.string(),

@@ -46,6 +46,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index('by_installation_command', ['installationId', 'commandId'])
+    .index('by_installation_created', ['installationId', 'createdAt'])
     .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
     .index('by_installation_status', ['installationId', 'status']),
 

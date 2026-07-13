@@ -27,13 +27,13 @@ These values identify a development deployment and one owner-controlled installa
 
 ## Client architecture
 
-Framework-neutral subscription descriptors, repository contracts, optimistic overlay/reconciliation helpers, connection state machine, clock boundaries, and Today view models live under `src/client-core`. The Convex repository adapter is the only module that owns generated query/mutation hooks. Components consume the repository interface and never own the generated API lifecycle.
+Framework-neutral types, repository ports, in-memory adapter, pending/optimistic reducers, connection state machine, clock boundaries, and Today view models live in `packages/client-core`. Thin React adapters under `src/client-core` are the only modules that own generated query/mutation hooks. Components consume the package repository interface and never own the generated API lifecycle.
 
 There is no polling and no legacy Convex API use. Revision-checked task/reminder mutations show one stable-ID optimistic row, then reconcile synchronously with a subscription or roll back with a typed conflict message. Entity/command locks prevent conflicting double submits.
 
 ## Pagination boundary
 
-Tasks use the accepted status/due index and reminders use the accepted status/time index, so loaded pages have deterministic due/time order. Run events use the run/sequence index. The current Convex contract has no installation-wide `createdAt` index for commands and no targeted job-by-command read query. The adapter therefore sorts the loaded command window newest-first, loads commands/jobs/runs together, and visibly reports when more activity is available. It does not claim that the initial page is a globally newest page. A backend follow-up can add a created-time command index and targeted job read without changing the repository/UI contract.
+Tasks use the accepted status/due index and reminders use the accepted status/time index, so loaded pages have deterministic due/time order. Run events use the run/sequence index. Activity uses one installation/created-time command index and one paginated read model that joins each command to its job and exact current-attempt run. Every page is globally newest-first and remains relationally coherent across retry boundaries.
 
 ## Browser-test handoff
 

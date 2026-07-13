@@ -1,8 +1,10 @@
 export type ConnectionMode = 'connecting' | 'online' | 'reconnecting' | 'offline'
+export type ConnectionRecovery = 'initial' | 'confirmed' | 'awaiting-ready' | 'awaiting-subscription' | 'unconfirmed'
 export type TaskStatus = 'open' | 'completed' | 'cancelled'
 export type ReminderStatus = 'scheduled' | 'fired' | 'dismissed' | 'cancelled'
 export type JobStatus = 'queued' | 'leased' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled'
+export type HonestRunState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type TransitionReason =
   | 'not_found'
   | 'stale_revision'
@@ -66,6 +68,7 @@ export interface JobItem {
 export interface RunItem {
   runId: string
   jobId: string
+  attempt: number
   nodeId: string
   status: RunStatus
   revision: number
@@ -92,13 +95,18 @@ export interface NodeItem {
   revision: number
 }
 
-export interface TodaySnapshot {
-  tasks: TaskItem[]
-  reminders: ReminderItem[]
-  commands: CommandItem[]
-  jobs: JobItem[]
-  runs: RunItem[]
-  nodes: NodeItem[]
+export interface ActivityItem {
+  command: CommandItem
+  job?: JobItem
+  run?: RunItem
+  state: HonestRunState
+  isFake: boolean
+}
+
+export interface ActivityProjectionItem {
+  command: CommandItem
+  job?: JobItem
+  run?: RunItem
 }
 
 export interface PageState {

@@ -5,7 +5,7 @@ import { renderToStaticMarkup, renderToString } from 'react-dom/server'
 import { Window } from 'happy-dom'
 
 import { queuedActivityFixture, reminderFixture, taskFixture } from './fixtures'
-import { ActivityRow, Brand, NodeSummary, PageHeader, ReminderRow, TaskRow } from './today-app'
+import { ActivityRow, Brand, NodeSummary, PageHeader, ReminderRow, SectionHeading, TaskRow } from './today-app'
 
 let hydratedRoot: Root | null = null
 
@@ -36,6 +36,20 @@ describe('Today presentational components', () => {
     expect(markup).toContain('reconnecting')
     expect(markup).toContain('Offline')
     expect(markup).toContain('aria-live="polite"')
+  })
+
+  test('shows preview and loaded counts before Today slices its rows', () => {
+    const markup = renderToStaticMarkup(<SectionHeading title="Next actions" href="/tasks" count="5 shown · 25 loaded" />)
+    expect(markup).toContain('5 shown · 25 loaded')
+    expect(markup).toContain('View all')
+  })
+
+  test('keeps View all targets at least 44px and renders one responsive activity tree', async () => {
+    const css = await Bun.file(new URL('../../app/globals.css', import.meta.url)).text()
+    const source = await Bun.file(new URL('./today-app.tsx', import.meta.url)).text()
+    expect(css).toContain('.section-heading a { min-width: 44px; min-height: 44px;')
+    expect(source.match(/<ActivityPanel/g)).toHaveLength(1)
+    expect(source).not.toContain('mobile-activity')
   })
 
   test('hydrates deterministic date, connection, node, and relative-time markup without errors', async () => {

@@ -53,6 +53,18 @@ async function readEvents(
   ).page
 }
 
+async function readActivity(
+  t: ReturnType<typeof backend>,
+  numItems = 100,
+  cursor: string | null = null,
+  installationId = 'installation-a',
+) {
+  return await t.query(api.read.activity, {
+    installationId,
+    paginationOpts: { numItems, cursor },
+  })
+}
+
 async function createInstallation(
   t: ReturnType<typeof backend>,
   installationId = 'installation-a',
@@ -134,6 +146,160 @@ describe('command submission', () => {
         maxAttempts: 3,
       }),
     ).rejects.toThrow('input must contain')
+  })
+})
+
+describe('coherent activity read model', () => {
+  test('paginates more than 25 commands newest-first across page boundaries and reacts to a new submission', async () => {
+    const t = backend()
+    await createInstallation(t)
+    for (let index = 0; index < 31; index += 1) {
+      vi.setSystemTime(2_000 + index)
+      await submit(t, `activity-command-${index}`)
+    }
+
+    const first = await readActivity(t, 25)
+    expect(first.page).toHaveLength(25)
+    expect(first.page[0]?.command.commandId).toBe('activity-command-30')
+    expect(first.page.at(-1)?.command.commandId).toBe('activity-command-6')
+    expect(first.isDone).toBe(false)
+
+    const second = await readActivity(t, 25, first.continueCursor)
+    expect(second.page.map((item) => item.command.commandId)).toEqual([
+      'activity-command-5',
+      'activity-command-4',
+      'activity-command-3',
+      'activity-command-2',
+      'activity-command-1',
+      'activity-command-0',
+    ])
+    expect(second.isDone).toBe(true)
+
+    vi.setSystemTime(3_000)
+    await submit(t, 'activity-command-new')
+    const refreshed = await readActivity(t, 25)
+    expect(refreshed.page[0]?.command.commandId).toBe('activity-command-new')
+    expect(new Set([
+      ...refreshed.page.map((item) => item.command.commandId),
+      ...(await readActivity(t, 25, refreshed.continueCursor)).page.map((item) => item.command.commandId),
+    ]).size).toBe(32)
+  })
+
+  test('joins the current job and exact attempt through retry, running, completion, and exhaustion', async () => {
+    const t = backend()
+    await createInstallation(t)
+    await registerNode(t, 'activity-node')
+    const submission = await submit(t, 'activity-retry-command', 'installation-a', 3)
+    const firstClaim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation-a',
+      nodeId: 'activity-node',
+      leaseDurationMs: 100,
+    })
+    if (firstClaim === null) throw new Error('expected first claim')
+    const firstRun = await t.mutation(api.worker.startRun, {
+      installationId: 'installation-a',
+      jobId: firstClaim.job.jobId,
+      nodeId: 'activity-node',
+      expectedJobRevision: firstClaim.job.revision,
+    })
+    if (!firstRun.ok) throw new Error('expected first run')
+    await t.mutation(api.worker.failRun, {
+      installationId: 'installation-a',
+      jobId: firstRun.job.jobId,
+      runId: firstRun.run.runId,
+      nodeId: 'activity-node',
+      error: 'operator retry',
+      retryable: false,
+      expectedJobRevision: firstRun.job.revision,
+      expectedRunRevision: firstRun.run.revision,
+    })
+    const failed = (await readActivity(t)).page[0]!
+    expect(failed).toMatchObject({
+      command: { status: 'failed' },
+      job: { status: 'failed', attempt: 1 },
+      run: { status: 'failed', attempt: 1 },
+    })
+
+    await t.mutation(api.commands.retry, {
+      installationId: 'installation-a',
+      commandId: submission.command.commandId,
+      expectedCommandRevision: failed.command.revision,
+      expectedJobRevision: failed.job!.revision,
+    })
+    const queued = (await readActivity(t)).page[0]!
+    expect(queued).toMatchObject({
+      command: { status: 'accepted' },
+      job: { status: 'queued', attempt: 1 },
+      run: { status: 'failed', attempt: 1 },
+    })
+
+    const secondClaim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation-a',
+      nodeId: 'activity-node',
+      leaseDurationMs: 100,
+    })
+    if (secondClaim === null) throw new Error('expected second claim')
+    const leased = (await readActivity(t)).page[0]
+    expect(leased).toMatchObject({ job: { status: 'leased', attempt: 2 } })
+    expect(leased?.run).toBeUndefined()
+    const secondRun = await t.mutation(api.worker.startRun, {
+      installationId: 'installation-a',
+      jobId: secondClaim.job.jobId,
+      nodeId: 'activity-node',
+      expectedJobRevision: secondClaim.job.revision,
+    })
+    if (!secondRun.ok) throw new Error('expected second run')
+    expect((await readActivity(t)).page[0]).toMatchObject({
+      job: { status: 'running', attempt: 2 },
+      run: { status: 'running', attempt: 2 },
+    })
+    await t.mutation(api.worker.completeRun, {
+      installationId: 'installation-a',
+      jobId: secondRun.job.jobId,
+      runId: secondRun.run.runId,
+      nodeId: 'activity-node',
+      expectedJobRevision: secondRun.job.revision,
+      expectedRunRevision: secondRun.run.revision,
+    })
+    expect((await readActivity(t)).page[0]).toMatchObject({
+      command: { status: 'completed' },
+      job: { status: 'succeeded', attempt: 2 },
+      run: { status: 'succeeded', attempt: 2 },
+    })
+
+    vi.setSystemTime(4_000)
+    const exhaustedSubmission = await submit(t, 'activity-exhausted-command', 'installation-a', 1)
+    const exhaustedClaim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation-a',
+      nodeId: 'activity-node',
+      leaseDurationMs: 100,
+    })
+    if (exhaustedClaim === null) throw new Error('expected exhausted claim')
+    const exhaustedRun = await t.mutation(api.worker.startRun, {
+      installationId: 'installation-a',
+      jobId: exhaustedClaim.job.jobId,
+      nodeId: 'activity-node',
+      expectedJobRevision: exhaustedClaim.job.revision,
+    })
+    if (!exhaustedRun.ok) throw new Error('expected exhausted run')
+    await t.mutation(api.worker.failRun, {
+      installationId: 'installation-a',
+      jobId: exhaustedRun.job.jobId,
+      runId: exhaustedRun.run.runId,
+      nodeId: 'activity-node',
+      error: 'final failure',
+      retryable: true,
+      expectedJobRevision: exhaustedRun.job.revision,
+      expectedRunRevision: exhaustedRun.run.revision,
+    })
+    const exhausted = (await readActivity(t)).page[0]!
+    expect(exhausted).toMatchObject({ command: { status: 'failed' }, job: { status: 'failed', attempt: 1, maxAttempts: 1 }, run: { status: 'failed', attempt: 1 } })
+    expect(await t.mutation(api.commands.retry, {
+      installationId: 'installation-a',
+      commandId: exhaustedSubmission.command.commandId,
+      expectedCommandRevision: exhausted.command.revision,
+      expectedJobRevision: exhausted.job!.revision,
+    })).toEqual({ ok: false, reason: 'attempts_exhausted' })
   })
 })
 

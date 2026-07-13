@@ -37,11 +37,11 @@ export function reconcilePatches<T extends RevisionedEntity>(
 
 export function normalizeTransitionReason(reason: unknown): TransitionReason {
   if (
-    reason === 'not_found' ||
-    reason === 'stale_revision' ||
-    reason === 'invalid_state' ||
-    reason === 'attempts_exhausted' ||
-    reason === 'already_terminal'
+    reason === 'not_found'
+    || reason === 'stale_revision'
+    || reason === 'invalid_state'
+    || reason === 'attempts_exhausted'
+    || reason === 'already_terminal'
   ) return reason
   return 'transport_error'
 }
