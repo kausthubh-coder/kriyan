@@ -17,7 +17,7 @@ import {
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { KRIYAN_CONFIG, useRecreateConvexClient } from '@/lib/convex'
+import { KRIYAN_CONFIG, useConvexClientControls } from '@/lib/convex'
 import { useConvexRepository } from '@/src/client-core/convex-repository'
 import { useVisibilityClock } from '@/src/client-core/use-visibility-clock'
 
@@ -72,8 +72,12 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
   const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null)
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const configuration = KRIYAN_CONFIG!
-  const recreateConvexClient = useRecreateConvexClient()
-  const { repository, connectionMode, connectionRecoveryRequired } = useConvexRepository(configuration, selectedRunId)
+  const convexClient = useConvexClientControls()
+  const { repository, connectionMode, connectionRecoveryRequired } = useConvexRepository(
+    configuration,
+    selectedRunId,
+    convexClient.generation,
+  )
   const heartbeatTimestamps = useMemo(
     () => repository.nodes.map((node) => node.lastHeartbeatAt),
     [repository.nodes],
@@ -138,7 +142,7 @@ export function TodayApp({ initialSection }: { initialSection: Section }) {
           <ConnectionBanner
             mode={connectionMode}
             recoveryRequired={connectionRecoveryRequired}
-            onRecreate={recreateConvexClient}
+            onRecreate={convexClient.recreate}
           />
         )}
         {notice && <Notice notice={notice} onClose={() => setNotice(null)} />}
@@ -283,12 +287,38 @@ function Notice({ notice, onClose }: { notice: NoticeValue; onClose: () => void 
   return <div className={`notice ${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}><span>{notice.text}</span><button className="icon-button" onClick={onClose} aria-label="Dismiss message"><CloseIcon /></button></div>
 }
 
+export interface ComposerKeyEvent {
+  key: string
+  shiftKey: boolean
+  altKey: boolean
+  ctrlKey: boolean
+  metaKey: boolean
+  nativeEvent: { isComposing?: boolean; keyCode?: number }
+  preventDefault: () => void
+}
+
+export function handleComposerKeyDown(
+  event: ComposerKeyEvent,
+  onSubmit: () => Promise<void>,
+): void {
+  const isPlainEnter = event.key === 'Enter'
+    && !event.shiftKey
+    && !event.altKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && event.nativeEvent.isComposing !== true
+    && event.nativeEvent.keyCode !== 229
+  if (!isPlainEnter) return
+  event.preventDefault()
+  void onSubmit()
+}
+
 function CommandComposer({ value, onChange, onSubmit, busy, nodeOnline }: { value: string; onChange: (value: string) => void; onSubmit: () => Promise<void>; busy: boolean; nodeOnline: boolean }) {
   return (
     <section className="composer" aria-labelledby="composer-title">
       <div><h2 id="composer-title">What should Kriyan handle?</h2><span>{nodeOnline ? 'Your node is ready.' : 'No node is online. New commands will wait in the queue.'}</span></div>
       <div className="composer-control">
-        <textarea value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void onSubmit() } }} rows={2} maxLength={8192} placeholder="remind me tomorrow at 8 to practice Korean" aria-describedby="composer-help" disabled={busy} />
+        <textarea value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => handleComposerKeyDown(event, onSubmit)} rows={2} maxLength={8192} placeholder="remind me tomorrow at 8 to practice Korean" aria-describedby="composer-help" disabled={busy} />
         <button className="primary-button send-button" onClick={() => void onSubmit()} disabled={!value.trim() || busy} aria-label={busy ? 'Queueing command' : 'Queue command'}>{busy ? <span className="spinner" /> : <SendIcon />}</button>
       </div>
       <p id="composer-help">Enter to queue · Shift + Enter for a new line</p>

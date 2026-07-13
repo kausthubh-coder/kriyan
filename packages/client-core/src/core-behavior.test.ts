@@ -4,6 +4,7 @@ import {
   deriveConnectionMode,
   INITIAL_CONNECTION_TRACKER,
   needsConnectionRecreate,
+  retainLastConfirmed,
   updateConnectionTracker,
   type ConnectionTracker,
 } from './connection'
@@ -60,41 +61,46 @@ describe('connection generation state machine', () => {
     let state = updateConnectionTracker(INITIAL_CONNECTION_TRACKER, {
       type: 'mounted',
       browserOnline: true,
+      clientGeneration: 0,
       observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 1 },
       now: 0,
     })
     expect(deriveConnectionMode(state)).toBe('reconnecting')
-    state = updateConnectionTracker(state, { type: 'subscription-confirmed', connectionCount: 1 })
+    state = updateConnectionTracker(state, { type: 'subscription-confirmed', clientGeneration: 0, connectionCount: 1 })
     expect(deriveConnectionMode(state)).toBe('online')
   })
 
-  test('records the disconnect count and requires a greater ready count', () => {
+  test('bounds awaiting-ready when Convex emits no greater generation', () => {
     let state: ConnectionTracker = { ...INITIAL_CONNECTION_TRACKER, mounted: true, browserOnline: true, socketConnected: true, hasEverConnected: true, readyCount: 4, confirmedCount: 4, recovery: 'confirmed' }
-    state = updateConnectionTracker(state, { type: 'observed', observation: { isWebSocketConnected: false, hasEverConnected: true, connectionCount: 4 }, now: 10 })
+    state = updateConnectionTracker(state, { type: 'observed', clientGeneration: 0, observation: { isWebSocketConnected: false, hasEverConnected: true, connectionCount: 4 }, now: 10 })
     expect(state.disconnectCount).toBe(4)
-    state = updateConnectionTracker(state, { type: 'observed', observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 4 }, now: 20 })
-    state = updateConnectionTracker(state, { type: 'subscription-confirmed', connectionCount: 4 })
-    expect(deriveConnectionMode(state)).toBe('reconnecting')
-    state = updateConnectionTracker(state, { type: 'observed', observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 5 }, now: 30 })
-    state = updateConnectionTracker(state, { type: 'subscription-confirmed', connectionCount: 5 })
-    expect(deriveConnectionMode(state)).toBe('online')
-  })
-
-  test('bounds an unconfirmed generation and never uses the timer to claim online', () => {
-    let state: ConnectionTracker = { ...INITIAL_CONNECTION_TRACKER, mounted: true, browserOnline: true, socketConnected: true, hasEverConnected: true, readyCount: 2, disconnectCount: 1, recovery: 'awaiting-subscription', confirmationDeadlineAt: 100 }
-    state = updateConnectionTracker(state, { type: 'confirmation-timeout', connectionCount: 2, now: 100 })
+    expect(state.confirmationDeadlineAt).toBe(15_010)
+    state = updateConnectionTracker(state, { type: 'observed', clientGeneration: 0, observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 4 }, now: 20 })
+    state = updateConnectionTracker(state, { type: 'ready-timeout', clientGeneration: 0, connectionCount: 4, now: 15_010 })
     expect(needsConnectionRecreate(state)).toBe(true)
     expect(deriveConnectionMode(state)).toBe('reconnecting')
-    state = updateConnectionTracker(state, { type: 'recreate-requested' })
-    expect(state.recovery).toBe('awaiting-ready')
+  })
+
+  test('bounds the current-generation probe and never uses a timeout to claim online', () => {
+    let state: ConnectionTracker = { ...INITIAL_CONNECTION_TRACKER, mounted: true, browserOnline: true, socketConnected: true, hasEverConnected: true, readyCount: 2, disconnectCount: 1, recovery: 'awaiting-subscription', confirmationDeadlineAt: 100 }
+    state = updateConnectionTracker(state, { type: 'subscription-confirmed', clientGeneration: 1, connectionCount: 2 })
+    expect(state.recovery).toBe('awaiting-subscription')
+    state = updateConnectionTracker(state, { type: 'confirmation-timeout', clientGeneration: 0, connectionCount: 2, now: 100 })
+    expect(needsConnectionRecreate(state)).toBe(true)
     expect(deriveConnectionMode(state)).toBe('reconnecting')
   })
 
-  test('keeps independent tab generations independent', () => {
-    const tabA = updateConnectionTracker({ ...INITIAL_CONNECTION_TRACKER }, { type: 'mounted', browserOnline: true, observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 1 }, now: 0 })
-    const tabB = updateConnectionTracker({ ...INITIAL_CONNECTION_TRACKER }, { type: 'mounted', browserOnline: true, observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 7 }, now: 0 })
-    expect(tabA.readyCount).toBe(1)
+  test('recovers only after a greater ready count and matching probe while retaining confirmed state', () => {
+    let tabA: ConnectionTracker = { ...INITIAL_CONNECTION_TRACKER, mounted: true, browserOnline: true, socketConnected: true, hasEverConnected: true, readyCount: 4, confirmedCount: 4, recovery: 'confirmed' }
+    tabA = updateConnectionTracker(tabA, { type: 'observed', clientGeneration: 0, observation: { isWebSocketConnected: false, hasEverConnected: true, connectionCount: 4 }, now: 10 })
+    tabA = updateConnectionTracker(tabA, { type: 'observed', clientGeneration: 0, observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 5 }, now: 20 })
+    tabA = updateConnectionTracker(tabA, { type: 'subscription-confirmed', clientGeneration: 0, connectionCount: 5 })
+    expect(deriveConnectionMode(tabA)).toBe('online')
+
+    const tabB = updateConnectionTracker({ ...INITIAL_CONNECTION_TRACKER }, { type: 'mounted', browserOnline: true, clientGeneration: 0, observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 7 }, now: 0 })
     expect(tabB.readyCount).toBe(7)
+    expect(retainLastConfirmed('reconnecting', ['warming'], ['confirmed'])).toEqual(['confirmed'])
+    expect(retainLastConfirmed('online', ['current'], ['confirmed'])).toEqual(['current'])
   })
 })
 

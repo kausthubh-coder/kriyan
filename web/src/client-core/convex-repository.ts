@@ -15,12 +15,15 @@ import {
   reconcileEntities,
   reconcilePatches,
   RECONNECT_CONFIRMATION_TIMEOUT_MS,
+  retainLastConfirmed,
   updateConnectionTracker,
   type ActionResult,
   type ActivityProjectionItem,
   type ClientRepository,
   type ConnectionMode,
   type EntityPatch,
+  type InstallationItem,
+  type NodeItem,
   type PageState,
   type ReminderItem,
   type ReminderStatus,
@@ -65,9 +68,22 @@ export interface ConvexRepositoryResult {
   connectionRecoveryRequired: boolean
 }
 
+interface RemoteSnapshot {
+  installation: InstallationItem | null | undefined
+  tasks: TaskItem[]
+  reminders: ReminderItem[]
+  activity: ActivityProjectionItem[]
+  nodes: NodeItem[]
+  runEvents: RunEventItem[]
+  loading: boolean
+  loadingRunEvents: boolean
+  pages: ClientRepository['pages']
+}
+
 export function useConvexRepository(
   configuration: KriyanWebConfiguration,
   selectedRunId: string | null,
+  clientGeneration: number,
 ): ConvexRepositoryResult {
   const { installationId } = configuration
   const connection = useConvexConnectionState()
@@ -80,6 +96,8 @@ export function useConvexRepository(
     [connection.connectionCount, connection.hasEverConnected, connection.isWebSocketConnected],
   )
   const initialConnection = useRef(connectionObservation)
+  const initialClientGeneration = useRef(clientGeneration)
+  const previousClientGeneration = useRef(clientGeneration)
   const [connectionTracker, dispatchConnection] = useReducer(
     updateConnectionTracker,
     INITIAL_CONNECTION_TRACKER,
@@ -155,10 +173,11 @@ export function useConvexRepository(
     dispatchConnection({
       type: 'mounted',
       browserOnline: navigator.onLine,
+      clientGeneration: initialClientGeneration.current,
       observation: initialConnection.current,
       now: Date.now(),
     })
-    const online = (): void => dispatchConnection({ type: 'browser-online' })
+    const online = (): void => dispatchConnection({ type: 'browser-online', now: Date.now() })
     const offline = (): void => dispatchConnection({ type: 'browser-offline', now: Date.now() })
     window.addEventListener('online', online)
     window.addEventListener('offline', offline)
@@ -169,24 +188,38 @@ export function useConvexRepository(
   }, [])
 
   useEffect(() => {
+    if (previousClientGeneration.current === clientGeneration) return
+    previousClientGeneration.current = clientGeneration
+    dispatchConnection({
+      type: 'client-replaced',
+      browserOnline: navigator.onLine,
+      clientGeneration,
+      now: Date.now(),
+    })
+  }, [clientGeneration])
+
+  useEffect(() => {
     dispatchConnection({
       type: 'observed',
+      clientGeneration,
       observation: connectionObservation,
       now: Date.now(),
     })
-  }, [connectionObservation])
+  }, [clientGeneration, connectionObservation])
 
   useEffect(() => {
     if (connectionProbe?.connectionCount !== connection.connectionCount) return
     dispatchConnection({
       type: 'subscription-confirmed',
+      clientGeneration,
       connectionCount: connectionProbe.connectionCount,
     })
-  }, [connection.connectionCount, connectionProbe])
+  }, [clientGeneration, connection.connectionCount, connectionProbe])
 
   useEffect(() => {
     if (
-      connectionTracker.recovery !== 'awaiting-subscription'
+      (connectionTracker.recovery !== 'awaiting-ready'
+        && connectionTracker.recovery !== 'awaiting-subscription')
       || connectionTracker.confirmationDeadlineAt === null
     ) return
     const connectionCount = connectionTracker.readyCount
@@ -195,24 +228,33 @@ export function useConvexRepository(
       connectionTracker.confirmationDeadlineAt - Date.now(),
     )
     const timer = setTimeout(() => {
-      dispatchConnection({
-        type: 'confirmation-timeout',
-        connectionCount,
-        now: Date.now(),
-      })
+      dispatchConnection(connectionTracker.recovery === 'awaiting-ready'
+        ? {
+            type: 'ready-timeout',
+            clientGeneration: connectionTracker.clientGeneration,
+            connectionCount,
+            now: Date.now(),
+          }
+        : {
+            type: 'confirmation-timeout',
+            clientGeneration: connectionTracker.clientGeneration,
+            connectionCount,
+            now: Date.now(),
+          })
     }, Math.min(remaining, RECONNECT_CONFIRMATION_TIMEOUT_MS))
     return () => clearTimeout(timer)
   }, [
     connectionTracker.confirmationDeadlineAt,
+    connectionTracker.clientGeneration,
     connectionTracker.readyCount,
     connectionTracker.recovery,
   ])
 
-  const remoteTasks = useMemo(
+  const currentTasks = useMemo(
     () => [...openTasksPage.results, ...completedTasksPage.results] as TaskItem[],
     [completedTasksPage.results, openTasksPage.results],
   )
-  const remoteReminders = useMemo(
+  const currentReminders = useMemo(
     () => [
       ...scheduledRemindersPage.results,
       ...firedRemindersPage.results,
@@ -220,6 +262,85 @@ export function useConvexRepository(
     ] as ReminderItem[],
     [dismissedRemindersPage.results, firedRemindersPage.results, scheduledRemindersPage.results],
   )
+  const currentLoading = [
+    openTasksPage.status,
+    completedTasksPage.status,
+    scheduledRemindersPage.status,
+    firedRemindersPage.status,
+    dismissedRemindersPage.status,
+    activityPage.status,
+    nodesPage.status,
+  ].some((status) => status === 'LoadingFirstPage')
+  const remindersCanLoadMore = [
+    scheduledRemindersPage.status,
+    firedRemindersPage.status,
+    dismissedRemindersPage.status,
+  ].some((status) => status === 'CanLoadMore')
+  const remindersLoadingMore = [
+    scheduledRemindersPage.status,
+    firedRemindersPage.status,
+    dismissedRemindersPage.status,
+  ].some((status) => status === 'LoadingMore')
+  const currentPages = useMemo<ClientRepository['pages']>(() => ({
+    openTasks: pageState(openTasksPage.status, openTasksPage.results.length),
+    completedTasks: pageState(completedTasksPage.status, completedTasksPage.results.length),
+    reminders: {
+      canLoadMore: remindersCanLoadMore,
+      loadingMore: remindersLoadingMore,
+      loadedCount: currentReminders.length,
+    },
+    activity: {
+      canLoadMore: activityPage.status === 'CanLoadMore',
+      loadingMore: activityPage.status === 'LoadingMore',
+      loadedCount: activityPage.results.length,
+    },
+    runEvents: pageState(runEventsPage.status, runEventsPage.results.length),
+  }), [
+    activityPage.results.length,
+    activityPage.status,
+    completedTasksPage.results.length,
+    completedTasksPage.status,
+    currentReminders.length,
+    openTasksPage.results.length,
+    openTasksPage.status,
+    remindersCanLoadMore,
+    remindersLoadingMore,
+    runEventsPage.results.length,
+    runEventsPage.status,
+  ])
+  const currentSnapshot = useMemo<RemoteSnapshot>(() => ({
+    installation: installation as InstallationItem | null | undefined,
+    tasks: currentTasks,
+    reminders: currentReminders,
+    activity: activityPage.results as ActivityProjectionItem[],
+    nodes: nodesPage.results as NodeItem[],
+    runEvents: runEventsPage.results as RunEventItem[],
+    loading: currentLoading,
+    loadingRunEvents: runEventsPage.status === 'LoadingFirstPage',
+    pages: currentPages,
+  }), [
+    activityPage.results,
+    currentLoading,
+    currentPages,
+    currentReminders,
+    currentTasks,
+    installation,
+    nodesPage.results,
+    runEventsPage.results,
+    runEventsPage.status,
+  ])
+  const connectionMode = deriveConnectionMode(connectionTracker)
+  const lastConfirmedSnapshot = useRef<RemoteSnapshot | null>(null)
+  useEffect(() => {
+    if (connectionMode === 'online') lastConfirmedSnapshot.current = currentSnapshot
+  }, [connectionMode, currentSnapshot])
+  const remote = retainLastConfirmed(
+    connectionMode,
+    currentSnapshot,
+    lastConfirmedSnapshot.current,
+  )
+  const remoteTasks = remote.tasks
+  const remoteReminders = remote.reminders
 
   useEffect(() => {
     const remoteIds = new Set(remoteTasks.map((task) => task.taskId))
@@ -249,8 +370,8 @@ export function useConvexRepository(
   }, [pendingReminders, remoteReminders, reminderPatches])
 
   const activity = useMemo(
-    () => deriveActivity(activityPage.results as ActivityProjectionItem[]),
-    [activityPage.results],
+    () => deriveActivity(remote.activity),
+    [remote.activity],
   )
 
   async function exclusive<T>(key: string, operation: () => Promise<ActionResult<T>>): Promise<ActionResult<T>> {
@@ -326,40 +447,16 @@ export function useConvexRepository(
   }
 
   const repository: ClientRepository = {
-    installation,
+    installation: remote.installation,
     tasks,
     reminders,
     activity,
-    nodes: nodesPage.results,
-    runEvents: [...runEventsPage.results as RunEventItem[]].sort((a, b) => a.sequence - b.sequence),
-    loading: [
-      openTasksPage.status,
-      completedTasksPage.status,
-      scheduledRemindersPage.status,
-      firedRemindersPage.status,
-      dismissedRemindersPage.status,
-      activityPage.status,
-      nodesPage.status,
-    ].some((status) => status === 'LoadingFirstPage'),
-    loadingRunEvents: runEventsPage.status === 'LoadingFirstPage',
+    nodes: remote.nodes,
+    runEvents: [...remote.runEvents].sort((a, b) => a.sequence - b.sequence),
+    loading: remote.loading,
+    loadingRunEvents: remote.loadingRunEvents,
     pending,
-    pages: {
-      openTasks: pageState(openTasksPage.status, openTasksPage.results.length),
-      completedTasks: pageState(completedTasksPage.status, completedTasksPage.results.length),
-      reminders: {
-        canLoadMore: [scheduledRemindersPage, firedRemindersPage, dismissedRemindersPage]
-          .some((page) => page.status === 'CanLoadMore'),
-        loadingMore: [scheduledRemindersPage, firedRemindersPage, dismissedRemindersPage]
-          .some((page) => page.status === 'LoadingMore'),
-        loadedCount: remoteReminders.length,
-      },
-      activity: {
-        canLoadMore: activityPage.status === 'CanLoadMore',
-        loadingMore: activityPage.status === 'LoadingMore',
-        loadedCount: activityPage.results.length,
-      },
-      runEvents: pageState(runEventsPage.status, runEventsPage.results.length),
-    },
+    pages: remote.pages,
     loadMore(name): void {
       if (name === 'openTasks' && openTasksPage.status === 'CanLoadMore') openTasksPage.loadMore(PAGE_SIZE)
       if (name === 'completedTasks' && completedTasksPage.status === 'CanLoadMore') completedTasksPage.loadMore(PAGE_SIZE)
@@ -513,7 +610,7 @@ export function useConvexRepository(
 
   return {
     repository,
-    connectionMode: deriveConnectionMode(connectionTracker),
+    connectionMode,
     connectionRecoveryRequired: needsConnectionRecreate(connectionTracker),
   }
 }

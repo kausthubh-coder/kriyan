@@ -16,6 +16,31 @@ type SpecDocument = {
 
 export {}
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseSpecDocument(value: unknown): SpecDocument {
+  if (!isRecord(value) || !Array.isArray(value.functions)) {
+    throw new Error('malformed function spec: expected a functions array')
+  }
+  for (const [index, fn] of value.functions.entries()) {
+    if (
+      !isRecord(fn)
+      || typeof fn.identifier !== 'string'
+      || !isRecord(fn.visibility)
+      || (fn.visibility.kind !== 'public' && fn.visibility.kind !== 'internal')
+      || !isRecord(fn.args)
+      || typeof fn.args.type !== 'string'
+      || !isRecord(fn.returns)
+      || typeof fn.returns.type !== 'string'
+    ) {
+      throw new Error(`malformed function spec: invalid function at index ${index}`)
+    }
+  }
+  return value as unknown as SpecDocument
+}
+
 const specPath = Bun.argv[2]
 if (specPath === undefined) {
   throw new Error(
@@ -23,7 +48,15 @@ if (specPath === undefined) {
   )
 }
 
-const spec = (await Bun.file(specPath).json()) as SpecDocument
+let decoded: unknown
+try {
+  decoded = await Bun.file(specPath).json()
+} catch (error) {
+  throw new Error(
+    `malformed function spec: ${error instanceof Error ? error.message : String(error)}`,
+  )
+}
+const spec = parseSpecDocument(decoded)
 const incomplete = spec.functions.filter(
   (fn) =>
     JSON.stringify(fn.args).includes('"type":"any"') ||

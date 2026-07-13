@@ -9,6 +9,7 @@ export interface ConnectionObservation {
 }
 
 export interface ConnectionTracker {
+  clientGeneration: number
   mounted: boolean
   browserOnline: boolean
   socketConnected: boolean
@@ -21,15 +22,17 @@ export interface ConnectionTracker {
 }
 
 export type ConnectionEvent =
-  | { type: 'mounted'; browserOnline: boolean; observation: ConnectionObservation; now: number }
+  | { type: 'mounted'; browserOnline: boolean; clientGeneration: number; observation: ConnectionObservation; now: number }
+  | { type: 'client-replaced'; browserOnline: boolean; clientGeneration: number; now: number }
   | { type: 'browser-offline'; now: number }
-  | { type: 'browser-online' }
-  | { type: 'observed'; observation: ConnectionObservation; now: number }
-  | { type: 'subscription-confirmed'; connectionCount: number }
-  | { type: 'confirmation-timeout'; connectionCount: number; now: number }
-  | { type: 'recreate-requested' }
+  | { type: 'browser-online'; now: number }
+  | { type: 'observed'; clientGeneration: number; observation: ConnectionObservation; now: number }
+  | { type: 'subscription-confirmed'; clientGeneration: number; connectionCount: number }
+  | { type: 'ready-timeout'; clientGeneration: number; connectionCount: number; now: number }
+  | { type: 'confirmation-timeout'; clientGeneration: number; connectionCount: number; now: number }
 
 export const INITIAL_CONNECTION_TRACKER: ConnectionTracker = {
+  clientGeneration: 0,
   mounted: false,
   browserOnline: true,
   socketConnected: false,
@@ -66,8 +69,8 @@ function observeReady(
         : state.recovery,
     confirmationDeadlineAt: hasNewReadyGeneration
       ? now + RECONNECT_CONFIRMATION_TIMEOUT_MS
-      : disconnected
-        ? null
+      : disconnected && state.browserOnline
+        ? now + RECONNECT_CONFIRMATION_TIMEOUT_MS
         : state.confirmationDeadlineAt,
   }
 }
@@ -85,10 +88,34 @@ export function updateConnectionTracker(
     return event.observation.isWebSocketConnected
       ? {
           ...mounted,
+          clientGeneration: event.clientGeneration,
           recovery: 'awaiting-subscription',
           confirmationDeadlineAt: event.now + RECONNECT_CONFIRMATION_TIMEOUT_MS,
         }
-      : mounted
+      : {
+          ...mounted,
+          clientGeneration: event.clientGeneration,
+          disconnectCount: event.observation.connectionCount,
+          recovery: 'awaiting-ready',
+          confirmationDeadlineAt: event.browserOnline
+            ? event.now + RECONNECT_CONFIRMATION_TIMEOUT_MS
+            : null,
+        }
+  }
+  if (event.type === 'client-replaced') {
+    if (event.clientGeneration <= state.clientGeneration) return state
+    return {
+      ...INITIAL_CONNECTION_TRACKER,
+      clientGeneration: event.clientGeneration,
+      mounted: true,
+      browserOnline: event.browserOnline,
+      hasEverConnected: state.hasEverConnected,
+      disconnectCount: 0,
+      recovery: 'awaiting-ready',
+      confirmationDeadlineAt: event.browserOnline
+        ? event.now + RECONNECT_CONFIRMATION_TIMEOUT_MS
+        : null,
+    }
   }
   if (event.type === 'browser-offline') {
     return {
@@ -99,9 +126,21 @@ export function updateConnectionTracker(
       confirmationDeadlineAt: null,
     }
   }
-  if (event.type === 'browser-online') return { ...state, browserOnline: true }
-  if (event.type === 'observed') return observeReady(state, event.observation, event.now)
+  if (event.type === 'browser-online') {
+    return {
+      ...state,
+      browserOnline: true,
+      disconnectCount: state.readyCount,
+      recovery: 'awaiting-ready',
+      confirmationDeadlineAt: event.now + RECONNECT_CONFIRMATION_TIMEOUT_MS,
+    }
+  }
+  if (event.type === 'observed') {
+    if (event.clientGeneration !== state.clientGeneration) return state
+    return observeReady(state, event.observation, event.now)
+  }
   if (event.type === 'subscription-confirmed') {
+    if (event.clientGeneration !== state.clientGeneration) return state
     const afterDisconnect = state.disconnectCount === null
       || event.connectionCount > state.disconnectCount
     if (
@@ -116,22 +155,27 @@ export function updateConnectionTracker(
       confirmationDeadlineAt: null,
     }
   }
-  if (event.type === 'confirmation-timeout') {
+  if (event.type === 'ready-timeout') {
     if (
-      state.recovery !== 'awaiting-subscription'
+      event.clientGeneration !== state.clientGeneration
+      || state.recovery !== 'awaiting-ready'
       || state.readyCount !== event.connectionCount
       || state.confirmationDeadlineAt === null
       || event.now < state.confirmationDeadlineAt
     ) return state
     return { ...state, recovery: 'unconfirmed', confirmationDeadlineAt: null }
   }
-  return {
-    ...state,
-    socketConnected: false,
-    disconnectCount: state.readyCount,
-    recovery: 'awaiting-ready',
-    confirmationDeadlineAt: null,
+  if (event.type === 'confirmation-timeout') {
+    if (
+      event.clientGeneration !== state.clientGeneration
+      || state.recovery !== 'awaiting-subscription'
+      || state.readyCount !== event.connectionCount
+      || state.confirmationDeadlineAt === null
+      || event.now < state.confirmationDeadlineAt
+    ) return state
+    return { ...state, recovery: 'unconfirmed', confirmationDeadlineAt: null }
   }
+  return state
 }
 
 export function deriveConnectionMode(state: ConnectionTracker): ConnectionMode {
@@ -147,4 +191,12 @@ export function deriveConnectionMode(state: ConnectionTracker): ConnectionMode {
 
 export function needsConnectionRecreate(state: ConnectionTracker): boolean {
   return state.recovery === 'unconfirmed'
+}
+
+export function retainLastConfirmed<T>(
+  mode: ConnectionMode,
+  current: T,
+  lastConfirmed: T | null,
+): T {
+  return mode === 'online' || lastConfirmed === null ? current : lastConfirmed
 }
