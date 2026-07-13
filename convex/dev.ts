@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation } from './_generated/server'
+import { internalMutation } from './_generated/server'
 import { assertId, assertShortText, assertTimestamp } from './lib'
 
 const tableNames = [
@@ -27,7 +27,7 @@ function assertIsolatedDevelopmentDeployment(deploymentName: string): void {
   }
 }
 
-export const seed = mutation({
+export const seed = internalMutation({
   args: {
     deploymentName: v.string(),
     installationId: v.string(),
@@ -58,7 +58,7 @@ export const seed = mutation({
   },
 })
 
-export const resetInstallation = mutation({
+export const resetInstallation = internalMutation({
   args: {
     deploymentName: v.string(),
     installationId: v.string(),

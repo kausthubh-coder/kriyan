@@ -129,6 +129,7 @@ export const taskValue = v.object({
   revision: v.number(),
   createdAt: v.number(),
   updatedAt: v.number(),
+  deletedAt: v.optional(v.number()),
 })
 
 export const reminderValue = v.object({
@@ -142,6 +143,7 @@ export const reminderValue = v.object({
   revision: v.number(),
   createdAt: v.number(),
   updatedAt: v.number(),
+  deletedAt: v.optional(v.number()),
 })
 
 export const transitionResult = v.union(
@@ -155,6 +157,9 @@ export const transitionResult = v.union(
       v.literal('lease_expired'),
       v.literal('not_lease_owner'),
       v.literal('attempts_exhausted'),
+      v.literal('inactive_node'),
+      v.literal('stale_heartbeat'),
+      v.literal('missing_capability'),
     ),
   }),
 )

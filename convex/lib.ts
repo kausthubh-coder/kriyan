@@ -7,6 +7,12 @@ const LIMITS = {
   capabilities: 64,
 } as const
 
+export const NODE_HEARTBEAT_TIMEOUT_MS = 60_000
+export const MAX_LEASE_DURATION_MS = 30_000
+export const MAX_PAGE_SIZE = 100
+export const MAX_EVENT_BATCH_SIZE = 32
+export const MAX_EVENT_BATCH_DATA = 65_536
+
 export function assertBoundedString(
   value: string,
   name: string,
@@ -52,6 +58,12 @@ export function assertPositiveInteger(
 ): void {
   if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
     throw new Error(`${name} must be an integer between 1 and ${maximum}`)
+  }
+}
+
+export function assertExpectedRevision(value: number): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('expectedRevision must be a non-negative safe integer')
   }
 }
 

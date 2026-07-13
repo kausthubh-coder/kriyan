@@ -1,11 +1,17 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from 'convex/server'
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
 import {
   assertId,
   assertInput,
+  assertExpectedRevision,
   assertPositiveInteger,
   assertTimestamp,
+  MAX_PAGE_SIZE,
   withoutSystemFields,
 } from './lib'
 import { commandValue, jobValue } from './validators'
@@ -138,17 +144,124 @@ export const get = query({
 })
 
 export const list = query({
-  args: { installationId: v.string() },
-  returns: v.array(commandValue),
+  args: {
+    installationId: v.string(),
+    status: v.optional(
+      v.union(
+        v.literal('accepted'),
+        v.literal('completed'),
+        v.literal('failed'),
+        v.literal('cancelled'),
+      ),
+    ),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: paginationResultValidator(commandValue),
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
-    const commands = await ctx.db
+    assertPositiveInteger(
+      args.paginationOpts.numItems,
+      'paginationOpts.numItems',
+      MAX_PAGE_SIZE,
+    )
+    const page =
+      args.status === undefined
+        ? await ctx.db
+            .query('commands')
+            .withIndex('by_installation_command', (q) =>
+              q.eq('installationId', args.installationId),
+            )
+            .paginate(args.paginationOpts)
+        : await ctx.db
+            .query('commands')
+            .withIndex('by_installation_status', (q) =>
+              q
+                .eq('installationId', args.installationId)
+                .eq('status', args.status!),
+            )
+            .paginate(args.paginationOpts)
+    return { ...page, page: page.page.map(withoutSystemFields) }
+  },
+})
+
+export const retry = mutation({
+  args: {
+    installationId: v.string(),
+    commandId: v.string(),
+    expectedCommandRevision: v.number(),
+    expectedJobRevision: v.number(),
+    now: v.number(),
+  },
+  returns: v.union(
+    v.object({
+      ok: v.literal(true),
+      commandRevision: v.number(),
+      jobRevision: v.number(),
+    }),
+    v.object({
+      ok: v.literal(false),
+      reason: v.union(
+        v.literal('not_found'),
+        v.literal('stale_revision'),
+        v.literal('invalid_state'),
+        v.literal('attempts_exhausted'),
+      ),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    assertId(args.commandId, 'commandId')
+    assertExpectedRevision(args.expectedCommandRevision)
+    assertExpectedRevision(args.expectedJobRevision)
+    assertTimestamp(args.now, 'now')
+    const command = await ctx.db
       .query('commands')
       .withIndex('by_installation_command', (q) =>
-        q.eq('installationId', args.installationId),
+        q
+          .eq('installationId', args.installationId)
+          .eq('commandId', args.commandId),
       )
-      .collect()
-    return commands.map(withoutSystemFields)
+      .unique()
+    const job = await ctx.db
+      .query('jobs')
+      .withIndex('by_installation_command', (q) =>
+        q
+          .eq('installationId', args.installationId)
+          .eq('commandId', args.commandId),
+      )
+      .unique()
+    if (command === null || job === null)
+      return { ok: false as const, reason: 'not_found' as const }
+    if (
+      command.revision !== args.expectedCommandRevision ||
+      job.revision !== args.expectedJobRevision
+    ) {
+      return { ok: false as const, reason: 'stale_revision' as const }
+    }
+    if (command.status !== 'failed' || job.status !== 'failed') {
+      return { ok: false as const, reason: 'invalid_state' as const }
+    }
+    if (job.attempt >= job.maxAttempts) {
+      return { ok: false as const, reason: 'attempts_exhausted' as const }
+    }
+    await ctx.db.patch(command._id, {
+      status: 'accepted',
+      revision: command.revision + 1,
+      updatedAt: args.now,
+    })
+    await ctx.db.patch(job._id, {
+      status: 'queued',
+      lastError: undefined,
+      leaseOwnerNodeId: undefined,
+      leaseExpiresAt: undefined,
+      revision: job.revision + 1,
+      updatedAt: args.now,
+    })
+    return {
+      ok: true as const,
+      commandRevision: command.revision + 1,
+      jobRevision: job.revision + 1,
+    }
   },
 })
 
@@ -173,6 +286,7 @@ export const cancel = mutation({
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     assertId(args.commandId, 'commandId')
+    assertExpectedRevision(args.expectedRevision)
     assertTimestamp(args.now, 'now')
     const command = await ctx.db
       .query('commands')

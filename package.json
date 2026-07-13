@@ -14,7 +14,8 @@
     "deploy:convex": "bunx convex deploy",
     "codegen:convex": "bunx convex codegen --typecheck enable",
     "typecheck:convex": "bunx tsc -p convex/tsconfig.json --noEmit",
-    "test:convex": "bunx vitest run convex",
+    "test:convex": "bunx vitest run convex/control-plane.test.ts",
+    "smoke:convex-worker": "bun --env-file=.env.local scripts/convex-worker-smoke.ts",
     "lint": "bun run lint:web && bun run lint:mobile",
     "lint:web": "cd web && bun run lint",
     "lint:mobile": "cd mobile && bun run lint"

@@ -65,8 +65,16 @@ export default defineSchema({
   })
     .index('by_installation_job', ['installationId', 'jobId'])
     .index('by_installation_command', ['installationId', 'commandId'])
-    .index('by_installation_status', ['installationId', 'status'])
-    .index('by_installation_lease', ['installationId', 'leaseExpiresAt']),
+    .index('by_installation_status_created', [
+      'installationId',
+      'status',
+      'createdAt',
+    ])
+    .index('by_installation_lease', ['installationId', 'leaseExpiresAt'])
+    .index('by_installation_lease_owner', [
+      'installationId',
+      'leaseOwnerNodeId',
+    ]),
 
   runs: defineTable({
     installationId: v.string(),
@@ -114,10 +122,12 @@ export default defineSchema({
     revision: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
   })
     .index('by_installation_task', ['installationId', 'taskId'])
     .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
-    .index('by_installation_status_due', ['installationId', 'status', 'dueAt']),
+    .index('by_installation_status_due', ['installationId', 'status', 'dueAt'])
+    .index('by_installation_due', ['installationId', 'dueAt']),
 
   reminders: defineTable({
     installationId: v.string(),
@@ -130,6 +140,7 @@ export default defineSchema({
     revision: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
   })
     .index('by_installation_reminder', ['installationId', 'reminderId'])
     .index('by_installation_idempotency', ['installationId', 'idempotencyKey'])
@@ -137,5 +148,6 @@ export default defineSchema({
       'installationId',
       'status',
       'remindAt',
-    ]),
+    ])
+    .index('by_installation_time', ['installationId', 'remindAt']),
 })

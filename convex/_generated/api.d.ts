@@ -9,12 +9,13 @@
  */
 
 import type * as commands from "../commands.js";
-import type * as coordination from "../coordination.js";
 import type * as dev from "../dev.js";
 import type * as installations from "../installations.js";
 import type * as lib from "../lib.js";
+import type * as projections from "../projections.js";
 import type * as read from "../read.js";
 import type * as validators from "../validators.js";
+import type * as worker from "../worker.js";
 
 import type {
   ApiFromModules,
@@ -24,12 +25,13 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   commands: typeof commands;
-  coordination: typeof coordination;
   dev: typeof dev;
   installations: typeof installations;
   lib: typeof lib;
+  projections: typeof projections;
   read: typeof read;
   validators: typeof validators;
+  worker: typeof worker;
 }>;
 
 /**
