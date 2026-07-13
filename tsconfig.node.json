@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "types": ["bun"]
+  },
+  "include": [
+    "apps/node/**/*.ts",
+    "apps/cli/**/*.ts",
+    "packages/agent-runtime/**/*.ts",
+    "packages/tools/**/*.ts",
+    "packages/convex-client/**/*.ts"
+  ]
+}

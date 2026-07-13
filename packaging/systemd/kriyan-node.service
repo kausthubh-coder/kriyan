@@ -1,0 +1,24 @@
+[Unit]
+Description=Kriyan Agent Node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kriyan
+Group=kriyan
+WorkingDirectory=/var/lib/kriyan
+ExecStart=/usr/local/bin/bun /opt/kriyan/current/apps/node/src/main.ts --config /etc/kriyan/node.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=45s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/kriyan
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+{
+  "name": "@kriyan/agent-runtime",
+  "type": "module",
+  "private": true,
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@kriyan/tools": "workspace:*"
+  }
+}

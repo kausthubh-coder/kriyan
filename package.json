@@ -3,6 +3,8 @@
   "type": "module",
   "private": true,
   "workspaces": [
+    "apps/*",
+    "packages/*",
     "web",
     "mobile"
   ],
@@ -18,6 +20,10 @@
     "test:convex": "bunx vitest run convex/control-plane.test.ts",
     "check:convex-metadata": "bun scripts/assert-convex-function-spec.ts",
     "smoke:convex-worker": "bun --env-file=.env.local scripts/convex-worker-smoke.ts",
+    "typecheck:node": "bunx tsc -p tsconfig.node.json --noEmit",
+    "test:node": "bun test apps/node/test packages/agent-runtime/test packages/tools/test apps/cli/test",
+    "test:node:live": "bun --env-file=.env.local apps/node/test/live-convex.ts",
+    "kriyan": "bun apps/cli/src/main.ts",
     "lint": "bun run lint:web && bun run lint:mobile",
     "lint:web": "cd web && bun run lint",
     "lint:mobile": "cd mobile && bun run lint"
@@ -30,6 +36,8 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-coding-agent": "0.80.6",
     "btca": "^1.0.41",
     "convex": "^1.42.1"
   }

@@ -1,0 +1,11 @@
+{
+  "name": "@kriyan/node",
+  "type": "module",
+  "private": true,
+  "bin": { "kriyan-node": "./src/main.ts" },
+  "dependencies": {
+    "@kriyan/agent-runtime": "workspace:*",
+    "@kriyan/convex-client": "workspace:*",
+    "@kriyan/tools": "workspace:*"
+  }
+}
