@@ -2,7 +2,11 @@ import { appendFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } fro
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 
-import { type PreparedEffect, validatePreparedEffect } from '@kriyan/tools'
+import {
+  type PreparedEffect,
+  type ProductToolCall,
+  validatePreparedEffect,
+} from '@kriyan/tools'
 
 export interface ShutdownBoundary {
   requestedAt: number
@@ -21,6 +25,9 @@ export interface RunCheckpoint {
   completed: boolean
   shutdown?: ShutdownBoundary
   piSessionFile?: string
+  piSessionRef?: string
+  assistantContent?: string
+  pendingToolCalls?: ProductToolCall[]
 }
 
 const MAX_TRANSCRIPT_BYTES = 5 * 1024 * 1024
@@ -43,6 +50,10 @@ function isCheckpoint(value: unknown, runId: string): value is RunCheckpoint {
     checkpoint.preparedEffects !== null &&
     Object.values(checkpoint.preparedEffects).every(validatePreparedEffect) &&
     typeof checkpoint.completed === 'boolean' &&
+    (checkpoint.piSessionFile === undefined || typeof checkpoint.piSessionFile === 'string') &&
+    (checkpoint.piSessionRef === undefined || typeof checkpoint.piSessionRef === 'string') &&
+    (checkpoint.assistantContent === undefined || typeof checkpoint.assistantContent === 'string') &&
+    (checkpoint.pendingToolCalls === undefined || Array.isArray(checkpoint.pendingToolCalls)) &&
     (checkpoint.shutdown === undefined ||
       (Number.isSafeInteger(checkpoint.shutdown.requestedAt) &&
         ['requested', 'released'].includes(checkpoint.shutdown.phase) &&
@@ -65,6 +76,41 @@ export class LocalRunStore {
 
   checkpointPath(runId: string): string {
     return join(this.runDir(runId), 'checkpoint.json')
+  }
+
+  private sessionRegistryPath(): string {
+    return join(this.dataDir, 'pi-sessions.json')
+  }
+
+  async resolvePiSession(piSessionRef: string): Promise<string | undefined> {
+    try {
+      const value: unknown = JSON.parse(await readFile(this.sessionRegistryPath(), 'utf8'))
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+      const path = (value as Record<string, unknown>)[piSessionRef]
+      return typeof path === 'string' ? path : undefined
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+      throw error
+    }
+  }
+
+  async bindPiSession(piSessionRef: string, sessionFile: string): Promise<void> {
+    let sessions: Record<string, string> = {}
+    try {
+      const value: unknown = JSON.parse(await readFile(this.sessionRegistryPath(), 'utf8'))
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        sessions = Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] =>
+          typeof entry[1] === 'string',
+        ))
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    const path = this.sessionRegistryPath()
+    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
+    await mkdir(this.dataDir, { recursive: true, mode: 0o700 })
+    await writeFile(temporary, `${JSON.stringify({ ...sessions, [piSessionRef]: sessionFile })}\n`, { mode: 0o600 })
+    await rename(temporary, path)
   }
 
   async prepare(runId: string): Promise<void> {

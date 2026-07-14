@@ -1,4 +1,9 @@
 import { ConvexClient } from 'convex/browser'
+import type {
+  WorkerOperation,
+  WorkerOperationInputMap,
+  WorkerOperationResultMap,
+} from '@kriyan/contracts'
 
 import { api } from '../../../convex/_generated/api'
 
@@ -9,6 +14,10 @@ import {
   type ProjectionUpsertResult,
   type SourceRefProjectionInput,
 } from './knowledge-projections'
+import {
+  createWorkerContractClient,
+  type WorkerContractClient,
+} from './worker-contract'
 
 export * from './knowledge-projections'
 export * from './worker-contract'
@@ -201,14 +210,39 @@ function requireUrl(value: string): string {
 }
 
 export class ConvexControlPlane
-  implements ControlPlane, KnowledgeProjectionPlane
+  implements ControlPlane, KnowledgeProjectionPlane, WorkerContractClient
 {
   private readonly client: ConvexClient
   private readonly knowledge: KnowledgeProjectionPlane
+  private readonly worker: WorkerContractClient
 
   constructor(url: string) {
     this.client = new ConvexClient(requireUrl(url))
     this.knowledge = createKnowledgeProjectionPlane(this.client)
+    this.worker = createWorkerContractClient(this.client)
+  }
+
+  async invoke<Operation extends WorkerOperation>(
+    operation: Operation,
+    input: WorkerOperationInputMap[Operation],
+  ): Promise<WorkerOperationResultMap[Operation]> {
+    return await this.worker.invoke(operation, input)
+  }
+
+  async upsertSourceExcerpt(input: WorkerOperationInputMap['memory.source-excerpt.upsert']) {
+    return await this.worker.upsertSourceExcerpt(input)
+  }
+
+  async upsertSourceExtraction(input: WorkerOperationInputMap['memory.source-extraction.upsert']) {
+    return await this.worker.upsertSourceExtraction(input)
+  }
+
+  async recordReversibleChange(input: WorkerOperationInputMap['memory.reversible-change.record']) {
+    return await this.worker.recordReversibleChange(input)
+  }
+
+  async upsertMemoryFact(input: WorkerOperationInputMap['memory.fact.upsert']) {
+    return await this.worker.upsertMemoryFact(input)
   }
 
   async registerNode(input: NodeRegistration) {

@@ -173,11 +173,71 @@ export interface EffectLinkage {
 
 export type EffectPhase = 'prepared' | 'committing' | 'committed'
 
+export type ProductEffectType = 'task' | 'reminder' | 'note' | 'source' | 'knowledge'
+
+export interface TaskEffectPayload {
+  action: 'create' | 'update' | 'complete' | 'tombstone'
+  taskId: string
+  expectedTargetRevision?: number
+  title?: string
+  description?: string
+  dueAt?: number
+}
+
+export interface ReminderEffectPayload {
+  action: 'create' | 'update' | 'acknowledge' | 'snooze' | 'tombstone'
+  reminderId: string
+  expectedTargetRevision?: number
+  message?: string
+  remindAt?: number
+  timezone?: string
+}
+
+export interface NoteEffectPayload {
+  action: 'create' | 'update' | 'archive'
+  noteId: string
+  expectedTargetRevision?: number
+  title?: string
+  contentJson?: string
+  plainTextPreview?: string
+  wordCount?: number
+}
+
+export interface SourceEffectPayload {
+  action: 'create' | 'update' | 'tombstone'
+  sourceRefId: string
+  expectedTargetRevision?: number
+  displayName?: string
+  sourceKind?: string
+}
+
+export interface KnowledgeEffectPayload {
+  action: 'create' | 'update' | 'tombstone'
+  knowledgeDocumentId: string
+  expectedTargetRevision?: number
+  title?: string
+  summary?: string
+  knowledgeKind?: string
+}
+
+export interface ProductEffectPayloadMap {
+  task: TaskEffectPayload
+  reminder: ReminderEffectPayload
+  note: NoteEffectPayload
+  source: SourceEffectPayload
+  knowledge: KnowledgeEffectPayload
+}
+
+export interface ProductToolCall<Type extends ProductEffectType = ProductEffectType> {
+  tool: `kriyan.${Type}`
+  input: ProductEffectPayloadMap[Type]
+}
+
 export interface PreparedEffect<T = unknown> {
   schemaVersion: 1
   effectId: string
   idempotencyKey: string
-  type: 'reminder'
+  type: ProductEffectType
   payload: T
   payloadHash: string
   phase: EffectPhase
@@ -195,12 +255,17 @@ export interface EffectCommitter {
   }): Promise<{ created: boolean }>
 }
 
+export interface ProductEffectCommitter {
+  commit(effect: PreparedEffect): Promise<{ created: boolean }>
+}
+
 export interface ToolContext {
   signal: AbortSignal
   effectId: string
   idempotencyKey: string
   linkage: EffectLinkage
   committer?: EffectCommitter
+  productCommitter?: ProductEffectCommitter
 }
 
 export interface StructuredToolResult<T = unknown> {
@@ -242,7 +307,7 @@ export function effectPayloadHash(payload: unknown): string {
 export function validatePreparedEffect(effect: PreparedEffect): boolean {
   return (
     effect.schemaVersion === 1 &&
-    effect.type === 'reminder' &&
+    ['task', 'reminder', 'note', 'source', 'knowledge'].includes(effect.type) &&
     /^[A-Za-z0-9:._-]{1,512}$/.test(effect.effectId) &&
     /^[A-Za-z0-9:._-]{1,512}$/.test(effect.idempotencyKey) &&
     effectPayloadHash(effect.payload) === effect.payloadHash &&
@@ -253,6 +318,122 @@ export function validatePreparedEffect(effect: PreparedEffect): boolean {
     typeof effect.linkage.runId === 'string' &&
     Number.isSafeInteger(effect.linkage.attempt)
   )
+}
+
+function validProductPayload(type: ProductEffectType, input: unknown): boolean {
+  if (!isRecord(input)) return false
+  const action = input.action
+  if (type === 'task') {
+    return ['create', 'update', 'complete', 'tombstone'].includes(String(action)) &&
+      isNonEmptyString(input.taskId)
+  }
+  if (type === 'reminder') {
+    return ['create', 'update', 'acknowledge', 'snooze', 'tombstone'].includes(String(action)) &&
+      isNonEmptyString(input.reminderId)
+  }
+  if (type === 'note') {
+    return ['create', 'update', 'archive'].includes(String(action)) && isNonEmptyString(input.noteId)
+  }
+  if (type === 'source') {
+    return ['create', 'update', 'tombstone'].includes(String(action)) &&
+      isNonEmptyString(input.sourceRefId)
+  }
+  return ['create', 'update', 'tombstone'].includes(String(action)) &&
+    isNonEmptyString(input.knowledgeDocumentId)
+}
+
+function productTool<Type extends Exclude<ProductEffectType, 'reminder'>>(
+  type: Type,
+): CapabilityTool<ProductEffectPayloadMap[Type], ProductEffectPayloadMap[Type]> {
+  return {
+    name: `kriyan.${type}`,
+    effectType: type,
+    async prepare(input, context) {
+      if (context.signal.aborted) {
+        return { ok: false, error: { code: 'cancelled', message: 'run cancelled', retryable: false } }
+      }
+      if (!validProductPayload(type, input)) {
+        return { ok: false, error: { code: `invalid_${type}`, message: `invalid ${type} effect`, retryable: false } }
+      }
+      return {
+        ok: true,
+        value: {
+          schemaVersion: 1,
+          effectId: context.effectId,
+          idempotencyKey: context.idempotencyKey,
+          type,
+          payload: input,
+          payloadHash: effectPayloadHash(input),
+          phase: 'prepared',
+          linkage: context.linkage,
+        },
+      }
+    },
+    async commit(effect, context) {
+      if (context.productCommitter === undefined) {
+        return { ok: false, error: { code: 'committer_missing', message: 'effect committer is unavailable', retryable: true } }
+      }
+      try {
+        return { ok: true, value: await context.productCommitter.commit(effect) }
+      } catch {
+        return { ok: false, error: { code: 'effect_commit_failed', message: 'effect commit failed', retryable: true } }
+      }
+    },
+    async reconcile(effect, context) {
+      return await this.commit(effect, context)
+    },
+  }
+}
+
+function productReminderTool(): CapabilityTool<ReminderEffectPayload, ReminderEffectPayload> {
+  return {
+    name: 'kriyan.reminder',
+    effectType: 'reminder',
+    async prepare(input, context) {
+      if (context.signal.aborted) {
+        return { ok: false, error: { code: 'cancelled', message: 'run cancelled', retryable: false } }
+      }
+      if (!validProductPayload('reminder', input)) {
+        return { ok: false, error: { code: 'invalid_reminder', message: 'invalid reminder effect', retryable: false } }
+      }
+      return {
+        ok: true,
+        value: {
+          schemaVersion: 1,
+          effectId: context.effectId,
+          idempotencyKey: context.idempotencyKey,
+          type: 'reminder',
+          payload: input,
+          payloadHash: effectPayloadHash(input),
+          phase: 'prepared',
+          linkage: context.linkage,
+        },
+      }
+    },
+    async commit(effect, context) {
+      if (context.productCommitter === undefined) {
+        return { ok: false, error: { code: 'committer_missing', message: 'effect committer is unavailable', retryable: true } }
+      }
+      try {
+        return { ok: true, value: await context.productCommitter.commit(effect) }
+      } catch {
+        return { ok: false, error: { code: 'effect_commit_failed', message: 'effect commit failed', retryable: true } }
+      }
+    },
+    async reconcile(effect, context) {
+      return await this.commit(effect, context)
+    },
+  }
+}
+
+export function productToolRegistry(): CapabilityRegistry {
+  const registry = new CapabilityRegistry()
+  registry.register(productTool('task'))
+  registry.register(productReminderTool())
+  registry.register(productTool('note'))
+  registry.register(productTool('source'))
+  registry.register(productTool('knowledge'))
+  return registry
 }
 
 export class CapabilityRegistry {

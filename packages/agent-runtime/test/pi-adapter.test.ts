@@ -4,7 +4,12 @@ import { join } from 'node:path'
 
 import { expect, test } from 'bun:test'
 
-import { createFauxPiFactory, LocalPiSessionFactory, PiAgentRuntime } from '../src'
+import {
+  createFauxPiConversationFactory,
+  createFauxPiFactory,
+  LocalPiSessionFactory,
+  PiAgentRuntime,
+} from '../src'
 
 test('official Pi AgentSession faux provider runs through the thin adapter', async () => {
   const workspace = await mkdtemp(join(tmpdir(), 'kriyan-pi-'))
@@ -31,6 +36,39 @@ test('official Pi AgentSession faux provider runs through the thin adapter', asy
     await session.dispose()
     expect(result.products).toEqual([expected])
     expect(events).toContain('message')
+    expect(faux.provider.state.callCount).toBe(1)
+  } finally {
+    faux.dispose()
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test('official Pi adapter returns bounded agent text and typed Kriyan tool calls', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'kriyan-pi-agent-'))
+  const output = {
+    assistantContent: 'I added the Korean task.',
+    toolCalls: [{
+      tool: 'kriyan.task' as const,
+      input: { action: 'create' as const, taskId: 'task:korean', title: 'Practice Korean' },
+    }],
+  }
+  const faux = createFauxPiConversationFactory(output)
+  try {
+    const runtime = new PiAgentRuntime(faux.factory)
+    const session = await runtime.createSession('run:agent', workspace)
+    const streamed: string[] = []
+    const result = await session.run({
+      runId: 'run:agent', input: 'Add a Korean task', workspace,
+      signal: new AbortController().signal, mode: 'agent-turn',
+      systemPrompt: 'Help the owner.', messages: [], toolCapabilities: ['task.write'],
+    }, async (event) => {
+      if (event.type === 'message') streamed.push(event.data)
+    })
+    await session.dispose()
+    expect(result.assistantContent).toBe(output.assistantContent)
+    expect(result.toolCalls).toEqual(output.toolCalls)
+    expect(streamed.join('')).toBe(output.assistantContent)
+    expect(streamed.join('')).not.toContain('kriyan-result')
     expect(faux.provider.state.callCount).toBe(1)
   } finally {
     faux.dispose()
