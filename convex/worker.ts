@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { REMINDER_CAPABILITY } from '@kriyan/contracts'
+import { canonicalContentHash, REMINDER_CAPABILITY } from '@kriyan/contracts'
 
 import type { Doc } from './_generated/dataModel'
 import { internalMutation, mutation, type MutationCtx } from './_generated/server'
@@ -38,6 +38,12 @@ const CLAIM_ACTIVE_READ_LIMIT = 64
 
 type NodeFailure = 'inactive_node' | 'stale_heartbeat' | 'missing_capability'
 
+type ClaimCursor = Doc<'projectionCursors'>
+
+function claimCursorId(nodeId: string): string {
+  return `worker-claim:${canonicalContentHash(JSON.stringify(nodeId)).slice('sha256:'.length)}`
+}
+
 async function collectActiveJobs(
   ctx: MutationCtx,
   installationId: string,
@@ -54,13 +60,110 @@ async function collectActiveJobs(
 async function collectQueuedJobs(
   ctx: MutationCtx,
   installationId: string,
+  cursor: ClaimCursor | null,
 ): Promise<Doc<'jobs'>[]> {
+  if (cursor?.pageCursor === undefined) {
+    return await ctx.db
+      .query('jobs')
+      .withIndex('by_installation_status_created', (q) =>
+        q.eq('installationId', installationId).eq('status', 'queued'),
+      )
+      .take(CLAIM_QUEUE_READ_LIMIT)
+  }
+
+  const current = await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_status_created', (q) =>
+      q
+        .eq('installationId', installationId)
+        .eq('status', 'queued')
+        .eq('createdAt', cursor.cursor)
+        .eq('jobId', cursor.pageCursor!),
+    )
+    .unique()
+  const tied = await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_status_created', (q) =>
+      q
+        .eq('installationId', installationId)
+        .eq('status', 'queued')
+        .eq('createdAt', cursor.cursor)
+        .gt('jobId', cursor.pageCursor!),
+    )
+    .take(CLAIM_QUEUE_READ_LIMIT - (current === null ? 0 : 1))
+  const prefix = current === null ? tied : [current, ...tied]
+  if (prefix.length === CLAIM_QUEUE_READ_LIMIT) return prefix
+  const later = await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_status_created', (q) =>
+      q
+        .eq('installationId', installationId)
+        .eq('status', 'queued')
+        .gt('createdAt', cursor.cursor),
+    )
+    .take(CLAIM_QUEUE_READ_LIMIT - prefix.length)
+  const continued = [...prefix, ...later]
+  if (continued.length > 0 || current !== null) return continued
   return await ctx.db
     .query('jobs')
     .withIndex('by_installation_status_created', (q) =>
       q.eq('installationId', installationId).eq('status', 'queued'),
     )
     .take(CLAIM_QUEUE_READ_LIMIT)
+}
+
+async function getClaimCursor(
+  ctx: MutationCtx,
+  installationId: string,
+  nodeId: string,
+): Promise<ClaimCursor | null> {
+  return await ctx.db
+    .query('projectionCursors')
+    .withIndex('by_installation_cursor', (q) =>
+      q.eq('installationId', installationId).eq('cursorId', claimCursorId(nodeId)),
+    )
+    .unique()
+}
+
+async function setClaimCursor(
+  ctx: MutationCtx,
+  cursor: ClaimCursor | null,
+  installationId: string,
+  nodeId: string,
+  job: Doc<'jobs'> | null,
+  now: number,
+): Promise<void> {
+  const queuedCreatedAt = job?.createdAt ?? 0
+  const queuedJobId = job?.jobId
+  if (cursor === null) {
+    if (job === null) return
+    await ctx.db.insert('projectionCursors', {
+      installationId,
+      cursorId: claimCursorId(nodeId),
+      vaultId: nodeId,
+      cursor: queuedCreatedAt,
+      pageCursor: queuedJobId,
+      mode: 'worker-claim-v1',
+      revision: 0,
+      createdAt: now,
+      updatedAt: now,
+    })
+    return
+  }
+  if (
+    cursor.cursor === queuedCreatedAt
+    && cursor.pageCursor === queuedJobId
+  ) return
+  if (job === null) {
+    await ctx.db.delete(cursor._id)
+    return
+  }
+  await ctx.db.patch(cursor._id, {
+    cursor: queuedCreatedAt,
+    pageCursor: queuedJobId,
+    revision: cursor.revision + 1,
+    updatedAt: now,
+  })
 }
 
 async function recordClaimTransactionMetrics(ctx: MutationCtx): Promise<void> {
@@ -381,21 +484,18 @@ async function terminalizeExhaustedJob(
   await finalizeAgentTurn(ctx, job, 'failed', now)
 }
 
-async function agentJobIsHeadOfLine(
+async function agentJobClaimability(
   ctx: MutationCtx,
   job: Doc<'jobs'>,
   nodeId: string,
-): Promise<boolean> {
-  if (job.threadId === undefined || job.turnId === undefined || job.turnOrdinal === undefined) return true
+): Promise<'eligible' | 'rotatable' | 'blocked'> {
+  if (job.threadId === undefined || job.turnId === undefined || job.turnOrdinal === undefined) return 'eligible'
+  if (job.preferredNodeId !== undefined && job.preferredNodeId !== nodeId) return 'rotatable'
   const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
   const preferredNodeId = thread?.preferredNodeId ?? job.preferredNodeId
-  if (preferredNodeId !== undefined && preferredNodeId !== nodeId) {
-    const message = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).first()
-    if (message?.state === 'queued') await ctx.db.patch(message._id, { state: 'waiting_for_node', updatedAt: Date.now() })
-    return false
-  }
-  if (thread === null || thread.deletedAt !== undefined) return false
-  if (thread.activeTurnId !== undefined && thread.activeTurnId !== job.turnId) return false
+  if (preferredNodeId !== undefined && preferredNodeId !== nodeId) return 'rotatable'
+  if (thread === null || thread.deletedAt !== undefined) return 'rotatable'
+  if (thread.activeTurnId !== undefined && thread.activeTurnId !== job.turnId) return 'blocked'
   const activeStatuses = ['queued', 'leased', 'running'] as const
   const heads = await Promise.all(activeStatuses.map(async (status) =>
     await ctx.db.query('jobs').withIndex('by_installation_thread_status_ordinal', (q) => q
@@ -404,7 +504,7 @@ async function agentJobIsHeadOfLine(
       .eq('status', status)).first()))
   const head = heads.filter((candidate) => candidate !== null)
     .sort((left, right) => left.turnOrdinal! - right.turnOrdinal! || left.jobId.localeCompare(right.jobId))[0]
-  return head?._id === job._id
+  return head?._id === job._id ? 'eligible' : 'blocked'
 }
 
 async function activateAgentTurn(ctx: MutationCtx, job: Doc<'jobs'>, now: number): Promise<void> {
@@ -603,9 +703,11 @@ export const claimJob = mutation({
 
     const node = await getNode(ctx, args.installationId, args.nodeId)
     if (node === null) throw new Error('worker rejected: inactive_node')
+    const cursor = await getClaimCursor(ctx, args.installationId, args.nodeId)
     const queued = await collectQueuedJobs(
       ctx,
       args.installationId,
+      cursor,
     )
     const active = await collectActiveJobs(ctx, args.installationId)
     const reclaimable: Doc<'jobs'>[] = []
@@ -637,12 +739,21 @@ export const claimJob = mutation({
     const compatible = candidates.filter((job) => nodeFailure(node, now, requiredCapabilities(job)) === null)
     if (compatible.length === 0) {
       if (queued.length > 0 || reclaimable.length > 0) {
-        throw new Error('worker rejected: missing_capability')
+        if (
+          cursor?.pageCursor === undefined
+          && queued.length < CLAIM_QUEUE_READ_LIMIT
+        ) throw new Error('worker rejected: missing_capability')
       }
     }
     let terminalized = false
+    let temporarilyBlocked = false
     for (const job of compatible) {
-      if (!await agentJobIsHeadOfLine(ctx, job, args.nodeId)) continue
+      const claimability = await agentJobClaimability(ctx, job, args.nodeId)
+      if (claimability === 'rotatable') continue
+      if (claimability === 'blocked') {
+        temporarilyBlocked = true
+        continue
+      }
       const reclaimed = job.status !== 'queued'
       if (job.attempt >= job.maxAttempts) {
         await terminalizeExhaustedJob(ctx, job, now, 'attempts exhausted')
@@ -663,11 +774,23 @@ export const claimJob = mutation({
       }
       await activateAgentTurn(ctx, job, now)
       await ctx.db.patch(job._id, claimed)
+      if (!reclaimed && (cursor !== null || queued.length === CLAIM_QUEUE_READ_LIMIT)) {
+        await setClaimCursor(ctx, cursor, args.installationId, args.nodeId, job, now)
+      }
       await advanceClientSnapshotRevision(ctx, args.installationId)
       await recordClaimTransactionMetrics(ctx)
       return { job: claimed, reclaimed }
     }
     if (terminalized) await advanceClientSnapshotRevision(ctx, args.installationId)
+    if (!temporarilyBlocked) {
+      const last = queued.at(-1) ?? null
+      const continuation = last !== null
+        && cursor?.pageCursor === last.jobId
+        && cursor.cursor === last.createdAt
+        ? null
+        : last
+      await setClaimCursor(ctx, cursor, args.installationId, args.nodeId, continuation, now)
+    }
     await recordClaimTransactionMetrics(ctx)
     return null
   },

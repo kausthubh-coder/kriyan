@@ -154,23 +154,68 @@ export const resetInstallation = internalMutation({
         case 'artifactMaterializationHistory':
         case 'artifacts':
         case 'noteVersions':
-        case 'agentMessages':
-        case 'agentThreads':
-        case 'agentRevisions':
-        case 'agents':
         case 'provenanceLinks':
         case 'reversibleChangeSources':
         case 'reversibleChanges':
         case 'memoryFacts':
         case 'memoryCorrections':
         case 'knowledgeRelations':
-        case 'projectionCursors':
         case 'sourceTranscriptExcerpts':
         case 'sourceExtractions':
           documentIds = (
             await ctx.db
               .query(tableName)
               .filter((q) => q.eq(q.field('installationId'), args.installationId))
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'agentMessages':
+          documentIds = (
+            await ctx.db
+              .query('agentMessages')
+              .withIndex('by_installation_message', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'agentThreads':
+          documentIds = (
+            await ctx.db
+              .query('agentThreads')
+              .withIndex('by_installation_thread', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'agentRevisions':
+          documentIds = (
+            await ctx.db
+              .query('agentRevisions')
+              .withIndex('by_installation_revision', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'agents':
+          documentIds = (
+            await ctx.db
+              .query('agents')
+              .withIndex('by_installation_agent', (q) =>
+                q.eq('installationId', args.installationId),
+              )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'projectionCursors':
+          documentIds = (
+            await ctx.db
+              .query('projectionCursors')
+              .withIndex('by_installation_cursor', (q) =>
+                q.eq('installationId', args.installationId),
+              )
               .take(args.batchSize + 1)
           ).map((document) => document._id)
           break

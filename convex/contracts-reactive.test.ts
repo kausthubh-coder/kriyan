@@ -102,7 +102,7 @@ test('preserves FIFO progress across one aggregate queue window for 64 capabilit
     capabilities, protocolVersion: '1',
   })
   await t.run(async (ctx) => {
-    for (let index = 0; index < 220; index += 1) {
+    for (let index = 0; index < 256; index += 1) {
       const legacy = index % 31 === 0
       const capability = capabilities[index % capabilities.length]
       await ctx.db.insert('jobs', {
@@ -121,17 +121,20 @@ test('preserves FIFO progress across one aggregate queue window for 64 capabilit
     await ctx.db.insert('jobs', {
       installationId: 'installation:contracts', jobId: 'job:aggregate-compatible:legacy',
       commandId: 'command:aggregate-compatible:legacy', status: 'queued', attempt: 0,
-      maxAttempts: 3, revision: 0, createdAt: 221, updatedAt: 221,
+      maxAttempts: 3, revision: 0, createdAt: 257, updatedAt: 257,
     })
     await ctx.db.insert('jobs', {
       installationId: 'installation:contracts', jobId: 'job:aggregate-compatible:routed',
       commandId: 'command:aggregate-compatible:routed',
       requiredCapabilities: [capabilities[63]], routingCapability: capabilities[63],
       status: 'queued', attempt: 0, maxAttempts: 3, revision: 0,
-      createdAt: 222, updatedAt: 222,
+      createdAt: 258, updatedAt: 258,
     })
   })
 
+  expect(await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:max-capabilities', leaseDurationMs: 30_000,
+  })).toBeNull()
   const legacy = await t.mutation(api.worker.claimJob, {
     installationId: 'installation:contracts', nodeId: 'node:max-capabilities', leaseDurationMs: 30_000,
   })
@@ -149,8 +152,135 @@ test('preserves FIFO progress across one aggregate queue window for 64 capabilit
       q.eq('installationId', 'installation:contracts').eq('status', 'queued'),
     )
     .take(256))
-  expect(obstacles).toHaveLength(220)
+  expect(obstacles).toHaveLength(256)
   expect(obstacles.every((job) => job.preferredNodeId === 'node:other')).toBe(true)
+})
+
+test('continues past position 256, traverses deeper windows, and wraps to later-eligible FIFO work', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(api.worker.registerNode, {
+    installationId: 'installation:contracts', nodeId: 'node:cursor', displayName: 'Cursor node',
+    capabilities: ['reminders'], protocolVersion: '1',
+  })
+  await t.run(async (ctx) => {
+    const now = 1_000
+    await ctx.db.insert('agentThreads', {
+      installationId: 'installation:contracts', threadId: 'thread:deep:000',
+      agentId: 'agent:deep', agentRevisionId: 'agent-revision:deep',
+      nextTurnOrdinal: 2, sessionRevision: 0, createdAt: now, updatedAt: now,
+    })
+    for (let index = 0; index < 512; index += 1) {
+      const suffix = index.toString().padStart(3, '0')
+      await ctx.db.insert('jobs', {
+        installationId: 'installation:contracts', jobId: `job:deep:${suffix}`,
+        commandId: `command:deep:${suffix}`, kind: 'agent.turn.v1',
+        threadId: `thread:deep:${suffix}`, turnId: `turn:deep:${suffix}`, turnOrdinal: 1,
+        preferredNodeId: 'node:other', requiredCapabilities: ['reminders'],
+        routingCapability: 'reminders', status: 'queued', attempt: 0, maxAttempts: 3,
+        revision: 0, createdAt: now + index, updatedAt: now + index,
+      })
+    }
+    for (const [offset, label] of [[512, 'older'], [513, 'newer']] as const) {
+      await ctx.db.insert('jobs', {
+        installationId: 'installation:contracts', jobId: `job:deep-compatible:${label}`,
+        commandId: `command:deep-compatible:${label}`, requiredCapabilities: ['reminders'],
+        routingCapability: 'reminders', status: 'queued', attempt: 0, maxAttempts: 3,
+        revision: 0, createdAt: now + offset, updatedAt: now + offset,
+      })
+    }
+  })
+
+  const poll = async () => await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:cursor', leaseDurationMs: 30_000,
+  })
+  expect(await poll()).toBeNull()
+  expect(await poll()).toBeNull()
+  expect((await poll())?.job.jobId).toBe('job:deep-compatible:older')
+  expect((await poll())?.job.jobId).toBe('job:deep-compatible:newer')
+
+  await t.run(async (ctx) => {
+    const laterEligible = await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', 'job:deep:000')).unique()
+    if (laterEligible === null) throw new Error('missing later-eligibility fixture')
+    await ctx.db.patch(laterEligible._id, { preferredNodeId: undefined, revision: 1, updatedAt: 2_000 })
+  })
+  expect((await poll())?.job.jobId).toBe('job:deep:000')
+})
+
+test('derives affinity waiting state before polling and activates one maximum-size message only on selection', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(mutation('agents:create'), {
+    installationId: 'installation:contracts', agentId: 'agent:affinity-bytes',
+    agentRevisionId: 'agent-revision:affinity-bytes', displayName: 'Affinity bytes',
+    systemPrompt: 'help', toolCapabilities: [],
+  })
+  await t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:affinity-bytes',
+    agentId: 'agent:affinity-bytes', preferredNodeId: 'node:affinity-owner',
+  })
+  const submitted = await t.mutation(mutation('agents:submitMessage'), {
+    installationId: 'installation:contracts', threadId: 'thread:affinity-bytes',
+    commandId: 'command:affinity-bytes', messageId: 'message:affinity-bytes',
+    idempotencyKey: 'intent:affinity-bytes', content: 'x'.repeat(65_536), maxAttempts: 3,
+  })
+  expect(submitted.message.state).toBe('waiting_for_node')
+  for (const nodeId of ['node:scanner', 'node:affinity-owner']) {
+    await t.mutation(api.worker.registerNode, {
+      installationId: 'installation:contracts', nodeId, displayName: nodeId,
+      capabilities: [AGENT_CHAT_CAPABILITY], protocolVersion: '1',
+    })
+  }
+  expect(await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:scanner', leaseDurationMs: 30_000,
+  })).toBeNull()
+  expect((await t.query(query('agents:listMessages'), {
+    installationId: 'installation:contracts', threadId: 'thread:affinity-bytes',
+    paginationOpts: { cursor: null, numItems: 10 },
+  })).page[0]?.state).toBe('waiting_for_node')
+  expect((await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:affinity-owner', leaseDurationMs: 30_000,
+  }))?.job.jobId).toBe(submitted.job.jobId)
+  expect((await t.query(query('agents:listMessages'), {
+    installationId: 'installation:contracts', threadId: 'thread:affinity-bytes',
+    paginationOpts: { cursor: null, numItems: 10 },
+  })).page[0]?.state).toBe('active')
+})
+
+test('lease ordering surfaces an expired active row beyond 64 healthy non-expired rows', async () => {
+  const t = backend(); await installation(t)
+  for (const nodeId of ['node:active-claimant', 'node:healthy-owner']) {
+    await t.mutation(api.worker.registerNode, {
+      installationId: 'installation:contracts', nodeId, displayName: nodeId,
+      capabilities: ['reminders'], protocolVersion: '1',
+    })
+  }
+  await t.run(async (ctx) => {
+    for (let index = 0; index < 64; index += 1) {
+      await ctx.db.insert('jobs', {
+        installationId: 'installation:contracts',
+        jobId: `job:healthy-active:${index.toString().padStart(2, '0')}`,
+        commandId: `command:healthy-active:${index.toString().padStart(2, '0')}`,
+        requiredCapabilities: ['reminders'], routingCapability: 'reminders',
+        status: 'running', attempt: 1, maxAttempts: 3,
+        leaseOwnerNodeId: 'node:healthy-owner', leaseExpiresAt: 2_000,
+        leaseToken: `lease:healthy:${index}`, revision: 1,
+        createdAt: index + 1, updatedAt: index + 1,
+      })
+    }
+    await ctx.db.insert('jobs', {
+      installationId: 'installation:contracts', jobId: 'job:expired-after-64',
+      commandId: 'command:expired-after-64', requiredCapabilities: ['reminders'],
+      routingCapability: 'reminders', status: 'leased', attempt: 1, maxAttempts: 3,
+      leaseOwnerNodeId: 'node:expired-owner', leaseExpiresAt: 999,
+      leaseToken: 'lease:expired-after-64', revision: 1,
+      createdAt: 100, updatedAt: 100,
+    })
+  })
+  const claim = await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:active-claimant', leaseDurationMs: 30_000,
+  })
+  expect(claim?.job.jobId).toBe('job:expired-after-64')
+  expect(claim?.reclaimed).toBe(true)
 })
 
 test('reclaims mixed active statuses and terminalizes one exhausted agent turn before the next FIFO job', async () => {

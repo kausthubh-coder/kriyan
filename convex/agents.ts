@@ -140,7 +140,7 @@ export const submitMessage = mutation({
     if (assistantCollision !== null) throw new Error('deterministic assistant messageId already exists')
     const now = Date.now()
     const common = { installationId: args.installationId, contractVersion: CONTRACT_VERSION, kind: JOB_KINDS.agentTurn, threadId: args.threadId, turnId, turnOrdinal: ordinal, agentRevisionId: pinnedRevisionId }
-    const message = { installationId: args.installationId, messageId: args.messageId, threadId: args.threadId, turnId, turnOrdinal: ordinal, role: 'user' as const, state: 'queued' as const, content: args.content, origin: 'client', agentRevisionId: pinnedRevisionId, createdAt: now, updatedAt: now }
+    const message = { installationId: args.installationId, messageId: args.messageId, threadId: args.threadId, turnId, turnOrdinal: ordinal, role: 'user' as const, state: thread.preferredNodeId === undefined ? 'queued' as const : 'waiting_for_node' as const, content: args.content, origin: 'client', agentRevisionId: pinnedRevisionId, createdAt: now, updatedAt: now }
     const command = { ...common, commandId: args.commandId, idempotencyKey: args.idempotencyKey, input: args.content, status: 'accepted' as const, revision: 0, createdAt: now, updatedAt: now }
     const job = { ...common, jobId: `job:${args.commandId}`, commandId: args.commandId, requiredCapabilities: [AGENT_CHAT_CAPABILITY], routingCapability: AGENT_CHAT_CAPABILITY, preferredNodeId: thread.preferredNodeId, assistantMessageId, sessionCheckpoint: thread.piSessionRef, sessionRevision: thread.sessionRevision, status: 'queued' as const, attempt: 0, maxAttempts: args.maxAttempts, revision: 0, createdAt: now, updatedAt: now }
     await ctx.db.insert('agentMessages', message); await ctx.db.insert('commands', command); await ctx.db.insert('jobs', job)
@@ -183,7 +183,14 @@ export const resetSession = mutation({
     const jobs = await ctx.db.query('jobs').withIndex('by_installation_thread_ordinal', (q) => q.eq('installationId', args.installationId).eq('threadId', args.threadId)).collect()
     for (const job of jobs) if (job.status === 'queued') await ctx.db.patch(job._id, { preferredNodeId: args.preferredNodeId, sessionCheckpoint: undefined, sessionRevision: thread.sessionRevision + 1, revision: job.revision + 1, updatedAt: now })
     const messages = await ctx.db.query('agentMessages').withIndex('by_installation_thread_ordinal', (q) => q.eq('installationId', args.installationId).eq('threadId', args.threadId)).collect()
-    for (const message of messages) if (message.state === 'waiting_for_node') await ctx.db.patch(message._id, { state: 'queued', updatedAt: now })
+    const waitingState = args.preferredNodeId === undefined ? 'queued' as const : 'waiting_for_node' as const
+    for (const message of messages) {
+      if (
+        message.role === 'user'
+        && (message.state === 'queued' || message.state === 'waiting_for_node')
+        && message.state !== waitingState
+      ) await ctx.db.patch(message._id, { state: waitingState, updatedAt: now })
+    }
     await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: thread.sessionRevision + 1 }
   },

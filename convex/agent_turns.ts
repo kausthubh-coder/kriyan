@@ -101,7 +101,12 @@ export async function releaseAgentTurnForRetry(
       q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user'),
     )
     .unique()
-  if (user?.state === 'active') await ctx.db.patch(user._id, { state: 'queued', updatedAt: now })
+  if (user?.state === 'active') {
+    const state = (thread?.preferredNodeId ?? job.preferredNodeId) === undefined
+      ? 'queued' as const
+      : 'waiting_for_node' as const
+    await ctx.db.patch(user._id, { state, updatedAt: now })
+  }
 }
 
 export async function fenceQueuedThreadJobs(
