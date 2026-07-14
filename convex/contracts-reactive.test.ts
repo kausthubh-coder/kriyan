@@ -501,7 +501,88 @@ test('reclaims mixed active statuses and terminalizes one exhausted agent turn b
   expect(state.user).toMatchObject({ state: 'failed', finalizedAt: 1_000 })
 })
 
-test('drains 64 maximum-Unicode exhausted turns in bounded atomic batches before later work', async () => {
+test('preserves the queue cursor when eight exhausted turns consume one claim budget', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(mutation('agents:create'), {
+    installationId: 'installation:contracts', agentId: 'agent:cap-cursor',
+    agentRevisionId: 'agent-revision:cap-cursor', displayName: 'Cap cursor',
+    systemPrompt: 'Preserve queued FIFO', toolCapabilities: [],
+  })
+  await t.mutation(api.worker.registerNode, {
+    installationId: 'installation:contracts', nodeId: 'node:cap-cursor',
+    displayName: 'Cap cursor',
+    capabilities: [AGENT_CHAT_CAPABILITY, MEMORY_RECONCILE_CAPABILITY], protocolVersion: '1',
+  })
+
+  for (let index = 0; index < 8; index += 1) {
+    const suffix = index.toString().padStart(2, '0')
+    await t.mutation(mutation('agents:createThread'), {
+      installationId: 'installation:contracts', threadId: `thread:cap-cursor:${suffix}`,
+      agentId: 'agent:cap-cursor',
+    })
+    const submission = await t.mutation(mutation('agents:submitMessage'), {
+      installationId: 'installation:contracts', threadId: `thread:cap-cursor:${suffix}`,
+      commandId: `command:cap-cursor:${suffix}`, messageId: `message:cap-cursor:${suffix}`,
+      idempotencyKey: `intent:cap-cursor:${suffix}`, content: `cap cursor ${suffix}`, maxAttempts: 1,
+    })
+    const claim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation:contracts', nodeId: 'node:cap-cursor', leaseDurationMs: 30_000,
+    })
+    expect(claim?.job.jobId).toBe(submission.job.jobId)
+    expect(await t.mutation(api.worker.startRun, {
+      installationId: 'installation:contracts', nodeId: 'node:cap-cursor',
+      jobId: claim!.job.jobId, expectedJobRevision: claim!.job.revision,
+      expectedLeaseToken: claim!.job.leaseToken,
+    })).toMatchObject({ ok: true, created: true, job: { status: 'running' } })
+  }
+
+  vi.setSystemTime(2_000)
+  const older = await t.mutation(api.knowledge.enqueueReconcile, {
+    installationId: 'installation:contracts', vaultId: 'vault:cap-cursor:older',
+    manifestHash: 'sha256:cap-cursor:older', maxAttempts: 3,
+  })
+  vi.setSystemTime(2_001)
+  const newer = await t.mutation(api.knowledge.enqueueReconcile, {
+    installationId: 'installation:contracts', vaultId: 'vault:cap-cursor:newer',
+    manifestHash: 'sha256:cap-cursor:newer', maxAttempts: 3,
+  })
+  vi.setSystemTime(31_001)
+
+  const readCoordinationState = async () => await t.run(async (ctx) => ({
+    installation: await ctx.db
+      .query('installations')
+      .withIndex('by_installation_id', (q) => q.eq('installationId', 'installation:contracts'))
+      .unique(),
+    cursors: (await ctx.db.query('projectionCursors').collect()).filter((cursor) =>
+      cursor.installationId === 'installation:contracts'
+      && cursor.mode === 'worker-claim-v1'
+      && cursor.vaultId === 'node:cap-cursor'),
+    older: await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', older.job.jobId)).unique(),
+    newer: await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', newer.job.jobId)).unique(),
+  }))
+  const before = await readCoordinationState()
+  expect(before.cursors).toHaveLength(0)
+
+  expect(await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:cap-cursor', leaseDurationMs: 30_000,
+  })).toBeNull()
+  const after = await readCoordinationState()
+  expect(after.installation?.snapshotRevision).toBe((before.installation?.snapshotRevision ?? 0) + 1)
+  expect(after.cursors).toEqual(before.cursors)
+  expect(after.older).toMatchObject({ status: 'queued', revision: 0 })
+  expect(after.newer).toMatchObject({ status: 'queued', revision: 0 })
+
+  expect((await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:cap-cursor', leaseDurationMs: 30_000,
+  }))?.job.jobId).toBe(older.job.jobId)
+  expect((await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:cap-cursor', leaseDurationMs: 30_000,
+  }))?.job.jobId).toBe(newer.job.jobId)
+})
+
+test('drains 64 maximum-Unicode exhausted turns in bounded atomic batches before later FIFO work', async () => {
   const t = backend(); await installation(t)
   await t.mutation(mutation('agents:create'), {
     installationId: 'installation:contracts', agentId: 'agent:unicode-exhaustion',
@@ -546,9 +627,14 @@ test('drains 64 maximum-Unicode exhausted turns in bounded atomic batches before
   }
 
   vi.setSystemTime(2_000)
-  const later = await t.mutation(api.knowledge.enqueueReconcile, {
-    installationId: 'installation:contracts', vaultId: 'vault:after-unicode-exhaustion',
-    manifestHash: 'sha256:after-unicode-exhaustion', maxAttempts: 3,
+  const older = await t.mutation(api.knowledge.enqueueReconcile, {
+    installationId: 'installation:contracts', vaultId: 'vault:after-unicode-exhaustion:older',
+    manifestHash: 'sha256:after-unicode-exhaustion:older', maxAttempts: 3,
+  })
+  vi.setSystemTime(2_001)
+  const newer = await t.mutation(api.knowledge.enqueueReconcile, {
+    installationId: 'installation:contracts', vaultId: 'vault:after-unicode-exhaustion:newer',
+    manifestHash: 'sha256:after-unicode-exhaustion:newer', maxAttempts: 3,
   })
   vi.setSystemTime(31_001)
   const snapshotBeforeDrain = await t.run(async (ctx) => await ctx.db
@@ -627,21 +713,29 @@ test('drains 64 maximum-Unicode exhausted turns in bounded atomic batches before
         cursor.installationId === 'installation:contracts'
         && cursor.mode === 'worker-claim-v1'
         && cursor.vaultId === 'node:unicode-exhaustion'),
+      older: await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+        q.eq('installationId', 'installation:contracts').eq('jobId', older.job.jobId)).unique(),
+      newer: await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+        q.eq('installationId', 'installation:contracts').eq('jobId', newer.job.jobId)).unique(),
     }))
     expect(afterPoll.installation?.snapshotRevision).toBe((snapshotBeforeDrain?.snapshotRevision ?? 0) + poll)
-    if (poll % 2 === 1) {
-      expect(afterPoll.claimCursors).toMatchObject([{ pageCursor: later.job.jobId }])
-    } else {
-      expect(afterPoll.claimCursors).toHaveLength(0)
-    }
+    expect(afterPoll.claimCursors).toHaveLength(0)
+    expect(afterPoll.older).toMatchObject({ status: 'queued', revision: 0 })
+    expect(afterPoll.newer).toMatchObject({ status: 'queued', revision: 0 })
   }
 
-  const claimedLater = await t.mutation(api.worker.claimJob, {
+  const claimedOlder = await t.mutation(api.worker.claimJob, {
     installationId: 'installation:contracts', nodeId: 'node:unicode-exhaustion',
     leaseDurationMs: 30_000,
   })
-  expect(claimedLater?.job.jobId).toBe(later.job.jobId)
-  expect(claimedLater?.reclaimed).toBe(false)
+  expect(claimedOlder?.job.jobId).toBe(older.job.jobId)
+  expect(claimedOlder?.reclaimed).toBe(false)
+  const claimedNewer = await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:unicode-exhaustion',
+    leaseDurationMs: 30_000,
+  })
+  expect(claimedNewer?.job.jobId).toBe(newer.job.jobId)
+  expect(claimedNewer?.reclaimed).toBe(false)
 }, 120_000)
 
 test('Memory project, reconcile, and correction jobs are deterministic, discoverable, and executable', async () => {

@@ -748,6 +748,7 @@ export const claimJob = mutation({
       }
     }
     let terminalized = 0
+    let stoppedAtTerminalizationLimit = false
     for (const job of compatible) {
       const claimability = await agentJobClaimability(ctx, job, args.nodeId)
       if (claimability === 'rotatable') continue
@@ -756,7 +757,10 @@ export const claimJob = mutation({
       if (job.attempt >= job.maxAttempts) {
         await terminalizeExhaustedJob(ctx, job, now, 'attempts exhausted')
         terminalized += 1
-        if (terminalized === CLAIM_EXHAUSTED_TERMINALIZATION_LIMIT) break
+        if (terminalized === CLAIM_EXHAUSTED_TERMINALIZATION_LIMIT) {
+          stoppedAtTerminalizationLimit = true
+          break
+        }
         continue
       }
       if (reclaimed) await closeActiveRun(ctx, job, now, 'lease reclaimed')
@@ -781,6 +785,10 @@ export const claimJob = mutation({
       return { job: claimed, reclaimed }
     }
     if (terminalized > 0) await advanceClientSnapshotRevision(ctx, args.installationId)
+    if (stoppedAtTerminalizationLimit) {
+      await recordClaimTransactionMetrics(ctx)
+      return null
+    }
     const last = queued.at(-1) ?? null
     const continuation = last !== null
       && cursor?.pageCursor === last.jobId
