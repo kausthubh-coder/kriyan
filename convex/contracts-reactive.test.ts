@@ -501,6 +501,149 @@ test('reclaims mixed active statuses and terminalizes one exhausted agent turn b
   expect(state.user).toMatchObject({ state: 'failed', finalizedAt: 1_000 })
 })
 
+test('drains 64 maximum-Unicode exhausted turns in bounded atomic batches before later work', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(mutation('agents:create'), {
+    installationId: 'installation:contracts', agentId: 'agent:unicode-exhaustion',
+    agentRevisionId: 'agent-revision:unicode-exhaustion', displayName: 'Unicode exhaustion',
+    systemPrompt: 'Bounded terminalization', toolCapabilities: [],
+  })
+  await t.mutation(api.worker.registerNode, {
+    installationId: 'installation:contracts', nodeId: 'node:unicode-exhaustion',
+    displayName: 'Unicode exhaustion',
+    capabilities: [AGENT_CHAT_CAPABILITY, MEMORY_RECONCILE_CAPABILITY], protocolVersion: '1',
+  })
+
+  const content = '漢'.repeat(65_536)
+  const submissions = []
+  for (let index = 0; index < 64; index += 1) {
+    const suffix = index.toString().padStart(2, '0')
+    await t.mutation(mutation('agents:createThread'), {
+      installationId: 'installation:contracts', threadId: `thread:unicode-exhaustion:${suffix}`,
+      agentId: 'agent:unicode-exhaustion',
+    })
+    submissions.push(await t.mutation(mutation('agents:submitMessage'), {
+      installationId: 'installation:contracts', threadId: `thread:unicode-exhaustion:${suffix}`,
+      commandId: `command:unicode-exhaustion:${suffix}`,
+      messageId: `message:unicode-exhaustion:${suffix}`,
+      idempotencyKey: `intent:unicode-exhaustion:${suffix}`,
+      content, maxAttempts: 1,
+    }))
+  }
+
+  for (const submission of submissions) {
+    const claim = await t.mutation(api.worker.claimJob, {
+      installationId: 'installation:contracts', nodeId: 'node:unicode-exhaustion',
+      leaseDurationMs: 30_000,
+    })
+    expect(claim?.job.jobId).toBe(submission.job.jobId)
+    const started = await t.mutation(api.worker.startRun, {
+      installationId: 'installation:contracts', nodeId: 'node:unicode-exhaustion',
+      jobId: claim!.job.jobId, expectedJobRevision: claim!.job.revision,
+      expectedLeaseToken: claim!.job.leaseToken,
+    })
+    expect(started).toMatchObject({ ok: true, created: true, job: { status: 'running' }, run: { status: 'running' } })
+  }
+
+  vi.setSystemTime(2_000)
+  const later = await t.mutation(api.knowledge.enqueueReconcile, {
+    installationId: 'installation:contracts', vaultId: 'vault:after-unicode-exhaustion',
+    manifestHash: 'sha256:after-unicode-exhaustion', maxAttempts: 3,
+  })
+  vi.setSystemTime(31_001)
+  const snapshotBeforeDrain = await t.run(async (ctx) => await ctx.db
+    .query('installations')
+    .withIndex('by_installation_id', (q) => q.eq('installationId', 'installation:contracts'))
+    .unique())
+
+  const readStates = async () => await t.run(async (ctx) => await Promise.all(
+    submissions.map(async (submission) => {
+      const job = await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+        q.eq('installationId', 'installation:contracts').eq('jobId', submission.job.jobId)).unique()
+      const command = await ctx.db.query('commands').withIndex('by_installation_command', (q) =>
+        q.eq('installationId', 'installation:contracts').eq('commandId', submission.command.commandId)).unique()
+      const message = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) =>
+        q.eq('installationId', 'installation:contracts').eq('turnId', submission.job.turnId!).eq('role', 'user')).unique()
+      const run = await ctx.db.query('runs').withIndex('by_installation_job_attempt', (q) =>
+        q.eq('installationId', 'installation:contracts').eq('jobId', submission.job.jobId).eq('attempt', 1)).unique()
+      const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) =>
+        q.eq('installationId', 'installation:contracts').eq('threadId', submission.job.threadId!)).unique()
+      return {
+        job: job === null ? null : {
+          status: job.status, attempt: job.attempt, lastError: job.lastError,
+          leaseOwnerNodeId: job.leaseOwnerNodeId, leaseExpiresAt: job.leaseExpiresAt,
+        },
+        command: command === null ? null : { status: command.status },
+        message: message === null ? null : { state: message.state, finalizedAt: message.finalizedAt },
+        run: run === null ? null : { status: run.status, error: run.error, finishedAt: run.finishedAt },
+        thread: thread === null ? null : { activeTurnId: thread.activeTurnId },
+      }
+    }),
+  ))
+
+  for (let poll = 1; poll <= 8; poll += 1) {
+    expect(await t.mutation(api.worker.claimJob, {
+      installationId: 'installation:contracts', nodeId: 'node:unicode-exhaustion',
+      leaseDurationMs: 30_000,
+    })).toBeNull()
+    const states = await readStates()
+    const processed = poll * 8
+    expect(states.filter((state) => state.job?.status === 'failed')).toHaveLength(processed)
+    for (const [index, state] of states.entries()) {
+      if (index < processed) {
+        expect(state).toEqual({
+          job: {
+            status: 'failed', attempt: 1, lastError: 'attempts exhausted',
+            leaseOwnerNodeId: undefined, leaseExpiresAt: undefined,
+          },
+          command: { status: 'failed' },
+          message: { state: 'failed', finalizedAt: 31_001 },
+          run: { status: 'failed', error: 'attempts exhausted', finishedAt: 31_001 },
+          thread: { activeTurnId: undefined },
+        })
+      } else {
+        expect(state).toMatchObject({
+          job: {
+            status: 'running', attempt: 1,
+            leaseOwnerNodeId: 'node:unicode-exhaustion', leaseExpiresAt: 31_000,
+          },
+          command: { status: 'accepted' },
+          message: { state: 'active' },
+          run: { status: 'running' },
+        })
+        expect(state.job?.lastError).toBeUndefined()
+        expect(state.message?.finalizedAt).toBeUndefined()
+        expect(state.run?.error).toBeUndefined()
+        expect(state.run?.finishedAt).toBeUndefined()
+        expect(state.thread?.activeTurnId).toBe(submissions[index]!.job.turnId)
+      }
+    }
+    const afterPoll = await t.run(async (ctx) => ({
+      installation: await ctx.db
+        .query('installations')
+        .withIndex('by_installation_id', (q) => q.eq('installationId', 'installation:contracts'))
+        .unique(),
+      claimCursors: (await ctx.db.query('projectionCursors').collect()).filter((cursor) =>
+        cursor.installationId === 'installation:contracts'
+        && cursor.mode === 'worker-claim-v1'
+        && cursor.vaultId === 'node:unicode-exhaustion'),
+    }))
+    expect(afterPoll.installation?.snapshotRevision).toBe((snapshotBeforeDrain?.snapshotRevision ?? 0) + poll)
+    if (poll % 2 === 1) {
+      expect(afterPoll.claimCursors).toMatchObject([{ pageCursor: later.job.jobId }])
+    } else {
+      expect(afterPoll.claimCursors).toHaveLength(0)
+    }
+  }
+
+  const claimedLater = await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:unicode-exhaustion',
+    leaseDurationMs: 30_000,
+  })
+  expect(claimedLater?.job.jobId).toBe(later.job.jobId)
+  expect(claimedLater?.reclaimed).toBe(false)
+}, 120_000)
+
 test('Memory project, reconcile, and correction jobs are deterministic, discoverable, and executable', async () => {
   const t = backend(); await installation(t)
   await t.mutation(api.knowledge.upsertSourceRef, {

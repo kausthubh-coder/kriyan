@@ -35,6 +35,7 @@ import {
 const OWNED_WORK_RELEASE_LIMIT = 32
 const CLAIM_QUEUE_READ_LIMIT = 256
 const CLAIM_ACTIVE_READ_LIMIT = 64
+const CLAIM_EXHAUSTED_TERMINALIZATION_LIMIT = 8
 
 type NodeFailure = 'inactive_node' | 'stale_heartbeat' | 'missing_capability'
 
@@ -173,6 +174,7 @@ async function recordClaimTransactionMetrics(ctx: MutationCtx): Promise<void> {
       event: 'claimJob.transactionMetrics',
       queuedJobReadLimit: CLAIM_QUEUE_READ_LIMIT,
       activeJobReadLimit: CLAIM_ACTIVE_READ_LIMIT,
+      exhaustedTerminalizationLimit: CLAIM_EXHAUSTED_TERMINALIZATION_LIMIT,
       documentsRead: metrics.documentsRead,
       bytesRead: metrics.bytesRead,
       databaseQueries: metrics.databaseQueries,
@@ -745,7 +747,7 @@ export const claimJob = mutation({
         ) throw new Error('worker rejected: missing_capability')
       }
     }
-    let terminalized = false
+    let terminalized = 0
     for (const job of compatible) {
       const claimability = await agentJobClaimability(ctx, job, args.nodeId)
       if (claimability === 'rotatable') continue
@@ -753,7 +755,8 @@ export const claimJob = mutation({
       const reclaimed = job.status !== 'queued'
       if (job.attempt >= job.maxAttempts) {
         await terminalizeExhaustedJob(ctx, job, now, 'attempts exhausted')
-        terminalized = true
+        terminalized += 1
+        if (terminalized === CLAIM_EXHAUSTED_TERMINALIZATION_LIMIT) break
         continue
       }
       if (reclaimed) await closeActiveRun(ctx, job, now, 'lease reclaimed')
@@ -777,7 +780,7 @@ export const claimJob = mutation({
       await recordClaimTransactionMetrics(ctx)
       return { job: claimed, reclaimed }
     }
-    if (terminalized) await advanceClientSnapshotRevision(ctx, args.installationId)
+    if (terminalized > 0) await advanceClientSnapshotRevision(ctx, args.installationId)
     const last = queued.at(-1) ?? null
     const continuation = last !== null
       && cursor?.pageCursor === last.jobId
