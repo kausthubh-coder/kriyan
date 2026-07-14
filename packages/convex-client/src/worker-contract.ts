@@ -33,6 +33,10 @@ const names: Record<WorkerOperation, [OperationKind, string]> = {
   'memory.work.read': ['query', 'worker_context:readMemoryWork'],
   'memory.project.enqueue': ['mutation', 'knowledge:enqueueProject'],
   'memory.reconcile.enqueue': ['mutation', 'knowledge:enqueueReconcile'],
+  'memory.source-excerpt.upsert': ['mutation', 'knowledge:upsertSourceExcerpt'],
+  'memory.source-extraction.upsert': ['mutation', 'knowledge:upsertSourceExtraction'],
+  'memory.reversible-change.record': ['mutation', 'knowledge:recordReversibleChange'],
+  'memory.fact.upsert': ['mutation', 'knowledge:upsertMemoryFact'],
   'effect.task.commit': ['mutation', 'worker_effects:commitTaskEffect'],
   'effect.reminder.commit': ['mutation', 'worker_effects:commitReminderEffect'],
   'effect.note.commit': ['mutation', 'worker_effects:commitNoteEffect'],
@@ -64,18 +68,27 @@ export interface WorkerContractClient {
     operation: Operation,
     input: WorkerOperationInputMap[Operation],
   ): Promise<WorkerOperationResultMap[Operation]>
+  upsertSourceExcerpt(input: WorkerOperationInputMap['memory.source-excerpt.upsert']): Promise<WorkerOperationResultMap['memory.source-excerpt.upsert']>
+  upsertSourceExtraction(input: WorkerOperationInputMap['memory.source-extraction.upsert']): Promise<WorkerOperationResultMap['memory.source-extraction.upsert']>
+  recordReversibleChange(input: WorkerOperationInputMap['memory.reversible-change.record']): Promise<WorkerOperationResultMap['memory.reversible-change.record']>
+  upsertMemoryFact(input: WorkerOperationInputMap['memory.fact.upsert']): Promise<WorkerOperationResultMap['memory.fact.upsert']>
 }
 
 export function createWorkerContractClient(client: Transport): WorkerContractClient {
+  async function invoke<Operation extends WorkerOperation>(operation: Operation, input: WorkerOperationInputMap[Operation]): Promise<WorkerOperationResultMap[Operation]> {
+    assertWorkerOperationInput(operation, input)
+    const binding = workerOperationBindings[operation]
+    const result: unknown = binding.kind === 'query'
+      ? await client.query(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
+      : await client.mutation(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
+    assertWorkerOperationResult(operation, result)
+    return result
+  }
   return {
-    async invoke<Operation extends WorkerOperation>(operation: Operation, input: WorkerOperationInputMap[Operation]): Promise<WorkerOperationResultMap[Operation]> {
-      assertWorkerOperationInput(operation, input)
-      const binding = workerOperationBindings[operation]
-      const result: unknown = binding.kind === 'query'
-        ? await client.query(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
-        : await client.mutation(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
-      assertWorkerOperationResult(operation, result)
-      return result
-    },
+    invoke,
+    upsertSourceExcerpt: (input) => invoke('memory.source-excerpt.upsert', input),
+    upsertSourceExtraction: (input) => invoke('memory.source-extraction.upsert', input),
+    recordReversibleChange: (input) => invoke('memory.reversible-change.record', input),
+    upsertMemoryFact: (input) => invoke('memory.fact.upsert', input),
   }
 }

@@ -24,6 +24,10 @@ export const WORKER_OPERATION_VALID_INPUTS = {
   'memory.work.read': { installationId, jobId: 'job:missing', nodeId: 'node:one', expectedJobRevision: 0, expectedLeaseToken: 'lease:one' },
   'memory.project.enqueue': { installationId, sourceRefId: 'source:one', sourceVersion: '1', maxAttempts: 3 },
   'memory.reconcile.enqueue': { installationId, vaultId: 'vault:one', manifestHash: 'sha256:one', maxAttempts: 3 },
+  'memory.source-excerpt.upsert': { installationId, excerptId: 'excerpt:one', sourceRefId: 'source:one', text: 'Excerpt', startOffset: 0, endOffset: 7 },
+  'memory.source-extraction.upsert': { installationId, extractionId: 'extraction:one', sourceRefId: 'source:one', kind: 'entity', label: 'Entity', value: 'One', confidence: 1, provenanceIds: ['excerpt:one'] },
+  'memory.reversible-change.record': { installationId, changeId: 'change:one', targetKind: 'task', targetId: 'task:one', action: 'update', summary: 'Changed task', origin: 'memory.project.v1', sourceRefIds: ['source:one'], provenanceIds: ['excerpt:one'], beforeRevision: 0, afterRevision: 1, reversible: true, revertPayload: '{"title":"Before"}' },
+  'memory.fact.upsert': { installationId, factId: 'fact:one', entityId: 'entity:one', predicate: 'timezone', value: 'UTC', confidence: 1, sourceRefIds: ['source:one'], provenanceIds: ['excerpt:one'] },
   'effect.task.commit': { installationId, jobId: 'job:missing', nodeId: 'node:one', expectedJobRevision: 0, expectedLeaseToken: 'lease:one', effectId: 'effect:task', action: 'complete', taskId: 'task:one', expectedTargetRevision: 0 },
   'effect.reminder.commit': { installationId, jobId: 'job:missing', nodeId: 'node:one', expectedJobRevision: 0, expectedLeaseToken: 'lease:one', effectId: 'effect:reminder', action: 'acknowledge', reminderId: 'reminder:one', expectedTargetRevision: 0 },
   'effect.note.commit': { installationId, jobId: 'job:missing', nodeId: 'node:one', expectedJobRevision: 0, expectedLeaseToken: 'lease:one', effectId: 'effect:note', action: 'archive', noteId: 'note:one', expectedTargetRevision: 0 },
@@ -88,6 +92,12 @@ const noteVersion = {
   wordCount: 0, authorOrigin: 'agent', createdAt: timestamp,
 }
 const effectResult = { ok: true as const, duplicate: false, receipt, jobRevision: 2 }
+const reversibleChange = {
+  changeId: 'change:one', targetKind: 'task', targetId: 'task:one', action: 'update',
+  summary: 'Changed task', origin: 'memory.project.v1', sourceRefIds: ['source:one'],
+  provenanceIds: ['excerpt:one'], beforeRevision: 0, afterRevision: 1,
+  reversible: true, createdAt: timestamp,
+}
 
 /** Valid portable result representatives for every public worker operation. */
 export const WORKER_OPERATION_VALID_RESULTS = {
@@ -120,6 +130,10 @@ export const WORKER_OPERATION_VALID_RESULTS = {
   'memory.work.read': { kind: 'project' as const, commandInput: '{"kind":"project"}', corrections: [correction] },
   'memory.project.enqueue': { created: true, command, job },
   'memory.reconcile.enqueue': { created: true, command, job },
+  'memory.source-excerpt.upsert': { created: true },
+  'memory.source-extraction.upsert': { created: true },
+  'memory.reversible-change.record': { created: true, change: reversibleChange },
+  'memory.fact.upsert': { ok: true as const, created: true, revision: 0 },
   'effect.task.commit': effectResult,
   'effect.reminder.commit': { ...effectResult, receipt: { ...receipt, family: 'reminder' as const } },
   'effect.note.commit': { ...effectResult, receipt: { ...receipt, family: 'note' as const } },

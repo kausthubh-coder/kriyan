@@ -33,6 +33,8 @@ import {
 } from './validators'
 
 const OWNED_WORK_RELEASE_LIMIT = 32
+const CLAIM_QUEUE_READ_LIMIT = 256
+const CLAIM_ACTIVE_READ_LIMIT = 64
 
 type NodeFailure = 'inactive_node' | 'stale_heartbeat' | 'missing_capability'
 
@@ -46,7 +48,7 @@ async function collectJobsByStatus(
     .withIndex('by_installation_status_created', (q) =>
       q.eq('installationId', installationId).eq('status', status),
     )
-    .collect()
+    .take(CLAIM_ACTIVE_READ_LIMIT)
 }
 
 async function collectCompatibleQueuedJobs(
@@ -64,7 +66,7 @@ async function collectCompatibleQueuedJobs(
           .eq('status', 'queued')
           .eq('routingCapability', capability),
       )
-      .collect()
+      .take(CLAIM_QUEUE_READ_LIMIT)
     for (const job of matches) jobs.set(job._id, job)
   }
   // Rows created before routingCapability was introduced remain claimable.
@@ -76,9 +78,11 @@ async function collectCompatibleQueuedJobs(
         .eq('status', 'queued')
         .eq('routingCapability', undefined),
     )
-    .collect()
+    .take(CLAIM_QUEUE_READ_LIMIT)
   for (const job of legacy) jobs.set(job._id, job)
   return [...jobs.values()]
+    .sort((left, right) => left.createdAt - right.createdAt || left.jobId.localeCompare(right.jobId))
+    .slice(0, CLAIM_QUEUE_READ_LIMIT)
 }
 
 const claimedJobResult = v.union(
@@ -387,15 +391,19 @@ async function agentJobIsHeadOfLine(
   const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId!)).unique()
   const preferredNodeId = thread?.preferredNodeId ?? job.preferredNodeId
   if (preferredNodeId !== undefined && preferredNodeId !== nodeId) {
-    const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
-    for (const message of messages) if (message.state === 'queued') await ctx.db.patch(message._id, { state: 'waiting_for_node', updatedAt: Date.now() })
+    const message = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).first()
+    if (message?.state === 'queued') await ctx.db.patch(message._id, { state: 'waiting_for_node', updatedAt: Date.now() })
     return false
   }
   if (thread === null || thread.deletedAt !== undefined) return false
   if (thread.activeTurnId !== undefined && thread.activeTurnId !== job.turnId) return false
-  const turns = await ctx.db.query('jobs').withIndex('by_installation_thread_ordinal', (q) => q.eq('installationId', job.installationId).eq('threadId', job.threadId)).collect()
-  const head = turns
-    .filter((candidate) => candidate.turnOrdinal !== undefined && !['succeeded', 'failed', 'cancelled'].includes(candidate.status))
+  const activeStatuses = ['queued', 'leased', 'running'] as const
+  const heads = await Promise.all(activeStatuses.map(async (status) =>
+    await ctx.db.query('jobs').withIndex('by_installation_thread_status_ordinal', (q) => q
+      .eq('installationId', job.installationId)
+      .eq('threadId', job.threadId)
+      .eq('status', status)).first()))
+  const head = heads.filter((candidate) => candidate !== null)
     .sort((left, right) => left.turnOrdinal! - right.turnOrdinal! || left.jobId.localeCompare(right.jobId))[0]
   return head?._id === job._id
 }
@@ -406,8 +414,8 @@ async function activateAgentTurn(ctx: MutationCtx, job: Doc<'jobs'>, now: number
   if (thread === null) throw new Error('agent job is missing its thread')
   if (thread.activeTurnId !== undefined && thread.activeTurnId !== job.turnId) throw new Error('agent thread already has an active turn')
   await ctx.db.patch(thread._id, { activeTurnId: job.turnId, updatedAt: now })
-  const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
-  for (const message of messages) if (message.state === 'queued' || message.state === 'waiting_for_node') await ctx.db.patch(message._id, { state: 'active', updatedAt: now })
+  const message = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user')).first()
+  if (message?.state === 'queued' || message?.state === 'waiting_for_node') await ctx.db.patch(message._id, { state: 'active', updatedAt: now })
 }
 
 export const registerNode = mutation({

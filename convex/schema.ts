@@ -122,6 +122,12 @@ export default defineSchema({
       'installationId',
       'threadId',
       'turnOrdinal',
+    ])
+    .index('by_installation_thread_status_ordinal', [
+      'installationId',
+      'threadId',
+      'status',
+      'turnOrdinal',
     ]),
 
   runs: defineTable({
@@ -464,14 +470,19 @@ export default defineSchema({
   reversibleChanges: defineTable({
     installationId: v.string(), changeId: v.string(), targetKind: v.string(),
     targetId: v.string(), action: v.string(), summary: v.string(),
-    origin: v.string(), sourceRefIds: v.array(v.string()), primarySourceRefId: v.optional(v.string()),
+    origin: v.string(), sourceRefIds: v.array(v.string()),
     provenanceIds: v.array(v.string()), beforeRevision: v.optional(v.number()),
     afterRevision: v.number(), reversible: v.boolean(), revertedAt: v.optional(v.number()),
     revertPayload: v.optional(v.string()), createdAt: v.number(),
   })
     .index('by_installation_change', ['installationId', 'changeId'])
-    .index('by_installation_target_created', ['installationId', 'targetKind', 'targetId', 'createdAt'])
-    .index('by_installation_source_created', ['installationId', 'primarySourceRefId', 'createdAt']),
+    .index('by_installation_target_created', ['installationId', 'targetKind', 'targetId', 'createdAt']),
+
+  reversibleChangeSources: defineTable({
+    installationId: v.string(), changeId: v.string(), sourceRefId: v.string(), createdAt: v.number(),
+  })
+    .index('by_installation_change_source', ['installationId', 'changeId', 'sourceRefId'])
+    .index('by_installation_source_created', ['installationId', 'sourceRefId', 'createdAt']),
 
   knowledgeDocuments: defineTable({
     installationId: v.string(),

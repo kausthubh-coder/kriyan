@@ -209,6 +209,22 @@ export interface WorkerMemoryWorkResult {
   corrections: WorkerCorrectionResult[]
 }
 
+export interface WorkerReversibleChangeResult {
+  changeId: string
+  targetKind: string
+  targetId: string
+  action: string
+  summary: string
+  origin: string
+  sourceRefIds: string[]
+  provenanceIds: string[]
+  beforeRevision?: number
+  afterRevision: number
+  reversible: boolean
+  revertedAt?: number
+  createdAt: number
+}
+
 export interface WorkerEffectCommitResult {
   ok: true
   duplicate: boolean
@@ -244,6 +260,10 @@ export interface WorkerOperationInputMap {
   'memory.work.read': WorkerLeaseInput
   'memory.project.enqueue': { installationId: string; sourceRefId: string; sourceVersion: string; maxAttempts: number }
   'memory.reconcile.enqueue': { installationId: string; vaultId: string; manifestHash: string; maxAttempts: number }
+  'memory.source-excerpt.upsert': { installationId: string; excerptId: string; sourceRefId: string; text: string; startOffset: number; endOffset: number; speaker?: string; startAtMs?: number; endAtMs?: number }
+  'memory.source-extraction.upsert': { installationId: string; extractionId: string; sourceRefId: string; kind: string; label: string; value: string; confidence?: number; provenanceIds: string[] }
+  'memory.reversible-change.record': { installationId: string; changeId: string; targetKind: string; targetId: string; action: string; summary: string; origin: string; sourceRefIds: string[]; provenanceIds: string[]; beforeRevision?: number; afterRevision: number; reversible: boolean; revertPayload?: string }
+  'memory.fact.upsert': { installationId: string; factId: string; entityId: string; predicate: string; value: string; confidence: number; sourceRefIds: string[]; provenanceIds: string[]; expectedRevision?: number }
   'effect.task.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'complete' | 'tombstone'; taskId: string; expectedTargetRevision?: number; title?: string; description?: string; dueAt?: number; idempotencyKey?: string }
   'effect.reminder.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'acknowledge' | 'snooze' | 'tombstone'; reminderId: string; expectedTargetRevision?: number; message?: string; remindAt?: number; timezone?: string; idempotencyKey?: string }
   'effect.note.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'archive'; noteId: string; expectedTargetRevision?: number; title?: string; contentJson?: string; plainTextPreview?: string; wordCount?: number; idempotencyKey?: string }
@@ -283,6 +303,10 @@ export interface WorkerOperationResultMap {
   'memory.work.read': WorkerMemoryWorkResult
   'memory.project.enqueue': { created: boolean; command: WorkerCommandResult; job: WorkerJobResult }
   'memory.reconcile.enqueue': WorkerOperationResultMap['memory.project.enqueue']
+  'memory.source-excerpt.upsert': { created: boolean }
+  'memory.source-extraction.upsert': { created: boolean }
+  'memory.reversible-change.record': { created: boolean; change: WorkerReversibleChangeResult }
+  'memory.fact.upsert': WorkerOperationResultMap['memory.relation.upsert']
   'effect.task.commit': WorkerEffectCommitResult | { ok: false; reason: TransitionFailure }
   'effect.reminder.commit': WorkerOperationResultMap['effect.task.commit']
   'effect.note.commit': WorkerOperationResultMap['effect.task.commit']
@@ -368,6 +392,10 @@ export const WORKER_OPERATION_SCHEMAS: { readonly [Operation in keyof WorkerOper
   'memory.work.read': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string' }),
   'memory.project.enqueue': operationSchema({ ...ids, sourceRefId: 'string', sourceVersion: 'string', maxAttempts: 'number' }),
   'memory.reconcile.enqueue': operationSchema({ ...ids, vaultId: 'string', manifestHash: 'string', maxAttempts: 'number' }),
+  'memory.source-excerpt.upsert': operationSchema({ ...ids, excerptId: 'string', sourceRefId: 'string', text: 'string', startOffset: 'number', endOffset: 'number' }, { speaker: 'string', startAtMs: 'number', endAtMs: 'number' }),
+  'memory.source-extraction.upsert': operationSchema({ ...ids, extractionId: 'string', sourceRefId: 'string', kind: 'string', label: 'string', value: 'string', provenanceIds: 'string[]' }, { confidence: 'number' }),
+  'memory.reversible-change.record': operationSchema({ ...ids, changeId: 'string', targetKind: 'string', targetId: 'string', action: 'string', summary: 'string', origin: 'string', sourceRefIds: 'string[]', provenanceIds: 'string[]', afterRevision: 'number', reversible: 'boolean' }, { beforeRevision: 'number', revertPayload: 'string' }),
+  'memory.fact.upsert': operationSchema({ ...ids, factId: 'string', entityId: 'string', predicate: 'string', value: 'string', confidence: 'number', sourceRefIds: 'string[]', provenanceIds: 'string[]' }, { expectedRevision: 'number' }),
   'effect.task.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'task-effect-action', taskId: 'string' }, { expectedTargetRevision: 'number', title: 'string', description: 'string', dueAt: 'number', idempotencyKey: 'string' }),
   'effect.reminder.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'reminder-effect-action', reminderId: 'string' }, { expectedTargetRevision: 'number', message: 'string', remindAt: 'number', timezone: 'string', idempotencyKey: 'string' }),
   'effect.note.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'note-effect-action', noteId: 'string' }, { expectedTargetRevision: 'number', title: 'string', contentJson: 'string', plainTextPreview: 'string', wordCount: 'number', idempotencyKey: 'string' }),

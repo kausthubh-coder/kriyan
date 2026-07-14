@@ -58,6 +58,14 @@ if (false) {
   void client.invoke('memory.correction.restore', { installationId: 'i', appliedRevision: 1 })
   // @ts-expect-error conflict must be a string
   void client.invoke('memory.correction.conflict', { installationId: 'i', correctionId: 'c', conflict: 1 })
+  // @ts-expect-error excerpt offsets must be numeric
+  void client.upsertSourceExcerpt({ installationId: 'i', excerptId: 'e', sourceRefId: 's', text: 'x', startOffset: '0', endOffset: 1 })
+  // @ts-expect-error extraction provenanceIds are required
+  void client.upsertSourceExtraction({ installationId: 'i', extractionId: 'e', sourceRefId: 's', kind: 'entity', label: 'E', value: 'x' })
+  // @ts-expect-error reversible changes require sourceRefIds
+  void client.recordReversibleChange({ installationId: 'i', changeId: 'c', targetKind: 'task', targetId: 't', action: 'update', summary: 's', origin: 'o', provenanceIds: [], afterRevision: 1, reversible: false })
+  // @ts-expect-error fact confidence must be numeric
+  void client.upsertMemoryFact({ installationId: 'i', factId: 'f', entityId: 'e', predicate: 'p', value: 'v', confidence: 'high', sourceRefIds: [], provenanceIds: [] })
 
   // Result inference stays operation-specific across every distinct result family.
   // @ts-expect-error node registration does not return a transition result
@@ -78,6 +86,14 @@ if (false) {
   const badProvenanceResult: Promise<{ created: string }> = client.invoke('memory.provenance.upsert', { installationId: 'i', provenanceLinkId: 'p', targetKind: 'k', targetId: 't', sourceRefId: 's', sourceVersion: '1', citation: 'c' })
   // @ts-expect-error correction creation returns the frozen correction DTO
   const badCorrectionResult: Promise<{ created: boolean; correction: string }> = client.invoke('memory.correction.create', { installationId: 'i', correctionId: 'c', targetKind: 'k', targetId: 't', action: 'retract', reason: 'r', actor: 'a', origin: 'o', expectedRevision: 0 })
+  // @ts-expect-error excerpt creation flags are boolean
+  const badExcerptResult: Promise<{ created: string }> = client.upsertSourceExcerpt({ installationId: 'i', excerptId: 'e', sourceRefId: 's', text: 'x', startOffset: 0, endOffset: 1 })
+  // @ts-expect-error extraction creation flags are boolean
+  const badExtractionResult: Promise<{ created: string }> = client.upsertSourceExtraction({ installationId: 'i', extractionId: 'e', sourceRefId: 's', kind: 'entity', label: 'E', value: 'x', provenanceIds: [] })
+  // @ts-expect-error reversible-change results contain the exact DTO
+  const badChangeResult: Promise<{ created: boolean; change: string }> = client.recordReversibleChange({ installationId: 'i', changeId: 'c', targetKind: 'task', targetId: 't', action: 'update', summary: 's', origin: 'o', sourceRefIds: [], provenanceIds: [], afterRevision: 1, reversible: false })
+  // @ts-expect-error fact revisions are numeric
+  const badFactResult: Promise<{ ok: true; created: boolean; revision: string }> = client.upsertMemoryFact({ installationId: 'i', factId: 'f', entityId: 'e', predicate: 'p', value: 'v', confidence: 1, sourceRefIds: [], provenanceIds: [] })
 
-  void [badRegisterResult, badReadResult, badClaimResult, badStartResult, badEventResult, badTransitionResult, badRelationResult, badProvenanceResult, badCorrectionResult]
+  void [badRegisterResult, badReadResult, badClaimResult, badStartResult, badEventResult, badTransitionResult, badRelationResult, badProvenanceResult, badCorrectionResult, badExcerptResult, badExtractionResult, badChangeResult, badFactResult]
 }

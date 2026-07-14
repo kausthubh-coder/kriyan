@@ -9,7 +9,7 @@ import {
   canonicalContentHash,
   canonicalJson,
 } from '@kriyan/contracts'
-import { workerOperationBindings } from '../packages/convex-client/src/worker-contract'
+import { createWorkerContractClient, workerOperationBindings } from '../packages/convex-client/src/worker-contract'
 import { convexTest } from 'convex-test'
 import { makeFunctionReference } from 'convex/server'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -52,8 +52,8 @@ test('discovers compatible work beyond a 64-job mixed-capability prefix', async 
   const t = backend(); await installation(t)
   await t.mutation(api.worker.registerNode, { installationId: 'installation:contracts', nodeId: 'node:agent-backlog', displayName: 'Agent', capabilities: [AGENT_CHAT_CAPABILITY], protocolVersion: '1' })
   await t.run(async (ctx) => {
-    for (let index = 0; index < 70; index += 1) {
-      const capability = index === 69 ? AGENT_CHAT_CAPABILITY : 'unavailable.worker.v1'
+    for (let index = 0; index < 200; index += 1) {
+      const capability = index === 199 ? AGENT_CHAT_CAPABILITY : 'unavailable.worker.v1'
       await ctx.db.insert('jobs', {
         installationId: 'installation:contracts', jobId: `job:backlog:${index.toString().padStart(3, '0')}`,
         commandId: `command:backlog:${index.toString().padStart(3, '0')}`,
@@ -64,14 +64,14 @@ test('discovers compatible work beyond a 64-job mixed-capability prefix', async 
     }
   })
   const claim = await t.mutation(api.worker.claimJob, { installationId: 'installation:contracts', nodeId: 'node:agent-backlog', leaseDurationMs: 30_000 })
-  expect(claim?.job.jobId).toBe('job:backlog:069')
+  expect(claim?.job.jobId).toBe('job:backlog:199')
 })
 
 test('discovers compatible work beyond 64 affinity-fenced jobs without violating affinity', async () => {
   const t = backend(); await installation(t)
   await t.mutation(api.worker.registerNode, { installationId: 'installation:contracts', nodeId: 'node:available', displayName: 'Available', capabilities: [AGENT_CHAT_CAPABILITY], protocolVersion: '1' })
   await t.run(async (ctx) => {
-    for (let index = 0; index < 69; index += 1) {
+    for (let index = 0; index < 199; index += 1) {
       await ctx.db.insert('jobs', {
         installationId: 'installation:contracts', jobId: `job:affinity:${index.toString().padStart(3, '0')}`,
         commandId: `command:affinity:${index.toString().padStart(3, '0')}`,
@@ -82,13 +82,13 @@ test('discovers compatible work beyond 64 affinity-fenced jobs without violating
       })
     }
     await ctx.db.insert('jobs', {
-      installationId: 'installation:contracts', jobId: 'job:affinity:069', commandId: 'command:affinity:069',
+      installationId: 'installation:contracts', jobId: 'job:affinity:199', commandId: 'command:affinity:199',
       requiredCapabilities: [AGENT_CHAT_CAPABILITY], routingCapability: AGENT_CHAT_CAPABILITY,
-      status: 'queued', attempt: 0, maxAttempts: 3, revision: 0, createdAt: 70, updatedAt: 70,
+      status: 'queued', attempt: 0, maxAttempts: 3, revision: 0, createdAt: 200, updatedAt: 200,
     })
   })
   const claim = await t.mutation(api.worker.claimJob, { installationId: 'installation:contracts', nodeId: 'node:available', leaseDurationMs: 30_000 })
-  expect(claim?.job.jobId).toBe('job:affinity:069')
+  expect(claim?.job.jobId).toBe('job:affinity:199')
 })
 
 test('Memory project, reconcile, and correction jobs are deterministic, discoverable, and executable', async () => {
@@ -257,9 +257,11 @@ describe('frozen worker operation conformance', () => {
     for (const operation of WORKER_OPERATIONS) {
       const operationBackend = fencedOperations.has(operation) ? backend() : t
       if (fencedOperations.has(operation)) await seedFencedOperation(operationBackend, operation)
-      if (operation === 'memory.project.enqueue') {
+      if (operation === 'memory.project.enqueue' || operation.startsWith('memory.source-') || operation === 'memory.reversible-change.record' || operation === 'memory.fact.upsert') {
         await operationBackend.run(async (ctx) => {
-          await ctx.db.insert('sourceRefs', {
+          const existing = await ctx.db.query('sourceRefs').withIndex('by_installation_source', (q) => q
+            .eq('installationId', 'installation:contracts').eq('sourceRefId', 'source:one')).unique()
+          if (existing === null) await ctx.db.insert('sourceRefs', {
             installationId: 'installation:contracts', sourceRefId: 'source:one',
             idempotencyKey: 'source:one', kind: 'other', displayName: 'One',
             syncState: 'pending', indexState: 'pending', provenanceIds: [],
@@ -277,6 +279,36 @@ describe('frozen worker operation conformance', () => {
       if (binding.kind === 'query') await operationBackend.query(binding.reference as never, input as never)
       else await operationBackend.mutation(binding.reference as never, input as never)
     }
+  })
+
+  test('executes all four projection families idempotently through only the worker contract client', async () => {
+    const t = backend(); await installation(t)
+    for (const sourceRefId of ['source:one', 'source:two']) {
+      await t.mutation(api.knowledge.upsertSourceRef, {
+        installationId: 'installation:contracts', sourceRefId, idempotencyKey: sourceRefId,
+        kind: 'document', displayName: sourceRefId, syncState: 'synced', indexState: 'indexed', provenanceIds: [],
+      })
+    }
+    const client = createWorkerContractClient({
+      mutation: (reference: never, input: never) => t.mutation(reference, input),
+      query: (reference: never, input: never) => t.query(reference, input),
+    } as never)
+    const excerpt = WORKER_OPERATION_VALID_INPUTS['memory.source-excerpt.upsert']
+    const extraction = WORKER_OPERATION_VALID_INPUTS['memory.source-extraction.upsert']
+    const change = {
+      ...WORKER_OPERATION_VALID_INPUTS['memory.reversible-change.record'],
+      sourceRefIds: ['source:one', 'source:two'],
+    }
+    const fact = WORKER_OPERATION_VALID_INPUTS['memory.fact.upsert']
+    expect(await client.upsertSourceExcerpt(excerpt)).toEqual({ created: true })
+    expect(await client.upsertSourceExcerpt(excerpt)).toEqual({ created: false })
+    expect(await client.upsertSourceExtraction(extraction)).toEqual({ created: true })
+    expect(await client.upsertSourceExtraction(extraction)).toEqual({ created: false })
+    const recorded = await client.recordReversibleChange(change)
+    expect(recorded).toMatchObject({ created: true, change: { sourceRefIds: ['source:one', 'source:two'] } })
+    expect(await client.recordReversibleChange(change)).toEqual({ ...recorded, created: false })
+    expect(await client.upsertMemoryFact(fact)).toEqual({ ok: true, created: true, revision: 0 })
+    expect(await client.upsertMemoryFact(fact)).toEqual({ ok: true, created: false, revision: 0 })
   })
 
   test('uses the shared canonical corpus inside the Convex harness', async () => {
@@ -410,6 +442,69 @@ describe('bounded reactive and detail authority', () => {
       installationId: 'installation:contracts', changeId: 'change:detail', expectedRevision: 1,
     })).toMatchObject({ ok: true, change: { revertedAt: 1_000 } })
     expect(await t.query(api.projections.getTask, { installationId: 'installation:contracts', taskId: 'task:detail' })).toMatchObject({ title: 'Before', revision: 2 })
+  })
+
+  test('normalizes multi-source changes without duplicates and cleans associations child-first', async () => {
+    const t = backend(); await installation(t)
+    for (const sourceRefId of ['source:primary', 'source:secondary']) {
+      await t.mutation(api.knowledge.upsertSourceRef, {
+        installationId: 'installation:contracts', sourceRefId, idempotencyKey: sourceRefId,
+        kind: 'document', displayName: sourceRefId, syncState: 'synced', indexState: 'indexed', provenanceIds: [],
+      })
+    }
+    await t.mutation(api.projections.createTask, {
+      installationId: 'installation:contracts', taskId: 'task:multi-source',
+      idempotencyKey: 'task:multi-source', title: 'After', tags: [], status: 'open',
+    })
+    const base = {
+      installationId: 'installation:contracts', targetKind: 'task', targetId: 'task:multi-source',
+      action: 'update', summary: 'Multi-source update', origin: 'memory.project.v1',
+      sourceRefIds: ['source:primary', 'source:secondary'], provenanceIds: [],
+      beforeRevision: 0, afterRevision: 0, reversible: true,
+      revertPayload: JSON.stringify({ title: 'Before' }),
+    }
+    for (const [index, changeId] of ['change:multi:one', 'change:multi:two'].entries()) {
+      vi.setSystemTime(1_000 + index)
+      expect((await t.mutation(api.knowledge.recordReversibleChange, { ...base, changeId })).created).toBe(true)
+      expect((await t.mutation(api.knowledge.recordReversibleChange, { ...base, changeId })).created).toBe(false)
+    }
+    const primary = await t.query(api.knowledge.getSourceDetail, {
+      installationId: 'installation:contracts', sourceRefId: 'source:primary', excerpts: 1, extractions: 1, derivedChanges: 1,
+    })
+    const secondary = await t.query(api.knowledge.getSourceDetail, {
+      installationId: 'installation:contracts', sourceRefId: 'source:secondary', excerpts: 1, extractions: 1, derivedChanges: 1,
+    })
+    expect(primary).toMatchObject({ derivedChangesTruncated: true, derivedChanges: [{ changeId: 'change:multi:two' }] })
+    expect(secondary).toMatchObject({ derivedChangesTruncated: true, derivedChanges: [{ changeId: 'change:multi:two' }] })
+    const listed = await t.query(api.knowledge.listDerivedChanges, {
+      installationId: 'installation:contracts', sourceRefId: 'source:secondary', limit: 10,
+    })
+    expect(listed.map((change) => change.changeId)).toEqual(['change:multi:two', 'change:multi:one'])
+    expect(new Set(listed.map((change) => change.changeId)).size).toBe(2)
+    vi.setSystemTime(2_000)
+    expect(await t.mutation(api.knowledge.revertChange, {
+      installationId: 'installation:contracts', changeId: 'change:multi:one', expectedRevision: 0,
+    })).toMatchObject({ ok: true, change: { revertedAt: 2_000 } })
+    expect((await t.query(api.knowledge.listDerivedChanges, {
+      installationId: 'installation:contracts', sourceRefId: 'source:secondary', limit: 10,
+    })).find((change) => change.changeId === 'change:multi:one')?.revertedAt).toBe(2_000)
+
+    vi.stubEnv('KRIYAN_DEV_DEPLOYMENT', 'pastel-tern-722')
+    let deleted = 0
+    let done = false
+    while (!done) {
+      const result = await t.mutation(internal.dev.resetInstallation, {
+        deploymentName: 'pastel-tern-722', installationId: 'installation:contracts',
+        confirmation: 'RESET_KRIYAN_DEV', batchSize: 64,
+      })
+      deleted += result.deleted
+      done = result.done
+    }
+    expect(deleted).toBeGreaterThan(0)
+    expect(await t.mutation(internal.dev.resetInstallation, {
+      deploymentName: 'pastel-tern-722', installationId: 'installation:contracts',
+      confirmation: 'RESET_KRIYAN_DEV', batchSize: 64,
+    })).toEqual({ deleted: 0, processedTable: null, nextTable: null, done: true })
   })
 })
 

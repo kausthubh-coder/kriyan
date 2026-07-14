@@ -19,6 +19,7 @@ const cleanupTables = [
   'agentRevisions',
   'agents',
   'provenanceLinks',
+  'reversibleChangeSources',
   'reversibleChanges',
   'memoryFacts',
   'memoryCorrections',
@@ -52,6 +53,7 @@ const cleanupTable = v.union(
   v.literal('agentRevisions'),
   v.literal('agents'),
   v.literal('provenanceLinks'),
+  v.literal('reversibleChangeSources'),
   v.literal('reversibleChanges'),
   v.literal('memoryFacts'),
   v.literal('memoryCorrections'),
@@ -157,6 +159,7 @@ export const resetInstallation = internalMutation({
         case 'agentRevisions':
         case 'agents':
         case 'provenanceLinks':
+        case 'reversibleChangeSources':
         case 'reversibleChanges':
         case 'memoryFacts':
         case 'memoryCorrections':

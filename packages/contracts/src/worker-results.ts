@@ -14,6 +14,7 @@ import type {
   WorkerOperationResultMap,
   WorkerRunEventResult,
   WorkerRunResult,
+  WorkerReversibleChangeResult,
 } from './worker-operations'
 
 type WorkerOperation = keyof WorkerOperationResultMap
@@ -139,6 +140,12 @@ const workerMemoryWorkResultSchema = s.object({
   kind: s.union(s.literal('project'), s.literal('reconcile'), s.literal('correction')),
   commandInput: string, corrections: s.array(workerCorrectionResultSchema),
 }) satisfies RuntimeSchema<WorkerMemoryWorkResult>
+const workerReversibleChangeResultSchema = s.object({
+  changeId: string, targetKind: string, targetId: string, action: string,
+  summary: string, origin: string, sourceRefIds: s.array(string), provenanceIds: s.array(string),
+  beforeRevision: optionalNumber, afterRevision: number, reversible: boolean,
+  revertedAt: optionalNumber, createdAt: number,
+}) satisfies RuntimeSchema<WorkerReversibleChangeResult>
 const workerEffectCommitResultSchema = s.object({
   ok: s.literal(true), duplicate: boolean, receipt: workerEffectReceiptResultSchema, jobRevision: number,
 }) satisfies RuntimeSchema<WorkerEffectCommitResult>
@@ -179,6 +186,10 @@ export const WORKER_OPERATION_RESULT_SCHEMAS: {
   'memory.work.read': workerMemoryWorkResultSchema,
   'memory.project.enqueue': s.object({ created: boolean, command: workerCommandResultSchema, job: workerJobResultSchema }),
   'memory.reconcile.enqueue': s.object({ created: boolean, command: workerCommandResultSchema, job: workerJobResultSchema }),
+  'memory.source-excerpt.upsert': s.object({ created: boolean }),
+  'memory.source-extraction.upsert': s.object({ created: boolean }),
+  'memory.reversible-change.record': s.object({ created: boolean, change: workerReversibleChangeResultSchema }),
+  'memory.fact.upsert': projectionUpsertResultSchema,
   'effect.task.commit': workerEffectOperationResultSchema,
   'effect.reminder.commit': workerEffectOperationResultSchema,
   'effect.note.commit': workerEffectOperationResultSchema,

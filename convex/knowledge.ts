@@ -9,7 +9,7 @@ import {
   MEMORY_RECONCILE_CAPABILITY,
 } from '@kriyan/contracts'
 
-import { mutation, query, type MutationCtx } from './_generated/server'
+import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import {
   advanceClientSnapshotRevision,
   assertBoundedString,
@@ -46,9 +46,49 @@ import {
 function publicChange(change: any): Record<string, unknown> {
   const value = withoutSystemFields(change) as Record<string, unknown>
   delete value.installationId
-  delete value.primarySourceRefId
   delete value.revertPayload
   return value
+}
+
+async function ensureReversibleChangeSources(
+  ctx: MutationCtx,
+  installationId: string,
+  changeId: string,
+  sourceRefIds: readonly string[],
+  createdAt: number,
+): Promise<void> {
+  for (const sourceRefId of sourceRefIds) {
+    const existing = await ctx.db.query('reversibleChangeSources')
+      .withIndex('by_installation_change_source', (q) => q
+        .eq('installationId', installationId)
+        .eq('changeId', changeId)
+        .eq('sourceRefId', sourceRefId))
+      .unique()
+    if (existing === null) {
+      await ctx.db.insert('reversibleChangeSources', { installationId, changeId, sourceRefId, createdAt })
+    }
+  }
+}
+
+async function readReversibleChangesForSource(
+  ctx: QueryCtx,
+  installationId: string,
+  sourceRefId: string,
+  limit: number,
+): Promise<{ changes: any[]; truncated: boolean }> {
+  const associations = await ctx.db.query('reversibleChangeSources')
+    .withIndex('by_installation_source_created', (q) => q
+      .eq('installationId', installationId)
+      .eq('sourceRefId', sourceRefId))
+    .order('desc')
+    .take(limit + 1)
+  const changes = await Promise.all(associations.slice(0, limit).map(async (association) =>
+    await ctx.db.query('reversibleChanges')
+      .withIndex('by_installation_change', (q) => q
+        .eq('installationId', installationId)
+        .eq('changeId', association.changeId))
+      .unique()))
+  return { changes: changes.filter((change) => change !== null), truncated: associations.length > limit }
 }
 
 function publicExcerpt(excerpt: any): Record<string, unknown> {
@@ -577,20 +617,28 @@ export const recordReversibleChange = mutation({
     assertBoundedString(args.summary, 'summary', 2_048)
     assertShortText(args.origin, 'origin')
     assertStringList(args.sourceRefIds, 'sourceRefIds', 128)
+    for (const sourceRefId of args.sourceRefIds) assertId(sourceRefId, 'sourceRefId')
     assertStringList(args.provenanceIds, 'provenanceIds', 128)
     if (args.beforeRevision !== undefined) assertExpectedRevision(args.beforeRevision)
     assertExpectedRevision(args.afterRevision)
     if (args.reversible && args.revertPayload === undefined) throw new Error('reversible changes require a revertPayload')
     if (!args.reversible && args.revertPayload !== undefined) throw new Error('non-reversible changes cannot include a revertPayload')
     if (args.revertPayload !== undefined) assertBoundedString(args.revertPayload, 'revertPayload', 16_384)
+    const sources = await Promise.all(args.sourceRefIds.map(async (sourceRefId) =>
+      await ctx.db.query('sourceRefs').withIndex('by_installation_source', (q) => q
+        .eq('installationId', args.installationId)
+        .eq('sourceRefId', sourceRefId)).unique()))
+    if (sources.some((source) => source === null || source.deletedAt !== undefined)) throw new Error('source not found')
     const existing = await ctx.db.query('reversibleChanges').withIndex('by_installation_change', (q) => q.eq('installationId', args.installationId).eq('changeId', args.changeId)).unique()
     if (existing !== null) {
-      const expected = { ...args, primarySourceRefId: args.sourceRefIds[0], createdAt: existing.createdAt }
+      const expected = { ...args, createdAt: existing.createdAt }
       if (!valuesEqual(withoutSystemFields(existing), expected)) throw new Error('changeId conflicts with existing change')
+      await ensureReversibleChangeSources(ctx, args.installationId, args.changeId, args.sourceRefIds, existing.createdAt)
       return { created: false, change: publicChange(existing) as any }
     }
-    const change = { ...args, primarySourceRefId: args.sourceRefIds[0], createdAt: Date.now() }
+    const change = { ...args, createdAt: Date.now() }
     await ctx.db.insert('reversibleChanges', change)
+    await ensureReversibleChangeSources(ctx, args.installationId, args.changeId, args.sourceRefIds, change.createdAt)
     await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, change: publicChange(change) as any }
   },
@@ -638,10 +686,10 @@ export const getSourceDetail = query({
     for (const [name, limit] of Object.entries({ excerpts: args.excerpts, extractions: args.extractions, derivedChanges: args.derivedChanges })) assertPositiveInteger(limit, name, MAX_PAGE_SIZE)
     const source = await ctx.db.query('sourceRefs').withIndex('by_installation_source', (q) => q.eq('installationId', args.installationId).eq('sourceRefId', args.sourceRefId)).unique()
     if (source === null) return null
-    const [excerptRows, extractionRows, changeRows] = await Promise.all([
+    const [excerptRows, extractionRows, changeResult] = await Promise.all([
       ctx.db.query('sourceTranscriptExcerpts').withIndex('by_installation_source_offset', (q) => q.eq('installationId', args.installationId).eq('sourceRefId', args.sourceRefId)).take(args.excerpts + 1),
       ctx.db.query('sourceExtractions').withIndex('by_installation_source', (q) => q.eq('installationId', args.installationId).eq('sourceRefId', args.sourceRefId)).take(args.extractions + 1),
-      ctx.db.query('reversibleChanges').withIndex('by_installation_source_created', (q) => q.eq('installationId', args.installationId).eq('primarySourceRefId', args.sourceRefId)).order('desc').take(args.derivedChanges + 1),
+      readReversibleChangesForSource(ctx, args.installationId, args.sourceRefId, args.derivedChanges),
     ])
     const excerpts = excerptRows.slice(0, args.excerpts)
     const transcriptPreview = excerpts.map((item) => item.text).join('\n').slice(0, 8_192) || undefined
@@ -650,7 +698,7 @@ export const getSourceDetail = query({
       transcriptTruncated: excerptRows.length > args.excerpts || excerpts.reduce((total, item) => total + item.text.length, 0) > 8_192,
       excerpts: excerpts.map(publicExcerpt) as any, excerptsTruncated: excerptRows.length > args.excerpts,
       extractions: extractionRows.slice(0, args.extractions).map(publicExtraction) as any, extractionsTruncated: extractionRows.length > args.extractions,
-      derivedChanges: changeRows.slice(0, args.derivedChanges).map(publicChange) as any, derivedChangesTruncated: changeRows.length > args.derivedChanges,
+      derivedChanges: changeResult.changes.map(publicChange) as any, derivedChangesTruncated: changeResult.truncated,
     }
   },
 })
@@ -660,7 +708,7 @@ export const listDerivedChanges = query({
   returns: v.array(reversibleChangePublicValue),
   handler: async (ctx, args) => {
     assertPositiveInteger(args.limit, 'limit', MAX_PAGE_SIZE)
-    return (await ctx.db.query('reversibleChanges').withIndex('by_installation_source_created', (q) => q.eq('installationId', args.installationId).eq('primarySourceRefId', args.sourceRefId)).order('desc').take(args.limit)).map(publicChange) as any
+    return (await readReversibleChangesForSource(ctx, args.installationId, args.sourceRefId, args.limit)).changes.map(publicChange) as any
   },
 })
 
