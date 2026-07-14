@@ -106,6 +106,7 @@ export default defineSchema({
       'installationId',
       'status',
       'createdAt',
+      'jobId',
     ])
     .index('by_installation_status_capability_created', [
       'installationId',
@@ -113,7 +114,12 @@ export default defineSchema({
       'routingCapability',
       'createdAt',
     ])
-    .index('by_installation_lease', ['installationId', 'leaseExpiresAt'])
+    .index('by_installation_lease', [
+      'installationId',
+      'leaseExpiresAt',
+      'createdAt',
+      'jobId',
+    ])
     .index('by_installation_lease_owner', [
       'installationId',
       'leaseOwnerNodeId',

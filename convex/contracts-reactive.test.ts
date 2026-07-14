@@ -91,6 +91,141 @@ test('discovers compatible work beyond 64 affinity-fenced jobs without violating
   expect(claim?.job.jobId).toBe('job:affinity:199')
 })
 
+test('preserves FIFO progress across one aggregate queue window for 64 capabilities and legacy jobs', async () => {
+  const t = backend(); await installation(t)
+  const capabilities = [
+    'reminders',
+    ...Array.from({ length: 63 }, (_, index) => `capability:${index.toString().padStart(2, '0')}`),
+  ]
+  await t.mutation(api.worker.registerNode, {
+    installationId: 'installation:contracts', nodeId: 'node:max-capabilities', displayName: 'Max capabilities',
+    capabilities, protocolVersion: '1',
+  })
+  await t.run(async (ctx) => {
+    for (let index = 0; index < 220; index += 1) {
+      const legacy = index % 31 === 0
+      const capability = capabilities[index % capabilities.length]
+      await ctx.db.insert('jobs', {
+        installationId: 'installation:contracts',
+        jobId: `job:aggregate-obstacle:${index.toString().padStart(3, '0')}`,
+        commandId: `command:aggregate-obstacle:${index.toString().padStart(3, '0')}`,
+        kind: 'agent.turn.v1', threadId: `thread:aggregate-obstacle:${index}`,
+        turnId: `turn:aggregate-obstacle:${index}`, turnOrdinal: 1,
+        preferredNodeId: 'node:other',
+        requiredCapabilities: legacy ? undefined : [capability],
+        routingCapability: legacy ? undefined : capability,
+        status: 'queued', attempt: 0, maxAttempts: 3, revision: 0,
+        createdAt: index + 1, updatedAt: index + 1,
+      })
+    }
+    await ctx.db.insert('jobs', {
+      installationId: 'installation:contracts', jobId: 'job:aggregate-compatible:legacy',
+      commandId: 'command:aggregate-compatible:legacy', status: 'queued', attempt: 0,
+      maxAttempts: 3, revision: 0, createdAt: 221, updatedAt: 221,
+    })
+    await ctx.db.insert('jobs', {
+      installationId: 'installation:contracts', jobId: 'job:aggregate-compatible:routed',
+      commandId: 'command:aggregate-compatible:routed',
+      requiredCapabilities: [capabilities[63]], routingCapability: capabilities[63],
+      status: 'queued', attempt: 0, maxAttempts: 3, revision: 0,
+      createdAt: 222, updatedAt: 222,
+    })
+  })
+
+  const legacy = await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:max-capabilities', leaseDurationMs: 30_000,
+  })
+  const routed = await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:max-capabilities', leaseDurationMs: 30_000,
+  })
+  expect(legacy?.job.jobId).toBe('job:aggregate-compatible:legacy')
+  expect(routed?.job.jobId).toBe('job:aggregate-compatible:routed')
+  expect(await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:max-capabilities', leaseDurationMs: 30_000,
+  })).toBeNull()
+  const obstacles = await t.run(async (ctx) => await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_status_created', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('status', 'queued'),
+    )
+    .take(256))
+  expect(obstacles).toHaveLength(220)
+  expect(obstacles.every((job) => job.preferredNodeId === 'node:other')).toBe(true)
+})
+
+test('reclaims mixed active statuses and terminalizes one exhausted agent turn before the next FIFO job', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(mutation('agents:create'), {
+    installationId: 'installation:contracts', agentId: 'agent:aggregate',
+    agentRevisionId: 'agent-revision:aggregate', displayName: 'Aggregate',
+    systemPrompt: 'help', toolCapabilities: [],
+  })
+  await t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:aggregate', agentId: 'agent:aggregate',
+  })
+  const exhausted = await t.mutation(mutation('agents:submitMessage'), {
+    installationId: 'installation:contracts', threadId: 'thread:aggregate',
+    commandId: 'command:aggregate-exhausted', messageId: 'message:aggregate-exhausted',
+    idempotencyKey: 'intent:aggregate-exhausted', content: 'exhaust this turn', maxAttempts: 1,
+  })
+  await t.mutation(api.worker.registerNode, {
+    installationId: 'installation:contracts', nodeId: 'node:aggregate-reclaimer', displayName: 'Reclaimer',
+    capabilities: [AGENT_CHAT_CAPABILITY], protocolVersion: '1',
+  })
+  await t.run(async (ctx) => {
+    const exhaustedJob = await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', exhausted.job.jobId)).unique()
+    const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('threadId', 'thread:aggregate')).unique()
+    const user = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('turnId', exhausted.job.turnId!).eq('role', 'user')).unique()
+    if (exhaustedJob === null || thread === null || user === null) throw new Error('missing exhausted fixture')
+    await ctx.db.patch(exhaustedJob._id, {
+      status: 'running', attempt: 1, leaseOwnerNodeId: 'node:expired-owner',
+      leaseExpiresAt: 999, leaseToken: 'lease:expired', revision: 1,
+    })
+    await ctx.db.patch(thread._id, { activeTurnId: exhausted.job.turnId, updatedAt: 1_000 })
+    await ctx.db.patch(user._id, { state: 'active', updatedAt: 1_000 })
+    await ctx.db.insert('jobs', {
+      installationId: 'installation:contracts', jobId: 'job:aggregate-leased',
+      commandId: 'command:aggregate-leased', requiredCapabilities: [AGENT_CHAT_CAPABILITY],
+      routingCapability: AGENT_CHAT_CAPABILITY, status: 'leased', attempt: 1, maxAttempts: 3,
+      leaseOwnerNodeId: 'node:expired-owner', leaseExpiresAt: 999, leaseToken: 'lease:leased',
+      revision: 1, createdAt: 1_001, updatedAt: 1_001,
+    })
+    await ctx.db.insert('jobs', {
+      installationId: 'installation:contracts', jobId: 'job:aggregate-queued',
+      commandId: 'command:aggregate-queued', requiredCapabilities: [AGENT_CHAT_CAPABILITY],
+      routingCapability: AGENT_CHAT_CAPABILITY, status: 'queued', attempt: 0, maxAttempts: 3,
+      revision: 0, createdAt: 1_002, updatedAt: 1_002,
+    })
+  })
+
+  const reclaimed = await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:aggregate-reclaimer', leaseDurationMs: 30_000,
+  })
+  expect(reclaimed?.job.jobId).toBe('job:aggregate-leased')
+  expect(reclaimed?.reclaimed).toBe(true)
+  expect((await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:aggregate-reclaimer', leaseDurationMs: 30_000,
+  }))?.job.jobId).toBe('job:aggregate-queued')
+
+  const state = await t.run(async (ctx) => ({
+    job: await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', exhausted.job.jobId)).unique(),
+    command: await ctx.db.query('commands').withIndex('by_installation_command', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('commandId', exhausted.command.commandId)).unique(),
+    thread: await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('threadId', 'thread:aggregate')).unique(),
+    user: await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('turnId', exhausted.job.turnId!).eq('role', 'user')).unique(),
+  }))
+  expect(state.job?.status).toBe('failed')
+  expect(state.command?.status).toBe('failed')
+  expect(state.thread?.activeTurnId).toBeUndefined()
+  expect(state.user).toMatchObject({ state: 'failed', finalizedAt: 1_000 })
+})
+
 test('Memory project, reconcile, and correction jobs are deterministic, discoverable, and executable', async () => {
   const t = backend(); await installation(t)
   await t.mutation(api.knowledge.upsertSourceRef, {

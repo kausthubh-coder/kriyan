@@ -69,16 +69,14 @@ export async function finalizeAgentTurn(
     }
   }
 
-  const users = await ctx.db
+  const user = await ctx.db
     .query('agentMessages')
     .withIndex('by_installation_turn_role', (q) =>
       q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user'),
     )
-    .collect()
-  for (const message of users) {
-    if (message.state !== state || message.finalizedAt === undefined) {
-      await ctx.db.patch(message._id, { state, updatedAt: now, finalizedAt: now })
-    }
+    .unique()
+  if (user !== null && (user.state !== state || user.finalizedAt === undefined)) {
+    await ctx.db.patch(user._id, { state, updatedAt: now, finalizedAt: now })
   }
 
   const thread = await threadForJob(ctx, job)
@@ -97,15 +95,13 @@ export async function releaseAgentTurnForRetry(
   if (thread?.activeTurnId === job.turnId) {
     await ctx.db.patch(thread._id, { activeTurnId: undefined, updatedAt: now })
   }
-  const users = await ctx.db
+  const user = await ctx.db
     .query('agentMessages')
     .withIndex('by_installation_turn_role', (q) =>
       q.eq('installationId', job.installationId).eq('turnId', job.turnId!).eq('role', 'user'),
     )
-    .collect()
-  for (const message of users) {
-    if (message.state === 'active') await ctx.db.patch(message._id, { state: 'queued', updatedAt: now })
-  }
+    .unique()
+  if (user?.state === 'active') await ctx.db.patch(user._id, { state: 'queued', updatedAt: now })
 }
 
 export async function fenceQueuedThreadJobs(

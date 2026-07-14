@@ -38,51 +38,50 @@ const CLAIM_ACTIVE_READ_LIMIT = 64
 
 type NodeFailure = 'inactive_node' | 'stale_heartbeat' | 'missing_capability'
 
-async function collectJobsByStatus(
+async function collectActiveJobs(
   ctx: MutationCtx,
   installationId: string,
-  status: 'queued' | 'leased' | 'running',
+): Promise<Doc<'jobs'>[]> {
+  const jobs = await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_lease', (q) =>
+      q.eq('installationId', installationId).gt('leaseExpiresAt', 0),
+    )
+    .take(CLAIM_ACTIVE_READ_LIMIT)
+  return jobs.filter((job) => job.status === 'leased' || job.status === 'running')
+}
+
+async function collectQueuedJobs(
+  ctx: MutationCtx,
+  installationId: string,
 ): Promise<Doc<'jobs'>[]> {
   return await ctx.db
     .query('jobs')
     .withIndex('by_installation_status_created', (q) =>
-      q.eq('installationId', installationId).eq('status', status),
-    )
-    .take(CLAIM_ACTIVE_READ_LIMIT)
-}
-
-async function collectCompatibleQueuedJobs(
-  ctx: MutationCtx,
-  installationId: string,
-  capabilities: readonly string[],
-): Promise<Doc<'jobs'>[]> {
-  const jobs = new Map<string, Doc<'jobs'>>()
-  for (const capability of capabilities) {
-    const matches = await ctx.db
-      .query('jobs')
-      .withIndex('by_installation_status_capability_created', (q) =>
-        q
-          .eq('installationId', installationId)
-          .eq('status', 'queued')
-          .eq('routingCapability', capability),
-      )
-      .take(CLAIM_QUEUE_READ_LIMIT)
-    for (const job of matches) jobs.set(job._id, job)
-  }
-  // Rows created before routingCapability was introduced remain claimable.
-  const legacy = await ctx.db
-    .query('jobs')
-    .withIndex('by_installation_status_capability_created', (q) =>
-      q
-        .eq('installationId', installationId)
-        .eq('status', 'queued')
-        .eq('routingCapability', undefined),
+      q.eq('installationId', installationId).eq('status', 'queued'),
     )
     .take(CLAIM_QUEUE_READ_LIMIT)
-  for (const job of legacy) jobs.set(job._id, job)
-  return [...jobs.values()]
-    .sort((left, right) => left.createdAt - right.createdAt || left.jobId.localeCompare(right.jobId))
-    .slice(0, CLAIM_QUEUE_READ_LIMIT)
+}
+
+async function recordClaimTransactionMetrics(ctx: MutationCtx): Promise<void> {
+  try {
+    const metrics = await ctx.meta.getTransactionMetrics()
+    console.info(JSON.stringify({
+      event: 'claimJob.transactionMetrics',
+      queuedJobReadLimit: CLAIM_QUEUE_READ_LIMIT,
+      activeJobReadLimit: CLAIM_ACTIVE_READ_LIMIT,
+      documentsRead: metrics.documentsRead,
+      bytesRead: metrics.bytesRead,
+      databaseQueries: metrics.databaseQueries,
+    }))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (
+      message.includes('getTransactionMetrics')
+      || message.includes('Unknown async operation')
+    ) return
+    throw error
+  }
 }
 
 const claimedJobResult = v.union(
@@ -604,23 +603,24 @@ export const claimJob = mutation({
 
     const node = await getNode(ctx, args.installationId, args.nodeId)
     if (node === null) throw new Error('worker rejected: inactive_node')
-    const queued = await collectCompatibleQueuedJobs(
+    const queued = await collectQueuedJobs(
       ctx,
       args.installationId,
-      node.capabilities,
     )
-    const active = [
-      ...await collectJobsByStatus(ctx, args.installationId, 'leased'),
-      ...await collectJobsByStatus(ctx, args.installationId, 'running'),
-    ]
+    const active = await collectActiveJobs(ctx, args.installationId)
     const reclaimable: Doc<'jobs'>[] = []
+    const owners = new Map<string, Doc<'nodes'> | null>()
     for (const job of active) {
       const expired =
         job.leaseExpiresAt !== undefined && job.leaseExpiresAt <= now
-      const owner =
-        job.leaseOwnerNodeId === undefined
-          ? null
-          : await getNode(ctx, args.installationId, job.leaseOwnerNodeId)
+      let owner: Doc<'nodes'> | null = null
+      if (!expired && job.leaseOwnerNodeId !== undefined) {
+        owner = owners.get(job.leaseOwnerNodeId) ?? null
+        if (!owners.has(job.leaseOwnerNodeId)) {
+          owner = await getNode(ctx, args.installationId, job.leaseOwnerNodeId)
+          owners.set(job.leaseOwnerNodeId, owner)
+        }
+      }
       if (expired || nodeFailure(owner, now, requiredCapabilities(job)) !== null) {
         reclaimable.push(job)
       }
@@ -636,13 +636,7 @@ export const claimJob = mutation({
     )
     const compatible = candidates.filter((job) => nodeFailure(node, now, requiredCapabilities(job)) === null)
     if (compatible.length === 0) {
-      const queuedExists = await ctx.db
-        .query('jobs')
-        .withIndex('by_installation_status_created', (q) =>
-          q.eq('installationId', args.installationId).eq('status', 'queued'),
-        )
-        .first()
-      if (queuedExists !== null || reclaimable.length > 0) {
+      if (queued.length > 0 || reclaimable.length > 0) {
         throw new Error('worker rejected: missing_capability')
       }
     }
@@ -670,9 +664,11 @@ export const claimJob = mutation({
       await activateAgentTurn(ctx, job, now)
       await ctx.db.patch(job._id, claimed)
       await advanceClientSnapshotRevision(ctx, args.installationId)
+      await recordClaimTransactionMetrics(ctx)
       return { job: claimed, reclaimed }
     }
     if (terminalized) await advanceClientSnapshotRevision(ctx, args.installationId)
+    await recordClaimTransactionMetrics(ctx)
     return null
   },
 })
