@@ -207,6 +207,151 @@ test('continues past position 256, traverses deeper windows, and wraps to later-
   expect((await poll())?.job.jobId).toBe('job:deep:000')
 })
 
+test('continues past a fully blocked turn page and wraps to the oldest newly eligible turn', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(mutation('agents:create'), {
+    installationId: 'installation:contracts', agentId: 'agent:blocked-page',
+    agentRevisionId: 'agent-revision:blocked-page', displayName: 'Blocked page',
+    systemPrompt: 'Head-of-line liveness', toolCapabilities: [],
+  })
+  await t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:blocked-page',
+    agentId: 'agent:blocked-page',
+  })
+  await t.mutation(api.worker.registerNode, {
+    installationId: 'installation:contracts', nodeId: 'node:blocked-page',
+    displayName: 'Blocked page',
+    capabilities: [AGENT_CHAT_CAPABILITY, MEMORY_RECONCILE_CAPABILITY], protocolVersion: '1',
+  })
+  for (let index = 0; index < 257; index += 1) {
+    const suffix = index.toString().padStart(3, '0')
+    await t.mutation(mutation('agents:submitMessage'), {
+      installationId: 'installation:contracts', threadId: 'thread:blocked-page',
+      commandId: `command:blocked-page:${suffix}`,
+      messageId: `message:blocked-page:${suffix}`,
+      idempotencyKey: `intent:blocked-page:${suffix}`,
+      content: `blocked page ${suffix}`, maxAttempts: 3,
+    })
+  }
+  vi.setSystemTime(1_001)
+  const unrelated = await t.mutation(api.knowledge.enqueueReconcile, {
+    installationId: 'installation:contracts', vaultId: 'vault:blocked-page-unrelated',
+    manifestHash: 'sha256:blocked-page-unrelated', maxAttempts: 3,
+  })
+  const poll = async () => await t.mutation(api.worker.claimJob, {
+    installationId: 'installation:contracts', nodeId: 'node:blocked-page', leaseDurationMs: 30_000,
+  })
+
+  const active = await poll()
+  expect(active?.job.jobId).toBe('job:command:blocked-page:000')
+  expect(await poll()).toBeNull()
+  expect((await poll())?.job.jobId).toBe(unrelated.job.jobId)
+
+  const started = await t.mutation(api.worker.startRun, {
+    installationId: 'installation:contracts', nodeId: 'node:blocked-page',
+    jobId: active!.job.jobId, expectedJobRevision: active!.job.revision,
+    expectedLeaseToken: active!.job.leaseToken,
+  })
+  if (!started.ok) throw new Error('expected active head run')
+  expect(await t.mutation(api.worker.completeRun, {
+    installationId: 'installation:contracts', nodeId: 'node:blocked-page',
+    jobId: started.job.jobId, runId: started.run.runId,
+    expectedJobRevision: started.job.revision,
+    expectedRunRevision: started.run.revision,
+    expectedLeaseToken: started.job.leaseToken,
+    assistantContent: 'head complete',
+  })).toMatchObject({ ok: true })
+
+  const wrapped = await poll()
+  expect(wrapped?.job.jobId).toBe('job:command:blocked-page:001')
+  expect(wrapped?.job.turnOrdinal).toBe(2)
+  const later = await t.run(async (ctx) => await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', 'job:command:blocked-page:002'),
+    )
+    .unique())
+  expect(later?.status).toBe('queued')
+})
+
+test('bounds thread titles and preferred node IDs before create or reset mutations', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(mutation('agents:create'), {
+    installationId: 'installation:contracts', agentId: 'agent:bounded-thread',
+    agentRevisionId: 'agent-revision:bounded-thread', displayName: 'Bounded thread',
+    systemPrompt: 'Input bounds', toolCapabilities: [],
+  })
+  const title256 = 't'.repeat(256)
+  const node128 = 'n'.repeat(128)
+  const accepted = await t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:bounded-max',
+    agentId: 'agent:bounded-thread', title: title256, preferredNodeId: node128,
+  })
+  expect(accepted).toMatchObject({ created: true, thread: { title: title256, preferredNodeId: node128 } })
+  expect((await t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:bounded-max',
+    agentId: 'agent:bounded-thread', title: title256, preferredNodeId: node128,
+  })).created).toBe(false)
+  await expect(t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:bounded-max',
+    agentId: 'agent:bounded-thread', title: 'u'.repeat(256), preferredNodeId: node128,
+  })).rejects.toThrow('threadId conflicts with an existing thread')
+  await expect(t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:title-too-long',
+    agentId: 'agent:bounded-thread', title: 't'.repeat(257),
+  })).rejects.toThrow('title must contain 1-256 characters')
+  await expect(t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:node-too-long',
+    agentId: 'agent:bounded-thread', preferredNodeId: 'n'.repeat(129),
+  })).rejects.toThrow('preferredNodeId must contain 1-128 characters')
+
+  await t.mutation(mutation('agents:createThread'), {
+    installationId: 'installation:contracts', threadId: 'thread:reset-bounds',
+    agentId: 'agent:bounded-thread',
+  })
+  const submitted = await t.mutation(mutation('agents:submitMessage'), {
+    installationId: 'installation:contracts', threadId: 'thread:reset-bounds',
+    commandId: 'command:reset-bounds', messageId: 'message:reset-bounds',
+    idempotencyKey: 'intent:reset-bounds', content: 'reset bounds', maxAttempts: 3,
+  })
+  expect(await t.mutation(mutation('agents:resetSession'), {
+    installationId: 'installation:contracts', threadId: 'thread:reset-bounds',
+    expectedRevision: 0, preferredNodeId: node128,
+  })).toEqual({ ok: true, revision: 1 })
+
+  const beforeRejection = await t.run(async (ctx) => ({
+    thread: await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('threadId', 'thread:reset-bounds')).unique(),
+    job: await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', submitted.job.jobId)).unique(),
+    message: await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('messageId', submitted.message.messageId)).unique(),
+    rejectedThreads: await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) =>
+      q.eq('installationId', 'installation:contracts')).collect(),
+  }))
+  expect(beforeRejection.thread).toMatchObject({ preferredNodeId: node128, sessionRevision: 1 })
+  expect(beforeRejection.job).toMatchObject({ preferredNodeId: node128, sessionRevision: 1, revision: 1 })
+  expect(beforeRejection.message).toMatchObject({ state: 'waiting_for_node' })
+  expect(beforeRejection.rejectedThreads.some((thread) =>
+    thread.threadId === 'thread:title-too-long' || thread.threadId === 'thread:node-too-long')).toBe(false)
+
+  await expect(t.mutation(mutation('agents:resetSession'), {
+    installationId: 'installation:contracts', threadId: 'thread:reset-bounds',
+    expectedRevision: 1, preferredNodeId: 'n'.repeat(129),
+  })).rejects.toThrow('preferredNodeId must contain 1-128 characters')
+  const afterRejection = await t.run(async (ctx) => ({
+    thread: await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('threadId', 'thread:reset-bounds')).unique(),
+    job: await ctx.db.query('jobs').withIndex('by_installation_job', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('jobId', submitted.job.jobId)).unique(),
+    message: await ctx.db.query('agentMessages').withIndex('by_installation_message', (q) =>
+      q.eq('installationId', 'installation:contracts').eq('messageId', submitted.message.messageId)).unique(),
+  }))
+  expect(afterRejection.thread).toEqual(beforeRejection.thread)
+  expect(afterRejection.job).toEqual(beforeRejection.job)
+  expect(afterRejection.message).toEqual(beforeRejection.message)
+})
+
 test('derives affinity waiting state before polling and activates one maximum-size message only on selection', async () => {
   const t = backend(); await installation(t)
   await t.mutation(mutation('agents:create'), {

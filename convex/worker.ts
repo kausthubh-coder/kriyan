@@ -746,14 +746,10 @@ export const claimJob = mutation({
       }
     }
     let terminalized = false
-    let temporarilyBlocked = false
     for (const job of compatible) {
       const claimability = await agentJobClaimability(ctx, job, args.nodeId)
       if (claimability === 'rotatable') continue
-      if (claimability === 'blocked') {
-        temporarilyBlocked = true
-        continue
-      }
+      if (claimability === 'blocked') continue
       const reclaimed = job.status !== 'queued'
       if (job.attempt >= job.maxAttempts) {
         await terminalizeExhaustedJob(ctx, job, now, 'attempts exhausted')
@@ -782,15 +778,13 @@ export const claimJob = mutation({
       return { job: claimed, reclaimed }
     }
     if (terminalized) await advanceClientSnapshotRevision(ctx, args.installationId)
-    if (!temporarilyBlocked) {
-      const last = queued.at(-1) ?? null
-      const continuation = last !== null
-        && cursor?.pageCursor === last.jobId
-        && cursor.cursor === last.createdAt
-        ? null
-        : last
-      await setClaimCursor(ctx, cursor, args.installationId, args.nodeId, continuation, now)
-    }
+    const last = queued.at(-1) ?? null
+    const continuation = last !== null
+      && cursor?.pageCursor === last.jobId
+      && cursor.cursor === last.createdAt
+      ? null
+      : last
+    await setClaimCursor(ctx, cursor, args.installationId, args.nodeId, continuation, now)
     await recordClaimTransactionMetrics(ctx)
     return null
   },

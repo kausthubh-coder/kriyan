@@ -14,7 +14,9 @@ import {
   assertBoundedString,
   assertExpectedRevision,
   assertId,
+  assertOptionalId,
   assertPositiveInteger,
+  assertShortText,
   assertStringList,
   MAX_PAGE_SIZE,
   withoutSystemFields,
@@ -84,6 +86,8 @@ export const createThread = mutation({
   returns: v.object({ created: v.boolean(), thread: agentThreadValue }),
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId'); assertId(args.threadId, 'threadId'); assertId(args.agentId, 'agentId')
+    if (args.title !== undefined) assertShortText(args.title, 'title')
+    assertOptionalId(args.preferredNodeId, 'preferredNodeId')
     const existing = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', args.threadId)).unique()
     if (existing !== null) {
       if (existing.agentId !== args.agentId || existing.title !== args.title || existing.preferredNodeId !== args.preferredNodeId) throw new Error('threadId conflicts with an existing thread')
@@ -174,6 +178,7 @@ export const resetSession = mutation({
   args: { installationId: v.string(), threadId: v.string(), expectedRevision: v.number(), preferredNodeId: v.optional(v.string()) },
   returns: transitionResult,
   handler: async (ctx, args) => {
+    assertOptionalId(args.preferredNodeId, 'preferredNodeId')
     const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', args.threadId)).unique()
     if (thread === null) return { ok: false as const, reason: 'not_found' as const }
     if (thread.sessionRevision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
