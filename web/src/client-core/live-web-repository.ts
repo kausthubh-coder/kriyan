@@ -18,7 +18,7 @@ import {
 } from '@kriyan/client-core'
 import { parseClientSnapshotWire, type SnapshotCalendarEventWire } from '@kriyan/contracts'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
+import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 
 import { api } from '@convex/_generated/api'
 import type { KriyanWebConfiguration } from '@/lib/convex'
@@ -26,6 +26,7 @@ import type { KriyanWebConfiguration } from '@/lib/convex'
 import { useConvexRepository } from './convex-repository'
 import type { WebRepository } from './web-repository'
 import { createWebReactiveRepository } from './reactive-web-adapter'
+import { createWebProductDetailRepository } from './product-detail-adapter'
 
 function createSnapshotBridge(): {
   repository: ReactiveClientRepository
@@ -73,6 +74,7 @@ export function useLiveWebRepository(
   clientGeneration: number,
 ): { repository: WebRepository; reactiveRepository: ReactiveClientRepository; connectionMode: ReturnType<typeof useConvexRepository>['connectionMode']; connectionRecoveryRequired: boolean } {
   const base = useConvexRepository(configuration, selectedRunId, clientGeneration)
+  const convex = useConvex()
   const { installationId } = configuration
   const [localPending, setLocalPending] = useState<ReadonlySet<string>>(new Set())
   const pendingRef = useRef(new Set<string>())
@@ -117,6 +119,7 @@ export function useLiveWebRepository(
 
   const repository: WebRepository = {
     ...base.repository,
+    ...createWebProductDetailRepository(convex, installationId),
     calendarEvents,
     notes: notesPage.results as AppNoteItem[],
     sourceRefs: sourcesPage.results as SourceRefItem[],

@@ -32,10 +32,54 @@ import {
   transitionResult,
 } from './validators'
 
-const CLAIM_SCAN_LIMIT = 64
 const OWNED_WORK_RELEASE_LIMIT = 32
 
 type NodeFailure = 'inactive_node' | 'stale_heartbeat' | 'missing_capability'
+
+async function collectJobsByStatus(
+  ctx: MutationCtx,
+  installationId: string,
+  status: 'queued' | 'leased' | 'running',
+): Promise<Doc<'jobs'>[]> {
+  return await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_status_created', (q) =>
+      q.eq('installationId', installationId).eq('status', status),
+    )
+    .collect()
+}
+
+async function collectCompatibleQueuedJobs(
+  ctx: MutationCtx,
+  installationId: string,
+  capabilities: readonly string[],
+): Promise<Doc<'jobs'>[]> {
+  const jobs = new Map<string, Doc<'jobs'>>()
+  for (const capability of capabilities) {
+    const matches = await ctx.db
+      .query('jobs')
+      .withIndex('by_installation_status_capability_created', (q) =>
+        q
+          .eq('installationId', installationId)
+          .eq('status', 'queued')
+          .eq('routingCapability', capability),
+      )
+      .collect()
+    for (const job of matches) jobs.set(job._id, job)
+  }
+  // Rows created before routingCapability was introduced remain claimable.
+  const legacy = await ctx.db
+    .query('jobs')
+    .withIndex('by_installation_status_capability_created', (q) =>
+      q
+        .eq('installationId', installationId)
+        .eq('status', 'queued')
+        .eq('routingCapability', undefined),
+    )
+    .collect()
+  for (const job of legacy) jobs.set(job._id, job)
+  return [...jobs.values()]
+}
 
 const claimedJobResult = v.union(
   v.null(),
@@ -550,35 +594,16 @@ export const claimJob = mutation({
     )
     if (failure !== null) throw new Error(`worker rejected: ${failure}`)
 
-    const queued = await ctx.db
-      .query('jobs')
-      .withIndex('by_installation_status_created', (q) =>
-        q.eq('installationId', args.installationId).eq('status', 'queued'),
-      )
-      .take(CLAIM_SCAN_LIMIT)
-    const expired = (
-      await ctx.db
-        .query('jobs')
-        .withIndex('by_installation_lease', (q) =>
-          q
-            .eq('installationId', args.installationId)
-            .lte('leaseExpiresAt', now),
-        )
-        .take(CLAIM_SCAN_LIMIT)
-    ).filter((job) => job.status === 'leased' || job.status === 'running')
+    const node = await getNode(ctx, args.installationId, args.nodeId)
+    if (node === null) throw new Error('worker rejected: inactive_node')
+    const queued = await collectCompatibleQueuedJobs(
+      ctx,
+      args.installationId,
+      node.capabilities,
+    )
     const active = [
-      ...(await ctx.db
-        .query('jobs')
-        .withIndex('by_installation_status_created', (q) =>
-          q.eq('installationId', args.installationId).eq('status', 'leased'),
-        )
-        .take(CLAIM_SCAN_LIMIT)),
-      ...(await ctx.db
-        .query('jobs')
-        .withIndex('by_installation_status_created', (q) =>
-          q.eq('installationId', args.installationId).eq('status', 'running'),
-        )
-        .take(CLAIM_SCAN_LIMIT)),
+      ...await collectJobsByStatus(ctx, args.installationId, 'leased'),
+      ...await collectJobsByStatus(ctx, args.installationId, 'running'),
     ]
     const reclaimable: Doc<'jobs'>[] = []
     for (const job of active) {
@@ -594,17 +619,25 @@ export const claimJob = mutation({
     }
     const candidates = [
       ...new Map(
-        [...queued, ...expired, ...reclaimable].map((job) => [job._id, job]),
+        [...queued, ...reclaimable].map((job) => [job._id, job]),
       ).values(),
     ].sort((left, right) =>
       left.createdAt === right.createdAt
         ? left.jobId.localeCompare(right.jobId)
         : left.createdAt - right.createdAt,
     )
-    const node = await getNode(ctx, args.installationId, args.nodeId)
-    if (node === null) throw new Error('worker rejected: inactive_node')
     const compatible = candidates.filter((job) => nodeFailure(node, now, requiredCapabilities(job)) === null)
-    if (candidates.length > 0 && compatible.length === 0) throw new Error('worker rejected: missing_capability')
+    if (compatible.length === 0) {
+      const queuedExists = await ctx.db
+        .query('jobs')
+        .withIndex('by_installation_status_created', (q) =>
+          q.eq('installationId', args.installationId).eq('status', 'queued'),
+        )
+        .first()
+      if (queuedExists !== null || reclaimable.length > 0) {
+        throw new Error('worker rejected: missing_capability')
+      }
+    }
     let terminalized = false
     for (const job of compatible) {
       if (!await agentJobIsHeadOfLine(ctx, job, args.nodeId)) continue

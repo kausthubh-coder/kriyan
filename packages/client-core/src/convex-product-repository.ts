@@ -1,5 +1,10 @@
 import type {
   ProductCalendarRepository,
+  ProductArtifactRepository,
+  ProductMemoryRepository,
+  ProductNoteDetailRepository,
+  ProductSourceDetailRepository,
+  ProductTaskProvenanceRepository,
   ProductKnowledgeRepository,
   ProductMutationResult,
   ProductNotificationIntentRepository,
@@ -23,6 +28,11 @@ export interface InjectedConvexProductClient {
   readonly notesV1: ProductNoteRepository
   readonly sourceRefsV1: ProductSourceRefRepository
   readonly knowledgeV1: ProductKnowledgeRepository
+  readonly noteDetailsV1: ProductNoteDetailRepository
+  readonly artifactsV1: ProductArtifactRepository
+  readonly sourceDetailsV1: ProductSourceDetailRepository
+  readonly memoryV1: ProductMemoryRepository
+  readonly taskProvenanceV1: ProductTaskProvenanceRepository
 }
 
 function transportFailure<T>(error: unknown): ProductMutationResult<T> {
@@ -49,6 +59,11 @@ export class ConvexProductRepository implements ProductRepository {
   readonly notesV1: ProductNoteRepository
   readonly sourceRefsV1: ProductSourceRefRepository
   readonly knowledgeV1: ProductKnowledgeRepository
+  readonly noteDetailsV1: ProductNoteDetailRepository
+  readonly artifactsV1: ProductArtifactRepository
+  readonly sourceDetailsV1: ProductSourceDetailRepository
+  readonly memoryV1: ProductMemoryRepository
+  readonly taskProvenanceV1: ProductTaskProvenanceRepository
 
   constructor(client: InjectedConvexProductClient) {
     this.tasksV1 = {
@@ -94,6 +109,34 @@ export class ConvexProductRepository implements ProductRepository {
       put: async (input) => await guard(() => client.knowledgeV1.put(input)),
       update: async (input) => await guard(() => client.knowledgeV1.update(input)),
       tombstone: async (id, revision) => await guard(() => client.knowledgeV1.tombstone(id, revision)),
+    }
+    this.noteDetailsV1 = {
+      getHistory: async (id, limit) => await client.noteDetailsV1.getHistory(id, limit),
+      getVersion: async (id) => await client.noteDetailsV1.getVersion(id),
+      createLink: async (input) => await guard(() => client.noteDetailsV1.createLink(input)),
+      tombstoneLink: async (id, revision) => await guard(() => client.noteDetailsV1.tombstoneLink(id, revision)),
+    }
+    this.artifactsV1 = {
+      get: async (id) => await client.artifactsV1.get(id),
+      listByNote: async (id, includeDeleted) => await client.artifactsV1.listByNote(id, includeDeleted),
+      create: async (input) => await guard(() => client.artifactsV1.create(input)),
+      advance: async (input) => await guard(() => client.artifactsV1.advance(input)),
+      tombstone: async (id, revision) => await guard(() => client.artifactsV1.tombstone(id, revision)),
+    }
+    this.sourceDetailsV1 = {
+      getDetail: async (id, limits) => await client.sourceDetailsV1.getDetail(id, limits),
+      listDerivedChanges: async (id, limit) => await client.sourceDetailsV1.listDerivedChanges(id, limit),
+    }
+    this.memoryV1 = {
+      getEntity: async (id, limit) => await client.memoryV1.getEntity(id, limit),
+      createCorrection: async (input) => await guard(() => client.memoryV1.createCorrection(input)),
+      applyCorrection: async (id, revision) => await guard(() => client.memoryV1.applyCorrection(id, revision)),
+      restoreCorrection: async (id, revision) => await guard(() => client.memoryV1.restoreCorrection(id, revision)),
+    }
+    this.taskProvenanceV1 = {
+      getDetail: async (id) => await client.taskProvenanceV1.getDetail(id),
+      listChanges: async (id, limit) => await client.taskProvenanceV1.listChanges(id, limit),
+      revertChange: async (id, revision) => await guard(() => client.taskProvenanceV1.revertChange(id, revision)),
     }
   }
 }

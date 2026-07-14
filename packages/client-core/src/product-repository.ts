@@ -383,7 +383,7 @@ export interface ProductDetailRepository {
   readonly taskProvenanceV1: ProductTaskProvenanceRepository
 }
 
-export interface ProductRepository {
+export interface ProductRepository extends ProductDetailRepository {
   readonly tasksV1: ProductTaskRepository
   readonly remindersV1: ProductReminderRepository
   readonly notificationIntentsV1: ProductNotificationIntentRepository

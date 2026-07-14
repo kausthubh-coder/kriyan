@@ -5,6 +5,7 @@ import type {
   ClientRepository,
   KnowledgeDocumentItem,
   PageState,
+  ProductDetailRepository,
   ReminderDeliveryPolicy,
   ReminderItem,
   SourceRefItem,
@@ -59,7 +60,7 @@ export type WebPages = ClientRepository['pages'] & {
   knowledge: PageState
 }
 
-export interface WebRepository extends Omit<
+export interface WebRepository extends ProductDetailRepository, Omit<
   ClientRepository,
   | 'pages'
   | 'loadMore'

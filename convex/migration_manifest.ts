@@ -7,6 +7,8 @@ export const migrationTableNames = [
   'installations', 'nodes', 'commands', 'jobs', 'runs', 'runEvents',
   'workerEffectReceipts', 'tasks', 'reminders', 'calendarEvents',
   'notificationIntents', 'notes', 'noteVersions', 'artifacts', 'noteLinks',
+  'artifactMaterializationHistory', 'sourceTranscriptExcerpts', 'sourceExtractions',
+  'reversibleChanges', 'memoryFacts',
   'agents', 'agentRevisions', 'agentThreads', 'agentMessages', 'sourceRefs',
   'knowledgeDocuments', 'knowledgeRelations', 'provenanceLinks',
   'projectionCursors', 'memoryCorrections',

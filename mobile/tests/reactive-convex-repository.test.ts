@@ -6,23 +6,25 @@ import {
   createConvexRepositoryWithClient,
   type MobileConvexClient,
 } from '../lib/convex-repository'
-import { settleRepositorySetup } from '../lib/product-store'
+import { loadAllProductPages, settleRepositorySetup } from '../lib/product-store'
 
 function baseSnapshot(revision = 0) {
-  const common = { revision, createdAt: 1, updatedAt: revision + 1 }
+  const common = { installationId: 'installation:contracts', revision, createdAt: 1, updatedAt: revision + 1 }
+  const window = { limit: 100, returned: 1, truncated: false }
   return {
     transactionRevision: revision,
+    windows: { tasks: window, reminders: window, calendarEvents: window, notes: window, notificationIntents: window, sources: window, documents: window, artifacts: { ...window, returned: 0 }, nodes: { ...window, returned: 0 }, threads: { ...window, returned: 0 }, messages: { ...window, returned: 0 }, activity: { ...window, returned: 0 } },
     productivity: {
-      tasks: [{ taskId: 'task:one', title: revision ? 'Committed task' : 'Old task', status: 'open', tags: [], ...common }],
-      reminders: [{ reminderId: 'reminder:one', message: 'Reminder', remindAt: 10, timezone: 'UTC', status: 'scheduled', ...common }],
-      calendarEvents: [{ calendarEventId: 'calendar:one', title: 'Event', startAt: 10, endAt: 20, timezone: 'UTC', allDay: false, status: 'confirmed', ...common }],
-      notes: [{ noteId: 'note:one', contentJson: '{"type":"doc"}', plainTextPreview: revision ? 'Committed note' : 'Old note', wordCount: 2, tags: [], ...common }],
+      tasks: [{ taskId: 'task:one', idempotencyKey: 'task:one', title: revision ? 'Committed task' : 'Old task', status: 'open', tags: [], ...common }],
+      reminders: [{ reminderId: 'reminder:one', idempotencyKey: 'reminder:one', message: 'Reminder', remindAt: 10, timezone: 'UTC', deliveryPolicy: 'normal', status: 'scheduled', scheduleKey: 'reminder:one', fireCount: 0, ...common }],
+      calendarEvents: [{ calendarEventId: 'calendar:one', idempotencyKey: 'calendar:one', title: 'Event', startAt: 10, endAt: 20, timezone: 'UTC', allDay: false, status: 'confirmed', ...common }],
+      notes: [{ noteId: 'note:one', idempotencyKey: 'note:one', contentJson: '{"type":"doc"}', plainTextPreview: revision ? 'Committed note' : 'Old note', wordCount: 2, tags: [], ...common }],
       notificationIntents: [{ notificationIntentId: 'intent:one', reminderId: 'reminder:one', scheduledFor: 10, deliveryPolicy: 'normal', dedupeKey: 'intent', lifecycle: 'queued', attempt: 0, escalationLevel: 0, ...common }],
     },
     agents: { threads: [], messages: [] },
     knowledge: {
-      sources: [{ sourceRefId: 'source:one', kind: 'document', displayName: revision ? 'Committed source' : 'Old source', syncState: 'synced', indexState: 'indexed', provenanceIds: [], ...common }],
-      documents: [{ knowledgeDocumentId: 'knowledge:one', kind: 'topic', title: revision ? 'Committed knowledge' : 'Old knowledge', summary: 'Summary', tags: [], sourceRefIds: [], provenanceIds: [], syncState: 'synced', indexState: 'indexed', ...common }],
+      sources: [{ sourceRefId: 'source:one', idempotencyKey: 'source:one', kind: 'document', displayName: revision ? 'Committed source' : 'Old source', syncState: 'synced', indexState: 'indexed', provenanceIds: [], ...common }],
+      documents: [{ knowledgeDocumentId: 'knowledge:one', idempotencyKey: 'knowledge:one', kind: 'topic', title: revision ? 'Committed knowledge' : 'Old knowledge', summary: 'Summary', tags: [], sourceRefIds: [], provenanceIds: [], syncState: 'synced', indexState: 'indexed', ...common }],
       artifacts: [],
     },
     nodes: { items: [], activity: [] },
@@ -35,9 +37,11 @@ class FakeClient implements MobileConvexClient {
   listeners = new Set<(value: any) => void>()
   unsubscribeCount = 0
   closeCount = 0
+  queryNames: string[] = []
 
   async query(reference: any, args: any): Promise<any> {
     const name = getFunctionName(reference)
+    this.queryNames.push(name)
     const snapshot = baseSnapshot(this.revision)
     const byName: Record<string, any> = {
       'projections:getTask': snapshot.productivity.tasks[0],
@@ -47,9 +51,25 @@ class FakeClient implements MobileConvexClient {
       'notes:get': snapshot.productivity.notes[0],
       'knowledge:getSourceRef': snapshot.knowledge.sources[0],
       'knowledge:getKnowledgeDocument': snapshot.knowledge.documents[0],
+      'notes:getHistory': null,
+      'notes:getVersion': null,
+      'notes:getArtifact': null,
+      'notes:listArtifactsByNote': [],
+      'knowledge:getSourceDetail': {
+        source: snapshot.knowledge.sources[0], transcriptTruncated: false,
+        excerpts: [], excerptsTruncated: false, extractions: [], extractionsTruncated: false,
+        derivedChanges: [], derivedChangesTruncated: false,
+      },
+      'knowledge:listDerivedChanges': [],
+      'knowledge:getMemoryEntity': null,
+      'knowledge:getTaskProvenance': {
+        task: snapshot.productivity.tasks[0], sources: [snapshot.knowledge.sources[0]],
+        changes: [], changesTruncated: false,
+      },
+      'knowledge:listTaskChanges': [],
     }
     const value = byName[name]
-    if (!value) throw new Error(`unexpected query ${name}`)
+    if (!(name in byName)) throw new Error(`unexpected query ${name}`)
     const id = Object.values(args).find((item) => typeof item === 'string' && item !== 'installation:contracts') as string | undefined
     return id && this.tombstoned.has(id) && !args.includeDeleted ? null : id && this.tombstoned.has(id) ? { ...value, deletedAt: 99 } : value
   }
@@ -129,6 +149,44 @@ test('Expo runtime uses the shared portable canonical vector corpus', () => {
     expect(canonicalJson(vector.value), vector.name).toBe(vector.canonical)
     expect(canonicalContentHash(JSON.stringify(vector.value))).toMatch(/^sha256:[0-9a-f]{64}$/)
   }
+})
+
+test('Expo public repository executes every detail query family through Convex', async () => {
+  const client = new FakeClient()
+  const repository = await createConvexRepositoryWithClient(client, 'installation:contracts')
+  await Promise.resolve()
+  expect(await repository.noteDetailsV1.getHistory('note:missing')).toBeNull()
+  expect(await repository.noteDetailsV1.getVersion('version:missing')).toBeNull()
+  expect(await repository.artifactsV1.get('artifact:missing')).toBeNull()
+  expect(await repository.artifactsV1.listByNote('note:missing')).toEqual([])
+  const sourceDetail = await repository.sourceDetailsV1.getDetail('source:one')
+  expect(sourceDetail?.source).not.toHaveProperty('installationId')
+  expect(await repository.sourceDetailsV1.listDerivedChanges('source:missing')).toEqual([])
+  expect(await repository.memoryV1.getEntity('entity:missing')).toBeNull()
+  const taskProvenance = await repository.taskProvenanceV1.getDetail('task:one')
+  expect(taskProvenance?.task).not.toHaveProperty('installationId')
+  expect(taskProvenance?.sources[0]).not.toHaveProperty('installationId')
+  expect(await repository.taskProvenanceV1.listChanges('task:missing')).toEqual([])
+  expect(client.queryNames).toEqual([
+    'notes:getHistory', 'notes:getVersion', 'notes:getArtifact', 'notes:listArtifactsByNote',
+    'knowledge:getSourceDetail', 'knowledge:listDerivedChanges', 'knowledge:getMemoryEntity',
+    'knowledge:getTaskProvenance', 'knowledge:listTaskChanges',
+  ])
+  repository.dispose()
+})
+
+test('Expo display authority loads row 101 again after a reconnect invalidation', async () => {
+  const rows = Array.from({ length: 101 }, (_, index) => `task:${index}`)
+  const calls: Array<string | null> = []
+  const load = async (cursor: string | null) => {
+    calls.push(cursor)
+    return cursor === null
+      ? { items: rows.slice(0, 100), cursor: '100', done: false }
+      : { items: rows.slice(100), cursor: null, done: true }
+  }
+  expect(await loadAllProductPages(load)).toEqual(rows)
+  expect(await loadAllProductPages(load)).toEqual(rows)
+  expect(calls).toEqual([null, '100', null, '100'])
 })
 
 test('superseded async setup and unmount disposal are fenced exactly once', async () => {

@@ -4,6 +4,9 @@ export const LEGACY_PROTOCOL_VERSION = '1' as const
 export const REMINDER_CAPABILITY = 'reminders' as const
 export const AGENT_CHAT_CAPABILITY = 'agent.chat.v1' as const
 export const ARTIFACT_MATERIALIZATION_CAPABILITY = 'artifact.materialization.v1' as const
+export const MEMORY_PROJECT_CAPABILITY = 'memory.project.v1' as const
+export const MEMORY_RECONCILE_CAPABILITY = 'memory.reconcile.v1' as const
+export const MEMORY_CORRECTION_CAPABILITY = 'memory.correction.apply.v1' as const
 
 export * from './canonical-vectors'
 export * from './client-snapshot'
@@ -42,6 +45,8 @@ export const WORKER_OPERATIONS = Object.freeze([
   'artifact.work.read',
   'note.version.read',
   'memory.work.read',
+  'memory.project.enqueue',
+  'memory.reconcile.enqueue',
   'effect.task.commit',
   'effect.reminder.commit',
   'effect.note.commit',
@@ -79,6 +84,7 @@ export interface WorkerJobContract {
   contractVersion?: typeof CONTRACT_VERSION
   kind?: JobKind
   requiredCapabilities?: string[]
+  routingCapability?: string
   preferredNodeId?: string
   threadId?: string
   turnId?: string

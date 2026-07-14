@@ -1,11 +1,18 @@
+import { canonicalContentHash } from '@kriyan/contracts'
+
 import type {
   AppNoteItem,
+  ArtifactItem,
   CalendarEventItem,
   KnowledgeDocumentItem,
+  MemoryCorrectionItem,
+  NoteLinkItem,
+  NoteVersionItem,
   NotificationIntentItem,
   ReminderItem,
   SourceRefItem,
   TaskItem,
+  ReversibleChangeItem,
 } from './types'
 import {
   isTipTapDocumentJson,
@@ -40,6 +47,11 @@ import {
   type UpdateProductTaskInput,
   type UpdateSourceRefInput,
   type ProductCalendarRepository,
+  type ProductArtifactRepository,
+  type ProductMemoryRepository,
+  type ProductNoteDetailRepository,
+  type ProductSourceDetailRepository,
+  type ProductTaskProvenanceRepository,
   type CreateNotificationIntentInput,
 } from './product-repository'
 
@@ -170,6 +182,11 @@ export class InMemoryProductRepository implements ProductRepository {
   private readonly noteStore = new EntityStore<AppNoteItem>(() => ++this.clock)
   private readonly sourceRefStore = new EntityStore<SourceRefItem>(() => ++this.clock)
   private readonly knowledgeStore = new EntityStore<KnowledgeDocumentItem>(() => ++this.clock)
+  private readonly noteLinks = new Map<string, NoteLinkItem>()
+  private readonly noteVersions = new Map<string, NoteVersionItem>()
+  private readonly artifacts = new Map<string, ArtifactItem>()
+  private readonly corrections = new Map<string, MemoryCorrectionItem>()
+  private readonly changes = new Map<string, ReversibleChangeItem>()
 
   readonly tasksV1: ProductTaskRepository = {
     list: async (filter = {}) => this.listTasks(filter),
@@ -233,6 +250,128 @@ export class InMemoryProductRepository implements ProductRepository {
     put: async (input) => this.putKnowledge(input),
     update: async (input) => this.updateKnowledge(input),
     tombstone: async (id, revision) => this.knowledgeStore.tombstone(id, revision),
+  }
+
+  readonly noteDetailsV1: ProductNoteDetailRepository = {
+    getHistory: async (noteId, limit = 50) => {
+      const note = this.noteStore.list().find((item) => item.noteId === noteId)
+      if (!note) return null
+      return {
+        note,
+        versions: [...this.noteVersions.values()].filter((item) => item.noteId === noteId).sort((left, right) => right.version - left.version).slice(0, limit),
+        links: [...this.noteLinks.values()].filter((item) => item.noteId === noteId).slice(0, limit),
+      }
+    },
+    getVersion: async (noteVersionId) => structuredClone(this.noteVersions.get(noteVersionId) ?? null),
+    createLink: async (input) => {
+      const existing = this.noteLinks.get(input.noteLinkId)
+      if (existing) return existing.noteId === input.noteId && existing.targetId === input.targetId
+        ? { ok: true, created: false, revision: existing.revision, value: structuredClone(existing) }
+        : failure('idempotency_conflict', 'The note link identity conflicts.')
+      const now = ++this.clock
+      const value: NoteLinkItem = { ...input, revision: 0, createdAt: now, updatedAt: now }
+      this.noteLinks.set(value.noteLinkId, value)
+      return { ok: true, created: true, revision: 0, value: structuredClone(value) }
+    },
+    tombstoneLink: async (noteLinkId, expectedRevision) => {
+      const current = this.noteLinks.get(noteLinkId)
+      if (!current) return failure('not_found', 'The note link does not exist.')
+      if (current.revision !== expectedRevision) return failure('stale_revision', 'The note link changed.')
+      const value = { ...current, revision: current.revision + 1, updatedAt: ++this.clock, deletedAt: this.clock }
+      this.noteLinks.set(noteLinkId, value)
+      return { ok: true, created: false, revision: value.revision, value: structuredClone(value) }
+    },
+  }
+
+  readonly artifactsV1: ProductArtifactRepository = {
+    get: async (artifactId) => structuredClone(this.artifacts.get(artifactId) ?? null),
+    listByNote: async (noteId, includeDeleted = false) => [...this.artifacts.values()].filter((item) => item.noteId === noteId && (includeDeleted || item.deletedAt === undefined)).map((item) => structuredClone(item)),
+    create: async (input) => {
+      const existing = this.artifacts.get(input.artifactId)
+      if (existing) return existing.noteVersionId === input.noteVersionId && existing.slug === input.slug
+        ? { ok: true, created: false, revision: existing.revision, value: structuredClone(existing) }
+        : failure('idempotency_conflict', 'The artifact identity conflicts.')
+      const now = ++this.clock
+      const value: ArtifactItem = { ...input, projectionState: 'pending', revision: 0, createdAt: now, updatedAt: now, history: [{ revision: 0, state: 'pending', noteVersionId: input.noteVersionId, slug: input.slug, occurredAt: now }] }
+      this.artifacts.set(input.artifactId, value)
+      return { ok: true, created: true, revision: 0, value: structuredClone(value) }
+    },
+    advance: async (input) => {
+      const current = this.artifacts.get(input.artifactId)
+      if (!current) return failure('not_found', 'The artifact does not exist.')
+      if (current.revision !== input.expectedRevision) return failure('stale_revision', 'The artifact changed.')
+      if (current.projectedHash !== input.expectedProjectedHash) return failure('invalid_state', 'The projected hash changed.')
+      const now = ++this.clock
+      const value: ArtifactItem = { ...current, noteVersionId: input.noteVersionId, slug: input.slug, projectionState: 'pending', revision: current.revision + 1, updatedAt: now, history: [...(current.history ?? []), { revision: current.revision + 1, state: 'pending', noteVersionId: input.noteVersionId, slug: input.slug, occurredAt: now }] }
+      this.artifacts.set(input.artifactId, value)
+      return { ok: true, created: false, revision: value.revision, value: structuredClone(value) }
+    },
+    tombstone: async (artifactId, expectedRevision) => {
+      const current = this.artifacts.get(artifactId)
+      if (!current) return failure('not_found', 'The artifact does not exist.')
+      if (current.revision !== expectedRevision) return failure('stale_revision', 'The artifact changed.')
+      const now = ++this.clock
+      const value: ArtifactItem = { ...current, projectionState: 'tombstoned', deletedAt: now, revision: current.revision + 1, updatedAt: now, history: [...(current.history ?? []), { revision: current.revision + 1, state: 'tombstoned', noteVersionId: current.noteVersionId, slug: current.slug, occurredAt: now }] }
+      this.artifacts.set(artifactId, value)
+      return { ok: true, created: false, revision: value.revision, value: structuredClone(value) }
+    },
+  }
+
+  readonly sourceDetailsV1: ProductSourceDetailRepository = {
+    getDetail: async (sourceRefId) => {
+      const source = this.sourceRefStore.list().find((item) => item.sourceRefId === sourceRefId)
+      return source ? { source, transcriptTruncated: false, excerpts: [], excerptsTruncated: false, extractions: [], extractionsTruncated: false, derivedChanges: [...this.changes.values()].filter((item) => item.sourceRefIds.includes(sourceRefId)), derivedChangesTruncated: false } : null
+    },
+    listDerivedChanges: async (sourceRefId, limit = 50) => [...this.changes.values()].filter((item) => item.sourceRefIds.includes(sourceRefId)).slice(0, limit).map((item) => structuredClone(item)),
+  }
+
+  readonly memoryV1: ProductMemoryRepository = {
+    getEntity: async (entityId, limit = 50) => {
+      const exists = this.knowledgeStore.list().some((item) => item.knowledgeDocumentId === entityId)
+      const corrections = [...this.corrections.values()].filter((item) => item.targetId === entityId).slice(0, limit)
+      return exists || corrections.length > 0 ? { entityId, facts: [], relations: [], provenance: [], corrections: corrections.filter((item) => item.state !== 'conflict'), conflicts: corrections.filter((item) => item.state === 'conflict') } : null
+    },
+    createCorrection: async (input) => {
+      const existing = this.corrections.get(input.correctionId)
+      if (existing) return existing.targetId === input.targetId && existing.action === input.action
+        ? { ok: true, created: false, revision: existing.expectedRevision, value: structuredClone(existing) }
+        : failure('idempotency_conflict', 'The correction identity conflicts.')
+      const now = ++this.clock
+      const value: MemoryCorrectionItem = { ...input, state: 'pending', createdAt: now, updatedAt: now }
+      this.corrections.set(input.correctionId, value)
+      return { ok: true, created: true, revision: value.expectedRevision, value: structuredClone(value) }
+    },
+    applyCorrection: async (correctionId, expectedRevision) => this.transitionMemoryCorrection(correctionId, expectedRevision, 'applied'),
+    restoreCorrection: async (correctionId, expectedRevision) => this.transitionMemoryCorrection(correctionId, expectedRevision, 'restored'),
+  }
+
+  readonly taskProvenanceV1: ProductTaskProvenanceRepository = {
+    getDetail: async (taskId) => {
+      const task = this.taskStore.list().find((item) => item.taskId === taskId)
+      if (!task) return null
+      const changes = [...this.changes.values()].filter((item) => item.targetKind === 'task' && item.targetId === taskId)
+      const sourceIds = new Set(changes.flatMap((item) => item.sourceRefIds))
+      return { task, origin: changes[0]?.origin ?? 'owner', sources: this.sourceRefStore.list().filter((item) => sourceIds.has(item.sourceRefId)), provenance: [], changes }
+    },
+    listChanges: async (taskId, limit = 50) => [...this.changes.values()].filter((item) => item.targetKind === 'task' && item.targetId === taskId).slice(0, limit).map((item) => structuredClone(item)),
+    revertChange: async (changeId, expectedRevision) => {
+      const current = this.changes.get(changeId)
+      if (!current) return failure('not_found', 'The change does not exist.')
+      if (current.afterRevision !== expectedRevision) return failure('stale_revision', 'The change target moved.')
+      if (!current.reversible || current.revertedAt !== undefined) return failure('invalid_state', 'The change cannot be reverted.')
+      const value = { ...current, revertedAt: ++this.clock }
+      this.changes.set(changeId, value)
+      return { ok: true, created: false, revision: expectedRevision + 1, value: structuredClone(value) }
+    },
+  }
+
+  private transitionMemoryCorrection(correctionId: string, appliedRevision: number, state: 'applied' | 'restored'): ProductMutationResult<MemoryCorrectionItem> {
+    const current = this.corrections.get(correctionId)
+    if (!current) return failure('not_found', 'The correction does not exist.')
+    if ((state === 'applied' && current.state !== 'pending') || (state === 'restored' && current.state !== 'applied')) return failure('invalid_state', 'The correction lifecycle transition is invalid.')
+    const value = { ...current, state, appliedRevision, updatedAt: ++this.clock }
+    this.corrections.set(correctionId, value)
+    return { ok: true, created: false, revision: appliedRevision, value: structuredClone(value) }
   }
 
   private listTasks(filter: ProductTaskListFilter): ProductPage<TaskItem> {
@@ -400,19 +539,35 @@ export class InMemoryProductRepository implements ProductRepository {
   private createNote(input: CreateAppNoteInput): ProductMutationResult<AppNoteItem> {
     if (!isTipTapDocumentJson(input.contentJson)) return failure('invalid_input', 'Note content must be a TipTap document JSON string.')
     const { noteId, idempotencyKey, ...value } = input
-    return this.noteStore.create(noteId, idempotencyKey, {
+    const result = this.noteStore.create(noteId, idempotencyKey, {
       ...value,
       noteId,
       tags: [...(value.tags ?? [])],
       wordCount: value.wordCount,
     })
+    if (result.ok && result.created) this.recordNoteVersion(result.value, 'owner')
+    return result
   }
 
   private updateNote(input: UpdateAppNoteInput): ProductMutationResult<AppNoteItem> {
     if (input.patch.contentJson !== undefined && !isTipTapDocumentJson(input.patch.contentJson)) return failure('invalid_input', 'Note content must be a TipTap document JSON string.')
-    return this.noteStore.update(input.noteId, input.expectedRevision, (current) => {
+    const result = this.noteStore.update(input.noteId, input.expectedRevision, (current) => {
       return assignNullable(current, input.patch)
     })
+    if (result.ok) this.recordNoteVersion(result.value, 'owner')
+    return result
+  }
+
+  private recordNoteVersion(note: AppNoteItem, authorOrigin: string): void {
+    const noteVersionId = `note-version:${note.noteId}:${note.revision}`
+    if (this.noteVersions.has(noteVersionId)) return
+    const version: NoteVersionItem = {
+      noteVersionId, noteId: note.noteId, version: note.revision,
+      contentJson: note.contentJson, contentHash: canonicalContentHash(note.contentJson),
+      plainTextPreview: note.plainTextPreview, wordCount: note.wordCount,
+      authorOrigin, createdAt: note.updatedAt,
+    }
+    this.noteVersions.set(noteVersionId, version)
   }
 
   private listSourceRefs(filter: SourceRefListFilter): ProductPage<SourceRefItem> {

@@ -1,6 +1,9 @@
 import {
   AGENT_CHAT_CAPABILITY,
   CANONICAL_VECTORS,
+  MEMORY_CORRECTION_CAPABILITY,
+  MEMORY_PROJECT_CAPABILITY,
+  MEMORY_RECONCILE_CAPABILITY,
   WORKER_OPERATIONS,
   WORKER_OPERATION_VALID_INPUTS,
   canonicalContentHash,
@@ -44,6 +47,101 @@ const fencedOperations = new Set<string>([
   'effect.task.commit', 'effect.reminder.commit', 'effect.note.commit',
   'effect.source.commit', 'effect.knowledge.commit',
 ])
+
+test('discovers compatible work beyond a 64-job mixed-capability prefix', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(api.worker.registerNode, { installationId: 'installation:contracts', nodeId: 'node:agent-backlog', displayName: 'Agent', capabilities: [AGENT_CHAT_CAPABILITY], protocolVersion: '1' })
+  await t.run(async (ctx) => {
+    for (let index = 0; index < 70; index += 1) {
+      const capability = index === 69 ? AGENT_CHAT_CAPABILITY : 'unavailable.worker.v1'
+      await ctx.db.insert('jobs', {
+        installationId: 'installation:contracts', jobId: `job:backlog:${index.toString().padStart(3, '0')}`,
+        commandId: `command:backlog:${index.toString().padStart(3, '0')}`,
+        requiredCapabilities: [capability], routingCapability: capability,
+        status: 'queued', attempt: 0, maxAttempts: 3, revision: 0,
+        createdAt: index + 1, updatedAt: index + 1,
+      })
+    }
+  })
+  const claim = await t.mutation(api.worker.claimJob, { installationId: 'installation:contracts', nodeId: 'node:agent-backlog', leaseDurationMs: 30_000 })
+  expect(claim?.job.jobId).toBe('job:backlog:069')
+})
+
+test('discovers compatible work beyond 64 affinity-fenced jobs without violating affinity', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(api.worker.registerNode, { installationId: 'installation:contracts', nodeId: 'node:available', displayName: 'Available', capabilities: [AGENT_CHAT_CAPABILITY], protocolVersion: '1' })
+  await t.run(async (ctx) => {
+    for (let index = 0; index < 69; index += 1) {
+      await ctx.db.insert('jobs', {
+        installationId: 'installation:contracts', jobId: `job:affinity:${index.toString().padStart(3, '0')}`,
+        commandId: `command:affinity:${index.toString().padStart(3, '0')}`,
+        kind: 'agent.turn.v1', threadId: `thread:affinity:${index}`, turnId: `turn:affinity:${index}`,
+        turnOrdinal: 1, preferredNodeId: 'node:other', requiredCapabilities: [AGENT_CHAT_CAPABILITY],
+        routingCapability: AGENT_CHAT_CAPABILITY, status: 'queued', attempt: 0, maxAttempts: 3,
+        revision: 0, createdAt: index + 1, updatedAt: index + 1,
+      })
+    }
+    await ctx.db.insert('jobs', {
+      installationId: 'installation:contracts', jobId: 'job:affinity:069', commandId: 'command:affinity:069',
+      requiredCapabilities: [AGENT_CHAT_CAPABILITY], routingCapability: AGENT_CHAT_CAPABILITY,
+      status: 'queued', attempt: 0, maxAttempts: 3, revision: 0, createdAt: 70, updatedAt: 70,
+    })
+  })
+  const claim = await t.mutation(api.worker.claimJob, { installationId: 'installation:contracts', nodeId: 'node:available', leaseDurationMs: 30_000 })
+  expect(claim?.job.jobId).toBe('job:affinity:069')
+})
+
+test('Memory project, reconcile, and correction jobs are deterministic, discoverable, and executable', async () => {
+  const t = backend(); await installation(t)
+  await t.mutation(api.knowledge.upsertSourceRef, {
+    installationId: 'installation:contracts', sourceRefId: 'source:memory', idempotencyKey: 'source:memory',
+    kind: 'document', displayName: 'Memory source', syncState: 'synced', indexState: 'indexed', provenanceIds: [],
+  })
+  const projectInput = { installationId: 'installation:contracts', sourceRefId: 'source:memory', sourceVersion: 'sha256:source', maxAttempts: 3 }
+  const project = await t.mutation(api.knowledge.enqueueProject, projectInput)
+  expect(await t.mutation(api.knowledge.enqueueProject, projectInput)).toEqual({ ...project, created: false })
+  const reconcileInput = { installationId: 'installation:contracts', vaultId: 'vault:memory', manifestHash: 'sha256:manifest', maxAttempts: 3 }
+  const reconcile = await t.mutation(api.knowledge.enqueueReconcile, reconcileInput)
+  expect(await t.mutation(api.knowledge.enqueueReconcile, reconcileInput)).toEqual({ ...reconcile, created: false })
+  const correctionInput = {
+    installationId: 'installation:contracts', correctionId: 'correction:memory', targetKind: 'entity', targetId: 'entity:memory',
+    action: 'retract' as const, reason: 'Owner correction', actor: 'owner', origin: 'client', expectedRevision: 0,
+  }
+  const correction = await t.mutation(api.knowledge.createCorrection, correctionInput)
+  expect(await t.mutation(api.knowledge.createCorrection, correctionInput)).toEqual({ ...correction, created: false })
+  expect(new Set([project.job.routingCapability, reconcile.job.routingCapability, correction.job.routingCapability])).toEqual(
+    new Set([MEMORY_PROJECT_CAPABILITY, MEMORY_RECONCILE_CAPABILITY, MEMORY_CORRECTION_CAPABILITY]),
+  )
+
+  await t.mutation(api.worker.registerNode, {
+    installationId: 'installation:contracts', nodeId: 'node:memory', displayName: 'Memory',
+    capabilities: [MEMORY_PROJECT_CAPABILITY, MEMORY_RECONCILE_CAPABILITY, MEMORY_CORRECTION_CAPABILITY], protocolVersion: '1',
+  })
+  const completedKinds = new Set<string>()
+  for (let index = 0; index < 3; index += 1) {
+    const claim = await t.mutation(api.worker.claimJob, { installationId: 'installation:contracts', nodeId: 'node:memory', leaseDurationMs: 30_000 })
+    expect(claim).not.toBeNull()
+    const started = await t.mutation(api.worker.startRun, {
+      installationId: 'installation:contracts', nodeId: 'node:memory', jobId: claim!.job.jobId,
+      expectedJobRevision: claim!.job.revision, expectedLeaseToken: claim!.job.leaseToken,
+    })
+    if (!started.ok) throw new Error('expected Memory run')
+    const work = await t.query(query('worker_context:readMemoryWork'), {
+      installationId: 'installation:contracts', nodeId: 'node:memory', jobId: started.job.jobId,
+      expectedJobRevision: started.job.revision, expectedLeaseToken: started.job.leaseToken,
+    })
+    completedKinds.add(work.kind)
+    expect(await t.mutation(api.worker.completeRun, {
+      installationId: 'installation:contracts', nodeId: 'node:memory', jobId: started.job.jobId,
+      runId: started.run.runId, expectedJobRevision: started.job.revision,
+      expectedRunRevision: started.run.revision, expectedLeaseToken: started.job.leaseToken,
+    })).toMatchObject({ ok: true })
+  }
+  expect(completedKinds).toEqual(new Set(['project', 'reconcile', 'correction']))
+  expect(await t.mutation(api.knowledge.applyCorrection, { installationId: 'installation:contracts', correctionId: 'correction:memory', appliedRevision: 1 })).toEqual({ ok: true, revision: 1 })
+  expect(await t.mutation(api.knowledge.restoreCorrection, { installationId: 'installation:contracts', correctionId: 'correction:memory', appliedRevision: 2 })).toEqual({ ok: true, revision: 2 })
+  expect(await t.mutation(api.worker.claimJob, { installationId: 'installation:contracts', nodeId: 'node:memory', leaseDurationMs: 30_000 })).toBeNull()
+})
 
 async function seedFencedOperation(t: ReturnType<typeof backend>, operation: string): Promise<void> {
   await installation(t)
@@ -159,6 +257,16 @@ describe('frozen worker operation conformance', () => {
     for (const operation of WORKER_OPERATIONS) {
       const operationBackend = fencedOperations.has(operation) ? backend() : t
       if (fencedOperations.has(operation)) await seedFencedOperation(operationBackend, operation)
+      if (operation === 'memory.project.enqueue') {
+        await operationBackend.run(async (ctx) => {
+          await ctx.db.insert('sourceRefs', {
+            installationId: 'installation:contracts', sourceRefId: 'source:one',
+            idempotencyKey: 'source:one', kind: 'other', displayName: 'One',
+            syncState: 'pending', indexState: 'pending', provenanceIds: [],
+            revision: 0, createdAt: 1_000, updatedAt: 1_000,
+          })
+        })
+      }
       const binding = workerOperationBindings[operation]
       const input = WORKER_OPERATION_VALID_INPUTS[operation]
       const invalid = { ...input, unexpected: true }
@@ -179,6 +287,129 @@ describe('frozen worker operation conformance', () => {
         expect(canonicalContentHash(JSON.stringify(vector.value))).toMatch(/^sha256:[0-9a-f]{64}$/)
       }
     })
+  })
+})
+
+describe('bounded reactive and detail authority', () => {
+  test('marks row 101 off-window while paginated display authority remains lossless', async () => {
+    const t = backend(); await installation(t)
+    await t.run(async (ctx) => {
+      for (let index = 0; index < 101; index += 1) {
+        await ctx.db.insert('tasks', {
+          installationId: 'installation:contracts', taskId: `task:window:${index.toString().padStart(3, '0')}`,
+          idempotencyKey: `task:window:${index}`, title: `Task ${index}`, tags: [], status: 'open',
+          revision: 0, createdAt: index + 1, updatedAt: index + 1,
+        })
+      }
+    })
+    const snapshot = await t.query(api.read.clientSnapshot, { installationId: 'installation:contracts' })
+    expect(snapshot.productivity.tasks).toHaveLength(100)
+    expect(snapshot.windows.tasks).toEqual({ limit: 100, returned: 100, truncated: true })
+    const first = await t.query(api.projections.listTasks, {
+      installationId: 'installation:contracts', paginationOpts: { cursor: null, numItems: 100 },
+    })
+    const second = await t.query(api.projections.listTasks, {
+      installationId: 'installation:contracts', paginationOpts: { cursor: first.continueCursor, numItems: 100 },
+    })
+    expect([...first.page, ...second.page]).toHaveLength(101)
+    expect([...first.page, ...second.page].some((item) => item.taskId === 'task:window:100')).toBe(true)
+  })
+
+  test('serves bounded note, artifact, source, Memory, and task provenance details with reversible changes', async () => {
+    const t = backend(); await installation(t)
+    await t.mutation(api.notes.create, {
+      installationId: 'installation:contracts', noteId: 'note:detail', idempotencyKey: 'note:detail',
+      title: 'Detail', contentJson: '{"type":"doc"}', plainTextPreview: 'Detail', wordCount: 1, tags: [],
+    })
+    await t.mutation(api.notes.createLink, {
+      installationId: 'installation:contracts', noteLinkId: 'note-link:detail', idempotencyKey: 'note-link:detail',
+      noteId: 'note:detail', targetKind: 'task', targetId: 'task:detail', relation: 'supports', provenanceIds: ['provenance:detail'],
+    })
+    await t.mutation(api.notes.createArtifact, {
+      installationId: 'installation:contracts', artifactId: 'artifact:detail', noteId: 'note:detail',
+      noteVersionId: 'note-version:note:detail:0', slug: 'detail',
+    })
+    expect(await t.mutation(api.notes.completeMaterialization, {
+      installationId: 'installation:contracts', artifactId: 'artifact:detail', noteVersionId: 'note-version:note:detail:0',
+      expectedRevision: 0, projectedHash: 'sha256:detail', projectedPath: 'artifacts/detail.md',
+    })).toEqual({ ok: true, revision: 1 })
+    await t.mutation(api.notes.update, {
+      installationId: 'installation:contracts', noteId: 'note:detail', expectedRevision: 0,
+      contentJson: '{"type":"doc","content":[]}', plainTextPreview: 'Updated', wordCount: 1,
+    })
+    const noteHistory = await t.query(api.notes.getHistory, { installationId: 'installation:contracts', noteId: 'note:detail', limit: 10 })
+    expect(noteHistory?.versions.map((item) => item.version)).toEqual([1, 0])
+    expect(noteHistory?.links).toHaveLength(1)
+    const artifact = await t.query(api.notes.getArtifact, { installationId: 'installation:contracts', artifactId: 'artifact:detail', historyLimit: 10, includeDeleted: true })
+    expect(artifact?.artifact).toMatchObject({ revision: 2, projectionState: 'pending', priorProjectedHash: 'sha256:detail' })
+    expect(artifact?.history.map((item) => item.state)).toEqual(['pending', 'projected', 'pending'])
+
+    await t.mutation(api.knowledge.upsertSourceRef, {
+      installationId: 'installation:contracts', sourceRefId: 'source:detail', idempotencyKey: 'source:detail',
+      kind: 'document', displayName: 'Detail source', syncState: 'synced', indexState: 'indexed', provenanceIds: [],
+    })
+    for (let index = 0; index < 2; index += 1) {
+      await t.mutation(api.knowledge.upsertSourceExcerpt, {
+        installationId: 'installation:contracts', excerptId: `excerpt:${index}`, sourceRefId: 'source:detail',
+        text: `Excerpt ${index}`, startOffset: index * 10, endOffset: index * 10 + 9,
+      })
+      await t.mutation(api.knowledge.upsertSourceExtraction, {
+        installationId: 'installation:contracts', extractionId: `extraction:${index}`, sourceRefId: 'source:detail',
+        kind: 'entity', label: `Entity ${index}`, value: `Value ${index}`, confidence: 0.9, provenanceIds: [`excerpt:${index}`],
+      })
+    }
+    await t.mutation(api.projections.createTask, {
+      installationId: 'installation:contracts', taskId: 'task:detail', idempotencyKey: 'task:detail',
+      title: 'Before', tags: [], status: 'open',
+    })
+    await t.mutation(api.projections.updateTask, {
+      installationId: 'installation:contracts', taskId: 'task:detail', expectedRevision: 0, title: 'After',
+    })
+    await t.mutation(api.knowledge.recordReversibleChange, {
+      installationId: 'installation:contracts', changeId: 'change:detail', targetKind: 'task', targetId: 'task:detail',
+      action: 'update', summary: 'Generated title', origin: 'memory.project.v1', sourceRefIds: ['source:detail'],
+      provenanceIds: ['provenance:detail'], beforeRevision: 0, afterRevision: 1, reversible: true,
+      revertPayload: JSON.stringify({ title: 'Before' }),
+    })
+    const sourceDetail = await t.query(api.knowledge.getSourceDetail, {
+      installationId: 'installation:contracts', sourceRefId: 'source:detail', excerpts: 1, extractions: 1, derivedChanges: 1,
+    })
+    expect(sourceDetail).toMatchObject({ excerptsTruncated: true, extractionsTruncated: true, derivedChangesTruncated: false })
+    expect(sourceDetail?.derivedChanges[0]).toMatchObject({ changeId: 'change:detail', reversible: true })
+
+    await t.mutation(api.knowledge.upsertKnowledgeDocument, {
+      installationId: 'installation:contracts', knowledgeDocumentId: 'entity:detail', idempotencyKey: 'entity:detail',
+      kind: 'person', title: 'Detail entity', summary: 'Detail entity summary', tags: [], sourceRefIds: ['source:detail'],
+      provenanceIds: ['provenance:detail'], syncState: 'synced', indexState: 'indexed',
+    })
+    await t.mutation(api.knowledge.upsertMemoryFact, {
+      installationId: 'installation:contracts', factId: 'fact:detail', entityId: 'entity:detail',
+      predicate: 'timezone', value: 'UTC', confidence: 1, sourceRefIds: ['source:detail'], provenanceIds: ['provenance:fact'],
+    })
+    await t.mutation(api.knowledge.upsertRelation, {
+      installationId: 'installation:contracts', relationId: 'relation:detail', fromId: 'entity:detail', toId: 'entity:other',
+      kind: 'related', changeId: 'change:detail', confidence: 0.8,
+    })
+    await t.mutation(api.knowledge.upsertProvenance, {
+      installationId: 'installation:contracts', provenanceLinkId: 'provenance:relation', targetKind: 'relation',
+      targetId: 'relation:detail', sourceRefId: 'source:detail', sourceVersion: '1', citation: 'Excerpt 0',
+    })
+    await t.mutation(api.knowledge.createCorrection, {
+      installationId: 'installation:contracts', correctionId: 'correction:detail', targetKind: 'fact', targetId: 'fact:detail',
+      action: 'replace', replacement: 'America/New_York', reason: 'Owner correction', actor: 'owner', origin: 'client', expectedRevision: 0,
+    })
+    expect(await t.query(api.knowledge.getMemoryEntity, { installationId: 'installation:contracts', entityId: 'entity:detail', limit: 10 })).toMatchObject({
+      facts: [{ factId: 'fact:detail' }], relations: [{ relationId: 'relation:detail' }],
+      provenance: [{ provenanceLinkId: 'provenance:relation' }], corrections: [{ correctionId: 'correction:detail' }],
+    })
+    expect(await t.query(api.knowledge.getTaskProvenance, { installationId: 'installation:contracts', taskId: 'task:detail', limit: 10 })).toMatchObject({
+      task: { title: 'After' }, origin: 'memory.project.v1', sources: [{ sourceRefId: 'source:detail' }],
+      changes: [{ changeId: 'change:detail' }],
+    })
+    expect(await t.mutation(api.knowledge.revertChange, {
+      installationId: 'installation:contracts', changeId: 'change:detail', expectedRevision: 1,
+    })).toMatchObject({ ok: true, change: { revertedAt: 1_000 } })
+    expect(await t.query(api.projections.getTask, { installationId: 'installation:contracts', taskId: 'task:detail' })).toMatchObject({ title: 'Before', revision: 2 })
   })
 })
 

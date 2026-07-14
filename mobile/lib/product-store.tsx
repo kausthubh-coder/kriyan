@@ -30,6 +30,17 @@ function isReactive(repository: ProductRepository): repository is ProductReposit
   return 'getSnapshot' in repository && 'subscribe' in repository && 'dispose' in repository
 }
 
+export async function loadAllProductPages<T>(load: (cursor: string | null) => Promise<{ items: T[]; cursor: string | null; done: boolean }>): Promise<T[]> {
+  const items: T[] = []
+  let cursor: string | null = null
+  do {
+    const page = await load(cursor)
+    items.push(...page.items)
+    if (page.done || page.cursor === null) return items
+    cursor = page.cursor
+  } while (true)
+}
+
 export async function settleRepositorySetup(
   setup: Promise<ProductRepository>,
   isCurrent: () => boolean,
@@ -69,24 +80,21 @@ export function ProductStoreProvider({
 
   const refresh = useCallback(async () => {
     if (!repository) return
-    if (isReactive(repository)) {
-      const snapshot = repository.getSnapshot()
-      setTasks(snapshot.productivity.tasks); setReminders(snapshot.productivity.reminders)
-      setEvents(snapshot.productivity.calendarEvents); setNotes(snapshot.productivity.notes)
-      setSources(snapshot.knowledge.sources); setKnowledge(snapshot.knowledge.documents)
-      setConnection(snapshot.connection); setError(snapshot.error)
-      return
-    }
-    setConnection((current) => current === 'online' ? 'reconnecting' : 'connecting')
+    const reactiveSnapshot = isReactive(repository) ? repository.getSnapshot() : undefined
+    if (reactiveSnapshot) { setConnection(reactiveSnapshot.connection); setError(reactiveSnapshot.error) }
+    else setConnection((current) => current === 'online' ? 'reconnecting' : 'connecting')
     try {
-      const [taskPage, reminderPage, eventPage, notePage, sourcePage, knowledgePage] = await Promise.all([
-        repository.tasksV1.list({ limit: 100 }), repository.remindersV1.list({ limit: 100 }),
-        repository.calendarV1.list({ limit: 100 }), repository.notesV1.list({ limit: 100 }),
-        repository.sourceRefsV1.list({ limit: 100 }), repository.knowledgeV1.list({ limit: 100 }),
+      const [allTasks, allReminders, allEvents, allNotes, allSources, allKnowledge] = await Promise.all([
+        loadAllProductPages((cursor) => repository.tasksV1.list({ cursor, limit: 100 })),
+        loadAllProductPages((cursor) => repository.remindersV1.list({ cursor, limit: 100 })),
+        loadAllProductPages((cursor) => repository.calendarV1.list({ cursor, limit: 100 })),
+        loadAllProductPages((cursor) => repository.notesV1.list({ cursor, limit: 100 })),
+        loadAllProductPages((cursor) => repository.sourceRefsV1.list({ cursor, limit: 100 })),
+        loadAllProductPages((cursor) => repository.knowledgeV1.list({ cursor, limit: 100 })),
       ])
-      setTasks(taskPage.items); setReminders(reminderPage.items); setEvents(eventPage.items)
-      setNotes(notePage.items); setSources(sourcePage.items); setKnowledge(knowledgePage.items)
-      setConnection('online'); setError(undefined)
+      setTasks(allTasks); setReminders(allReminders); setEvents(allEvents)
+      setNotes(allNotes); setSources(allSources); setKnowledge(allKnowledge)
+      setConnection(reactiveSnapshot?.connection ?? 'online'); setError(reactiveSnapshot?.error)
     } catch (cause) {
       setConnection('offline')
       setError(cause instanceof Error ? cause.message : 'Unable to refresh. Showing last confirmed data.')
@@ -120,10 +128,8 @@ export function ProductStoreProvider({
     if (!isReactive(repository)) { void refresh(); return }
     const synchronize = (): void => {
       const snapshot: ClientSnapshot = repository.getSnapshot()
-      setTasks(snapshot.productivity.tasks); setReminders(snapshot.productivity.reminders)
-      setEvents(snapshot.productivity.calendarEvents); setNotes(snapshot.productivity.notes)
-      setSources(snapshot.knowledge.sources); setKnowledge(snapshot.knowledge.documents)
       setConnection(snapshot.connection); setError(snapshot.error)
+      void refresh()
     }
     synchronize()
     const unsubscribe = repository.subscribe(synchronize)

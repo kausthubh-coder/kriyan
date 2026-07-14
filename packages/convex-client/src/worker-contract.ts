@@ -31,6 +31,8 @@ const names: Record<WorkerOperation, [OperationKind, string]> = {
   'artifact.work.read': ['query', 'worker_context:readArtifactWork'],
   'note.version.read': ['query', 'worker_context:readNoteVersion'],
   'memory.work.read': ['query', 'worker_context:readMemoryWork'],
+  'memory.project.enqueue': ['mutation', 'knowledge:enqueueProject'],
+  'memory.reconcile.enqueue': ['mutation', 'knowledge:enqueueReconcile'],
   'effect.task.commit': ['mutation', 'worker_effects:commitTaskEffect'],
   'effect.reminder.commit': ['mutation', 'worker_effects:commitReminderEffect'],
   'effect.note.commit': ['mutation', 'worker_effects:commitNoteEffect'],

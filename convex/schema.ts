@@ -79,6 +79,7 @@ export default defineSchema({
     contractVersion: v.optional(v.string()),
     kind: v.optional(v.string()),
     requiredCapabilities: v.optional(v.array(v.string())),
+    routingCapability: v.optional(v.string()),
     preferredNodeId: v.optional(v.string()),
     threadId: v.optional(v.string()),
     turnId: v.optional(v.string()),
@@ -104,6 +105,12 @@ export default defineSchema({
     .index('by_installation_status_created', [
       'installationId',
       'status',
+      'createdAt',
+    ])
+    .index('by_installation_status_capability_created', [
+      'installationId',
+      'status',
+      'routingCapability',
       'createdAt',
     ])
     .index('by_installation_lease', ['installationId', 'leaseExpiresAt'])
@@ -352,7 +359,18 @@ export default defineSchema({
     updatedAt: v.number(), deletedAt: v.optional(v.number()),
   })
     .index('by_installation_artifact', ['installationId', 'artifactId'])
-    .index('by_installation_note', ['installationId', 'noteId']),
+    .index('by_installation_note', ['installationId', 'noteId'])
+    .index('by_installation_live_artifact', ['installationId', 'deletedAt', 'artifactId']),
+
+  artifactMaterializationHistory: defineTable({
+    installationId: v.string(), historyId: v.string(), artifactId: v.string(),
+    revision: v.number(), state: projectionState, noteVersionId: v.string(),
+    slug: v.string(), projectedPath: v.optional(v.string()),
+    projectedHash: v.optional(v.string()), error: v.optional(v.string()),
+    occurredAt: v.number(),
+  })
+    .index('by_installation_history', ['installationId', 'historyId'])
+    .index('by_installation_artifact_revision', ['installationId', 'artifactId', 'revision']),
 
   noteLinks: defineTable({
     installationId: v.string(), noteLinkId: v.string(), noteId: v.string(),
@@ -425,6 +443,36 @@ export default defineSchema({
     .index('by_installation_live_kind', ['installationId', 'deletedAt', 'kind'])
     .index('by_installation_live_sync', ['installationId', 'deletedAt', 'syncState']),
 
+  sourceTranscriptExcerpts: defineTable({
+    installationId: v.string(), excerptId: v.string(), sourceRefId: v.string(),
+    text: v.string(), startOffset: v.number(), endOffset: v.number(),
+    speaker: v.optional(v.string()), startAtMs: v.optional(v.number()),
+    endAtMs: v.optional(v.number()), createdAt: v.number(),
+  })
+    .index('by_installation_excerpt', ['installationId', 'excerptId'])
+    .index('by_installation_source_offset', ['installationId', 'sourceRefId', 'startOffset']),
+
+  sourceExtractions: defineTable({
+    installationId: v.string(), extractionId: v.string(), sourceRefId: v.string(),
+    kind: v.string(), label: v.string(), value: v.string(),
+    confidence: v.optional(v.number()), provenanceIds: v.array(v.string()),
+    createdAt: v.number(),
+  })
+    .index('by_installation_extraction', ['installationId', 'extractionId'])
+    .index('by_installation_source', ['installationId', 'sourceRefId']),
+
+  reversibleChanges: defineTable({
+    installationId: v.string(), changeId: v.string(), targetKind: v.string(),
+    targetId: v.string(), action: v.string(), summary: v.string(),
+    origin: v.string(), sourceRefIds: v.array(v.string()), primarySourceRefId: v.optional(v.string()),
+    provenanceIds: v.array(v.string()), beforeRevision: v.optional(v.number()),
+    afterRevision: v.number(), reversible: v.boolean(), revertedAt: v.optional(v.number()),
+    revertPayload: v.optional(v.string()), createdAt: v.number(),
+  })
+    .index('by_installation_change', ['installationId', 'changeId'])
+    .index('by_installation_target_created', ['installationId', 'targetKind', 'targetId', 'createdAt'])
+    .index('by_installation_source_created', ['installationId', 'primarySourceRefId', 'createdAt']),
+
   knowledgeDocuments: defineTable({
     installationId: v.string(),
     knowledgeDocumentId: v.string(),
@@ -452,13 +500,29 @@ export default defineSchema({
     toId: v.string(), kind: v.string(), changeId: v.string(), confidence: v.number(),
     revision: v.number(), createdAt: v.number(), updatedAt: v.number(),
     deletedAt: v.optional(v.number()),
-  }).index('by_installation_relation', ['installationId', 'relationId']),
+  })
+    .index('by_installation_relation', ['installationId', 'relationId'])
+    .index('by_installation_from', ['installationId', 'fromId'])
+    .index('by_installation_to', ['installationId', 'toId']),
+
+  memoryFacts: defineTable({
+    installationId: v.string(), factId: v.string(), entityId: v.string(),
+    predicate: v.string(), value: v.string(), confidence: v.number(),
+    sourceRefIds: v.array(v.string()), provenanceIds: v.array(v.string()),
+    revision: v.number(), createdAt: v.number(), updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_installation_fact', ['installationId', 'factId'])
+    .index('by_installation_entity', ['installationId', 'entityId']),
 
   provenanceLinks: defineTable({
     installationId: v.string(), provenanceLinkId: v.string(), targetKind: v.string(),
     targetId: v.string(), sourceRefId: v.string(), sourceVersion: v.string(),
     citation: v.string(), createdAt: v.number(), deletedAt: v.optional(v.number()),
-  }).index('by_installation_provenance', ['installationId', 'provenanceLinkId']),
+  })
+    .index('by_installation_provenance', ['installationId', 'provenanceLinkId'])
+    .index('by_installation_target', ['installationId', 'targetKind', 'targetId'])
+    .index('by_installation_source', ['installationId', 'sourceRefId']),
 
   projectionCursors: defineTable({
     installationId: v.string(), cursorId: v.string(), vaultId: v.string(),
@@ -474,5 +538,7 @@ export default defineSchema({
     reason: v.string(), actor: v.string(), origin: v.string(), expectedRevision: v.number(),
     state: correctionState, appliedRevision: v.optional(v.number()),
     conflict: v.optional(v.string()), createdAt: v.number(), updatedAt: v.number(),
-  }).index('by_installation_correction', ['installationId', 'correctionId']),
+  })
+    .index('by_installation_correction', ['installationId', 'correctionId'])
+    .index('by_installation_target', ['installationId', 'targetKind', 'targetId']),
 })

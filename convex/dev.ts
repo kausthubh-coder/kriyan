@@ -11,6 +11,7 @@ const cleanupTables = [
   'jobs',
   'commands',
   'noteLinks',
+  'artifactMaterializationHistory',
   'artifacts',
   'noteVersions',
   'agentMessages',
@@ -18,6 +19,8 @@ const cleanupTables = [
   'agentRevisions',
   'agents',
   'provenanceLinks',
+  'reversibleChanges',
+  'memoryFacts',
   'memoryCorrections',
   'knowledgeRelations',
   'projectionCursors',
@@ -26,6 +29,8 @@ const cleanupTables = [
   'calendarEvents',
   'notificationIntents',
   'notes',
+  'sourceTranscriptExcerpts',
+  'sourceExtractions',
   'sourceRefs',
   'knowledgeDocuments',
   'nodes',
@@ -39,6 +44,7 @@ const cleanupTable = v.union(
   v.literal('jobs'),
   v.literal('commands'),
   v.literal('noteLinks'),
+  v.literal('artifactMaterializationHistory'),
   v.literal('artifacts'),
   v.literal('noteVersions'),
   v.literal('agentMessages'),
@@ -46,6 +52,8 @@ const cleanupTable = v.union(
   v.literal('agentRevisions'),
   v.literal('agents'),
   v.literal('provenanceLinks'),
+  v.literal('reversibleChanges'),
+  v.literal('memoryFacts'),
   v.literal('memoryCorrections'),
   v.literal('knowledgeRelations'),
   v.literal('projectionCursors'),
@@ -54,6 +62,8 @@ const cleanupTable = v.union(
   v.literal('calendarEvents'),
   v.literal('notificationIntents'),
   v.literal('notes'),
+  v.literal('sourceTranscriptExcerpts'),
+  v.literal('sourceExtractions'),
   v.literal('sourceRefs'),
   v.literal('knowledgeDocuments'),
   v.literal('nodes'),
@@ -139,6 +149,7 @@ export const resetInstallation = internalMutation({
           break
         case 'workerEffectReceipts':
         case 'noteLinks':
+        case 'artifactMaterializationHistory':
         case 'artifacts':
         case 'noteVersions':
         case 'agentMessages':
@@ -146,9 +157,13 @@ export const resetInstallation = internalMutation({
         case 'agentRevisions':
         case 'agents':
         case 'provenanceLinks':
+        case 'reversibleChanges':
+        case 'memoryFacts':
         case 'memoryCorrections':
         case 'knowledgeRelations':
         case 'projectionCursors':
+        case 'sourceTranscriptExcerpts':
+        case 'sourceExtractions':
           documentIds = (
             await ctx.db
               .query(tableName)

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import type { ClientSnapshot, TaskItem } from '@kriyan/client-core'
 import type { ConvexReactClient } from 'convex/react'
 import { act, useState, useSyncExternalStore } from 'react'
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
@@ -8,7 +9,8 @@ import { Window } from 'happy-dom'
 import { ConfiguredProvider, useConvexClientControls } from '@/lib/convex'
 
 import { queuedActivityFixture, reminderFixture, taskFixture } from './fixtures'
-import { ActivityRow, Brand, handleComposerKeyDown, NodeSummary, PageHeader, ReminderRow, SectionHeading, TaskRow } from './today-app'
+import { ActivityRow, applyReactiveDisplayAuthority, Brand, handleComposerKeyDown, NodeSummary, PageHeader, ReminderRow, SectionHeading, TaskRow } from './today-app'
+import type { WebRepository } from '@/src/client-core/web-repository'
 
 let hydratedRoot: Root | null = null
 
@@ -20,6 +22,23 @@ afterEach(async () => {
 })
 
 describe('Today presentational components', () => {
+  test('keeps paginated display authority beyond the reactive 100-row window across reconnects', () => {
+    const tasks = Array.from({ length: 101 }, (_, index): TaskItem => ({
+      ...taskFixture,
+      taskId: `task:${index.toString().padStart(3, '0')}`,
+      title: `Task ${index}`,
+    }))
+    const repository = { tasks, nodes: [], activity: [] } as unknown as WebRepository
+    const first = applyReactiveDisplayAuthority(repository, {
+      nodes: { items: [], activity: [] },
+    } as unknown as ClientSnapshot)
+    const reconnected = applyReactiveDisplayAuthority(first, {
+      nodes: { items: [], activity: [] },
+    } as unknown as ClientSnapshot)
+    expect(reconnected.tasks).toHaveLength(101)
+    expect(reconnected.tasks[100]?.taskId).toBe('task:100')
+  })
+
   test('renders task, reminder, and honest queued activity with native controls', () => {
     const task = renderToStaticMarkup(<TaskRow task={taskFixture} now={2_000} />)
     const reminder = renderToStaticMarkup(<ReminderRow reminder={reminderFixture} now={2_000} />)

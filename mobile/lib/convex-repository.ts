@@ -2,9 +2,11 @@
 import {
   ConvexProductRepository, deriveActivity,
   type ClientSnapshot,
-  type AppNoteItem, type CalendarEventItem, type InjectedConvexProductClient,
+  type AppNoteItem, type ArtifactItem, type CalendarEventItem, type InjectedConvexProductClient,
   type KnowledgeDocumentItem, type NotificationIntentItem, type ProductMutationResult, type ProductPage,
-  type ProductRepository, type ReactiveClientRepository, type ReminderItem, type SourceRefItem, type TaskItem,
+  type MemoryCorrectionItem, type NoteHistoryItem, type NoteVersionItem, type ProductRepository,
+  type ReactiveClientRepository, type ReminderItem, type ReversibleChangeItem, type SourceDetailItem,
+  type SourceRefItem, type TaskItem, type TaskProvenanceDetailItem,
 } from '@kriyan/client-core'
 import { parseClientSnapshotWire, type SnapshotCalendarEventWire } from '@kriyan/contracts'
 import { ConvexClient } from 'convex/browser'
@@ -17,6 +19,27 @@ const page = <T,>(value: any): ProductPage<T> => ({ items: value.page as T[], cu
 const failure = <T,>(reason: string): ProductMutationResult<T> => ({ ok: false, reason: reason as any, message: `Convex rejected the write: ${reason}.` })
 const success = <T,>(created: boolean, value: T): ProductMutationResult<T> => ({ ok: true, created, revision: (value as any).revision, value })
 const event = (value: SnapshotCalendarEventWire): CalendarEventItem => ({ ...value, lifecycle: value.status, recurrence: value.recurrenceRule ? { rule: value.recurrenceRule } : undefined })
+const stripInstallation = <T,>(value: any): T => { const portable = { ...value }; delete portable.installationId; return portable as T }
+const artifactDetail = (value: any): ArtifactItem => ({
+  ...stripInstallation<ArtifactItem>(value.artifact),
+  history: value.history.map((item: any) => {
+    const history = { ...item }
+    delete history.installationId
+    delete history.historyId
+    delete history.artifactId
+    return history
+  }),
+})
+const correctionMutation = (created: boolean, correction: any): ProductMutationResult<MemoryCorrectionItem> => {
+  const value = stripInstallation<MemoryCorrectionItem>(correction)
+  return { ok: true, created, revision: value.appliedRevision ?? value.expectedRevision, value }
+}
+const sourceDetail = (value: any): SourceDetailItem | null => value
+  ? { ...value, source: stripInstallation(value.source) } as SourceDetailItem
+  : null
+const taskProvenanceDetail = (value: any): TaskProvenanceDetailItem | null => value
+  ? { ...value, task: stripInstallation(value.task), sources: value.sources.map((item: any) => stripInstallation(item)) } as TaskProvenanceDetailItem
+  : null
 
 export interface MobileConvexClient {
   query(reference: any, args: any): Promise<any>
@@ -104,6 +127,78 @@ export async function createConvexRepositoryWithClient(client: MobileConvexClien
       put: async (input) => { const value: any = await client.mutation(api.knowledge.upsertKnowledgeDocument, { installationId, ...input, tags: input.tags ?? [], sourceRefIds: input.sourceRefIds ?? [], provenanceIds: input.provenanceIds ?? [] }); const item = await getKnowledge(input.knowledgeDocumentId); return value.ok && item ? success(value.created, item) : failure(value.reason ?? 'not_found') },
       update: async (input) => { const current = await getKnowledge(input.knowledgeDocumentId); if (!current) return failure('not_found'); const next = { ...current, ...input.patch }; const value: any = await client.mutation(api.knowledge.upsertKnowledgeDocument, { installationId, knowledgeDocumentId: current.knowledgeDocumentId, idempotencyKey: `knowledge:${current.knowledgeDocumentId}`, kind: next.kind, title: next.title, summary: next.summary, tags: next.tags, sourceRefIds: next.sourceRefIds, provenanceIds: next.provenanceIds, syncState: next.syncState, indexState: next.indexState, expectedRevision: input.expectedRevision }); const item = await getKnowledge(input.knowledgeDocumentId); return value.ok && item ? success(false, item) : failure(value.reason ?? 'not_found') },
       tombstone: async (id, revision) => after(await client.mutation(api.knowledge.tombstoneProjection, { installationId, kind: 'knowledge', projectionId: id, expectedRevision: revision }), () => getKnowledge(id, true)),
+    },
+    noteDetailsV1: {
+      getHistory: async (noteId, limit = 50) => {
+        const value = await client.query(api.notes.getHistory, { installationId, noteId, limit })
+        if (!value) return null
+        return {
+          note: stripInstallation<AppNoteItem>(value.note),
+          versions: value.versions.map((item: any) => stripInstallation<NoteVersionItem>(item)),
+          links: value.links.map((item: any) => stripInstallation(item)),
+        } as NoteHistoryItem
+      },
+      getVersion: async (noteVersionId) => {
+        const value = await client.query(api.notes.getVersion, { installationId, noteVersionId })
+        return value ? stripInstallation<NoteVersionItem>(value) : null
+      },
+      createLink: async (input) => {
+        const value = await client.mutation(api.notes.createLink, { installationId, ...input })
+        return success(value.created, stripInstallation(value.link))
+      },
+      tombstoneLink: async (noteLinkId, expectedRevision) => {
+        const result = await client.mutation(api.notes.tombstoneLink, { installationId, noteLinkId, expectedRevision })
+        if (!result.ok) return failure(result.reason)
+        const value = await client.query(api.notes.getLink, { installationId, noteLinkId })
+        return value ? { ok: true, created: false, revision: result.revision, value: stripInstallation(value) } : failure('not_found')
+      },
+    },
+    artifactsV1: {
+      get: async (artifactId) => { const value = await client.query(api.notes.getArtifact, { installationId, artifactId, historyLimit: 100, includeDeleted: true }); return value ? artifactDetail(value) : null },
+      listByNote: async (noteId, includeDeleted = false) => (await client.query(api.notes.listArtifactsByNote, { installationId, noteId, includeDeleted, limit: 100 })).map(artifactDetail),
+      create: async (input) => { const value = await client.mutation(api.notes.createArtifact, { installationId, ...input }); return success(value.created, stripInstallation<ArtifactItem>(value.artifact)) },
+      advance: async (input) => {
+        const result = await client.mutation(api.notes.advanceArtifact, { installationId, ...input })
+        if (!result.ok) return failure(result.reason)
+        const value = await client.query(api.notes.getArtifact, { installationId, artifactId: input.artifactId, historyLimit: 100, includeDeleted: true })
+        return value ? { ok: true, created: false, revision: result.revision, value: artifactDetail(value) } : failure('not_found')
+      },
+      tombstone: async (artifactId, expectedRevision) => {
+        const current = await client.query(api.notes.getArtifact, { installationId, artifactId, historyLimit: 1, includeDeleted: true })
+        if (!current) return failure('not_found')
+        const result = await client.mutation(api.notes.tombstoneMaterialization, { installationId, artifactId, noteVersionId: current.artifact.noteVersionId, expectedRevision, expectedProjectedHash: current.artifact.projectedHash })
+        if (!result.ok) return failure(result.reason)
+        const value = await client.query(api.notes.getArtifact, { installationId, artifactId, historyLimit: 100, includeDeleted: true })
+        return value ? { ok: true, created: false, revision: result.revision, value: artifactDetail(value) } : failure('not_found')
+      },
+    },
+    sourceDetailsV1: {
+      getDetail: async (sourceRefId, limits = {}) => sourceDetail(await client.query(api.knowledge.getSourceDetail, { installationId, sourceRefId, excerpts: limits.excerpts ?? 50, extractions: limits.extractions ?? 50, derivedChanges: limits.derivedChanges ?? 50 })),
+      listDerivedChanges: async (sourceRefId, limit = 50) => await client.query(api.knowledge.listDerivedChanges, { installationId, sourceRefId, limit }) as ReversibleChangeItem[],
+    },
+    memoryV1: {
+      getEntity: async (entityId, limit = 50) => await client.query(api.knowledge.getMemoryEntity, { installationId, entityId, limit }),
+      createCorrection: async (input) => { const value = await client.mutation(api.knowledge.createCorrection, { installationId, ...input }); return correctionMutation(value.created, value.correction) },
+      applyCorrection: async (correctionId, expectedRevision) => {
+        const result = await client.mutation(api.knowledge.applyCorrection, { installationId, correctionId, appliedRevision: expectedRevision })
+        if (!result.ok) return failure(result.reason)
+        const value = await client.query(api.knowledge.getCorrection, { installationId, correctionId })
+        return value ? correctionMutation(false, value) : failure('not_found')
+      },
+      restoreCorrection: async (correctionId, expectedRevision) => {
+        const result = await client.mutation(api.knowledge.restoreCorrection, { installationId, correctionId, appliedRevision: expectedRevision })
+        if (!result.ok) return failure(result.reason)
+        const value = await client.query(api.knowledge.getCorrection, { installationId, correctionId })
+        return value ? correctionMutation(false, value) : failure('not_found')
+      },
+    },
+    taskProvenanceV1: {
+      getDetail: async (taskId) => taskProvenanceDetail(await client.query(api.knowledge.getTaskProvenance, { installationId, taskId, limit: 100 })),
+      listChanges: async (taskId, limit = 50) => await client.query(api.knowledge.listTaskChanges, { installationId, taskId, limit }) as ReversibleChangeItem[],
+      revertChange: async (changeId, expectedRevision) => {
+        const result = await client.mutation(api.knowledge.revertChange, { installationId, changeId, expectedRevision })
+        return result.ok ? { ok: true, created: false, revision: result.change.afterRevision + 1, value: result.change as ReversibleChangeItem } : failure(result.reason)
+      },
     },
   }
   const repository = new ConvexProductRepository(injected)

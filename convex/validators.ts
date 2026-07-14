@@ -206,6 +206,7 @@ export const jobValue = v.object({
   contractVersion: v.optional(v.string()),
   kind: v.optional(v.string()),
   requiredCapabilities: v.optional(v.array(v.string())),
+  routingCapability: v.optional(v.string()),
   preferredNodeId: v.optional(v.string()),
   threadId: v.optional(v.string()),
   turnId: v.optional(v.string()),
@@ -418,6 +419,14 @@ export const artifactValue = v.object({
   updatedAt: v.number(), deletedAt: v.optional(v.number()),
 })
 
+export const artifactMaterializationHistoryValue = v.object({
+  installationId: v.string(), historyId: v.string(), artifactId: v.string(),
+  revision: v.number(), state: projectionState, noteVersionId: v.string(),
+  slug: v.string(), projectedPath: v.optional(v.string()),
+  projectedHash: v.optional(v.string()), error: v.optional(v.string()),
+  occurredAt: v.number(),
+})
+
 export const noteLinkValue = v.object({
   installationId: v.string(), noteLinkId: v.string(), noteId: v.string(),
   idempotencyKey: v.string(), targetKind: v.string(), targetId: v.string(),
@@ -431,6 +440,49 @@ export const memoryCorrectionValue = v.object({
   reason: v.string(), actor: v.string(), origin: v.string(), expectedRevision: v.number(),
   state: correctionState, appliedRevision: v.optional(v.number()),
   conflict: v.optional(v.string()), createdAt: v.number(), updatedAt: v.number(),
+})
+
+export const sourceTranscriptExcerptValue = v.object({
+  installationId: v.string(), excerptId: v.string(), sourceRefId: v.string(),
+  text: v.string(), startOffset: v.number(), endOffset: v.number(),
+  speaker: v.optional(v.string()), startAtMs: v.optional(v.number()),
+  endAtMs: v.optional(v.number()), createdAt: v.number(),
+})
+
+export const sourceExtractionValue = v.object({
+  installationId: v.string(), extractionId: v.string(), sourceRefId: v.string(),
+  kind: v.string(), label: v.string(), value: v.string(),
+  confidence: v.optional(v.number()), provenanceIds: v.array(v.string()),
+  createdAt: v.number(),
+})
+
+export const reversibleChangeValue = v.object({
+  installationId: v.string(), changeId: v.string(), targetKind: v.string(),
+  targetId: v.string(), action: v.string(), summary: v.string(),
+  origin: v.string(), sourceRefIds: v.array(v.string()), provenanceIds: v.array(v.string()),
+  beforeRevision: v.optional(v.number()), afterRevision: v.number(),
+  reversible: v.boolean(), revertedAt: v.optional(v.number()), createdAt: v.number(),
+})
+
+export const memoryFactValue = v.object({
+  installationId: v.string(), factId: v.string(), entityId: v.string(),
+  predicate: v.string(), value: v.string(), confidence: v.number(),
+  sourceRefIds: v.array(v.string()), provenanceIds: v.array(v.string()),
+  revision: v.number(), createdAt: v.number(), updatedAt: v.number(),
+  deletedAt: v.optional(v.number()),
+})
+
+export const knowledgeRelationValue = v.object({
+  installationId: v.string(), relationId: v.string(), fromId: v.string(),
+  toId: v.string(), kind: v.string(), changeId: v.string(), confidence: v.number(),
+  revision: v.number(), createdAt: v.number(), updatedAt: v.number(),
+  deletedAt: v.optional(v.number()),
+})
+
+export const provenanceLinkValue = v.object({
+  installationId: v.string(), provenanceLinkId: v.string(), targetKind: v.string(),
+  targetId: v.string(), sourceRefId: v.string(), sourceVersion: v.string(),
+  citation: v.string(), createdAt: v.number(), deletedAt: v.optional(v.number()),
 })
 
 export const sourceRefValue = v.object({
@@ -472,6 +524,20 @@ export const knowledgeDocumentValue = v.object({
 
 export const clientSnapshotValue = v.object({
   transactionRevision: v.number(),
+  windows: v.object({
+    tasks: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    reminders: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    calendarEvents: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    notes: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    notificationIntents: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    sources: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    documents: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    artifacts: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    nodes: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    threads: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    messages: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+    activity: v.object({ limit: v.number(), returned: v.number(), truncated: v.boolean() }),
+  }),
   productivity: v.object({
     tasks: v.array(taskValue), reminders: v.array(reminderValue),
     calendarEvents: v.array(calendarEventValue), notes: v.array(noteValue),

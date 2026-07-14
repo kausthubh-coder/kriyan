@@ -164,6 +164,11 @@ export function useDemoRepository(selectedRunId: string | null): WebRepository {
   }
 
   return {
+    noteDetailsV1: repository.noteDetailsV1,
+    artifactsV1: repository.artifactsV1,
+    sourceDetailsV1: repository.sourceDetailsV1,
+    memoryV1: repository.memoryV1,
+    taskProvenanceV1: repository.taskProvenanceV1,
     installation: repository.installation, tasks: data.tasks, reminders: data.reminders,
     calendarEvents: data.calendarEvents, notes: data.notes, sourceRefs: data.sourceRefs,
     knowledgeDocuments: data.knowledgeDocuments, activity: [...repository.activity], nodes: [...repository.nodes],

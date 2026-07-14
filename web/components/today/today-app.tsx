@@ -6,6 +6,7 @@ import {
   retryEligibility,
   type ActionResult,
   type ActivityItem,
+  type ClientSnapshot,
   type ClientRepository,
   type ConnectionMode,
   type NodeItem,
@@ -110,18 +111,22 @@ function LiveTodayApp({ initialSection, configuration, displayName }: { initialS
     runtime.reactiveRepository.getSnapshot,
     runtime.reactiveRepository.getSnapshot,
   )
-  const repository = useMemo(() => ({
-    ...runtime.repository,
-    tasks: snapshot.productivity.tasks,
-    reminders: snapshot.productivity.reminders,
-    calendarEvents: snapshot.productivity.calendarEvents,
-    notes: snapshot.productivity.notes,
-    sourceRefs: snapshot.knowledge.sources,
-    knowledgeDocuments: snapshot.knowledge.documents,
+  const repository = useMemo(
+    () => applyReactiveDisplayAuthority(runtime.repository, snapshot),
+    [runtime.repository, snapshot],
+  )
+  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode={snapshot.connection} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} displayName={displayName} demoMode={false} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+}
+
+export function applyReactiveDisplayAuthority(
+  repository: WebRepository,
+  snapshot: ClientSnapshot,
+): WebRepository {
+  return {
+    ...repository,
     nodes: snapshot.nodes.items,
     activity: snapshot.nodes.activity,
-  }), [runtime.repository, snapshot])
-  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode={snapshot.connection} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} displayName={displayName} demoMode={false} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+  }
 }
 
 function DemoTodayApp({ initialSection, displayName }: { initialSection: Section; displayName: string }) {
