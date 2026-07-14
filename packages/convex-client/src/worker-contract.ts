@@ -1,6 +1,7 @@
 import {
   WORKER_OPERATIONS,
   assertWorkerOperationInput,
+  assertWorkerOperationResult,
   type WorkerOperation,
   type WorkerOperationInputMap,
   type WorkerOperationResultMap,
@@ -26,7 +27,16 @@ const names: Record<WorkerOperation, [OperationKind, string]> = {
   'run.fail': ['mutation', 'worker:failRun'],
   'run.cancel': ['mutation', 'commands:cancel'],
   'thread.session.reset': ['mutation', 'agents:resetSession'],
-  'assistant.finalize': ['mutation', 'worker:finalizeAssistantRun'],
+  'execution.context.read': ['query', 'worker_context:readExecutionContext'],
+  'artifact.work.read': ['query', 'worker_context:readArtifactWork'],
+  'note.version.read': ['query', 'worker_context:readNoteVersion'],
+  'memory.work.read': ['query', 'worker_context:readMemoryWork'],
+  'effect.task.commit': ['mutation', 'worker_effects:commitTaskEffect'],
+  'effect.reminder.commit': ['mutation', 'worker_effects:commitReminderEffect'],
+  'effect.note.commit': ['mutation', 'worker_effects:commitNoteEffect'],
+  'effect.source.commit': ['mutation', 'worker_effects:commitSourceEffect'],
+  'effect.knowledge.commit': ['mutation', 'worker_effects:commitKnowledgeEffect'],
+  'assistant.finalize': ['mutation', 'worker:completeRun'],
   'artifact.materialization.complete': ['mutation', 'notes:completeMaterialization'],
   'artifact.materialization.fail': ['mutation', 'notes:failMaterialization'],
   'artifact.materialization.tombstone': ['mutation', 'notes:tombstoneMaterialization'],
@@ -59,9 +69,11 @@ export function createWorkerContractClient(client: Transport): WorkerContractCli
     async invoke<Operation extends WorkerOperation>(operation: Operation, input: WorkerOperationInputMap[Operation]): Promise<WorkerOperationResultMap[Operation]> {
       assertWorkerOperationInput(operation, input)
       const binding = workerOperationBindings[operation]
-      return binding.kind === 'query'
+      const result: unknown = binding.kind === 'query'
         ? await client.query(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
         : await client.mutation(binding.reference as never, input as never) as WorkerOperationResultMap[Operation]
+      assertWorkerOperationResult(operation, result)
+      return result
     },
   }
 }

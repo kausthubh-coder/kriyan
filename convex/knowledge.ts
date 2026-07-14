@@ -1,12 +1,10 @@
-import {
-  paginationOptsValidator,
-  paginationResultValidator,
-} from 'convex/server'
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server'
 import { v } from 'convex/values'
 import { canonicalContentHash } from '@kriyan/contracts'
 
 import { mutation, query, type MutationCtx } from './_generated/server'
 import {
+  advanceClientSnapshotRevision,
   assertBoundedString,
   assertExpectedRevision,
   assertId,
@@ -22,6 +20,7 @@ import {
   valuesEqual,
   withoutSystemFields,
 } from './lib'
+import { computeMigrationManifest, migrationManifestValue } from './migration_manifest'
 import {
   indexState,
   knowledgeDocumentValue,
@@ -114,6 +113,7 @@ export const upsertSourceRef = mutation({
         createdAt: now,
         updatedAt: now,
       })
+      await advanceClientSnapshotRevision(ctx, args.installationId)
       return { ok: true as const, created: true, revision: 0 }
     }
     if (
@@ -148,6 +148,7 @@ export const upsertSourceRef = mutation({
       revision: existing.revision + 1,
       updatedAt: Date.now(),
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return {
       ok: true as const,
       created: false,
@@ -171,12 +172,14 @@ export const upsertRelation = mutation({
     if (existing === null) {
       if (args.expectedRevision !== undefined) return { ok: false as const, reason: 'not_found' as const }
       await ctx.db.insert('knowledgeRelations', { installationId: args.installationId, relationId: args.relationId, fromId: args.fromId, toId: args.toId, kind: args.kind, changeId: args.changeId, confidence: args.confidence, revision: 0, createdAt: now, updatedAt: now })
+      await advanceClientSnapshotRevision(ctx, args.installationId)
       return { ok: true as const, created: true, revision: 0 }
     }
     const same = existing.fromId === args.fromId && existing.toId === args.toId && existing.kind === args.kind && existing.changeId === args.changeId && existing.confidence === args.confidence && existing.deletedAt === undefined
     if (same) return { ok: true as const, created: false, revision: existing.revision }
     if (args.expectedRevision === undefined || existing.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
     await ctx.db.patch(existing._id, { fromId: args.fromId, toId: args.toId, kind: args.kind, changeId: args.changeId, confidence: args.confidence, deletedAt: undefined, revision: existing.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, created: false, revision: existing.revision + 1 }
   },
 })
@@ -193,6 +196,7 @@ export const upsertProvenance = mutation({
       return { created: false }
     }
     await ctx.db.insert('provenanceLinks', { ...args, createdAt: Date.now() })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true }
   },
 })
@@ -208,6 +212,7 @@ export const advanceProjectionCursor = mutation({
     if (existing === null) {
       if (args.expectedRevision !== undefined) return { ok: false as const, reason: 'not_found' as const }
       await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId: args.cursorId, vaultId: args.vaultId, cursor: args.cursor, documentHash: args.documentHash, mode: args.mode, revision: 0, createdAt: now, updatedAt: now })
+      await advanceClientSnapshotRevision(ctx, args.installationId)
       return { ok: true as const, created: true, revision: 0 }
     }
     if (existing.vaultId === args.vaultId && existing.cursor === args.cursor && existing.documentHash === args.documentHash && existing.mode === args.mode) {
@@ -216,6 +221,7 @@ export const advanceProjectionCursor = mutation({
     if (args.expectedRevision === undefined || existing.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
     if (args.cursor < existing.cursor) return { ok: false as const, reason: 'invalid_state' as const }
     await ctx.db.patch(existing._id, { cursor: args.cursor, documentHash: args.documentHash, mode: args.mode, revision: existing.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, created: false, revision: existing.revision + 1 }
   },
 })
@@ -234,6 +240,7 @@ export const createCorrection = mutation({
     if (args.action === 'replace' && args.replacement === undefined) throw new Error('replacement is required for replace')
     const now = Date.now(); const correction = { ...args, state: 'pending' as const, createdAt: now, updatedAt: now }
     await ctx.db.insert('memoryCorrections', correction)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, correction }
   },
 })
@@ -245,6 +252,7 @@ async function transitionCorrection(ctx: MutationCtx, installationId: string, co
   if (state === 'restored' && correction.state !== 'applied') return { ok: false, reason: 'invalid_state' }
   if (state !== 'restored' && correction.state !== 'pending') return { ok: false, reason: 'invalid_state' }
   await ctx.db.patch(correction._id, { state, appliedRevision, conflict, updatedAt: Date.now() })
+  await advanceClientSnapshotRevision(ctx, installationId)
   return { ok: true, revision: appliedRevision ?? correction.expectedRevision }
 }
 
@@ -261,6 +269,7 @@ export const tombstoneReconciliationRelation = mutation({
     if (relation.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
     if (relation.deletedAt !== undefined) return { ok: false as const, reason: 'invalid_state' as const }
     const now = Date.now(); await ctx.db.patch(relation._id, { deletedAt: now, revision: relation.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: relation.revision + 1 }
   },
 })
@@ -295,6 +304,7 @@ export const backfillLegacyProjections = mutation({
     await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId: batchId, vaultId: 'legacy:d41', cursor: page.page.length, pageCursor: page.continueCursor, scanned: page.page.length, createdCount: provenanceCreated, manifestHash, mode: page.isDone ? 'verified' : 'backfill', revision: 0, createdAt: now, updatedAt: now })
     if (existingCursor === null) await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId, vaultId: 'legacy:d41', cursor: page.page.length, documentHash: progressHash, mode: page.isDone ? 'verified' : 'backfill', revision: 0, createdAt: now, updatedAt: now })
     else await ctx.db.patch(existingCursor._id, { cursor: existingCursor.cursor + page.page.length, documentHash: progressHash, mode: page.isDone ? 'verified' : 'backfill', revision: existingCursor.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { continueCursor: page.continueCursor, isDone: page.isDone, scanned: page.page.length, provenanceCreated }
   },
 })
@@ -441,6 +451,7 @@ export const upsertKnowledgeDocument = mutation({
         createdAt: now,
         updatedAt: now,
       })
+      await advanceClientSnapshotRevision(ctx, args.installationId)
       return { ok: true as const, created: true, revision: 0 }
     }
     if (
@@ -474,6 +485,7 @@ export const upsertKnowledgeDocument = mutation({
       revision: existing.revision + 1,
       updatedAt: Date.now(),
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return {
       ok: true as const,
       created: false,
@@ -586,28 +598,15 @@ export const tombstoneProjection = mutation({
       revision: projection.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: projection.revision + 1 }
   },
 })
 
 export const migrationManifest = query({
   args: { installationId: v.string() },
-  returns: v.object({ sourceHash: v.string(), knowledgeHash: v.string(), provenanceHash: v.string(), correctionHash: v.string() }),
-  handler: async (ctx, args) => {
-    const [sources, documents, provenance, corrections] = await Promise.all([
-      ctx.db.query('sourceRefs').withIndex('by_installation_source', (q) => q.eq('installationId', args.installationId)).collect(),
-      ctx.db.query('knowledgeDocuments').withIndex('by_installation_knowledge', (q) => q.eq('installationId', args.installationId)).collect(),
-      ctx.db.query('provenanceLinks').withIndex('by_installation_provenance', (q) => q.eq('installationId', args.installationId)).collect(),
-      ctx.db.query('memoryCorrections').withIndex('by_installation_correction', (q) => q.eq('installationId', args.installationId)).collect(),
-    ])
-    const hash = (value: unknown) => canonicalContentHash(JSON.stringify(value))
-    return {
-      sourceHash: hash(sources.map((item) => ({ id: item.sourceRefId, revision: item.revision, deletedAt: item.deletedAt, provenanceIds: item.provenanceIds }))),
-      knowledgeHash: hash(documents.map((item) => ({ id: item.knowledgeDocumentId, revision: item.revision, deletedAt: item.deletedAt, sourceRefIds: item.sourceRefIds, provenanceIds: item.provenanceIds }))),
-      provenanceHash: hash(provenance.map((item) => ({ id: item.provenanceLinkId, targetId: item.targetId, sourceRefId: item.sourceRefId, deletedAt: item.deletedAt }))),
-      correctionHash: hash(corrections.map((item) => ({ id: item.correctionId, targetId: item.targetId, action: item.action, state: item.state, appliedRevision: item.appliedRevision }))),
-    }
-  },
+  returns: migrationManifestValue,
+  handler: async (ctx, args) => computeMigrationManifest(ctx, args.installationId),
 })
 
 export const reconcileManifest = mutation({
@@ -638,6 +637,7 @@ export const reconcileManifest = mutation({
     }
     if (cursor === null) await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId: args.cursorId, vaultId: args.vaultId, cursor: args.cursor, documentHash: args.manifestHash, manifestHash: args.manifestHash, mode: 'reconciled', revision: 0, createdAt: now, updatedAt: now })
     else await ctx.db.patch(cursor._id, { cursor: args.cursor, documentHash: args.manifestHash, manifestHash: args.manifestHash, mode: 'reconciled', revision: cursor.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true, tombstonedDocuments, tombstonedProvenance, reappliedCorrections, cursorRevision: cursor === null ? 0 : cursor.revision + 1 }
   },
 })

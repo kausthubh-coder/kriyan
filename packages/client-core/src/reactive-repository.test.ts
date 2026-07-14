@@ -30,7 +30,7 @@ test('two independent clients converge on productivity, agent, knowledge, and no
       notes: [{ noteId: 'note:one', contentJson: '{"type":"doc"}', plainTextPreview: 'One', wordCount: 1, tags: [], revision: 0, createdAt: 1, updatedAt: 1 }],
     },
     agents: { threads: [{ threadId: 'thread:one', agentRevisionId: 'revision:one' }], messages: [] },
-    knowledge: { sources: [], documents: [], artifacts: [{ artifactId: 'artifact:one', noteVersionId: 'version:one', projectionState: 'pending' as const }] },
+    knowledge: { sources: [], documents: [], artifacts: [{ artifactId: 'artifact:one', noteId: 'note:one', noteVersionId: 'version:one', slug: 'one', projectionState: 'pending' as const, revision: 0, createdAt: 1, updatedAt: 1 }] },
     nodes: { items: [{ nodeId: 'node:one', displayName: 'One', capabilities: ['agent.chat.v1'], status: 'online' as const, lastHeartbeatAt: 1, revision: 1 }], activity: [] },
     connection: 'online' as const,
   }

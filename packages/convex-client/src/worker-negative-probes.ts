@@ -30,6 +30,10 @@ if (false) {
   void client.invoke('run.cancel', { installationId: 'i', commandId: 'c' })
   // @ts-expect-error threadId is required
   void client.invoke('thread.session.reset', { installationId: 'i', expectedRevision: 0 })
+  // @ts-expect-error expectedLeaseToken is required for execution reads
+  void client.invoke('execution.context.read', { installationId: 'i', jobId: 'j', nodeId: 'n', expectedJobRevision: 0, maxMessages: 10 })
+  // @ts-expect-error effectId is required for typed task commits
+  void client.invoke('effect.task.commit', { installationId: 'i', jobId: 'j', nodeId: 'n', expectedJobRevision: 0, expectedLeaseToken: 'l', action: 'complete', taskId: 't' })
   // @ts-expect-error expectedRunRevision is required
   void client.invoke('assistant.finalize', { installationId: 'i', jobId: 'j', runId: 'r', nodeId: 'n', expectedJobRevision: 0 })
   // @ts-expect-error projectedPath is required

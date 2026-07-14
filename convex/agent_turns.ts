@@ -113,6 +113,8 @@ export async function fenceQueuedThreadJobs(
   installationId: string,
   threadId: string,
   nodeId: string,
+  piSessionRef: string,
+  sessionRevision: number,
   now: number,
 ): Promise<void> {
   const jobs = await ctx.db
@@ -122,9 +124,18 @@ export async function fenceQueuedThreadJobs(
     )
     .collect()
   for (const job of jobs) {
-    if (job.status === 'queued' && job.preferredNodeId !== nodeId) {
+    if (
+      job.status === 'queued'
+      && (
+        job.preferredNodeId !== nodeId
+        || job.sessionCheckpoint !== piSessionRef
+        || job.sessionRevision !== sessionRevision
+      )
+    ) {
       await ctx.db.patch(job._id, {
         preferredNodeId: nodeId,
+        sessionCheckpoint: piSessionRef,
+        sessionRevision,
         revision: job.revision + 1,
         updatedAt: now,
       })

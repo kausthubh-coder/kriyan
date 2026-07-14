@@ -16,6 +16,7 @@ import {
   type ClientSnapshot,
   type SnapshotSubscriptionTransport,
 } from '@kriyan/client-core'
+import { parseClientSnapshotWire, type SnapshotCalendarEventWire } from '@kriyan/contracts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 
@@ -57,9 +58,13 @@ function failure(reason: unknown, error?: unknown): ActionResult<never> {
   }
 }
 
-function mapEvent(value: Record<string, unknown>): CalendarEventItem {
+function mapEvent(value: SnapshotCalendarEventWire): CalendarEventItem {
   const { status, ...event } = value
-  return { ...event, lifecycle: status } as CalendarEventItem
+  return {
+    ...event,
+    lifecycle: status,
+    recurrence: value.recurrenceRule ? { rule: value.recurrenceRule } : undefined,
+  }
 }
 
 export function useLiveWebRepository(
@@ -103,7 +108,7 @@ export function useLiveWebRepository(
   }
 
   const calendarEvents = useMemo(
-    () => (calendarPage.results as unknown as Record<string, unknown>[]).map(mapEvent),
+    () => (calendarPage.results as unknown as SnapshotCalendarEventWire[]).map(mapEvent),
     [calendarPage.results],
   )
   const pending = useMemo(() => new Set([...base.repository.pending, ...localPending]), [base.repository.pending, localPending])
@@ -186,7 +191,7 @@ export function useLiveWebRepository(
     },
     createCalendarEvent(input) {
       return exclusive('calendar:create', async () => {
-        try { const result = await createCalendar({ installationId, calendarEventId: createClientId('calendar'), idempotencyKey: createClientId('calendar-intent'), ...input, status: 'confirmed' }); return { ok: true, value: mapEvent(result.event as unknown as Record<string, unknown>) } }
+        try { const result = await createCalendar({ installationId, calendarEventId: createClientId('calendar'), idempotencyKey: createClientId('calendar-intent'), ...input, status: 'confirmed' }); return { ok: true, value: mapEvent(result.event as unknown as SnapshotCalendarEventWire) } }
         catch (error) { return failure('transport_error', error) }
       })
     },
@@ -225,18 +230,19 @@ export function useLiveWebRepository(
   const reactive = useMemo(() => createSnapshotBridge(), [])
   useEffect(() => {
     if (!contractSnapshot) return
+    const wire = parseClientSnapshotWire(contractSnapshot)
     reactive.publish({
-      transactionRevision: contractSnapshot.transactionRevision,
+      transactionRevision: wire.transactionRevision,
       productivity: {
-        tasks: contractSnapshot.productivity.tasks,
-        reminders: contractSnapshot.productivity.reminders,
-        calendarEvents: contractSnapshot.productivity.calendarEvents.map(mapEvent),
-        notes: contractSnapshot.productivity.notes,
-        notificationIntents: contractSnapshot.productivity.notificationIntents,
+        tasks: wire.productivity.tasks,
+        reminders: wire.productivity.reminders,
+        calendarEvents: wire.productivity.calendarEvents.map(mapEvent),
+        notes: wire.productivity.notes,
+        notificationIntents: wire.productivity.notificationIntents,
       },
-      agents: contractSnapshot.agents,
-      knowledge: contractSnapshot.knowledge,
-      nodes: { items: contractSnapshot.nodes.items, activity: deriveActivity(contractSnapshot.nodes.activity) },
+      agents: wire.agents,
+      knowledge: wire.knowledge,
+      nodes: { items: wire.nodes.items, activity: deriveActivity(wire.nodes.activity) },
       connection: base.connectionMode,
     })
   }, [base.connectionMode, contractSnapshot, reactive])

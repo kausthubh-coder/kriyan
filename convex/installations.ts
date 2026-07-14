@@ -41,6 +41,7 @@ export const create = mutation({
       installationId: args.installationId,
       timezone: args.timezone,
       protocolVersion: args.protocolVersion,
+      snapshotRevision: 0,
       createdAt: now,
       updatedAt: now,
     })

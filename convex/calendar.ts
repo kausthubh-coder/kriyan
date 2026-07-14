@@ -1,11 +1,9 @@
-import {
-  paginationOptsValidator,
-  paginationResultValidator,
-} from 'convex/server'
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server'
 import { v } from 'convex/values'
 
 import { mutation, query, type MutationCtx } from './_generated/server'
 import {
+  advanceClientSnapshotRevision,
   assertBoundedString,
   assertExpectedRevision,
   assertId,
@@ -123,6 +121,7 @@ export const create = mutation({
     const now = Date.now()
     const event = { ...args, revision: 0, createdAt: now, updatedAt: now }
     await ctx.db.insert('calendarEvents', event)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, event }
   },
 })
@@ -284,6 +283,7 @@ export const update = mutation({
       revision: event.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: event.revision + 1 }
   },
 })
@@ -320,6 +320,7 @@ export const tombstone = mutation({
       revision: event.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: event.revision + 1 }
   },
 })

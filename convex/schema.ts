@@ -33,6 +33,7 @@ export default defineSchema({
     updatedAt: v.number(),
     contractVersion: v.optional(v.string()),
     compatibilityMode: v.optional(v.union(v.literal('dual-read'), v.literal('canonical'), v.literal('rollback'))),
+    snapshotRevision: v.optional(v.number()),
   }).index('by_installation_id', ['installationId']),
 
   nodes: defineTable({
@@ -87,6 +88,7 @@ export default defineSchema({
     leaseToken: v.optional(v.string()),
     effectCheckpoint: v.optional(v.string()),
     sessionCheckpoint: v.optional(v.string()),
+    sessionRevision: v.optional(v.number()),
     status: jobStatus,
     attempt: v.number(),
     maxAttempts: v.number(),
@@ -155,6 +157,15 @@ export default defineSchema({
       'runId',
       'sequence',
     ]),
+
+  workerEffectReceipts: defineTable({
+    installationId: v.string(), effectId: v.string(), jobId: v.string(),
+    family: v.union(v.literal('task'), v.literal('reminder'), v.literal('note'), v.literal('source'), v.literal('knowledge')),
+    action: v.string(), targetId: v.string(), inputHash: v.string(),
+    targetRevision: v.number(), created: v.boolean(), createdAt: v.number(),
+  })
+    .index('by_installation_effect', ['installationId', 'effectId'])
+    .index('by_installation_job', ['installationId', 'jobId']),
 
   tasks: defineTable({
     installationId: v.string(),

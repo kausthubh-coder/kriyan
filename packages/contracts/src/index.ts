@@ -6,8 +6,11 @@ export const AGENT_CHAT_CAPABILITY = 'agent.chat.v1' as const
 export const ARTIFACT_MATERIALIZATION_CAPABILITY = 'artifact.materialization.v1' as const
 
 export * from './canonical-vectors'
+export * from './client-snapshot'
+export * from './runtime-schema'
 export * from './worker-operations'
 export * from './worker-fixtures'
+export * from './worker-results'
 
 export const JOB_KINDS = Object.freeze({
   legacyCommand: 'command.v1',
@@ -35,6 +38,15 @@ export const WORKER_OPERATIONS = Object.freeze([
   'run.fail',
   'run.cancel',
   'thread.session.reset',
+  'execution.context.read',
+  'artifact.work.read',
+  'note.version.read',
+  'memory.work.read',
+  'effect.task.commit',
+  'effect.reminder.commit',
+  'effect.note.commit',
+  'effect.source.commit',
+  'effect.knowledge.commit',
   'assistant.finalize',
   'artifact.materialization.complete',
   'artifact.materialization.fail',

@@ -6,6 +6,7 @@ import {
   type KnowledgeDocumentItem, type NotificationIntentItem, type ProductMutationResult, type ProductPage,
   type ProductRepository, type ReactiveClientRepository, type ReminderItem, type SourceRefItem, type TaskItem,
 } from '@kriyan/client-core'
+import { parseClientSnapshotWire, type SnapshotCalendarEventWire } from '@kriyan/contracts'
 import { ConvexClient } from 'convex/browser'
 
 import { api } from '@convex/_generated/api'
@@ -15,7 +16,7 @@ const pageArgs = (filter?: { cursor?: string | null; limit?: number }) => ({ cur
 const page = <T,>(value: any): ProductPage<T> => ({ items: value.page as T[], cursor: value.isDone ? null : value.continueCursor, done: value.isDone })
 const failure = <T,>(reason: string): ProductMutationResult<T> => ({ ok: false, reason: reason as any, message: `Convex rejected the write: ${reason}.` })
 const success = <T,>(created: boolean, value: T): ProductMutationResult<T> => ({ ok: true, created, revision: (value as any).revision, value })
-const event = (value: any): CalendarEventItem => ({ ...value, lifecycle: value.status, recurrence: value.recurrenceRule ? { rule: value.recurrenceRule } : undefined })
+const event = (value: SnapshotCalendarEventWire): CalendarEventItem => ({ ...value, lifecycle: value.status, recurrence: value.recurrenceRule ? { rule: value.recurrenceRule } : undefined })
 
 export interface MobileConvexClient {
   query(reference: any, args: any): Promise<any>
@@ -24,19 +25,20 @@ export interface MobileConvexClient {
   close(): Promise<void>
 }
 
-function snapshotFromValue(value: any): ClientSnapshot {
+function snapshotFromValue(value: unknown): ClientSnapshot {
+  const wire = parseClientSnapshotWire(value)
   return {
-    transactionRevision: value.transactionRevision,
+    transactionRevision: wire.transactionRevision,
     productivity: {
-      tasks: value.productivity.tasks,
-      reminders: value.productivity.reminders,
-      calendarEvents: value.productivity.calendarEvents.map(event),
-      notes: value.productivity.notes,
-      notificationIntents: value.productivity.notificationIntents,
+      tasks: wire.productivity.tasks,
+      reminders: wire.productivity.reminders,
+      calendarEvents: wire.productivity.calendarEvents.map(event),
+      notes: wire.productivity.notes,
+      notificationIntents: wire.productivity.notificationIntents,
     },
-    agents: value.agents,
-    knowledge: value.knowledge,
-    nodes: { items: value.nodes.items, activity: deriveActivity(value.nodes.activity) },
+    agents: wire.agents,
+    knowledge: wire.knowledge,
+    nodes: { items: wire.nodes.items, activity: deriveActivity(wire.nodes.activity) },
     connection: 'online',
   }
 }

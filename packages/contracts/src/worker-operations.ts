@@ -71,6 +71,7 @@ export interface WorkerJobResult {
   leaseToken?: string
   effectCheckpoint?: string
   sessionCheckpoint?: string
+  sessionRevision?: number
   status: 'queued' | 'leased' | 'running' | 'succeeded' | 'failed' | 'cancelled'
   attempt: number
   maxAttempts: number
@@ -124,6 +125,104 @@ export interface WorkerCorrectionResult {
   updatedAt: number
 }
 
+export interface WorkerAgentRevisionResult {
+  agentRevisionId: string
+  agentId: string
+  ordinal: number
+  displayName: string
+  systemPrompt: string
+  toolCapabilities: string[]
+  createdAt: number
+}
+
+export interface WorkerThreadMessageResult {
+  messageId: string
+  threadId: string
+  turnId: string
+  turnOrdinal: number
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  state: 'queued' | 'active' | 'completed' | 'failed' | 'cancelled' | 'waiting_for_node'
+  content: string
+  origin: string
+  agentRevisionId: string
+  createdAt: number
+  updatedAt: number
+  finalizedAt?: number
+}
+
+export interface WorkerEffectReceiptResult {
+  effectId: string
+  jobId: string
+  family: 'task' | 'reminder' | 'note' | 'source' | 'knowledge'
+  action: string
+  targetId: string
+  inputHash: string
+  targetRevision: number
+  created: boolean
+  createdAt: number
+}
+
+export interface WorkerExecutionContextResult {
+  command: WorkerCommandResult
+  job: WorkerJobResult
+  agentRevision: WorkerAgentRevisionResult
+  thread: {
+    threadId: string
+    agentId: string
+    preferredNodeId?: string
+    piSessionRef?: string
+    sessionRevision: number
+  }
+  messages: WorkerThreadMessageResult[]
+  messagesTruncated: boolean
+  effectReceipts: WorkerEffectReceiptResult[]
+}
+
+export interface WorkerNoteVersionResult {
+  noteVersionId: string
+  noteId: string
+  version: number
+  contentJson: string
+  contentHash: string
+  plainTextPreview: string
+  wordCount: number
+  authorOrigin: string
+  createdAt: number
+}
+
+export interface WorkerArtifactWorkResult {
+  action: 'materialize' | 'tombstone'
+  artifactId: string
+  noteId: string
+  noteVersion: WorkerNoteVersionResult
+  expectedArtifactRevision: number
+  slug: string
+  projectedPath: string
+  priorProjectedHash?: string
+  priorProjectedPath?: string
+}
+
+export interface WorkerMemoryWorkResult {
+  kind: 'project' | 'reconcile' | 'correction'
+  commandInput: string
+  corrections: WorkerCorrectionResult[]
+}
+
+export interface WorkerEffectCommitResult {
+  ok: true
+  duplicate: boolean
+  receipt: WorkerEffectReceiptResult
+  jobRevision: number
+}
+
+export interface WorkerLeaseInput {
+  installationId: string
+  jobId: string
+  nodeId: string
+  expectedJobRevision: number
+  expectedLeaseToken: string
+}
+
 export interface WorkerOperationInputMap {
   'node.register': { installationId: string; nodeId: string; displayName: string; capabilities: string[]; protocolVersion: string }
   'node.heartbeat': { installationId: string; nodeId: string; expectedRevision: number }
@@ -133,11 +232,20 @@ export interface WorkerOperationInputMap {
   'run.start': { installationId: string; jobId: string; nodeId: string; expectedJobRevision: number; expectedLeaseToken?: string }
   'run.events.append': { installationId: string; jobId: string; runId: string; nodeId: string; expectedJobRevision: number; expectedRunRevision: number; expectedLeaseToken?: string; events: RunEventInput[] }
   'effect.checkpoint': { installationId: string; jobId: string; nodeId: string; expectedJobRevision: number; expectedLeaseToken?: string; checkpoint: string }
-  'session.checkpoint': { installationId: string; jobId: string; nodeId: string; expectedJobRevision: number; expectedLeaseToken?: string; piSessionRef: string }
+  'session.checkpoint': { installationId: string; jobId: string; nodeId: string; expectedJobRevision: number; expectedLeaseToken?: string; expectedSessionRevision?: number; piSessionRef: string }
   'run.complete': { installationId: string; jobId: string; runId: string; nodeId: string; expectedJobRevision: number; expectedRunRevision: number; expectedLeaseToken?: string; assistantContent?: string }
   'run.fail': { installationId: string; jobId: string; runId: string; nodeId: string; error: string; retryable: boolean; expectedJobRevision: number; expectedRunRevision: number; expectedLeaseToken?: string }
   'run.cancel': { installationId: string; commandId: string; expectedRevision: number }
   'thread.session.reset': { installationId: string; threadId: string; expectedRevision: number; preferredNodeId?: string }
+  'execution.context.read': WorkerLeaseInput & { maxMessages: number }
+  'artifact.work.read': WorkerLeaseInput
+  'note.version.read': WorkerLeaseInput & { noteVersionId: string }
+  'memory.work.read': WorkerLeaseInput
+  'effect.task.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'complete' | 'tombstone'; taskId: string; expectedTargetRevision?: number; title?: string; description?: string; dueAt?: number; idempotencyKey?: string }
+  'effect.reminder.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'acknowledge' | 'snooze' | 'tombstone'; reminderId: string; expectedTargetRevision?: number; message?: string; remindAt?: number; timezone?: string; idempotencyKey?: string }
+  'effect.note.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'archive'; noteId: string; expectedTargetRevision?: number; title?: string; contentJson?: string; plainTextPreview?: string; wordCount?: number; idempotencyKey?: string }
+  'effect.source.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'tombstone'; sourceRefId: string; expectedTargetRevision?: number; displayName?: string; sourceKind?: string; idempotencyKey?: string }
+  'effect.knowledge.commit': WorkerLeaseInput & { effectId: string; action: 'create' | 'update' | 'tombstone'; knowledgeDocumentId: string; expectedTargetRevision?: number; title?: string; summary?: string; knowledgeKind?: string; idempotencyKey?: string }
   'assistant.finalize': WorkerOperationInputMap['run.complete']
   'artifact.materialization.complete': { installationId: string; artifactId: string; noteVersionId: string; expectedRevision: number; expectedPriorHash?: string; projectedHash: string; projectedPath: string }
   'artifact.materialization.fail': { installationId: string; artifactId: string; noteVersionId: string; expectedRevision: number; error: string }
@@ -166,6 +274,15 @@ export interface WorkerOperationResultMap {
   'run.fail': TransitionResult
   'run.cancel': TransitionResult
   'thread.session.reset': TransitionResult
+  'execution.context.read': WorkerExecutionContextResult
+  'artifact.work.read': WorkerArtifactWorkResult
+  'note.version.read': WorkerNoteVersionResult
+  'memory.work.read': WorkerMemoryWorkResult
+  'effect.task.commit': WorkerEffectCommitResult | { ok: false; reason: TransitionFailure }
+  'effect.reminder.commit': WorkerOperationResultMap['effect.task.commit']
+  'effect.note.commit': WorkerOperationResultMap['effect.task.commit']
+  'effect.source.commit': WorkerOperationResultMap['effect.task.commit']
+  'effect.knowledge.commit': WorkerOperationResultMap['effect.task.commit']
   'assistant.finalize': TransitionResult
   'artifact.materialization.complete': TransitionResult
   'artifact.materialization.fail': TransitionResult
@@ -180,7 +297,7 @@ export interface WorkerOperationResultMap {
   'memory.correction.conflict': TransitionResult
 }
 
-type FieldKind = 'string' | 'number' | 'boolean' | 'string[]' | 'events' | 'correction-action'
+type FieldKind = 'string' | 'number' | 'boolean' | 'string[]' | 'events' | 'correction-action' | 'task-effect-action' | 'reminder-effect-action' | 'note-effect-action' | 'projection-effect-action'
 
 export interface PortableOperationSchema<T> {
   readonly required: Readonly<Record<string, FieldKind>>
@@ -201,6 +318,10 @@ function valueMatches(kind: FieldKind, value: unknown): boolean {
       && typeof event.data === 'string'
   })
   if (kind === 'correction-action') return value === 'retract' || value === 'replace' || value === 'restore'
+  if (kind === 'task-effect-action') return value === 'create' || value === 'update' || value === 'complete' || value === 'tombstone'
+  if (kind === 'reminder-effect-action') return value === 'create' || value === 'update' || value === 'acknowledge' || value === 'snooze' || value === 'tombstone'
+  if (kind === 'note-effect-action') return value === 'create' || value === 'update' || value === 'archive'
+  if (kind === 'projection-effect-action') return value === 'create' || value === 'update' || value === 'tombstone'
   return typeof value === kind
 }
 
@@ -231,11 +352,20 @@ export const WORKER_OPERATION_SCHEMAS: { readonly [Operation in keyof WorkerOper
   'run.start': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number' }, lease),
   'run.events.append': operationSchema({ ...ids, jobId: 'string', runId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedRunRevision: 'number', events: 'events' }, lease),
   'effect.checkpoint': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', checkpoint: 'string' }, lease),
-  'session.checkpoint': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', piSessionRef: 'string' }, lease),
+  'session.checkpoint': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', piSessionRef: 'string' }, { ...lease, expectedSessionRevision: 'number' }),
   'run.complete': operationSchema({ ...ids, jobId: 'string', runId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedRunRevision: 'number' }, { ...lease, assistantContent: 'string' }),
   'run.fail': operationSchema({ ...ids, jobId: 'string', runId: 'string', nodeId: 'string', error: 'string', retryable: 'boolean', expectedJobRevision: 'number', expectedRunRevision: 'number' }, lease),
   'run.cancel': operationSchema({ ...ids, commandId: 'string', expectedRevision: 'number' }),
   'thread.session.reset': operationSchema({ ...ids, threadId: 'string', expectedRevision: 'number' }, { preferredNodeId: 'string' }),
+  'execution.context.read': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', maxMessages: 'number' }),
+  'artifact.work.read': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string' }),
+  'note.version.read': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', noteVersionId: 'string' }),
+  'memory.work.read': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string' }),
+  'effect.task.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'task-effect-action', taskId: 'string' }, { expectedTargetRevision: 'number', title: 'string', description: 'string', dueAt: 'number', idempotencyKey: 'string' }),
+  'effect.reminder.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'reminder-effect-action', reminderId: 'string' }, { expectedTargetRevision: 'number', message: 'string', remindAt: 'number', timezone: 'string', idempotencyKey: 'string' }),
+  'effect.note.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'note-effect-action', noteId: 'string' }, { expectedTargetRevision: 'number', title: 'string', contentJson: 'string', plainTextPreview: 'string', wordCount: 'number', idempotencyKey: 'string' }),
+  'effect.source.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'projection-effect-action', sourceRefId: 'string' }, { expectedTargetRevision: 'number', displayName: 'string', sourceKind: 'string', idempotencyKey: 'string' }),
+  'effect.knowledge.commit': operationSchema({ ...ids, jobId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedLeaseToken: 'string', effectId: 'string', action: 'projection-effect-action', knowledgeDocumentId: 'string' }, { expectedTargetRevision: 'number', title: 'string', summary: 'string', knowledgeKind: 'string', idempotencyKey: 'string' }),
   'assistant.finalize': operationSchema({ ...ids, jobId: 'string', runId: 'string', nodeId: 'string', expectedJobRevision: 'number', expectedRunRevision: 'number' }, { ...lease, assistantContent: 'string' }),
   'artifact.materialization.complete': operationSchema({ ...ids, artifactId: 'string', noteVersionId: 'string', expectedRevision: 'number', projectedHash: 'string', projectedPath: 'string' }, { expectedPriorHash: 'string' }),
   'artifact.materialization.fail': operationSchema({ ...ids, artifactId: 'string', noteVersionId: 'string', expectedRevision: 'number', error: 'string' }),

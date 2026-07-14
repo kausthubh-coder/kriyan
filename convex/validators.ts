@@ -166,6 +166,7 @@ export const installationValue = v.object({
   updatedAt: v.number(),
   contractVersion: v.optional(v.string()),
   compatibilityMode: v.optional(v.union(v.literal('dual-read'), v.literal('canonical'), v.literal('rollback'))),
+  snapshotRevision: v.optional(v.number()),
 })
 
 export const nodeValue = v.object({
@@ -214,6 +215,7 @@ export const jobValue = v.object({
   leaseToken: v.optional(v.string()),
   effectCheckpoint: v.optional(v.string()),
   sessionCheckpoint: v.optional(v.string()),
+  sessionRevision: v.optional(v.number()),
   status: jobStatus,
   attempt: v.number(),
   maxAttempts: v.number(),
@@ -251,6 +253,13 @@ export const runEventValue = v.object({
   type: runEventType,
   data: v.string(),
   createdAt: v.number(),
+})
+
+export const workerEffectReceiptValue = v.object({
+  effectId: v.string(), jobId: v.string(),
+  family: v.union(v.literal('task'), v.literal('reminder'), v.literal('note'), v.literal('source'), v.literal('knowledge')),
+  action: v.string(), targetId: v.string(), inputHash: v.string(),
+  targetRevision: v.number(), created: v.boolean(), createdAt: v.number(),
 })
 
 export const activityValue = v.object({
@@ -459,6 +468,21 @@ export const knowledgeDocumentValue = v.object({
   createdAt: v.number(),
   updatedAt: v.number(),
   deletedAt: v.optional(v.number()),
+})
+
+export const clientSnapshotValue = v.object({
+  transactionRevision: v.number(),
+  productivity: v.object({
+    tasks: v.array(taskValue), reminders: v.array(reminderValue),
+    calendarEvents: v.array(calendarEventValue), notes: v.array(noteValue),
+    notificationIntents: v.array(notificationIntentValue),
+  }),
+  agents: v.object({ threads: v.array(agentThreadValue), messages: v.array(agentMessageValue) }),
+  knowledge: v.object({
+    sources: v.array(sourceRefValue), documents: v.array(knowledgeDocumentValue),
+    artifacts: v.array(artifactValue),
+  }),
+  nodes: v.object({ items: v.array(nodeValue), activity: v.array(activityValue) }),
 })
 
 export const transitionResult = v.union(

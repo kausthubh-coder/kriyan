@@ -323,7 +323,7 @@ describe('leases and runs', () => {
       }),
     ).toEqual({ ok: false, reason: 'stale_revision' })
     expect(
-      await t.mutation(api.worker.revokeNode, {
+      await t.mutation(internal.worker.revokeNode, {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: 1,
@@ -810,7 +810,7 @@ describe('round 1 rejection regressions', () => {
     if (!started.ok) throw new Error('expected run')
 
     expect(
-      await t.mutation(api.worker.revokeNode, {
+      await t.mutation(internal.worker.revokeNode, {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: registration.node.revision,
@@ -1296,7 +1296,7 @@ describe('round 2 rejection regressions', () => {
     }
 
     expect(
-      await t.mutation(api.worker.revokeNode, {
+      await t.mutation(internal.worker.revokeNode, {
         installationId: 'installation-a',
         nodeId: 'node-a',
         expectedRevision: registration.node.revision,
@@ -1311,11 +1311,11 @@ describe('round 2 rejection regressions', () => {
       (await readJobs(t)).filter((job) => job.leaseOwnerNodeId === 'node-a'),
     ).toHaveLength(38)
     const continuations = await Promise.all([
-      t.mutation(api.worker.continueNodeRevocationCleanup, {
+      t.mutation(internal.worker.continueNodeRevocationCleanup, {
         installationId: 'installation-a',
         nodeId: 'node-a',
       }),
-      t.mutation(api.worker.continueNodeRevocationCleanup, {
+      t.mutation(internal.worker.continueNodeRevocationCleanup, {
         installationId: 'installation-a',
         nodeId: 'node-a',
       }),
@@ -1327,7 +1327,7 @@ describe('round 2 rejection regressions', () => {
       ]),
     )
     expect(
-      await t.mutation(api.worker.continueNodeRevocationCleanup, {
+      await t.mutation(internal.worker.continueNodeRevocationCleanup, {
         installationId: 'installation-a',
         nodeId: 'node-a',
       }),

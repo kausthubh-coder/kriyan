@@ -1,12 +1,10 @@
-import {
-  paginationOptsValidator,
-  paginationResultValidator,
-} from 'convex/server'
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server'
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
-import { finalizeAgentTurn } from './agent-turns'
+import { finalizeAgentTurn } from './agent_turns'
 import {
+  advanceClientSnapshotRevision,
   assertId,
   assertInput,
   assertExpectedRevision,
@@ -120,6 +118,7 @@ export const submit = mutation({
     }
     await ctx.db.insert('commands', commandDoc)
     await ctx.db.insert('jobs', jobDoc)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, command: commandDoc, job: jobDoc }
   },
 })
@@ -259,6 +258,7 @@ export const retry = mutation({
       const messages = await ctx.db.query('agentMessages').withIndex('by_installation_turn_role', (q) => q.eq('installationId', args.installationId).eq('turnId', job.turnId!).eq('role', 'user')).collect()
       for (const message of messages) await ctx.db.patch(message._id, { state: 'queued', finalizedAt: undefined, updatedAt: now })
     }
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return {
       ok: true as const,
       commandRevision: command.revision + 1,
@@ -346,6 +346,7 @@ export const cancel = mutation({
       })
     }
     await finalizeAgentTurn(ctx, job, 'cancelled', now)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: command.revision + 1 }
   },
 })

@@ -33,7 +33,7 @@ test('independent Web and Expo adapters converge through one atomic subscription
     knowledge: {
       sources: [],
       documents: [{ knowledgeDocumentId: 'knowledge:one', kind: 'topic', title: 'One', summary: 'Summary', tags: [], sourceRefIds: [], provenanceIds: [], syncState: 'synced', indexState: 'indexed', revision: 1, createdAt: 1, updatedAt: 2 }],
-      artifacts: [{ artifactId: 'artifact:one', noteVersionId: 'version:one', projectionState: 'projected' }],
+      artifacts: [{ artifactId: 'artifact:one', noteId: 'note:one', noteVersionId: 'version:one', slug: 'one', projectionState: 'projected', revision: 1, createdAt: 1, updatedAt: 2 }],
     },
     nodes: {
       items: [{ nodeId: 'node:one', displayName: 'Node', capabilities: ['agent.chat.v1'], status: 'online', lastHeartbeatAt: 2, revision: 1 }],
@@ -63,6 +63,23 @@ test('independent Web and Expo adapters converge through one atomic subscription
   expect(expo.getSnapshot()).toMatchObject({ transactionRevision: 1, connection: 'reconnecting', error: 'offline' })
   server.reconnect(); await flush()
   expect(expo.getSnapshot()).toMatchObject({ transactionRevision: 1, connection: 'online' })
+
+  server.mutate(({ transactionRevision: _revision, ...current }) => ({
+    ...current,
+    productivity: { ...current.productivity, tasks: [...current.productivity.tasks, { taskId: 'task:newest', title: 'Newest', status: 'open', revision: 0, createdAt: 3, updatedAt: 3 }] },
+  }))
+  server.mutate(({ transactionRevision: _revision, ...current }) => ({
+    ...current,
+    productivity: { ...current.productivity, tasks: current.productivity.tasks.filter((task) => task.taskId !== 'task:newest') },
+  }))
+  server.fail(new Error('delete reconnect'))
+  server.mutate(({ transactionRevision: _revision, ...current }) => ({
+    ...current,
+    productivity: { ...current.productivity, tasks: [] },
+  }))
+  server.reconnect(); await flush()
+  expect(web.getSnapshot()).toMatchObject({ transactionRevision: 4, productivity: { tasks: [] }, connection: 'online' })
+  expect(expo.getSnapshot()).toEqual(web.getSnapshot())
 
   unsubscribeWeb()
   web.dispose(); web.dispose()

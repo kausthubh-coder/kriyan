@@ -6,9 +6,21 @@ import { assertId, assertPositiveInteger, assertShortText } from './lib'
 
 const cleanupTables = [
   'runEvents',
+  'workerEffectReceipts',
   'runs',
   'jobs',
   'commands',
+  'noteLinks',
+  'artifacts',
+  'noteVersions',
+  'agentMessages',
+  'agentThreads',
+  'agentRevisions',
+  'agents',
+  'provenanceLinks',
+  'memoryCorrections',
+  'knowledgeRelations',
+  'projectionCursors',
   'tasks',
   'reminders',
   'calendarEvents',
@@ -22,9 +34,21 @@ const cleanupTables = [
 
 const cleanupTable = v.union(
   v.literal('runEvents'),
+  v.literal('workerEffectReceipts'),
   v.literal('runs'),
   v.literal('jobs'),
   v.literal('commands'),
+  v.literal('noteLinks'),
+  v.literal('artifacts'),
+  v.literal('noteVersions'),
+  v.literal('agentMessages'),
+  v.literal('agentThreads'),
+  v.literal('agentRevisions'),
+  v.literal('agents'),
+  v.literal('provenanceLinks'),
+  v.literal('memoryCorrections'),
+  v.literal('knowledgeRelations'),
+  v.literal('projectionCursors'),
   v.literal('tasks'),
   v.literal('reminders'),
   v.literal('calendarEvents'),
@@ -110,6 +134,25 @@ export const resetInstallation = internalMutation({
               .withIndex('by_installation_event', (q) =>
                 q.eq('installationId', args.installationId),
               )
+              .take(args.batchSize + 1)
+          ).map((document) => document._id)
+          break
+        case 'workerEffectReceipts':
+        case 'noteLinks':
+        case 'artifacts':
+        case 'noteVersions':
+        case 'agentMessages':
+        case 'agentThreads':
+        case 'agentRevisions':
+        case 'agents':
+        case 'provenanceLinks':
+        case 'memoryCorrections':
+        case 'knowledgeRelations':
+        case 'projectionCursors':
+          documentIds = (
+            await ctx.db
+              .query(tableName)
+              .filter((q) => q.eq(q.field('installationId'), args.installationId))
               .take(args.batchSize + 1)
           ).map((document) => document._id)
           break

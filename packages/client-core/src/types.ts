@@ -40,6 +40,10 @@ export interface TaskItem {
   startAt?: number
   projectId?: string
   entityId?: string
+  origin?: 'user' | 'agent' | 'import' | 'projection'
+  sourceRefIds?: string[]
+  provenanceIds?: string[]
+  reversibleChangeId?: string
   revision: number
   createdAt: number
   updatedAt: number
@@ -118,10 +122,192 @@ export interface AppNoteItem {
   wordCount: number
   tags: string[]
   entityId?: string
+  currentVersionId?: string
+  contentHash?: string
   revision: number
   createdAt: number
   updatedAt: number
   deletedAt?: number
+}
+
+export interface NoteVersionItem {
+  noteVersionId: string
+  noteId: string
+  version: number
+  contentJson: string
+  contentHash: string
+  plainTextPreview: string
+  wordCount: number
+  authorOrigin: string
+  createdAt: number
+}
+
+export interface NoteLinkItem {
+  noteLinkId: string
+  noteId: string
+  targetKind: string
+  targetId: string
+  relation: string
+  provenanceIds: string[]
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+export interface NoteHistoryItem {
+  note: AppNoteItem
+  versions: NoteVersionItem[]
+  links: NoteLinkItem[]
+}
+
+export interface ArtifactMaterializationHistoryItem {
+  revision: number
+  state: 'pending' | 'projected' | 'failed' | 'tombstoned'
+  noteVersionId: string
+  slug: string
+  projectedPath?: string
+  projectedHash?: string
+  error?: string
+  occurredAt: number
+}
+
+export interface ArtifactItem {
+  artifactId: string
+  noteId: string
+  noteVersionId: string
+  slug: string
+  projectionState: 'pending' | 'projected' | 'failed' | 'tombstoned'
+  projectedHash?: string
+  projectedPath?: string
+  priorProjectedHash?: string
+  priorProjectedPath?: string
+  lastError?: string
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+  history?: ArtifactMaterializationHistoryItem[]
+}
+
+export interface SourceTranscriptExcerptItem {
+  excerptId: string
+  text: string
+  startOffset: number
+  endOffset: number
+  speaker?: string
+  startAtMs?: number
+  endAtMs?: number
+}
+
+export interface SourceExtractionItem {
+  extractionId: string
+  kind: string
+  label: string
+  value: string
+  confidence?: number
+  provenanceIds: string[]
+}
+
+export interface ReversibleChangeItem {
+  changeId: string
+  targetKind: string
+  targetId: string
+  action: string
+  summary: string
+  origin: string
+  sourceRefIds: string[]
+  provenanceIds: string[]
+  beforeRevision?: number
+  afterRevision: number
+  reversible: boolean
+  revertedAt?: number
+  createdAt: number
+}
+
+export interface SourceDetailItem {
+  source: SourceRefItem
+  transcriptPreview?: string
+  transcriptTruncated: boolean
+  excerpts: SourceTranscriptExcerptItem[]
+  excerptsTruncated: boolean
+  extractions: SourceExtractionItem[]
+  extractionsTruncated: boolean
+  derivedChanges: ReversibleChangeItem[]
+  derivedChangesTruncated: boolean
+}
+
+export interface MemoryFactItem {
+  factId: string
+  entityId: string
+  predicate: string
+  value: string
+  confidence: number
+  sourceRefIds: string[]
+  provenanceIds: string[]
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+export interface MemoryRelationItem {
+  relationId: string
+  fromEntityId: string
+  toEntityId: string
+  relationType: string
+  confidence: number
+  provenanceIds: string[]
+  revision: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+export interface MemoryProvenanceItem {
+  provenanceLinkId: string
+  targetKind: string
+  targetId: string
+  sourceRefId: string
+  excerpt?: string
+  locator?: string
+  confidence?: number
+  createdAt: number
+  deletedAt?: number
+}
+
+export interface MemoryCorrectionItem {
+  correctionId: string
+  targetKind: string
+  targetId: string
+  action: 'retract' | 'replace' | 'restore'
+  replacement?: string
+  reason: string
+  actor: string
+  origin: string
+  expectedRevision: number
+  state: 'pending' | 'applied' | 'restored' | 'conflict'
+  appliedRevision?: number
+  conflict?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface MemoryEntityDetailItem {
+  entityId: string
+  facts: MemoryFactItem[]
+  relations: MemoryRelationItem[]
+  provenance: MemoryProvenanceItem[]
+  corrections: MemoryCorrectionItem[]
+  conflicts: MemoryCorrectionItem[]
+}
+
+export interface TaskProvenanceDetailItem {
+  task: TaskItem
+  origin: string
+  sources: SourceRefItem[]
+  provenance: MemoryProvenanceItem[]
+  changes: ReversibleChangeItem[]
 }
 
 export interface SourceRefItem {

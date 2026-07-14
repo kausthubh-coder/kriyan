@@ -1,5 +1,7 @@
 import { canonicalJson } from '@kriyan/contracts'
 
+import type { MutationCtx } from './_generated/server'
+
 const LIMITS = {
   id: 128,
   shortText: 256,
@@ -177,4 +179,19 @@ export function withoutSystemFields<
     ...value
   } = document
   return value
+}
+
+/** Same-transaction installation clock for every aggregate-visible mutation. */
+export async function advanceClientSnapshotRevision(
+  ctx: MutationCtx,
+  installationId: string,
+): Promise<number> {
+  const installation = await ctx.db
+    .query('installations')
+    .withIndex('by_installation_id', (q) => q.eq('installationId', installationId))
+    .unique()
+  if (installation === null) throw new Error('installation not found')
+  const snapshotRevision = (installation.snapshotRevision ?? 0) + 1
+  await ctx.db.patch(installation._id, { snapshotRevision, updatedAt: Date.now() })
+  return snapshotRevision
 }

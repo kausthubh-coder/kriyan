@@ -6,6 +6,7 @@ import { v } from 'convex/values'
 
 import { mutation, query, type MutationCtx } from './_generated/server'
 import {
+  advanceClientSnapshotRevision,
   assertBoundedString,
   assertExpectedRevision,
   assertId,
@@ -131,6 +132,7 @@ export const createTask = mutation({
       updatedAt: now,
     }
     await ctx.db.insert('tasks', task)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, task }
   },
 })
@@ -321,6 +323,7 @@ export const updateTask = mutation({
       revision: task.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: task.revision + 1 }
   },
 })
@@ -355,6 +358,7 @@ export const setTaskStatus = mutation({
       revision: task.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: task.revision + 1 }
   },
 })
@@ -389,6 +393,7 @@ export const tombstoneTask = mutation({
       revision: task.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: task.revision + 1 }
   },
 })
@@ -491,6 +496,7 @@ export const createReminder = mutation({
       updatedAt: now,
     }
     await ctx.db.insert('reminders', reminder)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, reminder }
   },
 })
@@ -666,6 +672,7 @@ export const updateReminder = mutation({
       revision: reminder.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: reminder.revision + 1 }
   },
 })
@@ -702,6 +709,7 @@ export const setReminderStatus = mutation({
       revision: reminder.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: reminder.revision + 1 }
   },
 })
@@ -773,6 +781,7 @@ export const markReminderFired = mutation({
       revision: reminder.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: reminder.revision + 1 }
   },
 })
@@ -813,6 +822,7 @@ export const acknowledgeReminder = mutation({
       revision: reminder.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: reminder.revision + 1 }
   },
 })
@@ -859,6 +869,7 @@ export const snoozeReminder = mutation({
       revision: reminder.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: reminder.revision + 1 }
   },
 })
@@ -895,6 +906,7 @@ export const tombstoneReminder = mutation({
       revision: reminder.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: reminder.revision + 1 }
   },
 })

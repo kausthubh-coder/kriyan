@@ -11,7 +11,7 @@ import { convexTest } from 'convex-test'
 import { makeFunctionReference } from 'convex/server'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import schema from './schema'
 
 const modules = import.meta.glob('./**/*.ts')
@@ -39,6 +39,36 @@ async function activeAgentTurn(t: ReturnType<typeof backend>, suffix: string) {
   return { registration, submission, started }
 }
 
+const fencedOperations = new Set<string>([
+  'execution.context.read', 'artifact.work.read', 'note.version.read', 'memory.work.read',
+  'effect.task.commit', 'effect.reminder.commit', 'effect.note.commit',
+  'effect.source.commit', 'effect.knowledge.commit',
+])
+
+async function seedFencedOperation(t: ReturnType<typeof backend>, operation: string): Promise<void> {
+  await installation(t)
+  await t.run(async (ctx) => {
+    const now = 1_000
+    const kind = operation === 'artifact.work.read' ? 'artifact.materialize.v1'
+      : operation === 'memory.work.read' ? 'memory.project.v1' : 'agent.turn.v1'
+    const input = operation === 'artifact.work.read'
+      ? JSON.stringify({ action: 'materialize', artifactId: 'artifact:one', noteId: 'note:one', noteVersionId: 'version:missing', expectedArtifactRevision: 0, slug: 'one', projectedPath: 'artifacts/one.md' })
+      : operation === 'memory.work.read' ? JSON.stringify({ kind: 'project' }) : 'work'
+    await ctx.db.insert('nodes', { installationId: 'installation:contracts', nodeId: 'node:one', displayName: 'Node', capabilities: ['agent.chat.v1'], protocolVersion: '1', status: 'online', lastHeartbeatAt: now, revision: 0, createdAt: now, updatedAt: now })
+    await ctx.db.insert('commands', { installationId: 'installation:contracts', commandId: 'command:fenced', idempotencyKey: 'intent:fenced', input, kind, agentRevisionId: 'agent-revision:one', status: 'accepted', revision: 0, createdAt: now, updatedAt: now })
+    await ctx.db.insert('jobs', { installationId: 'installation:contracts', jobId: 'job:missing', commandId: 'command:fenced', kind, threadId: 'thread:one', agentRevisionId: 'agent-revision:one', requiredCapabilities: ['agent.chat.v1'], status: 'leased', attempt: 1, maxAttempts: 3, leaseToken: 'lease:one', leaseOwnerNodeId: 'node:one', leaseExpiresAt: 31_000, revision: 0, createdAt: now, updatedAt: now })
+    await ctx.db.insert('agentRevisions', { installationId: 'installation:contracts', agentRevisionId: 'agent-revision:one', agentId: 'agent:one', ordinal: 1, displayName: 'Agent', systemPrompt: 'Help', toolCapabilities: ['task.write'], createdAt: now })
+    await ctx.db.insert('agentThreads', { installationId: 'installation:contracts', threadId: 'thread:one', agentId: 'agent:one', agentRevisionId: 'agent-revision:one', nextTurnOrdinal: 1, sessionRevision: 0, createdAt: now, updatedAt: now })
+    await ctx.db.insert('noteVersions', { installationId: 'installation:contracts', noteVersionId: 'version:missing', noteId: 'note:one', version: 0, contentJson: '{"type":"doc"}', contentHash: canonicalContentHash('{"type":"doc"}'), plainTextPreview: '', wordCount: 0, authorOrigin: 'fixture', createdAt: now })
+    if (operation === 'artifact.work.read') await ctx.db.insert('artifacts', { installationId: 'installation:contracts', artifactId: 'artifact:one', noteId: 'note:one', noteVersionId: 'version:missing', slug: 'one', projectionState: 'pending', revision: 0, createdAt: now, updatedAt: now })
+    if (operation === 'effect.task.commit') await ctx.db.insert('tasks', { installationId: 'installation:contracts', taskId: 'task:one', idempotencyKey: 'task:one', title: 'One', tags: [], status: 'open', revision: 0, createdAt: now, updatedAt: now })
+    if (operation === 'effect.reminder.commit') await ctx.db.insert('reminders', { installationId: 'installation:contracts', reminderId: 'reminder:one', idempotencyKey: 'reminder:one', message: 'One', remindAt: 10, timezone: 'UTC', deliveryPolicy: 'normal', status: 'scheduled', scheduleKey: 'reminder:one', fireCount: 0, revision: 0, createdAt: now, updatedAt: now })
+    if (operation === 'effect.note.commit') await ctx.db.insert('notes', { installationId: 'installation:contracts', noteId: 'note:one', idempotencyKey: 'note:one', contentJson: '{"type":"doc"}', plainTextPreview: '', wordCount: 0, tags: [], revision: 0, createdAt: now, updatedAt: now })
+    if (operation === 'effect.source.commit') await ctx.db.insert('sourceRefs', { installationId: 'installation:contracts', sourceRefId: 'source:one', idempotencyKey: 'source:one', kind: 'other', displayName: 'One', syncState: 'pending', indexState: 'pending', provenanceIds: [], revision: 0, createdAt: now, updatedAt: now })
+    if (operation === 'effect.knowledge.commit') await ctx.db.insert('knowledgeDocuments', { installationId: 'installation:contracts', knowledgeDocumentId: 'knowledge:one', idempotencyKey: 'knowledge:one', kind: 'other', title: 'One', summary: '', tags: [], sourceRefIds: [], provenanceIds: [], syncState: 'pending', indexState: 'pending', revision: 0, createdAt: now, updatedAt: now })
+  })
+}
+
 describe('agent turn contract', () => {
   test('pins revisions, deduplicates submission, and enforces capability FIFO finalization', async () => {
     const t = backend(); await installation(t)
@@ -61,7 +91,7 @@ describe('agent turn contract', () => {
     const started = await t.mutation(api.worker.startRun, { installationId: 'installation:contracts', nodeId: 'node:agent', jobId: claim!.job.jobId, expectedJobRevision: claim!.job.revision, expectedLeaseToken: claim!.job.leaseToken })
     expect(started.ok).toBe(true)
     if (!started.ok) throw new Error('expected run')
-    expect(await t.mutation(api.worker.finalizeAssistantRun, { installationId: 'installation:contracts', nodeId: 'node:agent', jobId: started.job.jobId, runId: started.run.runId, expectedJobRevision: started.job.revision, expectedRunRevision: started.run.revision, expectedLeaseToken: started.job.leaseToken, assistantContent: 'done' })).toEqual({ ok: true, revision: 3 })
+    expect(await t.mutation(api.worker.completeRun, { installationId: 'installation:contracts', nodeId: 'node:agent', jobId: started.job.jobId, runId: started.run.runId, expectedJobRevision: started.job.revision, expectedRunRevision: started.run.revision, expectedLeaseToken: started.job.leaseToken, assistantContent: 'done' })).toEqual({ ok: true, revision: 3 })
     const messages = await t.query(query('agents:listMessages'), { installationId: 'installation:contracts', threadId: 'thread:one', paginationOpts: { cursor: null, numItems: 100 } })
     expect(messages.page.filter((item: any) => item.role === 'assistant')).toEqual([expect.objectContaining({ messageId: 'message:thread:one:1:assistant', content: 'done' })])
     expect((await t.mutation(api.worker.claimJob, { installationId: 'installation:contracts', nodeId: 'node:agent', leaseDurationMs: 30_000 }))?.job.turnOrdinal).toBe(2)
@@ -116,7 +146,7 @@ describe('agent turn contract', () => {
 
     const revoked = backend()
     const revokedTurn = await activeAgentTurn(revoked, 'revoke')
-    expect(await revoked.mutation(api.worker.revokeNode, { installationId: 'installation:contracts', nodeId: 'node:revoke', expectedRevision: revokedTurn.registration.node.revision })).toMatchObject({ ok: true, releasedWork: 1, cleanupPending: false })
+    expect(await revoked.mutation(internal.worker.revokeNode, { installationId: 'installation:contracts', nodeId: 'node:revoke', expectedRevision: revokedTurn.registration.node.revision })).toMatchObject({ ok: true, releasedWork: 1, cleanupPending: false })
     expect((await revoked.query(query('agents:listThreads'), { installationId: 'installation:contracts', paginationOpts: { cursor: null, numItems: 10 } })).page[0].activeTurnId).toBeUndefined()
     const messages = await revoked.query(query('agents:listMessages'), { installationId: 'installation:contracts', threadId: 'thread:revoke', paginationOpts: { cursor: null, numItems: 10 } })
     expect(messages.page.find((item: any) => item.role === 'user')?.state).toBe('failed')
@@ -127,15 +157,17 @@ describe('frozen worker operation conformance', () => {
   test('runs every valid binding through convexTest and rejects invalid validator shapes', async () => {
     const t = backend(); await installation(t)
     for (const operation of WORKER_OPERATIONS) {
+      const operationBackend = fencedOperations.has(operation) ? backend() : t
+      if (fencedOperations.has(operation)) await seedFencedOperation(operationBackend, operation)
       const binding = workerOperationBindings[operation]
       const input = WORKER_OPERATION_VALID_INPUTS[operation]
       const invalid = { ...input, unexpected: true }
       const invalidCall = binding.kind === 'query'
-        ? t.query(binding.reference as never, invalid as never)
-        : t.mutation(binding.reference as never, invalid as never)
+        ? operationBackend.query(binding.reference as never, invalid as never)
+        : operationBackend.mutation(binding.reference as never, invalid as never)
       await expect(invalidCall, operation).rejects.toThrow()
-      if (binding.kind === 'query') await t.query(binding.reference as never, input as never)
-      else await t.mutation(binding.reference as never, input as never)
+      if (binding.kind === 'query') await operationBackend.query(binding.reference as never, input as never)
+      else await operationBackend.mutation(binding.reference as never, input as never)
     }
   })
 
@@ -177,7 +209,7 @@ describe('note migration and projection contracts', () => {
     } while (true)
     expect(await t.query(api.notes.verifyBackfill, { installationId: 'installation:contracts' })).toMatchObject({ notes: 3, versionZero: 3, complete: true, cursorVerified: true })
     await t.mutation(api.notes.create, { installationId: 'installation:contracts', noteId: 'note:during-cutover', idempotencyKey: 'note:during-cutover', contentJson: '{"type":"doc"}', plainTextPreview: '', wordCount: 0, tags: [] })
-    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'canonical' })).toEqual({ ok: false, mode: 'canonical' })
+    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'canonical', expectedManifestHash: before.aggregateHash })).toMatchObject({ ok: false, mode: 'canonical', reason: 'manifest_mismatch' })
 
     for (const phase of ['source', 'knowledge'] as const) {
       let cursor: string | null = null
@@ -189,10 +221,11 @@ describe('note migration and projection contracts', () => {
       } while (true)
     }
     const after = await t.query(api.knowledge.migrationManifest, { installationId: 'installation:contracts' })
-    expect(after.sourceHash).toBe(before.sourceHash)
-    expect(after.knowledgeHash).toBe(before.knowledgeHash)
-    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'canonical' })).toEqual({ ok: true, mode: 'canonical' })
-    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'rollback' })).toEqual({ ok: true, mode: 'rollback' })
+    expect(after.tables.find((item) => item.table === 'sourceRefs')?.hash).toBe(before.tables.find((item) => item.table === 'sourceRefs')?.hash)
+    expect(after.tables.find((item) => item.table === 'knowledgeDocuments')?.hash).toBe(before.tables.find((item) => item.table === 'knowledgeDocuments')?.hash)
+    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'canonical', expectedManifestHash: after.aggregateHash })).toMatchObject({ ok: true, mode: 'canonical', manifestHash: after.aggregateHash })
+    const canonicalManifest = await t.query(api.knowledge.migrationManifest, { installationId: 'installation:contracts' })
+    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'rollback', expectedManifestHash: canonicalManifest.aggregateHash })).toMatchObject({ ok: true, mode: 'rollback', manifestHash: canonicalManifest.aggregateHash })
     await expect(t.mutation(api.notes.update, { installationId: 'installation:contracts', noteId: 'note:legacy:1', expectedRevision: 1, title: 'blocked' })).rejects.toThrow('writers are disabled')
     const preserved = await t.run(async (ctx) => ({
       notes: (await ctx.db.query('notes').withIndex('by_installation_note', (q) => q.eq('installationId', 'installation:contracts')).collect()).filter((note) => note.noteId.startsWith('note:legacy')).map((note) => ({ id: note.noteId, revision: note.revision, deletedAt: note.deletedAt, currentVersionId: note.currentVersionId })),
@@ -215,7 +248,8 @@ describe('note migration and projection contracts', () => {
     const replay = await t.mutation(api.notes.backfillLegacyVersions, { installationId: 'installation:contracts', cursor: null, numItems: 10 })
     expect(first.created).toBe(1); expect(replay.created).toBe(0)
     expect(await t.query(api.notes.verifyBackfill, { installationId: 'installation:contracts' })).toMatchObject({ notes: 1, versionZero: 1, complete: true, compatibilityMode: 'dual-read' })
-    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'rollback' })).toEqual({ ok: true, mode: 'rollback' })
+    const manifest = await t.query(api.knowledge.migrationManifest, { installationId: 'installation:contracts' })
+    expect(await t.mutation(api.notes.setCompatibilityMode, { installationId: 'installation:contracts', mode: 'rollback', expectedManifestHash: manifest.aggregateHash })).toMatchObject({ ok: true, mode: 'rollback', manifestHash: manifest.aggregateHash })
     expect((await t.query(api.notes.get, { installationId: 'installation:contracts', noteId: 'note:legacy' }))?.revision).toBe(7)
   })
 
@@ -240,6 +274,7 @@ describe('note migration and projection contracts', () => {
     const artifact = await t.mutation(api.notes.createArtifact, artifactInput)
     expect((await t.mutation(api.notes.createArtifact, artifactInput)).created).toBe(false)
     await expect(t.mutation(api.notes.createArtifact, { ...artifactInput, slug: 'changed' })).rejects.toThrow('conflicts')
+    await expect(t.mutation(api.notes.createArtifact, { ...artifactInput, artifactId: 'artifact:collision' })).rejects.toThrow('artifact slug conflicts')
     expect(await t.mutation(api.notes.completeMaterialization, { installationId: 'installation:contracts', artifactId: 'artifact:one', noteVersionId: note.note.currentVersionId!, expectedRevision: artifact.artifact.revision, projectedHash: 'hash:one', projectedPath: 'artifacts/one.md' })).toEqual({ ok: true, revision: 1 })
     const updated = await t.mutation(api.notes.update, { installationId: 'installation:contracts', noteId: 'note:new', expectedRevision: 0, contentJson: '{"type":"doc","content":[]}', plainTextPreview: 'updated', wordCount: 1 })
     expect(updated).toEqual({ ok: true, revision: 1 })

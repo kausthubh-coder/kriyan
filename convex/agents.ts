@@ -10,6 +10,7 @@ import { v } from 'convex/values'
 
 import { mutation, query, type MutationCtx } from './_generated/server'
 import {
+  advanceClientSnapshotRevision,
   assertBoundedString,
   assertExpectedRevision,
   assertId,
@@ -54,6 +55,7 @@ export const create = mutation({
     const revision = { installationId: args.installationId, agentRevisionId: args.agentRevisionId, agentId: args.agentId, ordinal: 0, displayName: args.displayName, systemPrompt: args.systemPrompt, toolCapabilities: args.toolCapabilities, createdAt: now }
     const agent = { installationId: args.installationId, agentId: args.agentId, displayName: args.displayName, currentRevisionId: args.agentRevisionId, revision: 0, createdAt: now, updatedAt: now }
     await ctx.db.insert('agentRevisions', revision); await ctx.db.insert('agents', agent)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, agent, revision }
   },
 })
@@ -72,6 +74,7 @@ export const revise = mutation({
     const now = Date.now()
     await ctx.db.insert('agentRevisions', { installationId: args.installationId, agentRevisionId: args.agentRevisionId, agentId: args.agentId, ordinal: agent.revision + 1, displayName: args.displayName, systemPrompt: args.systemPrompt, toolCapabilities: args.toolCapabilities, createdAt: now })
     await ctx.db.patch(agent._id, { displayName: args.displayName, currentRevisionId: args.agentRevisionId, revision: agent.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: agent.revision + 1 }
   },
 })
@@ -91,6 +94,7 @@ export const createThread = mutation({
     const now = Date.now()
     const thread = { installationId: args.installationId, threadId: args.threadId, agentId: args.agentId, agentRevisionId: agent.currentRevisionId, title: args.title, nextTurnOrdinal: 1, preferredNodeId: args.preferredNodeId, sessionRevision: 0, createdAt: now, updatedAt: now }
     await ctx.db.insert('agentThreads', thread)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, thread }
   },
 })
@@ -138,9 +142,10 @@ export const submitMessage = mutation({
     const common = { installationId: args.installationId, contractVersion: CONTRACT_VERSION, kind: JOB_KINDS.agentTurn, threadId: args.threadId, turnId, turnOrdinal: ordinal, agentRevisionId: pinnedRevisionId }
     const message = { installationId: args.installationId, messageId: args.messageId, threadId: args.threadId, turnId, turnOrdinal: ordinal, role: 'user' as const, state: 'queued' as const, content: args.content, origin: 'client', agentRevisionId: pinnedRevisionId, createdAt: now, updatedAt: now }
     const command = { ...common, commandId: args.commandId, idempotencyKey: args.idempotencyKey, input: args.content, status: 'accepted' as const, revision: 0, createdAt: now, updatedAt: now }
-    const job = { ...common, jobId: `job:${args.commandId}`, commandId: args.commandId, requiredCapabilities: [AGENT_CHAT_CAPABILITY], preferredNodeId: thread.preferredNodeId, assistantMessageId, status: 'queued' as const, attempt: 0, maxAttempts: args.maxAttempts, revision: 0, createdAt: now, updatedAt: now }
+    const job = { ...common, jobId: `job:${args.commandId}`, commandId: args.commandId, requiredCapabilities: [AGENT_CHAT_CAPABILITY], preferredNodeId: thread.preferredNodeId, assistantMessageId, sessionCheckpoint: thread.piSessionRef, sessionRevision: thread.sessionRevision, status: 'queued' as const, attempt: 0, maxAttempts: args.maxAttempts, revision: 0, createdAt: now, updatedAt: now }
     await ctx.db.insert('agentMessages', message); await ctx.db.insert('commands', command); await ctx.db.insert('jobs', job)
     await ctx.db.patch(thread._id, { agentRevisionId: pinnedRevisionId, nextTurnOrdinal: ordinal + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, message, command, job }
   },
 })
@@ -176,9 +181,10 @@ export const resetSession = mutation({
     const now = Date.now()
     await ctx.db.patch(thread._id, { preferredNodeId: args.preferredNodeId, piSessionRef: undefined, sessionRevision: thread.sessionRevision + 1, updatedAt: now })
     const jobs = await ctx.db.query('jobs').withIndex('by_installation_thread_ordinal', (q) => q.eq('installationId', args.installationId).eq('threadId', args.threadId)).collect()
-    for (const job of jobs) if (job.status === 'queued') await ctx.db.patch(job._id, { preferredNodeId: args.preferredNodeId, revision: job.revision + 1, updatedAt: now })
+    for (const job of jobs) if (job.status === 'queued') await ctx.db.patch(job._id, { preferredNodeId: args.preferredNodeId, sessionCheckpoint: undefined, sessionRevision: thread.sessionRevision + 1, revision: job.revision + 1, updatedAt: now })
     const messages = await ctx.db.query('agentMessages').withIndex('by_installation_thread_ordinal', (q) => q.eq('installationId', args.installationId).eq('threadId', args.threadId)).collect()
     for (const message of messages) if (message.state === 'waiting_for_node') await ctx.db.patch(message._id, { state: 'queued', updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: thread.sessionRevision + 1 }
   },
 })

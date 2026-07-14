@@ -1,7 +1,4 @@
-import {
-  paginationOptsValidator,
-  paginationResultValidator,
-} from 'convex/server'
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server'
 import { v } from 'convex/values'
 import {
   ARTIFACT_MATERIALIZATION_CAPABILITY,
@@ -12,6 +9,7 @@ import {
 
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import {
+  advanceClientSnapshotRevision,
   assertBoundedString,
   assertExpectedRevision,
   assertId,
@@ -24,6 +22,7 @@ import {
   withoutSystemFields,
 } from './lib'
 import { artifactValue, noteLinkValue, noteValue, noteVersionValue, transitionResult } from './validators'
+import { computeMigrationManifest } from './migration_manifest'
 
 async function assertInstallation(
   ctx: MutationCtx,
@@ -60,15 +59,27 @@ async function readCompatibleNote(ctx: MutationCtx | QueryCtx, note: any): Promi
 
 async function queueArtifactJob(
   ctx: MutationCtx,
-  artifact: any,
-  noteVersionId: string,
+  artifact: {
+    installationId: string; artifactId: string; noteId: string; noteVersionId: string;
+    slug: string; revision: number; projectedHash?: string; projectedPath?: string;
+    priorProjectedHash?: string; priorProjectedPath?: string;
+    projectionState?: 'pending' | 'projected' | 'failed' | 'tombstoned';
+    updatedAt?: number;
+  },
   kind: typeof JOB_KINDS.artifactMaterialize | typeof JOB_KINDS.artifactTombstone,
   now: number,
 ): Promise<void> {
-  const commandId = `command:${kind}:${artifact.artifactId}:${noteVersionId}`
+  const action = kind === JOB_KINDS.artifactMaterialize ? 'materialize' : 'tombstone'
+  const commandId = `command:${kind}:${artifact.artifactId}:${artifact.revision}`
   const existing = await ctx.db.query('commands').withIndex('by_installation_command', (q) => q.eq('installationId', artifact.installationId).eq('commandId', commandId)).unique()
   if (existing !== null) return
-  const input = JSON.stringify({ artifactId: artifact.artifactId, noteVersionId, expectedRevision: artifact.revision + 1 })
+  const input = JSON.stringify({
+    action, artifactId: artifact.artifactId, noteId: artifact.noteId,
+    noteVersionId: artifact.noteVersionId, expectedArtifactRevision: artifact.revision,
+    slug: artifact.slug, projectedPath: `artifacts/${artifact.slug}.md`,
+    priorProjectedHash: artifact.priorProjectedHash ?? artifact.projectedHash,
+    priorProjectedPath: artifact.priorProjectedPath ?? artifact.projectedPath,
+  })
   await ctx.db.insert('commands', {
     installationId: artifact.installationId, commandId, idempotencyKey: commandId,
     input, contractVersion: CONTRACT_VERSION, kind, status: 'accepted',
@@ -80,6 +91,20 @@ async function queueArtifactJob(
     requiredCapabilities: [ARTIFACT_MATERIALIZATION_CAPABILITY], status: 'queued',
     attempt: 0, maxAttempts: 3, revision: 0, createdAt: now, updatedAt: now,
   })
+}
+
+async function assertArtifactSlugAvailable(
+  ctx: MutationCtx,
+  installationId: string,
+  slug: string,
+  artifactId: string,
+): Promise<void> {
+  const artifacts = await ctx.db.query('artifacts').withIndex('by_installation_artifact', (q) =>
+    q.eq('installationId', installationId),
+  ).collect()
+  if (artifacts.some((artifact) => artifact.artifactId !== artifactId && artifact.slug === slug && artifact.deletedAt === undefined)) {
+    throw new Error('artifact slug conflicts with an active artifact path')
+  }
 }
 
 function assertPreview(value: string): void {
@@ -161,6 +186,7 @@ export const create = mutation({
       plainTextPreview: args.plainTextPreview, wordCount: args.wordCount,
       authorOrigin: 'client', createdAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, note }
   },
 })
@@ -288,8 +314,13 @@ export const update = mutation({
         priorProjectedPath: artifact.projectedPath, lastError: undefined,
         revision: artifact.revision + 1, updatedAt: now,
       })
-      await queueArtifactJob(ctx, artifact, noteVersionId, JOB_KINDS.artifactMaterialize, now)
+      await queueArtifactJob(ctx, {
+        ...withoutSystemFields(artifact), noteVersionId, projectionState: 'pending',
+        priorProjectedHash: artifact.projectedHash, priorProjectedPath: artifact.projectedPath,
+        revision: artifact.revision + 1, updatedAt: now,
+      }, JOB_KINDS.artifactMaterialize, now)
     }
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: note.revision + 1 }
   },
 })
@@ -331,16 +362,21 @@ export const backfillLegacyVersions = mutation({
     await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId: batchId, vaultId: 'legacy:d41', cursor: page.page.length, pageCursor: page.continueCursor, scanned: page.page.length, createdCount: created, manifestHash, mode: page.isDone ? 'verified' : 'backfill', revision: 0, createdAt: now, updatedAt: now })
     if (progress === null) await ctx.db.insert('projectionCursors', { installationId: args.installationId, cursorId, vaultId: 'legacy:d41', cursor: page.page.length, documentHash: progressHash, mode: page.isDone ? 'verified' : 'backfill', revision: 0, createdAt: now, updatedAt: now })
     else await ctx.db.patch(progress._id, { cursor: progress.cursor + page.page.length, documentHash: progressHash, mode: page.isDone ? 'verified' : 'backfill', revision: progress.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { continueCursor: page.continueCursor, isDone: page.isDone, scanned: page.page.length, created }
   },
 })
 
 export const setCompatibilityMode = mutation({
-  args: { installationId: v.string(), mode: v.union(v.literal('dual-read'), v.literal('canonical'), v.literal('rollback')) },
-  returns: v.object({ ok: v.boolean(), mode: v.string() }),
+  args: { installationId: v.string(), mode: v.union(v.literal('dual-read'), v.literal('canonical'), v.literal('rollback')), expectedManifestHash: v.string() },
+  returns: v.object({ ok: v.boolean(), mode: v.string(), manifestHash: v.string(), reason: v.optional(v.string()) }),
   handler: async (ctx, args) => {
     const installation = await ctx.db.query('installations').withIndex('by_installation_id', (q) => q.eq('installationId', args.installationId)).unique()
-    if (installation === null) return { ok: false, mode: args.mode }
+    if (installation === null) return { ok: false, mode: args.mode, manifestHash: '', reason: 'not_found' }
+    const manifest = await computeMigrationManifest(ctx, args.installationId)
+    if (manifest.aggregateHash !== args.expectedManifestHash) {
+      return { ok: false, mode: args.mode, manifestHash: manifest.aggregateHash, reason: 'manifest_mismatch' }
+    }
     if (args.mode === 'canonical') {
       const [notes, versions, sources, knowledge, sourceCursor, knowledgeCursor] = await Promise.all([
         ctx.db.query('notes').withIndex('by_installation_note', (q) => q.eq('installationId', args.installationId)).collect(),
@@ -350,11 +386,12 @@ export const setCompatibilityMode = mutation({
         ctx.db.query('projectionCursors').withIndex('by_installation_cursor', (q) => q.eq('installationId', args.installationId).eq('cursorId', 'd41-backfill:source')).unique(),
         ctx.db.query('projectionCursors').withIndex('by_installation_cursor', (q) => q.eq('installationId', args.installationId).eq('cursorId', 'd41-backfill:knowledge')).unique(),
       ])
-      if (!notes.every((note) => versions.some((version) => version.noteId === note.noteId && version.version === 0))) return { ok: false, mode: args.mode }
-      if ((sources.length > 0 && sourceCursor?.mode !== 'verified') || (knowledge.length > 0 && knowledgeCursor?.mode !== 'verified')) return { ok: false, mode: args.mode }
+      if (!notes.every((note) => versions.some((version) => version.noteId === note.noteId && version.version === 0))) return { ok: false, mode: args.mode, manifestHash: manifest.aggregateHash, reason: 'notes_backfill_incomplete' }
+      if ((sources.length > 0 && sourceCursor?.mode !== 'verified') || (knowledge.length > 0 && knowledgeCursor?.mode !== 'verified')) return { ok: false, mode: args.mode, manifestHash: manifest.aggregateHash, reason: 'projection_backfill_incomplete' }
     }
     await ctx.db.patch(installation._id, { compatibilityMode: args.mode, contractVersion: CONTRACT_VERSION, updatedAt: Date.now() })
-    return { ok: true, mode: args.mode }
+    await advanceClientSnapshotRevision(ctx, args.installationId)
+    return { ok: true, mode: args.mode, manifestHash: manifest.aggregateHash }
   },
 })
 
@@ -382,11 +419,14 @@ export const createArtifact = mutation({
       if (existing.noteId !== args.noteId || existing.noteVersionId !== args.noteVersionId || existing.slug !== args.slug || existing.deletedAt !== undefined) throw new Error('artifactId conflicts with an existing artifact')
       return { created: false, artifact: withoutSystemFields(existing) }
     }
+    await assertArtifactSlugAvailable(ctx, args.installationId, args.slug, args.artifactId)
     const version = await ctx.db.query('noteVersions').withIndex('by_installation_version', (q) => q.eq('installationId', args.installationId).eq('noteVersionId', args.noteVersionId)).unique()
     if (version === null || version.noteId !== args.noteId) throw new Error('committed note version not found')
     const now = Date.now()
     const artifact = { ...args, projectionState: 'pending' as const, revision: 0, createdAt: now, updatedAt: now }
     await ctx.db.insert('artifacts', artifact)
+    await queueArtifactJob(ctx, artifact, JOB_KINDS.artifactMaterialize, now)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, artifact }
   },
 })
@@ -402,9 +442,15 @@ export const advanceArtifact = mutation({
     if (artifact.deletedAt !== undefined || artifact.projectedHash !== args.expectedProjectedHash) return { ok: false as const, reason: 'invalid_state' as const }
     const version = await ctx.db.query('noteVersions').withIndex('by_installation_version', (q) => q.eq('installationId', args.installationId).eq('noteVersionId', args.noteVersionId)).unique()
     if (version === null || version.noteId !== artifact.noteId) return { ok: false as const, reason: 'invalid_state' as const }
+    await assertArtifactSlugAvailable(ctx, args.installationId, args.slug, args.artifactId)
     const now = Date.now()
     await ctx.db.patch(artifact._id, { noteVersionId: args.noteVersionId, slug: args.slug, projectionState: 'pending', priorProjectedHash: artifact.projectedHash, priorProjectedPath: artifact.projectedPath, lastError: undefined, revision: artifact.revision + 1, updatedAt: now })
-    await queueArtifactJob(ctx, artifact, args.noteVersionId, JOB_KINDS.artifactMaterialize, now)
+    await queueArtifactJob(ctx, {
+      ...withoutSystemFields(artifact), noteVersionId: args.noteVersionId, slug: args.slug,
+      projectionState: 'pending', priorProjectedHash: artifact.projectedHash,
+      priorProjectedPath: artifact.projectedPath, revision: artifact.revision + 1, updatedAt: now,
+    }, JOB_KINDS.artifactMaterialize, now)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: artifact.revision + 1 }
   },
 })
@@ -427,6 +473,7 @@ export const createLink = mutation({
     if (note === null || note.deletedAt !== undefined) throw new Error('note not found')
     const now = Date.now(); const link = { ...args, revision: 0, createdAt: now, updatedAt: now }
     await ctx.db.insert('noteLinks', link)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, link }
   },
 })
@@ -448,6 +495,7 @@ export const tombstoneLink = mutation({
     if (link.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
     if (link.deletedAt !== undefined) return { ok: false as const, reason: 'invalid_state' as const }
     const now = Date.now(); await ctx.db.patch(link._id, { deletedAt: now, revision: link.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: link.revision + 1 }
   },
 })
@@ -462,6 +510,7 @@ export const completeMaterialization = mutation({
     if (artifact.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
     if (artifact.noteVersionId !== args.noteVersionId || artifact.projectedHash !== args.expectedPriorHash || artifact.deletedAt !== undefined) return { ok: false as const, reason: 'invalid_state' as const }
     await ctx.db.patch(artifact._id, { projectionState: 'projected', projectedHash: args.projectedHash, projectedPath: args.projectedPath, lastError: undefined, revision: artifact.revision + 1, updatedAt: Date.now() })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: artifact.revision + 1 }
   },
 })
@@ -475,6 +524,7 @@ export const failMaterialization = mutation({
     if (artifact.revision !== args.expectedRevision) return { ok: false as const, reason: 'stale_revision' as const }
     if (artifact.noteVersionId !== args.noteVersionId || artifact.deletedAt !== undefined) return { ok: false as const, reason: 'invalid_state' as const }
     await ctx.db.patch(artifact._id, { projectionState: 'failed', lastError: args.error, revision: artifact.revision + 1, updatedAt: Date.now() })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: artifact.revision + 1 }
   },
 })
@@ -489,6 +539,7 @@ export const tombstoneMaterialization = mutation({
     if (artifact.noteVersionId !== args.noteVersionId || artifact.projectedHash !== args.expectedProjectedHash) return { ok: false as const, reason: 'invalid_state' as const }
     const now = Date.now()
     await ctx.db.patch(artifact._id, { projectionState: 'tombstoned', deletedAt: now, revision: artifact.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: artifact.revision + 1 }
   },
 })
@@ -524,7 +575,8 @@ export const tombstone = mutation({
       updatedAt: now,
     })
     const artifacts = await ctx.db.query('artifacts').withIndex('by_installation_note', (q) => q.eq('installationId', args.installationId).eq('noteId', note.noteId)).collect()
-    for (const artifact of artifacts) if (artifact.deletedAt === undefined) await queueArtifactJob(ctx, artifact, artifact.noteVersionId, JOB_KINDS.artifactTombstone, now)
+    for (const artifact of artifacts) if (artifact.deletedAt === undefined) await queueArtifactJob(ctx, withoutSystemFields(artifact), JOB_KINDS.artifactTombstone, now)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: note.revision + 1 }
   },
 })

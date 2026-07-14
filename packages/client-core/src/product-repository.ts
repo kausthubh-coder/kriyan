@@ -1,10 +1,16 @@
 import type {
+  ArtifactItem,
   AppNoteItem,
   CalendarEventItem,
   CalendarEventLifecycle,
   CalendarRecurrenceMetadata,
   KnowledgeDocumentItem,
   KnowledgeKind,
+  MemoryCorrectionItem,
+  MemoryEntityDetailItem,
+  NoteHistoryItem,
+  NoteLinkItem,
+  NoteVersionItem,
   NotificationIntentItem,
   NotificationIntentLifecycle,
   ProjectionIndexState,
@@ -12,9 +18,12 @@ import type {
   ReminderDeliveryPolicy,
   ReminderItem,
   ReminderStatus,
+  ReversibleChangeItem,
+  SourceDetailItem,
   SourceKind,
   SourceRefItem,
   TaskItem,
+  TaskProvenanceDetailItem,
   TaskPriority,
   TaskStatus,
 } from './types'
@@ -330,6 +339,48 @@ export interface ProductKnowledgeRepository {
   put(input: PutKnowledgeDocumentInput): Promise<ProductMutationResult<KnowledgeDocumentItem>>
   update(input: UpdateKnowledgeDocumentInput): Promise<ProductMutationResult<KnowledgeDocumentItem>>
   tombstone(knowledgeDocumentId: string, expectedRevision: number): Promise<ProductMutationResult<KnowledgeDocumentItem>>
+}
+
+/** Downstream detail ports are framework-neutral and never expose generated Convex references. */
+export interface ProductNoteDetailRepository {
+  getHistory(noteId: string, limit?: number): Promise<NoteHistoryItem | null>
+  getVersion(noteVersionId: string): Promise<NoteVersionItem | null>
+  createLink(input: Omit<NoteLinkItem, 'revision' | 'createdAt' | 'updatedAt' | 'deletedAt'> & ProductCreateIdentity): Promise<ProductMutationResult<NoteLinkItem>>
+  tombstoneLink(noteLinkId: string, expectedRevision: number): Promise<ProductMutationResult<NoteLinkItem>>
+}
+
+export interface ProductArtifactRepository {
+  get(artifactId: string): Promise<ArtifactItem | null>
+  listByNote(noteId: string, includeDeleted?: boolean): Promise<ArtifactItem[]>
+  create(input: { artifactId: string; noteId: string; noteVersionId: string; slug: string }): Promise<ProductMutationResult<ArtifactItem>>
+  advance(input: { artifactId: string; expectedRevision: number; expectedProjectedHash?: string; noteVersionId: string; slug: string }): Promise<ProductMutationResult<ArtifactItem>>
+  tombstone(artifactId: string, expectedRevision: number): Promise<ProductMutationResult<ArtifactItem>>
+}
+
+export interface ProductSourceDetailRepository {
+  getDetail(sourceRefId: string, limits?: { excerpts?: number; extractions?: number; derivedChanges?: number }): Promise<SourceDetailItem | null>
+  listDerivedChanges(sourceRefId: string, limit?: number): Promise<ReversibleChangeItem[]>
+}
+
+export interface ProductMemoryRepository {
+  getEntity(entityId: string, limit?: number): Promise<MemoryEntityDetailItem | null>
+  createCorrection(input: Omit<MemoryCorrectionItem, 'state' | 'appliedRevision' | 'conflict' | 'createdAt' | 'updatedAt'>): Promise<ProductMutationResult<MemoryCorrectionItem>>
+  applyCorrection(correctionId: string, expectedRevision: number): Promise<ProductMutationResult<MemoryCorrectionItem>>
+  restoreCorrection(correctionId: string, expectedRevision: number): Promise<ProductMutationResult<MemoryCorrectionItem>>
+}
+
+export interface ProductTaskProvenanceRepository {
+  getDetail(taskId: string): Promise<TaskProvenanceDetailItem | null>
+  listChanges(taskId: string, limit?: number): Promise<ReversibleChangeItem[]>
+  revertChange(changeId: string, expectedRevision: number): Promise<ProductMutationResult<ReversibleChangeItem>>
+}
+
+export interface ProductDetailRepository {
+  readonly noteDetailsV1: ProductNoteDetailRepository
+  readonly artifactsV1: ProductArtifactRepository
+  readonly sourceDetailsV1: ProductSourceDetailRepository
+  readonly memoryV1: ProductMemoryRepository
+  readonly taskProvenanceV1: ProductTaskProvenanceRepository
 }
 
 export interface ProductRepository {

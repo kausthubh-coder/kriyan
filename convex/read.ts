@@ -13,6 +13,7 @@ import {
 } from './lib'
 import {
   activityValue,
+  clientSnapshotValue,
   jobStatus,
   jobValue,
   nodeValue,
@@ -220,10 +221,11 @@ export const runEvents = query({
 
 export const clientSnapshot = query({
   args: { installationId: v.string() },
-  returns: v.any(),
+  returns: clientSnapshotValue,
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
-    const [tasks, reminders, calendarEvents, notes, notificationIntents, sources, knowledge, nodes, commands, threads, messages, artifacts] = await Promise.all([
+    const [installation, tasks, reminders, calendarEvents, notes, notificationIntents, sources, knowledge, nodes, commands, threads, messages, artifacts] = await Promise.all([
+      ctx.db.query('installations').withIndex('by_installation_id', (q) => q.eq('installationId', args.installationId)).unique(),
       ctx.db.query('tasks').withIndex('by_installation_live_task', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
       ctx.db.query('reminders').withIndex('by_installation_live_reminder', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
       ctx.db.query('calendarEvents').withIndex('by_installation_live_start', (q) => q.eq('installationId', args.installationId).eq('deletedAt', undefined)).take(100),
@@ -242,12 +244,9 @@ export const clientSnapshot = query({
       const run = job === null || job.attempt === 0 ? null : await ctx.db.query('runs').withIndex('by_installation_job_attempt', (q) => q.eq('installationId', args.installationId).eq('jobId', job.jobId).eq('attempt', job.attempt)).unique()
       return { command: withoutSystemFields(command), job: job === null ? undefined : withoutSystemFields(job), run: run === null ? undefined : withoutSystemFields(run) }
     }))
-    const transactionRevision = Math.max(0, ...[
-      ...tasks, ...reminders, ...calendarEvents, ...notes, ...notificationIntents,
-      ...sources, ...knowledge, ...nodes, ...commands, ...threads, ...messages, ...artifacts,
-    ].map((item) => (item as { updatedAt?: number }).updatedAt ?? 0))
+    if (installation === null) throw new Error('installation not found')
     return {
-      transactionRevision,
+      transactionRevision: installation.snapshotRevision ?? 0,
       productivity: { tasks: tasks.map(withoutSystemFields), reminders: reminders.map(withoutSystemFields), calendarEvents: calendarEvents.map(withoutSystemFields), notes: notes.map(withoutSystemFields), notificationIntents: notificationIntents.map(withoutSystemFields) },
       agents: { threads: threads.map(withoutSystemFields), messages: messages.map(withoutSystemFields) },
       knowledge: { sources: sources.map(withoutSystemFields), documents: knowledge.map(withoutSystemFields), artifacts: artifacts.filter((item) => item.deletedAt === undefined).map(withoutSystemFields) },

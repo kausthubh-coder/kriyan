@@ -1,7 +1,8 @@
-import type { AgentTurnState, ProjectionState } from '@kriyan/contracts'
+import type { AgentTurnState } from '@kriyan/contracts'
 
 import type {
   ActivityItem,
+  ArtifactItem,
   AppNoteItem,
   CalendarEventItem,
   KnowledgeDocumentItem,
@@ -20,7 +21,7 @@ export interface AgentSnapshot {
 export interface KnowledgeSnapshot {
   sources: SourceRefItem[]
   documents: KnowledgeDocumentItem[]
-  artifacts: Array<{ artifactId: string; noteVersionId: string; projectionState: ProjectionState }>
+  artifacts: ArtifactItem[]
 }
 
 export interface ClientSnapshot {

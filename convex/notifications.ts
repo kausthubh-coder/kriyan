@@ -1,11 +1,9 @@
-import {
-  paginationOptsValidator,
-  paginationResultValidator,
-} from 'convex/server'
+import { paginationOptsValidator, paginationResultValidator } from 'convex/server'
 import { v } from 'convex/values'
 
 import { mutation, query, type MutationCtx } from './_generated/server'
 import {
+  advanceClientSnapshotRevision,
   assertBoundedString,
   assertError,
   assertExpectedRevision,
@@ -123,6 +121,7 @@ export const create = mutation({
       updatedAt: now,
     }
     await ctx.db.insert('notificationIntents', intent)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, intent }
   },
 })
@@ -219,6 +218,7 @@ export const markDispatched = mutation({
       revision: intent.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: intent.revision + 1 }
   },
 })
@@ -246,6 +246,7 @@ export const acknowledge = mutation({
       revision: intent.revision + 1,
       updatedAt: Date.now(),
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: intent.revision + 1 }
   },
 })
@@ -278,6 +279,7 @@ export const fail = mutation({
       revision: intent.revision + 1,
       updatedAt: Date.now(),
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: intent.revision + 1 }
   },
 })
@@ -314,6 +316,7 @@ export const requeue = mutation({
       revision: intent.revision + 1,
       updatedAt: Date.now(),
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: intent.revision + 1 }
   },
 })
@@ -345,6 +348,7 @@ export const cancel = mutation({
       revision: intent.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: intent.revision + 1 }
   },
 })

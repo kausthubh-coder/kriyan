@@ -2,13 +2,14 @@ import { v } from 'convex/values'
 import { REMINDER_CAPABILITY } from '@kriyan/contracts'
 
 import type { Doc } from './_generated/dataModel'
-import { mutation, type MutationCtx } from './_generated/server'
+import { internalMutation, mutation, type MutationCtx } from './_generated/server'
 import {
   fenceQueuedThreadJobs,
   finalizeAgentTurn,
   releaseAgentTurnForRetry,
-} from './agent-turns'
+} from './agent_turns'
 import {
+  advanceClientSnapshotRevision,
   assertCapabilities,
   assertError,
   assertEventData,
@@ -418,6 +419,7 @@ export const registerNode = mutation({
       updatedAt: now,
     }
     await ctx.db.insert('nodes', node)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, node }
   },
 })
@@ -451,11 +453,12 @@ export const heartbeatNode = mutation({
       updatedAt: now,
       revision: node.revision + 1,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: node.revision + 1 }
   },
 })
 
-export const revokeNode = mutation({
+export const revokeNode = internalMutation({
   args: {
     installationId: v.string(),
     nodeId: v.string(),
@@ -487,11 +490,12 @@ export const revokeNode = mutation({
       now,
       'node revoked',
     )
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: node.revision + 1, ...cleanup }
   },
 })
 
-export const continueNodeRevocationCleanup = mutation({
+export const continueNodeRevocationCleanup = internalMutation({
   args: {
     installationId: v.string(),
     nodeId: v.string(),
@@ -506,15 +510,17 @@ export const continueNodeRevocationCleanup = mutation({
     if (node.status !== 'revoked') {
       return { ok: false as const, reason: 'invalid_state' as const }
     }
+    const cleanup = await releaseOwnedWork(
+      ctx,
+      args.installationId,
+      args.nodeId,
+      Date.now(),
+      'node revoked',
+    )
+    if (cleanup.releasedWork > 0) await advanceClientSnapshotRevision(ctx, args.installationId)
     return {
       ok: true as const,
-      ...(await releaseOwnedWork(
-        ctx,
-        args.installationId,
-        args.nodeId,
-        Date.now(),
-        'node revoked',
-      )),
+      ...cleanup,
     }
   },
 })
@@ -599,11 +605,13 @@ export const claimJob = mutation({
     if (node === null) throw new Error('worker rejected: inactive_node')
     const compatible = candidates.filter((job) => nodeFailure(node, now, requiredCapabilities(job)) === null)
     if (candidates.length > 0 && compatible.length === 0) throw new Error('worker rejected: missing_capability')
+    let terminalized = false
     for (const job of compatible) {
       if (!await agentJobIsHeadOfLine(ctx, job, args.nodeId)) continue
       const reclaimed = job.status !== 'queued'
       if (job.attempt >= job.maxAttempts) {
         await terminalizeExhaustedJob(ctx, job, now, 'attempts exhausted')
+        terminalized = true
         continue
       }
       if (reclaimed) await closeActiveRun(ctx, job, now, 'lease reclaimed')
@@ -620,8 +628,10 @@ export const claimJob = mutation({
       }
       await activateAgentTurn(ctx, job, now)
       await ctx.db.patch(job._id, claimed)
+      await advanceClientSnapshotRevision(ctx, args.installationId)
       return { job: claimed, reclaimed }
     }
+    if (terminalized) await advanceClientSnapshotRevision(ctx, args.installationId)
     return null
   },
 })
@@ -665,6 +675,7 @@ export const renewLease = mutation({
       revision: job.revision + 1,
       updatedAt: now,
     })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: job.revision + 1 }
   },
 })
@@ -689,6 +700,8 @@ export const startRun = mutation({
       return { ok: false as const, reason: 'not_found' as const }
     const nodeFailure = await validateNode(ctx, args.installationId, args.nodeId, now, requiredCapabilities(job))
     if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
+    const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken)
+    if (failure !== null) return { ok: false as const, reason: failure }
     const existingRun = await ctx.db
       .query('runs')
       .withIndex('by_installation_job_attempt', (q) =>
@@ -715,8 +728,6 @@ export const startRun = mutation({
     }
     if (job.status !== 'leased')
       return { ok: false as const, reason: 'invalid_state' as const }
-    const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken)
-    if (failure !== null) return { ok: false as const, reason: failure }
     const runId = `run:${job.jobId}:${job.attempt}`
     assertId(runId, 'derived runId')
     const updatedJob = {
@@ -742,6 +753,7 @@ export const startRun = mutation({
     }
     await ctx.db.patch(job._id, updatedJob)
     await ctx.db.insert('runs', run)
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, created: true, job: updatedJob, run }
   },
 })
@@ -864,6 +876,7 @@ export const appendRunEvents = mutation({
     }))
     for (const event of events) await ctx.db.insert('runEvents', event)
     await ctx.db.patch(run._id, { revision: run.revision + events.length })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return {
       ok: true as const,
       duplicate: false,
@@ -976,6 +989,7 @@ async function finishRun(
     if (!outcome.retryable || job.attempt >= job.maxAttempts) await finalizeAgentTurn(ctx, job, 'failed', now)
     else await releaseAgentTurnForRetry(ctx, job, now)
   }
+  await advanceClientSnapshotRevision(ctx, args.installationId)
   return { ok: true as const, revision: job.revision + 1 }
 }
 
@@ -1002,8 +1016,6 @@ export const completeRun = mutation({
     return await finishRun(ctx, args, { status: 'succeeded' })
   },
 })
-
-export const finalizeAssistantRun = completeRun
 
 export const failRun = mutation({
   args: {
@@ -1045,12 +1057,13 @@ export const checkpointEffect = mutation({
     if (job.status !== 'running') return { ok: false as const, reason: 'invalid_state' as const }
     const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken); if (failure !== null) return { ok: false as const, reason: failure }
     await ctx.db.patch(job._id, { effectCheckpoint: args.checkpoint, revision: job.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: job.revision + 1 }
   },
 })
 
 export const checkpointSession = mutation({
-  args: { installationId: v.string(), jobId: v.string(), nodeId: v.string(), expectedJobRevision: v.number(), expectedLeaseToken: v.optional(v.string()), piSessionRef: v.string() },
+  args: { installationId: v.string(), jobId: v.string(), nodeId: v.string(), expectedJobRevision: v.number(), expectedLeaseToken: v.optional(v.string()), expectedSessionRevision: v.optional(v.number()), piSessionRef: v.string() },
   returns: transitionResult,
   handler: async (ctx, args) => {
     assertShortText(args.piSessionRef, 'piSessionRef')
@@ -1058,13 +1071,20 @@ export const checkpointSession = mutation({
     const now = Date.now(); const job = await getJob(ctx, args.installationId, args.jobId)
     if (job === null) return { ok: false as const, reason: 'not_found' as const }
     if (job.revision !== args.expectedJobRevision) return { ok: false as const, reason: 'stale_revision' as const }
+    if (job.status !== 'running') return { ok: false as const, reason: 'invalid_state' as const }
+    const nodeFailure = await validateNode(ctx, args.installationId, args.nodeId, now, requiredCapabilities(job)); if (nodeFailure !== null) return { ok: false as const, reason: nodeFailure }
     const failure = leaseFailure(job, args.nodeId, now, args.expectedLeaseToken); if (failure !== null) return { ok: false as const, reason: failure }
     if (job.threadId === undefined) return { ok: false as const, reason: 'invalid_state' as const }
     const thread = await ctx.db.query('agentThreads').withIndex('by_installation_thread', (q) => q.eq('installationId', args.installationId).eq('threadId', job.threadId!)).unique()
     if (thread === null) return { ok: false as const, reason: 'not_found' as const }
+    const expectedSessionRevision = args.expectedSessionRevision ?? job.sessionRevision ?? thread.sessionRevision
+    if (thread.sessionRevision !== expectedSessionRevision) return { ok: false as const, reason: 'stale_revision' as const }
+    if (thread.piSessionRef === args.piSessionRef && job.sessionCheckpoint === args.piSessionRef && job.sessionRevision === thread.sessionRevision) return { ok: true as const, revision: job.revision }
+    const sessionRevision = thread.sessionRevision + 1
     await ctx.db.patch(thread._id, { piSessionRef: args.piSessionRef, preferredNodeId: args.nodeId, sessionRevision: thread.sessionRevision + 1, updatedAt: now })
-    await fenceQueuedThreadJobs(ctx, args.installationId, job.threadId, args.nodeId, now)
-    await ctx.db.patch(job._id, { sessionCheckpoint: args.piSessionRef, revision: job.revision + 1, updatedAt: now })
+    await fenceQueuedThreadJobs(ctx, args.installationId, job.threadId, args.nodeId, args.piSessionRef, sessionRevision, now)
+    await ctx.db.patch(job._id, { sessionCheckpoint: args.piSessionRef, sessionRevision, revision: job.revision + 1, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
     return { ok: true as const, revision: job.revision + 1 }
   },
 })
