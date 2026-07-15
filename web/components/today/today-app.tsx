@@ -99,7 +99,7 @@ function LiveTodayApp({ initialSection, configuration, displayName }: { initialS
     () => applyReactiveDisplayAuthority(runtime.repository, snapshot),
     [runtime.repository, snapshot],
   )
-  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode={snapshot.connection} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} displayName={displayName} demoMode={false} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
+  return <RepositoryTodayApp initialSection={initialSection} repository={repository} connectionMode={runtime.connectionMode} connectionRecoveryRequired={runtime.connectionRecoveryRequired} onRecreate={convexClient.recreate} installationId={configuration.installationId} displayName={displayName} demoMode={false} selectedRunId={selectedRunId} setSelectedRunId={setSelectedRunId} />
 }
 
 export function applyReactiveDisplayAuthority(
