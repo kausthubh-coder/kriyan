@@ -43,6 +43,7 @@ export function NoteEditor({
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>(
     'idle',
   )
+  const [validationMessage, setValidationMessage] = useState('')
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -65,12 +66,19 @@ export function NoteEditor({
     onUpdate: () => {
       setDirty(true)
       setSaveState('idle')
+      setValidationMessage('')
     },
   })
 
   async function save(): Promise<void> {
     if (!editor) return
     const plainTextPreview = editor.getText().trim().slice(0, 4096)
+    if (!title.trim() && !plainTextPreview) {
+      setValidationMessage('Add a title or some note content before saving.')
+      setSaveState('failed')
+      return
+    }
+    setValidationMessage('')
     const ok = await onSave({
       title: title.trim() || undefined,
       contentJson: JSON.stringify(editor.getJSON()),
@@ -96,6 +104,7 @@ export function NoteEditor({
     update()
     setDirty(true)
     setSaveState('idle')
+    setValidationMessage('')
   }
 
   return (
@@ -121,6 +130,7 @@ export function NoteEditor({
           }
           placeholder="Untitled note"
           aria-label="Note title"
+          aria-invalid={validationMessage ? true : undefined}
         />
         <span
           className={styles.saveState}
@@ -240,6 +250,11 @@ export function NoteEditor({
         </button>
       </div>
       <EditorContent editor={editor} />
+      {validationMessage && (
+        <p className={styles.validation} role="alert">
+          {validationMessage}
+        </p>
+      )}
       <div className="note-meta-grid">
         <label>
           <span>Tags</span>

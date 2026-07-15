@@ -10,8 +10,13 @@ import {
   type ProductMutationResult,
 } from '@kriyan/client-core'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import {
+  persistDemoArtifact,
+  persistDemoNote,
+  restoreDemoKnowledge,
+} from '@/components/knowledge/demo-knowledge-persistence'
 import type { WebRepository } from '@/src/client-core/web-repository'
 
 import { NoteEditor } from './note-editor'
@@ -30,8 +35,14 @@ function mutationResult(result: ProductMutationResult<unknown>): ActionResult {
       }
 }
 
+function versionTimestamp(createdAt: number): string {
+  return Number.isFinite(createdAt) && createdAt >= Date.UTC(2000, 0, 1)
+    ? new Date(createdAt).toLocaleString()
+    : 'Timestamp unavailable'
+}
+
 function versionLabel(version: NoteVersionItem): string {
-  return `v${version.version} · ${version.authorOrigin} · ${new Date(version.createdAt).toLocaleString()}`
+  return `v${version.version} · ${version.authorOrigin} · ${versionTimestamp(version.createdAt)}`
 }
 
 export function NotesWorkspace({
@@ -54,10 +65,19 @@ export function NotesWorkspace({
   const [slug, setSlug] = useState('')
   const [inspectedVersion, setInspectedVersion] =
     useState<NoteVersionItem | null>(null)
+  const restoredDemo = useRef(false)
   const selectedId = selected && selected !== 'new' ? selected.noteId : null
   const noteKey = repository.notes
     .map((note) => `${note.noteId}:${note.revision}`)
     .join('|')
+
+  useEffect(() => {
+    if (repository.loading || restoredDemo.current) return
+    restoredDemo.current = true
+    void restoreDemoKnowledge(repository)
+    // The repository adapter changes identity as snapshots arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repository.loading])
 
   useEffect(() => {
     if (!selectedId) return
@@ -199,17 +219,17 @@ export function NotesWorkspace({
                     'Note created with an immutable committed version.',
                   )
                   if (result.ok) {
+                    persistDemoNote(repository, result.value.noteId, draft)
                     setSelected(result.value)
                     setRefresh((value) => value + 1)
                   }
                   return result.ok
                 }
-                const result = await repository.updateNote(
-                  currentNote ?? selected,
-                  draft,
-                )
+                const noteToUpdate = currentNote ?? selected
+                const result = await repository.updateNote(noteToUpdate, draft)
                 onResult(result, 'Note saved as a new immutable version.')
                 if (result.ok) {
+                  persistDemoNote(repository, noteToUpdate.noteId, draft)
                   setRefresh((value) => value + 1)
                 }
                 return result.ok
@@ -284,7 +304,7 @@ export function NotesWorkspace({
                                   {version.contentHash.slice(0, 12)}
                                 </span>
                                 <span>
-                                  {new Date(version.createdAt).toLocaleString()}
+                                  {versionTimestamp(version.createdAt)}
                                 </span>
                               </span>
                             </span>
@@ -495,6 +515,11 @@ export function NotesWorkspace({
                             : undefined,
                         )
                         if (result.ok) {
+                          persistDemoArtifact(
+                            repository,
+                            currentNote,
+                            result.value,
+                          )
                           setSlug('')
                           setRefresh((value) => value + 1)
                         }

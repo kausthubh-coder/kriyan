@@ -47,6 +47,12 @@
   font-size: 0.65rem;
 }
 
+.validation {
+  color: var(--danger, #a33a32);
+  font-size: 0.8125rem;
+  margin: 0.25rem 0 0;
+}
+
 @media (max-width: 720px) {
   .heading {
     align-items: flex-start;

@@ -10,7 +10,7 @@ import {
   type SourceDetailItem,
 } from '@kriyan/client-core'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useConvexClientControls } from '@/lib/convex'
 import {
@@ -20,8 +20,9 @@ import {
 import { useDemoRepository } from '@/src/client-core/demo-repository'
 import { useLiveWebRepository } from '@/src/client-core/live-web-repository'
 import type { WebRepository } from '@/src/client-core/web-repository'
-
 import styles from '@/components/productivity/productivity.module.css'
+
+import { restoreDemoKnowledge } from './demo-knowledge-persistence'
 
 export type KnowledgeRouteView =
   | { kind: 'today' }
@@ -51,6 +52,12 @@ function Status({ children }: { children: string }) {
       {children.replaceAll('-', ' ')}
     </span>
   )
+}
+
+function historicalTimestamp(value: number): string {
+  return Number.isFinite(value) && value >= Date.UTC(2000, 0, 1)
+    ? new Date(value).toLocaleString()
+    : 'Timestamp unavailable'
 }
 
 function Loading({ label = 'Loading current data' }: { label?: string }) {
@@ -112,6 +119,24 @@ export function KnowledgeRoute({ view }: { view: KnowledgeRouteView }) {
 
 function DemoKnowledgeRoute({ view }: { view: KnowledgeRouteView }) {
   const repository = useDemoRepository(null)
+  const [restored, setRestored] = useState(false)
+  const restorePromise = useRef<Promise<void> | null>(null)
+
+  useEffect(() => {
+    if (repository.loading) return
+    restorePromise.current ??= restoreDemoKnowledge(repository)
+    void restorePromise.current.finally(() => setRestored(true))
+    // Restore the browser-only demo after its deterministic seed is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repository.loading])
+
+  if (!restored) {
+    return (
+      <main className={styles.page}>
+        <Loading label="Restoring demo knowledge" />
+      </main>
+    )
+  }
   return (
     <RouteSurface
       view={view}
@@ -670,7 +695,7 @@ function ArtifactDetail({
                   </div>
                   <div className={styles.metadata}>
                     <span>revision {entry.revision}</span>
-                    <span>{new Date(entry.occurredAt).toLocaleString()}</span>
+                    <span>{historicalTimestamp(entry.occurredAt)}</span>
                     <span>{entry.noteVersionId}</span>
                   </div>
                   {entry.error && <p>{entry.error}</p>}

@@ -1,4 +1,5 @@
 import { KnowledgeRoute } from '@/components/knowledge/knowledge-route'
+import { decodeRouteId } from '@/components/knowledge/route-id'
 
 export default async function EntityDetailPage({
   params,
@@ -6,5 +7,7 @@ export default async function EntityDetailPage({
   params: Promise<{ entityId: string }>
 }) {
   const { entityId } = await params
-  return <KnowledgeRoute view={{ kind: 'entity', id: entityId }} />
+  return (
+    <KnowledgeRoute view={{ kind: 'entity', id: decodeRouteId(entityId) }} />
+  )
 }
