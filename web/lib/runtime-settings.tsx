@@ -92,9 +92,14 @@ function settingsSnapshot(): string {
   return window.localStorage.getItem(KRIYAN_SETTINGS_STORAGE_KEY) ?? ''
 }
 
+function subscribeHydration(listener: () => void): () => void {
+  queueMicrotask(listener)
+  return () => undefined
+}
+
 export function RuntimeSettingsProvider({ children }: { children: ReactNode }) {
   const serialized = useSyncExternalStore(subscribeSettings, settingsSnapshot, () => '')
-  const hydrated = useSyncExternalStore(subscribeSettings, () => true, () => false)
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false)
   const settings = useMemo(
     () => serialized
       ? readStoredRuntimeSettings({ getItem: () => serialized }) ?? BUILD_RUNTIME_SETTINGS

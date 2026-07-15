@@ -1,6 +1,6 @@
 .page {
   min-height: 100dvh;
-  padding: 0 0 3rem;
+  padding: 0 0 1.25rem;
   background: var(--canvas);
   color: var(--ink);
 }
@@ -62,7 +62,7 @@
 }
 
 .productHeader {
-  min-height: 64px;
+  min-height: 58px;
   padding: 0 1.25rem;
   display: flex;
   align-items: center;
@@ -179,7 +179,7 @@
 .workspaceIntro {
   width: min(1460px, calc(100% - 2.5rem));
   margin: 0 auto;
-  padding: 2.2rem 0 1.2rem;
+  padding: 1.35rem 0 0.85rem;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -195,7 +195,7 @@
 
 .workspaceIntro h1 {
   margin: 0;
-  font-size: 1.85rem;
+  font-size: clamp(1.45rem, 2vw, 1.75rem);
   line-height: 1.15;
   letter-spacing: -0.035em;
   text-wrap: balance;
@@ -206,7 +206,7 @@
   max-width: 68ch;
   margin-top: 0.45rem;
   color: var(--ink-soft);
-  font-size: 0.83rem;
+  font-size: 0.78rem;
   line-height: 1.5;
 }
 
@@ -315,15 +315,76 @@
 
 .demoDisclosure,
 .notice,
+.nodeHealth,
 .inlineForm,
 .agentDetails,
 .mobileTabs,
 .workspaceGrid,
 .skeletonGrid,
-.fullState {
+.fullState,
+.firstAgentState {
   width: min(1460px, calc(100% - 2.5rem));
   margin-right: auto;
   margin-left: auto;
+}
+
+.nodeHealth {
+  min-height: 58px;
+  margin-top: 0.65rem;
+  padding: 0.62rem 0.75rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(220px, 0.7fr);
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.nodeHealthIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.nodeHealthCopy {
+  min-width: 0;
+  display: grid;
+  gap: 0.14rem;
+}
+
+.nodeHealthCopy > div {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.nodeHealthCopy strong {
+  overflow: hidden;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeHealthCopy > span,
+.nodeHealth > p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+.nodeHealth > p {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--line);
+}
+
+.nodeHealth > p strong {
+  color: var(--ink-soft);
 }
 
 .demoDisclosure {
@@ -534,11 +595,12 @@
 }
 
 .workspaceGrid {
-  min-height: 670px;
-  max-height: calc(100dvh - 230px);
+  height: clamp(590px, calc(100dvh - 360px), 760px);
+  min-height: 590px;
+  max-height: none;
   margin-top: 0.65rem;
   display: grid;
-  grid-template-columns: 270px minmax(400px, 1fr) 340px;
+  grid-template-columns: 250px minmax(390px, 1fr) 320px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -634,7 +696,7 @@
 
 .threadSelect {
   width: 100%;
-  min-height: 100px;
+  min-height: 92px;
   padding: 0.72rem 2rem 0.72rem 0.55rem;
   display: flex;
   flex-direction: column;
@@ -828,7 +890,7 @@
 }
 
 .message {
-  max-width: 720px;
+  max-width: 760px;
   padding: 0.8rem 0;
   border-bottom: 1px solid var(--line);
 }
@@ -1272,6 +1334,104 @@
   background: var(--surface);
 }
 
+.firstAgentState {
+  min-height: 520px;
+  margin-top: 0.65rem;
+  padding: clamp(1.25rem, 4vw, 3.25rem);
+  display: grid;
+  grid-template-columns: minmax(240px, 0.75fr) minmax(320px, 1.1fr);
+  align-items: center;
+  gap: clamp(2rem, 7vw, 6rem);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.firstAgentIntro > span {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.firstAgentIntro > span svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.firstAgentIntro > p:first-of-type {
+  margin: 0 0 0.35rem;
+  color: var(--primary);
+  font-size: 0.69rem;
+  font-weight: 680;
+}
+
+.firstAgentIntro h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: -0.03em;
+}
+
+.firstAgentIntro > p:last-child {
+  max-width: 46ch;
+  margin: 0.65rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.firstAgentState form {
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-raised);
+}
+
+.firstAgentState label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.firstAgentState label > span {
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.firstAgentState input,
+.firstAgentState textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.firstAgentState textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.firstAgentState input:focus,
+.firstAgentState textarea:focus {
+  border-color: var(--primary);
+}
+
+.firstAgentState .primaryButton {
+  justify-self: start;
+}
+
 .fullState > svg {
   width: 1.8rem;
   height: 1.8rem;
@@ -1360,13 +1520,23 @@
   .workspaceIntro,
   .demoDisclosure,
   .notice,
+  .nodeHealth,
   .inlineForm,
   .agentDetails,
   .mobileTabs,
   .workspaceGrid,
   .skeletonGrid,
-  .fullState {
+  .fullState,
+  .firstAgentState {
     width: calc(100% - 1rem);
+  }
+
+  .nodeHealth {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .nodeHealth > p {
+    display: none;
   }
 
   .workspaceIntro {
@@ -1450,6 +1620,13 @@
     margin-top: 0.45rem;
     display: block;
     overflow: visible;
+  }
+
+  .firstAgentState {
+    min-height: 0;
+    padding: 1.25rem;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
 
   .workspaceGrid > .threadPane,

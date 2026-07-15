@@ -26,6 +26,7 @@ import type {
   AgentWorkspacePortErrorCode,
   AgentWorkspacePortResult,
   AgentWorkspaceSnapshot,
+  CreateAgentInput,
   CreateAgentThreadInput,
   ReviseAgentInput,
   SubmitAgentMessageInput,
@@ -397,6 +398,7 @@ function mapWorkspace(
 
 interface LiveOperations {
   refresh(): Promise<AgentWorkspacePortResult>
+  createAgent(input: CreateAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>>
   createThread(input: CreateAgentThreadInput): Promise<AgentWorkspacePortResult<AgentThreadView>>
   renameThread(threadId: string, title: string): Promise<AgentWorkspacePortResult<AgentThreadView>>
   reviseAgent(input: ReviseAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>>
@@ -408,6 +410,7 @@ interface LiveOperations {
 
 const UNAVAILABLE_OPERATIONS: LiveOperations = {
   refresh: async () => failure('offline', 'The live adapter is still loading.'),
+  createAgent: async () => failure('offline', 'The live adapter is still loading.'),
   createThread: async () => failure('offline', 'The live adapter is still loading.'),
   renameThread: async () => failure('offline', 'The live adapter is still loading.'),
   reviseAgent: async () => failure('offline', 'The live adapter is still loading.'),
@@ -433,6 +436,7 @@ class ReactiveAgentWorkspacePort implements AgentWorkspacePort {
     for (const listener of [...this.listeners]) listener()
   }
   refresh = (): Promise<AgentWorkspacePortResult> => this.operations.refresh()
+  createAgent = (input: CreateAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>> => this.operations.createAgent(input)
   createThread = (input: CreateAgentThreadInput): Promise<AgentWorkspacePortResult<AgentThreadView>> => this.operations.createThread(input)
   renameThread = (threadId: string, title: string): Promise<AgentWorkspacePortResult<AgentThreadView>> => this.operations.renameThread(threadId, title)
   reviseAgent = (input: ReviseAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>> => this.operations.reviseAgent(input)
@@ -478,6 +482,7 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
     return () => window.clearTimeout(timeout)
   }, [clock, heartbeatTimestamps])
 
+  const createAgentMutation = useMutation(api.agents.create)
   const createThreadMutation = useMutation(api.agents.createThread)
   const renameThreadMutation = useMutation(api.agents.renameThread)
   const reviseAgentMutation = useMutation(api.agents.revise)
@@ -495,6 +500,40 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
     refresh: async () => {
       controls.recreate()
       return success(undefined)
+    },
+    createAgent: async (input) => {
+      const displayName = input.displayName.trim()
+      const systemPrompt = input.systemPromptSummary.trim()
+      if (!displayName || !systemPrompt) return failure('invalid_input', 'Name and instructions are required.')
+      const agentId = createClientId('agent')
+      const agentRevisionId = createClientId('agent-revision')
+      const toolCapabilities = [...new Set(input.toolCapabilities.map((item) => item.trim()).filter(Boolean))]
+      try {
+        const result = await createAgentMutation({
+          installationId,
+          agentId,
+          agentRevisionId,
+          displayName,
+          systemPrompt,
+          toolCapabilities,
+        })
+        return success({
+          agentId: result.agent.agentId,
+          displayName: result.agent.displayName,
+          currentRevisionId: result.agent.currentRevisionId,
+          revision: result.agent.revision,
+          revisions: [{
+            revisionId: result.revision.agentRevisionId,
+            ordinal: result.revision.ordinal,
+            displayName: result.revision.displayName,
+            systemPromptSummary: result.revision.systemPrompt,
+            toolCapabilities: result.revision.toolCapabilities,
+            createdAt: result.revision.createdAt,
+          }],
+        })
+      } catch (error) {
+        return exceptionFailure(error, online)
+      }
     },
     createThread: async (input) => {
       const title = input.title.trim()
@@ -670,6 +709,7 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
   }), [
     cancelMutation,
     controls,
+    createAgentMutation,
     createThreadMutation,
     installationId,
     mapped,

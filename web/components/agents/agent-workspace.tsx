@@ -106,6 +106,69 @@ function WorkspaceSkeleton() {
   </div>
 }
 
+function NodeHealthBar({
+  node,
+  nodes,
+  connection,
+}: {
+  node?: AgentNodeView
+  nodes: AgentNodeView[]
+  connection: 'online' | 'reconnecting' | 'offline'
+}) {
+  const activeNode = node ?? nodes.find((item) => item.state === 'online') ?? nodes[0]
+  const onlineCount = nodes.filter((item) => item.state === 'online').length
+  return <section className={styles.nodeHealth} aria-label="Agent runtime status">
+    <span className={styles.nodeHealthIcon}><Icon name="node" /></span>
+    <div className={styles.nodeHealthCopy}>
+      <div>
+        <strong>{activeNode?.displayName ?? 'No agent node connected'}</strong>
+        <StatusBadge state={activeNode?.state ?? connection} />
+      </div>
+      <span>{activeNode
+        ? `${onlineCount} online · heartbeat ${formatRelativeTime(activeNode.lastSeenAt)} · ${activeNode.capabilities.length} capabilities`
+        : 'Pair a desktop or VPS runtime to claim durable work from Convex.'}</span>
+    </div>
+    <p><strong>Chat is intent.</strong> The run timeline is proof of what the node actually did.</p>
+  </section>
+}
+
+function FirstAgentSetup({
+  busy,
+  mode,
+  onCreate,
+}: {
+  busy: boolean
+  mode: 'demo' | 'live'
+  onCreate: (displayName: string, summary: string, capabilities: string[]) => Promise<boolean>
+}) {
+  const [displayName, setDisplayName] = useState('Kriyan')
+  const [summary, setSummary] = useState('Coordinate my work, use durable tools carefully, and leave clear outcomes.')
+  const [capabilities, setCapabilities] = useState('agent.chat.v1, task.write, reminder.write, note.read, source.search')
+  return <section className={styles.firstAgentState} aria-labelledby="first-agent-title">
+    <div className={styles.firstAgentIntro}>
+      <span><Icon name="agent" /></span>
+      <p>{mode === 'live' ? 'Connected workspace' : 'Preview setup'}</p>
+      <h2 id="first-agent-title">Create your first agent</h2>
+      <p>An agent definition is versioned in Convex. Threads pin the revision they started with, so later edits do not silently rewrite old work.</p>
+    </div>
+    <form onSubmit={async (event) => {
+      event.preventDefault()
+      await onCreate(
+        displayName,
+        summary,
+        capabilities.split(',').map((item) => item.trim()).filter(Boolean),
+      )
+    }}>
+      <label><span>Name</span><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required /></label>
+      <label><span>What should it do?</span><textarea value={summary} onChange={(event) => setSummary(event.target.value)} rows={3} required /></label>
+      <label><span>Tool capabilities</span><input value={capabilities} onChange={(event) => setCapabilities(event.target.value)} /></label>
+      <button className={styles.primaryButton} disabled={busy || !displayName.trim() || !summary.trim()}>
+        {busy ? <><span className={styles.spinner} />Creating</> : <><Icon name="plus" />Create agent</>}
+      </button>
+    </form>
+  </section>
+}
+
 function ThreadStatusLine({ thread, node }: { thread: AgentThreadView; node?: AgentNodeView }) {
   if (thread.sessionState === 'waiting_for_node') {
     return <span><Icon name="clock" />Waiting for {node?.displayName ?? 'session node'}</span>
@@ -435,6 +498,7 @@ export function AgentWorkspace({ port }: { port: AgentWorkspacePort }): ReactNod
       .sort((left, right) => right.updatedAt - left.updatedAt)[0]
   }, [selectedThread, snapshot.runs])
   const selectedNode = snapshot.nodes.find((node) => node.nodeId === (selectedRun?.nodeId ?? selectedThread?.preferredNodeId))
+  const visibleNode = selectedNode ?? snapshot.nodes.find((node) => node.state === 'online') ?? snapshot.nodes[0]
   const messages = snapshot.messages.filter((message) => message.threadId === effectiveThreadId)
   const notice = localNotice ?? snapshot.operationNotice
 
@@ -483,6 +547,12 @@ export function AgentWorkspace({ port }: { port: AgentWorkspacePort }): ReactNod
     if (result.ok) setDraft('')
   }
 
+  const createAgent = async (displayName: string, systemPromptSummary: string, toolCapabilities: string[]): Promise<boolean> => {
+    const result = await runAction('create-agent', () => port.createAgent({ displayName, systemPromptSummary, toolCapabilities }), 'Agent created. Start its first durable conversation.')
+    if (result.ok) setSelectedAgentId(result.value.agentId)
+    return result.ok
+  }
+
   const demoPort = snapshot.mode === 'demo' ? port as DemoAgentWorkspacePort : undefined
   const revisionOrdinal = selectedAgent?.revisions.find((revision) => revision.revisionId === selectedRun?.agentRevisionId)?.ordinal
 
@@ -507,7 +577,7 @@ export function AgentWorkspace({ port }: { port: AgentWorkspacePort }): ReactNod
     </header>
 
     <div className={styles.workspaceIntro}>
-      <div><p>Do the work</p><h1>Agent workspace</h1><span>Choose an agent, keep each conversation durable, and inspect what the runtime actually did.</span></div>
+      <div><p>Agents</p><h1>Delegate work. Keep the proof.</h1><span>Every conversation is durable, every run has visible state, and your node stays behind Convex.</span></div>
       <div className={styles.agentChooser}>
         <label><span>Agent for new threads</span><select value={effectiveAgentId ?? ''} onChange={(event) => setSelectedAgentId(event.target.value)} disabled={snapshot.agents.length === 0}>{snapshot.agents.map((agent) => <option key={agent.agentId} value={agent.agentId}>{agent.displayName} · r{agent.revision}</option>)}</select></label>
         <button className={styles.primaryButton} type="button" onClick={() => setNewThreadOpen(true)} disabled={snapshot.agents.length === 0}><Icon name="plus" />New thread</button>
@@ -517,6 +587,8 @@ export function AgentWorkspace({ port }: { port: AgentWorkspacePort }): ReactNod
     {snapshot.mode === 'demo' && <div className={styles.demoDisclosure}><strong>Deterministic preview</strong><span>This route demonstrates the integration contract. It does not contact Convex or a node until the integration owner supplies the live port.</span></div>}
     {snapshot.coverageNotice && <div className={styles.coverageDisclosure} role="status"><Icon name="history" /><div><strong>Bounded history</strong><span>{snapshot.coverageNotice}</span></div></div>}
     {notice && <ResultNotice result={notice} />}
+
+    <NodeHealthBar node={visibleNode} nodes={snapshot.nodes} connection={snapshot.connection} />
 
     {newThreadOpen && <form className={styles.inlineForm} onSubmit={createThread}>
       <label><span>Thread title</span><input autoFocus value={newThreadTitle} onChange={(event) => setNewThreadTitle(event.target.value)} placeholder="What outcome will this conversation own?" required /></label>
@@ -546,9 +618,11 @@ export function AgentWorkspace({ port }: { port: AgentWorkspacePort }): ReactNod
 
     {snapshot.loadState === 'loading' ? <WorkspaceSkeleton /> : snapshot.loadState === 'error' ? <div className={styles.fullState}>
       <Icon name="warning" /><h2>Agent workspace did not load</h2><p>{snapshot.operationNotice?.message ?? 'The current subscription snapshot is unavailable.'}</p><button className={styles.primaryButton} type="button" onClick={() => void runAction('refresh', () => port.refresh())} disabled={busyAction === 'refresh'}><Icon name="retry" />Retry</button>
-    </div> : snapshot.loadState === 'empty' ? <div className={styles.fullState}>
-      <Icon name="agent" /><h2>No agent definitions yet</h2><p>Add the first immutable agent revision through the live adapter, then start a durable thread. This empty state intentionally does not invent an agent.</p>
-    </div> : <div className={styles.workspaceGrid} data-mobile-panel={mobilePanel}>
+    </div> : snapshot.loadState === 'empty' ? <FirstAgentSetup
+      busy={busyAction === 'create-agent'}
+      mode={snapshot.mode}
+      onCreate={createAgent}
+    /> : <div className={styles.workspaceGrid} data-mobile-panel={mobilePanel}>
       <ThreadPane
         threads={snapshot.threads}
         nodes={snapshot.nodes}

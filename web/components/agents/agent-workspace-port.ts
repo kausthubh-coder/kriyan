@@ -152,6 +152,12 @@ export interface CreateAgentThreadInput {
   preferredNodeId?: string
 }
 
+export interface CreateAgentInput {
+  displayName: string
+  systemPromptSummary: string
+  toolCapabilities: string[]
+}
+
 export interface ReviseAgentInput {
   agentId: string
   displayName: string
@@ -174,6 +180,7 @@ export interface AgentWorkspacePort {
   getSnapshot(): AgentWorkspaceSnapshot
   subscribe(listener: () => void): () => void
   refresh(): Promise<AgentWorkspacePortResult>
+  createAgent(input: CreateAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>>
   createThread(input: CreateAgentThreadInput): Promise<AgentWorkspacePortResult<AgentThreadView>>
   renameThread(threadId: string, title: string): Promise<AgentWorkspacePortResult<AgentThreadView>>
   reviseAgent(input: ReviseAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>>
