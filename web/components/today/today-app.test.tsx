@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import type { ClientSnapshot, TaskItem } from '@kriyan/client-core'
 import type { ConvexReactClient } from 'convex/react'
-import { act, useState, useSyncExternalStore } from 'react'
+import { act, StrictMode, useState, useSyncExternalStore } from 'react'
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup, renderToString } from 'react-dom/server'
 import { Window } from 'happy-dom'
@@ -138,7 +138,7 @@ describe('Today presentational components', () => {
     expect(container.textContent).toContain('connecting')
   })
 
-  test('manual recreation preserves local state and disposes each replaced client generation', async () => {
+  test('Strict Mode preserves the active client and disposes replaced and unmounted generations once', async () => {
     const browser = new Window({ url: 'http://localhost/' })
     Object.assign(globalThis, {
       window: browser,
@@ -160,25 +160,31 @@ describe('Today presentational components', () => {
     await act(async () => {
       hydratedRoot = createRoot(container as unknown as Element)
       hydratedRoot.render(
-        <ConfiguredProvider
-          configuration={{ convexUrl: 'https://example.convex.cloud', installationId: 'installation:test' }}
-          createClient={createClient}
-        >
-          <PreservedStateHarness />
-        </ConfiguredProvider>,
+        <StrictMode>
+          <ConfiguredProvider
+            configuration={{ convexUrl: 'https://example.convex.cloud', installationId: 'installation:test' }}
+            createClient={createClient}
+          >
+            <PreservedStateHarness />
+          </ConfiguredProvider>
+        </StrictMode>,
       )
     })
+    expect(clients).toHaveLength(2)
+    expect(clients[0]?.closeCalls).toBe(1)
+    expect(clients[1]?.closeCalls).toBe(0)
     await act(async () => {
       ;(container.querySelector('[data-mutate]') as unknown as HTMLButtonElement | null)?.click()
       ;(container.querySelector('[data-recreate]') as unknown as HTMLButtonElement | null)?.click()
     })
     expect(container.textContent).toContain('draft survives|command:retained|stale row|optimistic task|pending mutation|generation 1')
-    expect(clients).toHaveLength(2)
+    expect(clients).toHaveLength(3)
     expect(clients[0]?.closeCalls).toBe(1)
-    expect(clients[1]?.closeCalls).toBe(0)
+    expect(clients[1]?.closeCalls).toBe(1)
+    expect(clients[2]?.closeCalls).toBe(0)
     await act(async () => hydratedRoot?.unmount())
     hydratedRoot = null
-    expect(clients[1]?.closeCalls).toBe(1)
+    expect(clients.map((client) => client.closeCalls)).toEqual([1, 1, 1])
   })
 })
 

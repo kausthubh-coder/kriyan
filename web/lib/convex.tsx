@@ -70,33 +70,59 @@ export function ConfiguredProvider({
   configuration: KriyanWebConfiguration
   createClient?: ConvexClientFactory
 }) {
-  const [clientState, setClientState] = useState(() => ({
-    client: createClient(configuration.convexUrl),
+  const [clientState, setClientState] = useState<{
+    client: ConvexReactClient | null
+    generation: number
+  }>({
+    client: null,
     generation: 0,
-  }))
-  const activeClient = useRef(clientState.client)
+  })
+  const activeClient = useRef<ConvexReactClient | null>(null)
+  const closedClients = useRef(new WeakSet<ConvexReactClient>())
+  const lifecycleGeneration = useRef(0)
+  const closeClient = useCallback((client: ConvexReactClient | null): void => {
+    if (client === null || closedClients.current.has(client)) return
+    closedClients.current.add(client)
+    void client.close()
+  }, [])
   const recreate = useCallback((): void => {
+    const client = createClient(configuration.convexUrl)
     setClientState((current) => ({
-      client: createClient(configuration.convexUrl),
+      client,
       generation: current.generation + 1,
     }))
   }, [configuration.convexUrl, createClient])
 
   useEffect(() => {
+    if (clientState.client === null) return
     if (activeClient.current === clientState.client) return
     const replacedClient = activeClient.current
     activeClient.current = clientState.client
-    void replacedClient.close()
-  }, [clientState.client])
+    closeClient(replacedClient)
+  }, [clientState.client, closeClient])
 
-  useEffect(() => () => {
-    void activeClient.current.close()
-  }, [])
+  useEffect(() => {
+    const generation = lifecycleGeneration.current + 1
+    lifecycleGeneration.current = generation
+    const client = createClient(configuration.convexUrl)
+    activeClient.current = client
+    queueMicrotask(() => {
+      if (lifecycleGeneration.current !== generation || activeClient.current !== client) return
+      setClientState((current) => ({ ...current, client }))
+    })
+    return () => {
+      lifecycleGeneration.current += 1
+      closeClient(activeClient.current)
+      activeClient.current = null
+    }
+  }, [closeClient, configuration.convexUrl, createClient])
 
   const controls = useMemo(() => ({
     generation: clientState.generation,
     recreate,
   }), [clientState.generation, recreate])
+
+  if (clientState.client === null) return <RuntimeLoading />
 
   return (
     <ConvexClientControlsContext.Provider value={controls}>
