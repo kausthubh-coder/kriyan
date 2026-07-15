@@ -1,44 +1,54 @@
 # Kriyan Human Map
 
-Kriyan is a local-first personal productivity and second-brain system. The integrated product now has web, Android/Expo, and macOS/Tauri clients over a shared client contract, a Convex coordination plane, a Bun agent node and CLI, and a local Markdown/SQLite knowledge vault.
+Last reconciled: 2026-07-15 for the V1 release-candidate integration.
 
-## Repository shape
+Kriyan is a local-first productivity system and personal agent runtime. It combines tasks, reminders, calendar, notes, an entity-oriented Markdown second brain, and agent workspaces. Product clients and the agent node coordinate through the owner's Convex deployment; only the public documentation site is centrally hosted.
 
-- `web/` — Next.js 16 application for Today, tasks, reminders, notes, calendar, sources, entities, and runtime settings. It supports an explicit offline demo repository and an explicitly configured Convex repository.
-- `mobile/` — Expo Router client for Android-oriented Today, tasks, notes, calendar, knowledge, reminders, agent, and settings surfaces. It shares the product contracts through workspace imports and has a deterministic demo repository.
-- `apps/desktop/` — Tauri 2 macOS shell around the static Next.js export in `web/out/`. The desktop profile stores only non-secret runtime preferences.
-- `apps/docs/` — public Next.js installation, architecture, desktop, Convex, VPS, second-brain, operations, and status documentation. It is a root Bun workspace and uses the root lockfile.
-- `convex/` — coordination and product projection backend. It owns installation/node presence, commands, jobs, runs/events, tasks, reminders, calendar events, notification intents, notes, and compact source/knowledge projections.
-- `apps/node/` — long-running Bun worker with lease/retry/restart handling, durable effects, Pi runtime integration, and vault/retrieval hooks.
-- `apps/cli/` — `kriyan` setup, pairing, status, doctor, submission, source ingestion, search, and index rebuild commands.
-- `packages/client-core/` — repository contracts, in-memory and injected Convex adapters, connection state, optimistic state, and product view models shared by clients.
-- `packages/convex-client/` — narrow client for compact knowledge projections.
-- `packages/agent-runtime/` — agent/Pi adapter and cited-context assembly.
-- `packages/knowledge-vault/` — authoritative local source registry, Markdown entities/transcripts, journals, temporary materialization, and SQLite lexical/hybrid indexes.
+## Repository map
+
+- `web/` — Next.js product UI for Today, tasks, reminders, notes, calendar, sources, entities, agents, and settings. It supports explicit offline demo mode and an explicit live Convex mode.
+- `mobile/` — Expo Router Android client. Demo-mode data is persisted with bounded, versioned AsyncStorage snapshots; live mode uses the configured Convex repository.
+- `apps/desktop/` — Tauri 2 macOS shell around `web/`'s static export. Arbitrary knowledge IDs use finite query-based detail routes so runtime-created items work without a Next.js server.
+- `apps/docs/` — the only publicly hosted surface: landing page plus installation, architecture, Convex, VPS, desktop, second-brain, operations, and status docs.
+- `convex/` — reactive coordination and compact product projections: installations, nodes, commands/jobs/runs/events, tasks, reminders, calendar events, notes, sources, entities, agent definitions/threads/messages, and notification intents.
+- `apps/node/` — long-running Bun worker with leases, retries, durable effects, Pi integration, and vault/retrieval hooks.
+- `apps/cli/` — setup, pairing, node execution, health, work submission, source ingestion, search, indexing, and provider-generic VPS lifecycle commands.
+- `packages/client-core/` — framework-neutral repository contracts, local/in-memory adapters, injected Convex adapters, optimistic state, and view models shared by product clients.
+- `packages/agent-runtime/` — Pi/provider adapter and cited-context assembly.
+- `packages/knowledge-vault/` — local source registry, Markdown entities/transcripts, provenance, journals, temporary materialization, and rebuildable SQLite indexes.
+- `packages/convex-client/` — narrow compact-knowledge projection client.
 - `packages/tools/` — durable-effect and projection boundary contracts.
-- `packaging/` — reproducible standalone Linux x64 baseline node/CLI and macOS arm64 operator builds, provenance/archive verification, systemd installation, and transactional update/rollback support.
+- `packaging/` — standalone Linux x64 node/CLI, Darwin arm64 operator, exact-source provenance, release archive, systemd install, update, rollback, backup, and restore tooling.
 
-The root is a Git worktree and a Bun workspace. Use `bun`/`bunx`; npm, Vite, and Portless are not part of this integrated checkout.
+## Runtime and trust boundaries
 
-## Data and runtime boundaries
+```text
+local clients <-> owner Convex deployment <-> owner node <-> providers/vault
+```
 
-- Convex is the coordination authority and reactive compact projection store. It is not the authority for raw files, full transcript bodies, provider credentials, or browser profiles.
-- The knowledge vault is the local authority for raw-source references, Markdown entities/transcripts, provenance, journals, and rebuildable SQLite indexes.
-- The current product deliberately has no central account or authorization layer. `installationId` is a routing and data-isolation key, not an authentication credential; the owner-controlled Convex deployment, owner clients, and owner VPS form the present self-hosted trust boundary.
-- The agent node owns provider sessions, execution, leases, durable-effect reconciliation, temporary workspaces, and vault access.
-- Web, mobile, and desktop depend on client repository contracts. They do not directly own leases, Pi sessions, vault files, or the local search index.
-- Offline/demo mode is explicit. Live mode requires an explicit Convex URL and installation identifier; missing configuration fails closed.
+- Convex is the reactive coordination authority. It should not contain provider credentials, SSH material, browser profiles, raw source files by default, or full private vault bodies.
+- The knowledge vault is authoritative for source references, transcripts, structured Markdown, provenance, journals, and rebuildable local indexes.
+- The node owns provider sessions, execution, leases, durable effects, temporary workspaces, and vault access.
+- Clients never connect directly to a VPS. They write intent to Convex and subscribe to the resulting state.
+- V1 intentionally has no central Kriyan account service. `installationId` is a routing/isolation key inside an owner-controlled deployment, not an authentication credential.
+- Missing live configuration fails closed. Offline/demo mode must be selected explicitly.
 
-## Install and development
+## Product behavior now present
 
-From the repository root:
+- Tasks, reminders, calendar events, notes, and knowledge surfaces share repository contracts across web, desktop, and mobile.
+- The macOS release is a static Tauri app with query-based detail routes for arbitrary source, artifact, and entity IDs.
+- Android demo data survives force-stop and cold relaunch through a bounded local snapshot. Convex mode remains separate.
+- `/agents` uses the deterministic demo only in explicit demo mode. Live mode maps Convex definitions, revisions, threads, messages, runs, events, and nodes through `AgentWorkspacePort`, including create, rename, revise, submit, cancel, retry, and reset operations.
+- Live agent windows are bounded to 100 rows and the V1 UI does not yet surface truncation. Node freshness may remain visually stale until another reactive render occurs.
+
+## Install and develop
 
 ```sh
 bun install --frozen-lockfile
 bun run dev
 ```
 
-`bun run dev` starts Convex, the Next.js web app, and the Expo Android command concurrently. Run individual surfaces with:
+Individual surfaces:
 
 ```sh
 bun run dev:convex
@@ -47,41 +57,57 @@ bun run dev:mobile
 bun run --cwd apps/desktop dev
 ```
 
-The default credential-free shell does not select a `CONVEX_DEPLOYMENT`.
-Live integration uses only the ignored mode-0600 `.env.integration.local`; do
-not treat credential-free tests as live Convex proof or source that file outside
-the serialized live runbook.
+The repository uses Bun workspaces. Expo's Metro process runs through its expected Node-compatible tooling, but workspace commands still use `bun`/`bunx`.
+
+## Configure Convex and the node
+
+Use `bunx convex dev` to select or create a development deployment and generate bindings. Use `bunx convex deploy` only after reviewing the selected production target.
+
+Create a private node JSON config with `bun run kriyan setup`, pair the installation with `bun run kriyan pair`, and start the worker with `bun run kriyan node run`. Required configuration concepts are the Convex URL, unique installation ID, stable node ID, private data directory, IANA timezone, and BCP 47 locale. Store private values only in ignored, mode-restricted local files.
 
 ## Build outputs
 
 ```sh
 bun run --cwd web build
 bun run --cwd web build:desktop
-(cd mobile && bunx expo export --platform android)
-cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
-bun run --cwd apps/desktop build:debug
-bun run verify:docs
+bun run --cwd apps/desktop build:release
+bun run --cwd mobile build:android:apk
 bun run build:standalone
+bun run verify:docs
 ```
 
-The normal web build writes `web/.next/`; the desktop static export writes `web/out/`; the Android JS export writes `mobile/dist/`; the public docs build writes `apps/docs/.next/`; standalone executables write under `dist/`; and the macOS debug bundle is `apps/desktop/src-tauri/target/debug/bundle/macos/Kriyan.app`.
+- Web production build: `web/.next/`
+- Desktop static export: `web/out/`
+- macOS DMG and checksum: `apps/desktop/dist/release/`
+- Android APK: `mobile/build/kriyan-android-v1.0.0.apk`
+- Linux node/operator and Darwin operator CLI: `dist/`
+- Public docs build: `apps/docs/.next/`
 
-## Live integration configuration
+The macOS arm64 app is ad-hoc signed and its build fails unless strict signature verification passes. It is not Developer ID signed or notarized. The Android APK uses a generated debug key for direct V1 installation, not Play Store distribution.
 
-Live integration uses exactly one local file, `.env.integration.local`. It must remain Git-ignored and mode `0600`. The file contains the selected deployment references and URLs, UUID installation ID, stable node ID, release SHA, Droplet host metadata, and Vercel project ID. Never copy its values into commits, public docs, screenshots, journals, or chat evidence.
+## Release and operational truth
 
-Required variable names are `CONVEX_DEPLOYMENT`, `CONVEX_URL`, `KRIYAN_DEPLOYMENT_NAME`, `KRIYAN_PROD_DEPLOYMENT`, `KRIYAN_PROD_CONVEX_URL`, `KRIYAN_INSTALLATION_ID`, `KRIYAN_NODE_ID`, `KRIYAN_RELEASE_ID`, `KRIYAN_ENV_FILE`, `KRIYAN_DROPLET_ID`, `KRIYAN_DROPLET_HOST`, `KRIYAN_SSH_USER`, and `KRIYAN_VERCEL_PROJECT_ID`.
+- The accepted desktop component produced a strictly sealed arm64 DMG; its visible offline product flow and persistence passed Computer Use, while the exact copied-DMG app's final keyboard/detail smoke was blocked by a locked Mac and remains a post-integration check.
+- The accepted Android component installed on an API 36 emulator, completed a task and note flow without the prior stale-write retry, and preserved the changes after force-stop and cold relaunch.
+- Standalone Linux x64 node/CLI and Darwin operator artifacts pass local identity/archive verification.
+- The existing DigitalOcean systemd service is enabled, active, and healthy on its previous release. Promotion of this candidate stopped after repeated `remote vps update failed` results and a successful rollback; do not claim the candidate is running there.
+- Live Convex setup, node preflight, Settings connection, and `/agents` HTTP routing passed after the Strict Mode client-lifecycle repair. A complete visible agent thread/message/completion round trip is not claimed because two bounded browser-control sessions failed in their tooling layer.
+- Hetzner, self-hosted Convex, iOS, app-store distribution, and a real Pi/provider session require separate proof.
 
-The isolated live project is `kriyan-live-20260713`, with dev deployment `bold-cat-986` and production deployment `robust-clownfish-387`. The replacement VPS resource is named `kriyan-live-node`; the original Droplet `584129331` is preserve-only. Public docs use the existing Vercel project `kriyan-docs`; production metadata canonicalizes to the indexable alias `https://kriyan-docs.vercel.app`, while preview deployments use their generated `VERCEL_URL`.
+## Safe parallel ownership
 
-## Product-integration boundary
+- `convex/` plus generated API metadata is one shared schema/API lane.
+- `web/` and `apps/desktop/` overlap whenever desktop static output changes; rebuild the DMG after any integrated web change.
+- `mobile/` owns Expo/native artifacts but root `bun.lock` is shared.
+- `apps/cli/`, `apps/node/`, shared runtime packages, and `packaging/` overlap for release provenance and must freeze one final source SHA before artifact construction.
+- `README.md`, `human.md`, `test.md`, and `apps/docs/` are integration/release-owner files.
 
-This checkpoint integrates the accepted product, standalone CLI/node, and
-public-docs chains. The reference deployment has exact-SHA evidence for fresh
-Convex Cloud development and production deployments, the preserved Ubuntu VPS,
-systemd and host-reboot recovery, the Tauri desktop → Convex → VPS → reminder →
-desktop path, and the public Vercel docs origin. Android/iOS runtime, Hetzner,
-self-hosted Convex, real Pi provider sessions, and provider cloud-firewall state
-remain separate boundaries.
+## Workflow locations
 
-See `test.md` for the exact credential-free verification matrix and interactive boundaries.
+- Oracle plans: `.artifacts/plans/`
+- Run ledgers and evidence: `.artifacts/runs/`
+- Conclusions: `.artifacts/conclusions/`
+- UI explorations: `.design/`
+- Isolated worktrees/prototypes: `.sandbox/`
+
+See `test.md` for the smallest credible V1 regression and the explicit unclaimed boundaries.

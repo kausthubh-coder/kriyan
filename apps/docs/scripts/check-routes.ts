@@ -218,6 +218,13 @@ try {
   const installCopy = visibleText(renderedPages.get('/docs/install') ?? '')
   const updateCopy = visibleText(renderedPages.get('/docs/updates') ?? '')
   const requiredInstallCopy = [
+    'macOS arm64 DMG',
+    'Android APK',
+    'Linux x64 node archive',
+    'Darwin operator CLI',
+    'only this documentation site is hosted publicly',
+    'macOS is ad-hoc signed and not notarized',
+    'Android is debug-signed for direct installation',
     'It reports the configured data directory path but does not inspect that directory.',
     'does not check whether the reported path exists',
     'sudo test -d "$DATA_DIR"',
@@ -251,19 +258,23 @@ try {
     .map(visibleText)
     .join(' ')
   for (const requiredCopy of [
-    'fresh owner-controlled Convex Cloud production deployment',
-    'systemd service is enabled and active',
-    'recovered after service restart and host reboot',
-    'exact-release Tauri desktop command completed through production Convex and the Ubuntu VPS',
-    'public documentation is deployed at its canonical production origin',
-    'No iOS runtime proof, Android emulator/physical-device proof, or self-hosted Convex proof.',
-    'No Hetzner host proof or verified DigitalOcean Cloud Firewall resource',
+    'The existing DigitalOcean service is healthy on its previous release.',
+    'Promotion of this candidate stopped after repeated remote vps update failed',
+    'the candidate is not claimed as running there',
+    'complete visible live Agent chat submission, completion, and event-rendering proof',
+    'No hosted product workspace; the public production surface is documentation only.',
+    'The macOS app is ad-hoc signed, strictly sealed, Apple-silicon only, and not notarized.',
+    'The Android APK is debug-signed for direct installation',
   ]) {
     if (!operationalCopy.includes(requiredCopy)) {
       throw new Error(`Docs are missing verified operational copy: ${requiredCopy}`)
     }
   }
   for (const staleCopy of [
+    'No public installer is advertised here.',
+    'does not publish a general download URL',
+    'No general public standalone CLI/node download',
+    'Android emulator, physical Android, and iOS runtime behavior remain unverified.',
     'live deployment proof pending',
     'live release proof pending',
     'No fresh Convex Cloud + Ubuntu VPS round trip is claimed yet.',
@@ -279,7 +290,7 @@ try {
       throw new Error(`Docs contain stale operational copy: ${staleCopy}`)
     }
   }
-  console.log('PASS verified deployment truth and stale-copy regression guard')
+  console.log('PASS V1 distribution, VPS blocker, and stale-copy regression guard')
 
   const missingResponse = await fetch(`${baseUrl}/outside-the-constellation`)
   const missingHtml = await missingResponse.text()

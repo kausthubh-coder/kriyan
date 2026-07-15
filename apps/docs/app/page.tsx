@@ -3,6 +3,7 @@ import type { JSX } from 'react'
 
 import { ArchitectureFlow } from '@/components/architecture-flow'
 import { KnowledgeConstellation } from '@/components/knowledge-constellation'
+import { releaseAssetUrls, releasePageUrl } from '@/lib/release'
 
 const authorityRows = [
   {
@@ -34,7 +35,7 @@ export default function HomePage(): JSX.Element {
         <div className="hero-copy">
           <div className="release-signal">
             <span aria-hidden="true" />
-            Reference deployment · live and verified
+            Open-source V1 · direct download
           </div>
           <h1>
             Your days, your knowledge, <em>your infrastructure.</em>
@@ -50,9 +51,7 @@ export default function HomePage(): JSX.Element {
               See how the loop works
               <span aria-hidden="true">→</span>
             </Link>
-            <Link className="text-link" href="/docs">
-              Open the operator docs
-            </Link>
+            <a className="text-link" href={releasePageUrl}>Download V1</a>
           </div>
           <p className="hero-boundary">
             This public site hosts documentation only. It has no Kriyan account,
@@ -118,12 +117,12 @@ export default function HomePage(): JSX.Element {
         <div className="section-heading split-heading">
           <div>
             <p className="section-intro">The honest release boundary</p>
-            <h2 id="status-heading">Implemented source is not the same as a live release.</h2>
+            <h2 id="status-heading">Download the apps; operate the infrastructure.</h2>
           </div>
           <p>
-            The reference deployment has passed its fresh Convex Cloud production,
-            Ubuntu VPS, reboot recovery, desktop round-trip, and public-docs gates.
-            Distribution and mobile-platform claims remain separate.
+            V1 packages the local product clients and node tooling. The existing
+            DigitalOcean service remains healthy on its prior release after this
+            candidate&apos;s repeated update failure and rollback.
           </p>
         </div>
 
@@ -132,23 +131,23 @@ export default function HomePage(): JSX.Element {
             <h3><span className="status-mark current" />Current</h3>
             <ul>
               <li>Web, Expo mobile, and Tauri desktop clients share product contracts.</li>
-              <li>A fresh owner-controlled Convex Cloud production deployment coordinates the live installation.</li>
-              <li>An exact-release Tauri desktop command completed through the Ubuntu VPS and returned its reminder to the desktop.</li>
-              <li>The systemd node recovered after service restart and host reboot; these docs are deployed publicly.</li>
+              <li><a href={releaseAssetUrls.desktop}>macOS arm64 DMG</a> and <a href={releaseAssetUrls.android}>Android APK</a> are direct-download V1 apps.</li>
+              <li><a href={releaseAssetUrls.nodeLinux}>Linux x64 node archive</a> and <a href={releaseAssetUrls.cliDarwin}>Darwin operator CLI</a> support owner-operated nodes.</li>
+              <li>Only this landing page and documentation are hosted publicly.</li>
             </ul>
           </section>
           <section>
             <h3><span className="status-mark planned" />Boundaries</h3>
             <ul>
-              <li>No public standalone download URL, signed release, or notarized desktop distribution is advertised.</li>
-              <li>Android emulator, physical Android, and iOS runtime behavior remain unverified.</li>
-              <li>Hetzner, self-hosted Convex, and provider cloud-firewall configuration require separate proof.</li>
+              <li>macOS is ad-hoc signed and not notarized; Android is debug-signed for direct installation.</li>
+              <li>The candidate is not promoted to the existing VPS; it remains healthy on the prior release.</li>
+              <li>A complete visible live Agent chat round trip, iOS, Hetzner, and self-hosted Convex remain unproven.</li>
             </ul>
           </section>
         </div>
         <div className="status-actions">
           <Link className="button button-primary" href="/docs/install">
-            Read install and CLI guidance
+            Install apps and CLI
           </Link>
           <Link className="text-link" href="/docs/status">
             See the exact current status

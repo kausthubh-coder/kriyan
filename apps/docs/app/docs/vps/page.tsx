@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { JSX } from 'react'
 
+import { releaseAssetUrls, releasePageUrl } from '@/lib/release'
+
 export const metadata: Metadata = {
   title: 'VPS operations',
   description: 'Operate the Kriyan node on a private Ubuntu VPS with provider-generic controls.',
@@ -22,11 +24,21 @@ export default function VpsPage(): JSX.Element {
         <p className="doc-path">Docs / VPS operations</p>
         <h1>The node dials out. Your server stays private.</h1>
         <p>
-          The first live-proof target is DigitalOcean Ubuntu 24.04 x64. The same
-          operating model is provider-generic for a comparable Hetzner server,
-          but Hetzner is not a verified release target until its own host matrix passes.
+          The packaged target is Ubuntu 24.04 x64 on DigitalOcean or a comparable
+          provider. The operator uses ordinary SSH, so it does not require a
+          provider API. Hetzner still needs its own host evidence before it is called verified.
         </p>
       </header>
+
+      <aside className="notice notice-cinnabar" aria-label="VPS downloads">
+        <strong>Use the V1 archive and single-file operator.</strong>
+        <p>
+          Download the <a href={releaseAssetUrls.nodeLinux}>Linux x64 node archive</a>,
+          the <a href={releaseAssetUrls.cliDarwin}>Darwin operator CLI</a>, and their
+          checksums from the <a href={releasePageUrl}>release page</a>. The server
+          does not need Bun or Node. A trusted source clone remains the editable fallback.
+        </p>
+      </aside>
 
       <section id="host">
         <h2>Prepare the host</h2>
@@ -44,7 +56,7 @@ export default function VpsPage(): JSX.Element {
         <div className="mode-comparison">
           <div>
             <h3>DigitalOcean</h3>
-            <p>The accepted reference proof uses a fresh Ubuntu Droplet and passed standalone install, systemd health, host reboot recovery, and a correlated application command.</p>
+            <p>The existing service is enabled, active, and healthy on its prior release. Candidate promotion failed repeatedly and rolled back healthy, so the candidate is not described as deployed.</p>
           </div>
           <div>
             <h3>Hetzner</h3>
@@ -72,6 +84,15 @@ export default function VpsPage(): JSX.Element {
           sharing them; paths, source content, and provider output may be private.
         </p>
       </section>
+
+      <aside className="notice notice-saffron">
+        <strong>Do not repeat the current candidate update loop.</strong>
+        <p>
+          The same operator update path returned <code>remote vps update failed</code>
+          more than once. Per the V1 stopping rule, preserve the healthy prior
+          release and reopen deployment debugging only with a new hypothesis.
+        </p>
+      </aside>
 
       <section id="recovery">
         <h2>Recovery order</h2>

@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import type { JSX } from 'react'
 
+import { releasePageUrl } from '@/lib/release'
+
 export const metadata: Metadata = {
   title: 'Current status',
-  description: 'The honest Kriyan boundary between implemented source, local verification, live deployment, and public release.',
+  description: 'The honest Kriyan boundary between implemented source, packaged V1 artifacts, live deployment, and unproven flows.',
   alternates: { canonical: '/docs/status' },
 }
 
@@ -12,59 +14,69 @@ export default function StatusPage(): JSX.Element {
     <article className="prose docs-article">
       <header className="docs-hero">
         <p className="doc-path">Docs / Current status</p>
-        <h1>Implemented, locally verified, live-proven, and released are different states.</h1>
+        <h1>Packaged, locally verified, live-proven, and promoted are different states.</h1>
         <p>
-          This page describes the verified reference deployment as of July 13,
-          2026. It separates that exact live path from public distribution,
-          mobile platforms, alternative providers, and provider-runtime claims.
+          This page describes the V1 release boundary as of July 15, 2026.
+          Downloadable artifacts do not imply that this candidate was promoted
+          to an existing server or that every provider-backed agent flow passed.
         </p>
       </header>
+
+      <section id="released">
+        <h2>V1 release artifacts</h2>
+        <p>
+          The <a href={releasePageUrl}>v0.1.0 release</a> provides a macOS arm64
+          DMG, Android APK, Linux x64 node archive, and Darwin operator CLI with
+          integrity metadata. The apps are local/self-hosted; only these docs are hosted.
+        </p>
+        <ul className="check-list">
+          <li>The macOS app is ad-hoc signed, strictly sealed, Apple-silicon only, and not notarized.</li>
+          <li>The Android APK is debug-signed for direct installation, not Play Store distribution.</li>
+          <li>The Linux archive contains standalone CLI/node executables; Bun is not required on the Ubuntu host.</li>
+          <li>The Darwin operator is a single-file CLI for setup and SSH-based VPS lifecycle operations.</li>
+        </ul>
+      </section>
 
       <section id="implemented">
         <h2>Implemented in the integrated source</h2>
         <ul className="check-list">
-          <li>Next.js web, Expo mobile, and Tauri macOS clients over shared product contracts.</li>
-          <li>Convex functions for coordination, product state, node presence, and compact knowledge projections.</li>
-          <li>A Bun CLI and long-running node with setup, pairing, status, doctor, submission, retry, lease, and recovery behavior.</li>
-          <li>An owner-controlled knowledge vault with sources, Markdown, provenance, journals, SQLite lexical retrieval, optional embeddings, and rebuild.</li>
-          <li>Linux x64 standalone build, provenance, archive, install, update, rollback, backup, restore, systemd, and health scripts.</li>
+          <li>Next.js web, Expo Android, and Tauri macOS clients over shared product contracts.</li>
+          <li>Tasks, reminders, calendar, notes, source/knowledge views, and local persistence.</li>
+          <li>Convex coordination for product state, node presence, commands/jobs/runs, and agent workspaces.</li>
+          <li>A Bun node/CLI with pairing, health, work submission, lease/retry/recovery, source ingestion, search, and indexing.</li>
+          <li>An owner-controlled Markdown/SQLite vault with citations, provenance, and rebuildable indexes.</li>
         </ul>
       </section>
 
       <section id="verified">
-        <h2>Locally verified on the exact source</h2>
-        <p>
-          The recorded integration contract reports a frozen install, TypeScript
-          checks and deterministic tests across the product, web and mobile lint,
-          Next.js production and desktop exports, an Android JS export, Rust
-          checks, exact standalone release verification, and a debug Tauri app build.
-        </p>
-        <p>
-          Those checks prove the named source and artifacts. Live-provider and host
-          claims additionally require the correlated evidence below; neither layer
-          proves a physical mobile device or a real Pi provider session.
-        </p>
+        <h2>Component verification</h2>
+        <ul className="check-list">
+          <li>The Android APK installed on an API 36 emulator and preserved task/note changes through force-stop and cold launch.</li>
+          <li>The desktop DMG contains a strictly verified copied app; the prior visible desktop flow covered tasks, notes, navigation, and relaunch persistence.</li>
+          <li>Standalone CLI/node/operator artifacts passed local identity and archive verification.</li>
+          <li>Live Settings, node preflight, and the `/agents` route passed after the Convex client Strict Mode repair.</li>
+        </ul>
       </section>
 
       <section id="live-reference">
-        <h2>Live reference deployment verified</h2>
-        <ul className="check-list">
-          <li>A fresh owner-controlled Convex Cloud production deployment runs the exact accepted source.</li>
-          <li>A standalone Linux x64 node runs on Ubuntu 24.04 without Bun installed on the host.</li>
-          <li>The systemd service is enabled and active, and recovered after service restart and host reboot with a new process heartbeat.</li>
-          <li>An exact-release Tauri desktop command completed through production Convex and the Ubuntu VPS, created a reminder, and returned it to the desktop.</li>
-          <li>The public documentation is deployed at its canonical production origin with indexable metadata.</li>
-        </ul>
+        <h2>Existing DigitalOcean service</h2>
+        <p>
+          The systemd service is enabled and active, and status, doctor, and restart
+          checks are healthy on the prior release. Promotion of this candidate
+          repeatedly returned <code>remote vps update failed</code> and rolled back
+          healthy. The stopping condition was reached, so the candidate is not
+          claimed as running on that VPS.
+        </p>
       </section>
 
       <section id="boundaries">
         <h2>Boundaries not claimed</h2>
         <ul className="check-list">
-          <li>No general public standalone CLI/node download, checksum URL, signed release, or notarized desktop distribution.</li>
-          <li>No real Codex or Claude provider session through Pi.</li>
-          <li>No iOS runtime proof, Android emulator/physical-device proof, or self-hosted Convex proof.</li>
-          <li>No Hetzner host proof or verified DigitalOcean Cloud Firewall resource; Kriyan opened no inbound application port and did not weaken SSH policy.</li>
-          <li>No deployed live web workspace or two-session production web reactivity proof; the public production site is documentation only.</li>
+          <li>No Apple Developer ID, notarization, App Store, Play Store, iOS, or physical-Android proof.</li>
+          <li>No candidate-release promotion or candidate end-to-end desktop-to-VPS round trip.</li>
+          <li>No complete visible live Agent chat submission, completion, and event-rendering proof; two browser-control sessions failed in their tooling layer.</li>
+          <li>No real Pi/provider session, Hetzner host proof, self-hosted Convex proof, or provider cloud-firewall proof.</li>
+          <li>No hosted product workspace; the public production surface is documentation only.</li>
         </ul>
       </section>
 
@@ -72,10 +84,9 @@ export default function StatusPage(): JSX.Element {
         <h2>Release language</h2>
         <dl className="definition-list">
           <div><dt>Implemented</dt><dd>The behavior exists in source.</dd></div>
-          <div><dt>Locally verified</dt><dd>The exact checkpoint passed named local checks and fixtures.</dd></div>
-          <div><dt>Live-proven</dt><dd>The exact checkpoint passed a named real-service and host flow with sanitized evidence.</dd></div>
+          <div><dt>Locally verified</dt><dd>The exact checkpoint or artifact passed named local checks.</dd></div>
           <div><dt>Released</dt><dd>A versioned artifact is publicly available with integrity metadata and installation guidance.</dd></div>
-          <div><dt>Shipped</dt><dd>The requested production promotion occurred and was independently verified.</dd></div>
+          <div><dt>Promoted</dt><dd>The exact candidate is running on a named owner-controlled deployment or host and passed its post-promotion gate.</dd></div>
         </dl>
       </section>
     </article>

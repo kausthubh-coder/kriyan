@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { JSX } from 'react'
 
+import { releaseAssetUrls } from '@/lib/release'
+
 export const metadata: Metadata = {
   title: 'Desktop connection',
   description: 'Connect the Kriyan desktop app to an owner-controlled Convex deployment and installation.',
@@ -13,7 +15,7 @@ export default function DesktopPage(): JSX.Element {
     <article className="prose docs-article">
       <header className="docs-hero">
         <p className="doc-path">Docs / Desktop connection</p>
-        <h1>Connect the app to Convex, never directly to the VPS.</h1>
+        <h1>Download the local app, then connect it to your Convex.</h1>
         <p>
           The Tauri desktop app uses the same static Next.js product surface as
           the web client. Its local profile stores non-secret runtime preferences;
@@ -21,10 +23,19 @@ export default function DesktopPage(): JSX.Element {
         </p>
       </header>
 
+      <aside className="notice notice-cinnabar" aria-label="Desktop download">
+        <strong><a href={releaseAssetUrls.desktop}>Download the macOS arm64 DMG.</a></strong>
+        <p>
+          The V1 app is ad-hoc signed and strictly sealed, but it has no Apple
+          Developer ID signature and is not notarized. Control-click the app and
+          choose <strong>Open</strong> if macOS blocks the first normal launch.
+        </p>
+      </aside>
+
       <section id="configure">
         <h2>Configure the local profile</h2>
         <ol className="install-steps">
-          <li><strong>Build or obtain the exact desktop revision.</strong> Record the app revision before testing it against a live deployment.</li>
+          <li><strong>Install the app.</strong> Mount the DMG, drag Kriyan to Applications, and complete the first-open step.</li>
           <li><strong>Open Settings.</strong> Turn off Offline demo for a real connection.</li>
           <li><strong>Enter the Convex deployment URL.</strong> Use the URL from your private deployment configuration, not a value copied from public docs.</li>
           <li><strong>Enter the installation ID.</strong> It must match the installation created by your CLI/node setup.</li>
@@ -59,9 +70,10 @@ export default function DesktopPage(): JSX.Element {
           <li>A temporary node stop leaves queued work visible and recovery completes it.</li>
         </ul>
         <p>
-          The reference deployment passed this exact Tauri desktop → production
-          Convex → Ubuntu VPS → reminder → desktop path, including a new command
-          after service restart and host reboot. Check <Link href="/docs/status">current status</Link> for the remaining boundaries.
+          An earlier accepted release proved the full desktop → Convex → Ubuntu
+          VPS → reminder → desktop path. This V1 candidate is not promoted to the
+          existing VPS after its repeated update failure and healthy rollback, so
+          that candidate-specific round trip is not claimed. Check <Link href="/docs/status">current status</Link> for the exact boundary.
         </p>
       </section>
     </article>

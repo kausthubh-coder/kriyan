@@ -87,10 +87,11 @@ export default function ConvexPage(): JSX.Element {
           <li>Cleanup is scoped to that deployment and installation, then a second cleanup removes zero rows.</li>
         </ul>
         <p>
-          The reference deployment passed these production coordination checks
-          with a fresh Convex Cloud project, a UUID-scoped installation, and a
-          correlated desktop-to-VPS command. See the <Link href="/docs/status"> current status</Link>
-          for the exact release boundary and unverified targets.
+          A prior reference release passed these production coordination checks
+          with an isolated Convex Cloud project and a correlated desktop-to-VPS
+          command. This candidate is not promoted to the existing host. See the
+          <Link href="/docs/status"> current status</Link> for the exact release
+          boundary and unverified targets.
         </p>
       </section>
     </article>

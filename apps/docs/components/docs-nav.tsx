@@ -93,8 +93,8 @@ export function DocsNav(): JSX.Element {
           <div className="docs-status">
             <span className="status-light" aria-hidden="true" />
             <div>
-              <strong>Reference deployment live and verified</strong>
-              <p>Convex Cloud, Ubuntu recovery, desktop round trip, and public docs passed.</p>
+              <strong>Open-source V1 direct download</strong>
+              <p>Local apps and node tooling; only these docs are publicly hosted.</p>
             </div>
           </div>
         </div>

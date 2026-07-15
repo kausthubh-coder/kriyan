@@ -62,7 +62,7 @@ export default function OpenGraphImage(): ImageResponse {
               marginTop: 34,
             }}
           >
-            Open-source release planned · license published first
+            Open-source V1 · local apps · owner-operated node
           </div>
         </div>
         <div

@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { JSX } from 'react'
 
+import { releasePageUrl } from '@/lib/release'
+
 export const metadata: Metadata = {
   title: 'Documentation',
   description:
@@ -24,12 +26,12 @@ export default function DocsOverviewPage(): JSX.Element {
       </header>
 
       <aside className="notice notice-cinnabar" aria-label="Release status">
-        <strong>Reference deployment live and verified</strong>
+        <strong>Open-source V1 is a direct-download release</strong>
         <p>
-          The current reference path uses fresh Convex Cloud production, an Ubuntu
-          VPS node, and an exact-release Tauri desktop. A command completed through
-          that path, created a reminder, returned to the desktop, and recovered
-          after service restart and host reboot. This documentation is deployed publicly.
+          Download the macOS app, Android APK, Linux node archive, and Darwin
+          operator CLI from the <a href={releasePageUrl}>v0.1.0 release</a>. Only
+          this documentation is publicly hosted; the product remains local and
+          owner-operated.
         </p>
       </aside>
 
@@ -97,7 +99,7 @@ export default function DocsOverviewPage(): JSX.Element {
           </li>
           <li>
             <strong>Distribution claims follow evidence.</strong>
-            Implemented source is not presented as a public download or live service.
+            Public artifacts, local checks, and VPS promotion are reported as separate states.
           </li>
         </ol>
       </section>
@@ -111,7 +113,7 @@ export default function DocsOverviewPage(): JSX.Element {
           </Link>
           <Link href="/docs/install">
             <span>Install & standalone CLI</span>
-            Separate the verified reference archive from public distribution.
+            Download V1 or set up from source.
           </Link>
           <Link href="/docs/status">
             <span>Current status</span>

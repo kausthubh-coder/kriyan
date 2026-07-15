@@ -1,229 +1,144 @@
-# Kriyan Testing Contract
+# Kriyan V1 Testing Contract
 
-This is the testing contract for the integrated Bun monorepo. Evidence must identify an immutable checkpoint, distinguish deterministic local tests from live services, and name every skipped platform or external dependency.
+Last reconciled: 2026-07-15 for the integrated V1 release candidate.
 
-## Definition of done
+Testing must name the exact source SHA and artifact hash, operate the real user surface when practical, and separate local source gates, packaged-app proof, live Convex proof, VPS proof, and public-release proof. A tester records evidence but does not repair source; a fresh reviewer scores the same frozen checkpoint.
 
-- Install, typecheck, tests, lint, and applicable production/export/native builds pass from the same checkout.
-- Visible web behavior is checked at desktop and phone viewports; desktop behavior is checked in the built Tauri app.
-- Mocks, demo repositories, unavailable services, untested devices, and external-account boundaries are explicit.
-- A local or mocked result is never described as deployment, release, physical-device, or live-provider proof.
-- Test processes and mutable demo profiles are cleaned up before the checkpoint is frozen.
+## Practical V1 definition of done
 
-## Verified credential-free baseline
+- Frozen install and targeted TypeScript/build gates pass from one clean checkout.
+- The macOS arm64 DMG is ad-hoc signed, strictly verifies, copies from a mounted image, launches, and completes one representative local flow.
+- The Android APK installs on the assigned emulator, completes a task/note flow, and preserves it through force-stop and cold launch.
+- Standalone Linux x64 CLI/node and Darwin arm64 operator artifacts match the frozen source identity and pass archive/operator verification.
+- The existing VPS is inspected only through one serialized operator session. Do not repeat the candidate update path in this run: it already failed repeatedly and rolled back healthy.
+- Public docs accurately link the V1 release assets and state that only docs are hosted.
+- No result is described as a live agent chat round trip unless the visible thread, submission, run progression, response, and events were observed.
 
-Verified on macOS on 2026-07-13 after integrating the four accepted product checkpoints.
+## Fast source gate
 
-Install and static metadata boundary:
-
-```sh
-bun install --frozen-lockfile
-bun run check:convex-metadata
-```
-
-- Frozen install passed with no lockfile changes.
-- `check:convex-metadata` stopped with `No CONVEX_DEPLOYMENT set`; Convex codegen, metadata comparison, live worker smoke, and live Convex tests were therefore not run.
-
-Typechecks:
+Run from the repository root after `bun install --frozen-lockfile`:
 
 ```sh
 bun run typecheck:convex
 bun run typecheck:client-core
-bun run typecheck:smoke
 bun run typecheck:node
-bun run --cwd packages/knowledge-vault typecheck
 bun run --cwd web typecheck
 bun run --cwd mobile typecheck
+bun run --cwd web lint
+bun run --cwd mobile lint
+bun run --cwd web build
+bun run --cwd web build:desktop
+bun run verify:docs
 ```
 
-All listed typechecks passed.
-
-Tests:
+Use focused tests only when a changed boundary needs them:
 
 ```sh
 bun run test:convex
 bun run test:client-core
-bun run --cwd packages/convex-client test
 bun run test:node
-bun run --cwd packages/knowledge-vault test
-bun run --cwd packages/tools test
 bun run --cwd web test
 bun run --cwd mobile test
 ```
 
-Verified results:
+Do not rerun broad suites merely to accumulate counts. If a source or build gate fails, preserve the exact command/output and stop dependent artifact claims.
 
-- Convex: 33 passed, 0 failed.
-- Shared client-core: 35 passed, 0 failed.
-- Convex knowledge projection client: 1 passed, 0 failed.
-- Node, CLI, agent runtime, and tools composite: 55 passed, 0 failed.
-- Knowledge vault: 4 passed, 0 failed.
-- Web: 14 passed, 0 failed.
-- Mobile: 5 passed, 0 failed.
-- `packages/tools` also passed standalone: 4 passed, 0 failed; these four are already included in the 55-test composite.
-- Unique deterministic tests across the listed product surfaces: 147 passed, 0 failed.
-- The CLI composite includes a real subprocess fixture that creates a temporary source and vault, registers and ingests the source, performs cited lexical search, deletes the original source, rebuilds the index, repeats the search deterministically, and cleans up.
+## Desktop release smoke
 
-The first concurrent run made the CLI knowledge smoke exceed Bun's five-second per-test timeout while other heavy suites were running. An isolated rerun passed in 3.42 seconds, and the complete 55-test composite passed. This was recorded as resource contention, not a product failure.
-
-Lint:
+Build from the frozen integrated SHA:
 
 ```sh
-bun run --cwd web lint
-bun run --cwd mobile lint
+bun run --cwd apps/desktop build:release
+shasum -a 256 apps/desktop/dist/release/Kriyan_0.1.0_aarch64.dmg
 ```
 
-Both lint commands passed.
+Required hands-on sequence with Computer Use:
 
-Builds and exports:
+1. Mount the exact hashed DMG read-only.
+2. Copy `Kriyan.app` into a temporary isolated Applications directory, detach the image, and run `codesign --verify --deep --strict` on the copied app.
+3. Launch the copied app with an isolated `HOME` and `CFFIXED_USER_HOME` profile.
+4. Complete setup in Offline demo, create/complete a task, edit/save a note, and open one arbitrary-ID knowledge detail route.
+5. Use one bounded keyboard path and record visible focus or the exact inaccessible control.
+6. Quit, relaunch, confirm the saved local state, stop the app, and remove the temporary profile/install directory.
+
+If macOS is locked or Computer Use cannot expose a window, record the infrastructure blocker once. Do not substitute the build-tree app for copied-DMG proof or loop on the same locked-screen failure.
+
+## Android APK smoke
+
+Build and install the exact APK:
 
 ```sh
-bun run --cwd web build
-bun run --cwd web build:desktop
-(cd mobile && bunx expo export --platform android)
-cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
-bun run --cwd apps/desktop build:debug
+bun run --cwd mobile build:android:apk
+shasum -a 256 mobile/build/kriyan-android-v1.0.0.apk
+adb install -r mobile/build/kriyan-android-v1.0.0.apk
 ```
 
-Verified results:
+Use the assigned Android emulator exclusively. Record the device/API, package/activity, APK hash, and clean install result. With ADB plus Computer Use/UI Automator:
 
-- Next.js normal production build passed with 9 static routes plus the not-found route; output is `web/.next/`.
-- Next.js desktop static export passed for the same routes; output is `web/out/`.
-- Expo Android JS export passed with 1 Hermes bundle and 43 assets; output is `mobile/dist/`.
-- `cargo check` passed for `kriyan-desktop`.
-- Tauri debug build and `.app` bundling passed; output is `apps/desktop/src-tauri/target/debug/bundle/macos/Kriyan.app`.
+1. Cold launch `com.kriyan.mobile`.
+2. Complete a task on the first attempt and confirm there is no stale/retry notice.
+3. Create one task and edit/save one note.
+4. Force-stop the package, confirm its PID is gone, and cold launch again.
+5. Confirm all three changes persist, inspect the crash/ANR buffer, capture the representative UI tree/screenshots, then stop the package and emulator.
 
-## Interactive regression
+The accepted V1 boundary is emulator-tested, debug-signed direct installation. It does not prove Play Store updates, physical devices, or iOS.
 
-For web changes, run the integrated checkout in explicit offline/demo mode and use Browser Use against the exact local URL. Check Today/task/note/settings behavior at one desktop and one phone-sized viewport, including navigation, representative writes, persistence, and console errors. Bound browser-tool retries; record the exact failure if the tool becomes unresponsive.
+## Live Agent Workspace smoke
 
-For desktop changes, launch the freshly built debug `.app` with a dedicated mutable profile, use Computer Use to confirm it renders, exercise one representative navigation/settings persistence path, then stop the process. Do not reuse a mutable webview profile owned by another active process.
+Use an isolated development Convex deployment, unique installation ID, dedicated local browser profile, and fake or intentionally selected provider runtime. Never publish the URL, IDs, keys, or provider output.
 
-Verified Browser Use results against `NEXT_PUBLIC_KRIYAN_DEMO=1` at `http://127.0.0.1:3100/`:
+The complete visible flow is:
 
-- Desktop viewport (`1280x800`): Today rendered the offline/demo state; completing the first task immediately changed the Today count from 2 to 1; the Tasks workspace rendered both seeded tasks; the existing note was renamed and saved with revision advancing from 0 to 1; Settings changed the display name to `Integration smoke` and preserved it after a full page reload.
-- Phone viewport override (reported content width 433 px): Today, Notes, and Settings rendered with `scrollWidth === clientWidth` and no captured console warnings/errors. The Tasks route returned HTTP 200 but remained in its loading shell during the single bounded 1.2-second route check, so phone Tasks rendering is not claimed as interactively verified.
-- Full page reloads recreate the in-memory demo repository's seeded product data by design; settings persist separately in local app-profile storage.
-- The browser viewport override was reset, the Browser Use tab was finalized, and the local web server was stopped.
+1. Configure live Settings and observe Connected state plus a fresh node.
+2. Open `/agents`, create a thread, submit one message, and observe queued/running/completed progression.
+3. Confirm the assistant result and ordered run events render reactively.
+4. Exercise one cancellation/retry or session-reset control when the fixture supports it.
+5. Inspect console/network errors, stop the local node/server, and clean only the isolated fixture.
 
-Verified Computer Use results against `apps/desktop/src-tauri/target/debug/bundle/macos/Kriyan.app`:
+Current evidence proves Settings connection, fresh node preflight, `/agents` HTTP 200, and no recurrence of `ConvexReactClient has already been closed`. It does not prove the complete visible flow because two bounded browser-control sessions failed in their tooling layer. Do not start another identical automation loop without a healthy interactive browser session or a new hypothesis.
 
-- No other `kriyan-desktop` process was active before launch.
-- The freshly built app initially showed the webview startup frame and then rendered the integrated Today workspace at `tauri://localhost/`.
-- Settings navigation rendered at `tauri://localhost/settings/`; the display name was changed from `Desktop Test` to `Desktop Integration` and showed the saved-runtime confirmation.
-- The app was fully stopped, relaunched, and rendered Today with `Desktop Integration`, proving app-profile persistence across process restart.
-- The relaunched app was stopped; no desktop or web test process was intentionally left running.
+## CLI and VPS release smoke
 
-## Surface-specific expectations
-
-- Convex tests/typecheck are credential-free and use deterministic local harnesses. Codegen and live tests require an explicitly assigned isolated `CONVEX_DEPLOYMENT`.
-- Client-core contract behavior must pass for both in-memory and injected Convex adapters.
-- Node tests cover claim/lease behavior, reconnect/retry/cancellation, durable-effect crash boundaries, signal/drain behavior, redaction, Pi session persistence, packaging invariants, and knowledge context.
-- Knowledge-vault tests use temporary fixtures, never a user's real vault, and cover stable IDs, cleanup, atomic write recovery, stale-hash rejection, cited retrieval, and rebuild.
-- Mobile acceptance in this lane is lint, TypeScript, deterministic tests, and Android JS export. Do not retry the known broken emulator install in this integration lane.
-
-## Credential-free baseline boundaries
-
-- Without explicitly sourcing the ignored integration environment, no `CONVEX_DEPLOYMENT` is configured and the credential-free matrix alone provides no codegen refresh, live Convex metadata proof, reactive cloud proof, or live worker smoke.
-- No Android emulator or physical Android device run was attempted; the Android boundary is source checks plus JS export.
-- iOS build/runtime behavior is untested.
-- No real provider/model session was started and no external account was changed.
-- The credential-free matrix alone makes no Linux binary, installer, deployment, VPS, systemd host, release, signing/notarization, or distribution claim.
-- Live deployment authority exists only in the serialized live integration runbook below. No GitHub push, auth change, billing change, or unrelated external-account action is authorized.
-
-## Verified live reference boundary
-
-The July 13 live integration evidence established a fresh Convex Cloud
-production deployment, an Ubuntu 24.04 x64 standalone node with Bun absent,
-systemd restart and host-reboot recovery, an exact-release Tauri desktop →
-production Convex → VPS → reminder → desktop round trip, and the public Vercel
-documentation origin. These claims must be re-established after every source SHA
-change before promotion. Android/iOS runtime, Hetzner, self-hosted Convex, a real
-Pi provider session, a deployed live web workspace, and provider cloud-firewall
-configuration remain unverified.
-
-Round 4 passed 186 unique deterministic tests at the source gate: 33 Convex,
-35 client core, 94 node/CLI/agent-runtime/tools, 14 web, 5 mobile, 4 knowledge
-vault, and 1 Convex projection-client test. The standalone 4-test tools suite
-also passed but is already included in the 94-test composite.
-
-## Live integration writer runbook
-
-The live run uses the isolated project `kriyan-live-20260713`, dev deployment `bold-cat-986`, production deployment `robust-clownfish-387`, replacement host `kriyan-live-node`, and Vercel project `kriyan-docs`. Never put private URLs, the UUID installation, host addresses, keys, or provider sessions in tracked evidence.
-
-Preflight the single private environment before every live command:
-
-```sh
-test "$(stat -f '%Lp' .env.integration.local)" = 600
-git check-ignore .env.integration.local
-set -a
-source .env.integration.local
-set +a
-test "$KRIYAN_RELEASE_ID" = "$(git rev-parse HEAD)"
-test -z "$(git status --porcelain)"
-```
-
-Dev Convex validation and idempotent fixture cleanup:
-
-```sh
-set -a
-source .env.integration.local
-set +a
-bunx convex dev --once --env-file "$KRIYAN_ENV_FILE" --typecheck enable --tail-logs disable
-bunx convex codegen --typecheck enable
-bun run typecheck:convex
-bun run check:convex-metadata
-bun run test:node:live
-```
-
-`test:node:live` refuses a dirty checkout, release-SHA mismatch, non-UUID installation, or missing deployment name/URL/env file/node ID. Its sanitized output correlates command, job, run, ordered event sequences, server timestamps, reminder, node heartbeat, and release SHA. Cleanup is guarded by the exact selected deployment plus installation fingerprint and must delete zero rows on its second pass.
-
-This phase intentionally has no central account or authorization service. The installation ID scopes records and queries but is not an authentication credential. The owner-controlled Convex deployment plus owner-controlled clients and VPS are the current self-hosted trust boundary; tests must not describe installation-ID filtering as user authentication.
-
-Production deployment is explicit and happens only from the frozen integration SHA:
-
-```sh
-bunx convex deploy --env-file "$KRIYAN_ENV_FILE" --typecheck enable --message "Kriyan live integration $KRIYAN_RELEASE_ID"
-```
-
-Deploy docs preview and production from the same clean Git archive. Preview metadata must use its generated `VERCEL_URL`; production canonical, `og:url`, Open Graph image, `robots.txt`, and every sitemap location must use `https://kriyan-docs.vercel.app`. The production alias and canonical origin must both omit `x-robots-tag: noindex`:
-
-```sh
-bun run verify:docs
-curl -fsSI https://kriyan-docs.vercel.app | rg -iv '^x-robots-tag:.*noindex'
-curl -fsS https://kriyan-docs.vercel.app/robots.txt
-curl -fsS https://kriyan-docs.vercel.app/sitemap.xml
-```
-
-Build and verify the exact standalone release before touching the host:
+Build from the final frozen SHA and verify exact identity:
 
 ```sh
 bun run build:standalone
 file dist/kriyan-node-linux-x64 dist/kriyan-linux-x64 dist/kriyan-darwin-arm64
 packaging/scripts/verify-operator-build.sh \
-  dist/kriyan-darwin-arm64 "$KRIYAN_RELEASE_ID" \
+  dist/kriyan-darwin-arm64 "$(git rev-parse HEAD)" \
   dist/operator-provenance.manifest
 ```
 
-Follow `packaging/README.md` for archive construction and `kriyan vps install|status|doctor|restart|update|rollback`. The Ubuntu host must prove `command -v bun` fails before install, the release/archive hashes match locally and remotely, the service is enabled and active, the process-health release equals the Git SHA, and Convex shows a fresh heartbeat for the same node. Repeat install, restart, update, rollback, and host reboot must all preserve health.
+Construct and verify the Linux archive by following `packaging/README.md`. Record the source commit/tree, lock hash, Bun policy/version, artifact hashes, archive verifier result, and clean checkout.
 
-Repeat-install proof is exactly one standalone `kriyan vps install` invocation
-with a 15-minute wall-clock deadline. Start no competing install process. If the
-terminal yields before completion, continue polling that same terminal session;
-do not launch a replacement. Count the proof only after the original process
-exits zero, emits its final `ok:true` JSON with the expected release and healthy
-service checks, and a process audit finds no remaining local operator invocation.
-Record elapsed time and the settled host state. Concurrent or overlapping
-installs are explicitly not idempotency evidence.
+For remote checks, use the separately obtained Darwin operator, strict known-hosts, one assigned host, and one serialized terminal session. Exercise `vps status`, `doctor`, and at most one authorized `restart`, then require enabled/active service state, expected release identity, current process health, and fresh node heartbeat. Never expose the host, installation ID, deployment URL, SSH path, or logs containing user material.
 
-Build the fresh live Tauri handoff without committing private values:
+The current DigitalOcean host is healthy on its previous release after rollback. Candidate update/promotion repeatedly returned `remote vps update failed`; the stopping condition has been reached. Do not retry update, and do not describe the integrated candidate as deployed on the VPS.
+
+## Public docs and release verification
 
 ```sh
-NEXT_PUBLIC_CONVEX_URL="$KRIYAN_PROD_CONVEX_URL" \
-NEXT_PUBLIC_KRIYAN_INSTALLATION_ID="$KRIYAN_INSTALLATION_ID" \
-NEXT_PUBLIC_KRIYAN_DISPLAY_NAME="Kriyan live" \
-bun run --cwd web build:desktop
-bun run --cwd apps/desktop build:debug
+bun run verify:docs
 ```
 
-The writer may prove terminal and service behavior but does not self-accept desktop UX. A fresh Computer Use tester must launch that exact bundle with a dedicated profile and prove the desktop → production Convex → VPS → completed run/reminder → desktop loop, then service restart and host reboot recovery. Android device and iOS runtime coverage remain separate boundaries.
+After the release owner publishes `v0.1.0`, verify that the tag page and four advertised artifacts are reachable and that checksums match the locally frozen artifacts. Deploy only `apps/docs/` publicly, then check the canonical page, install, desktop, VPS, status, `robots.txt`, and `sitemap.xml`. The product apps, Convex deployment, node, vault, and local web UI are not hosted by the documentation deployment.
+
+## Required evidence and cleanup
+
+Record:
+
+- exact SHA/tree and clean tracked status;
+- exact artifact path, size, and SHA-256;
+- commands, exit codes, device/OS/tool, and representative screenshots/log excerpts;
+- what was mocked, local, live, blocked, or untested;
+- process/service cleanup and mutable-resource release.
+
+Never store tokens, private URLs, installation/node IDs, IPs, SSH keys, browser profiles, raw transcripts, or user source material in tracked evidence.
+
+## Current accepted and unclaimed boundaries
+
+- Android component: accepted after exact-APK emulator persistence proof.
+- Desktop component: accepted after arbitrary-ID route repair and strict copied-app signature proof; final copied-app visual/keyboard smoke remains post-integration because the Mac was locked.
+- CLI/node artifacts: locally verified; existing VPS healthy on the prior release; candidate promotion blocked and stopped after repetition.
+- Live Agent Workspace: code integrated with no confirmed P0/P1; complete visible live message round trip remains unproven.
+- No claim for Developer ID/notarization, Play Store/App Store, iOS, physical Android, Hetzner host proof, self-hosted Convex proof, or a real Pi/provider session.
