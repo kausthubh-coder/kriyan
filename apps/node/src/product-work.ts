@@ -38,7 +38,14 @@ export async function executeArtifactWork(
     if (!remote.ok && remote.reason !== 'already_terminal' && remote.reason !== 'stale_revision') {
       throw new Error(`artifact tombstone rejected: ${remote.reason}`)
     }
-    await projections.tombstone(work.artifactId, work.noteVersion.noteVersionId, work.priorProjectedHash)
+    const local = await projections.tombstone(
+      work.artifactId,
+      work.noteVersion.noteVersionId,
+      work.priorProjectedHash,
+    )
+    if (local === 'stale') {
+      throw new Error('artifact tombstone requires reconciliation: local projection is stale')
+    }
     return
   }
 
@@ -71,6 +78,7 @@ export async function executeArtifactWork(
 }
 
 interface MemoryWorkInput {
+  correctionId?: string
   records?: Array<Omit<ProjectedMemoryRecord, 'tombstoned'>>
   sourceExcerpts?: Array<{
     excerptId: string; sourceRefId: string; text: string; startOffset: number; endOffset: number
@@ -112,18 +120,39 @@ export async function executeMemoryWork(
 ): Promise<'project' | 'reconcile' | 'correction'> {
   const work = await client.invoke('memory.work.read', lease(config, job))
   const ledger = new MemoryLedger(join(config.dataDir, 'vault'))
+  if (Buffer.byteLength(work.commandInput) > 256 * 1024) throw new Error('memory work input exceeds limit')
+  const input = JSON.parse(work.commandInput) as MemoryWorkInput
+  const targetedCorrectionId = work.kind === 'correction' ? input.correctionId : undefined
+  if (work.kind === 'correction' && typeof targetedCorrectionId !== 'string') {
+    throw new Error('memory correction work has no correctionId')
+  }
+  let foundTargetedCorrection = false
   for (const correction of work.corrections) {
-    const appliedRevision = (correction.appliedRevision ?? correction.expectedRevision) + 1
+    const targeted = correction.correctionId === targetedCorrectionId
+    if (targeted) foundTargetedCorrection = true
+
+    if (correction.state === 'conflict') continue
+    if (correction.state === 'pending' && !targeted) continue
+
+    const appliedRevision = correction.state === 'pending'
+      ? correction.expectedRevision + 1
+      : correction.appliedRevision
+    if (appliedRevision === undefined) {
+      throw new Error(`terminal memory correction has no applied revision: ${correction.correctionId}`)
+    }
+    const ledgerAction = correction.state === 'restored' ? 'restore' : correction.action
     await ledger.correct({
       correctionId: correction.correctionId,
       targetKind: correction.targetKind,
       targetId: correction.targetId,
-      action: correction.action,
-      replacement: correction.replacement,
+      action: ledgerAction,
+      replacement: ledgerAction === 'restore' ? undefined : correction.replacement,
       reason: correction.reason,
       revision: appliedRevision,
       provenanceIds: [correction.origin],
     })
+    if (correction.state !== 'pending') continue
+
     const outcome = correction.action === 'restore'
       ? await client.invoke('memory.correction.restore', {
           installationId: config.installationId,
@@ -139,9 +168,9 @@ export async function executeMemoryWork(
       throw new Error(`memory correction rejected: ${outcome.reason}`)
     }
   }
-
-  if (Buffer.byteLength(work.commandInput) > 256 * 1024) throw new Error('memory work input exceeds limit')
-  const input = JSON.parse(work.commandInput) as MemoryWorkInput
+  if (work.kind === 'correction' && !foundTargetedCorrection) {
+    throw new Error(`memory correction not found: ${targetedCorrectionId}`)
+  }
   if (work.kind === 'reconcile') {
     await ledger.reconcile(input.records ?? [])
   } else {
