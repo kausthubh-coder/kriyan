@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import type { JSX } from 'react'
 
-import { releasePageUrl } from '@/lib/release'
+import { appReleasePageUrl, nodeReleasePageUrl } from '@/lib/release'
 
 export const metadata: Metadata = {
   title: 'Current status',
@@ -38,9 +38,10 @@ export default function StatusPage(): JSX.Element {
       <section id="released">
         <h2>V1 release artifacts</h2>
         <p>
-          The <a href={releasePageUrl}>v0.1.0 release</a> provides a macOS arm64
-          DMG, Android APK, Linux x64 node archive, and Darwin operator CLI with
-          integrity metadata. The apps are local/self-hosted; only these docs are hosted.
+          The <a href={appReleasePageUrl}>v0.1.0 app release</a> provides the macOS arm64
+          DMG and Android APK. The <a href={nodeReleasePageUrl}>v0.1.1 tooling patch</a> provides
+          the exact Linux x64 node archive and Darwin operator CLI used by the promoted
+          reference node, with integrity metadata. The apps are local/self-hosted; only these docs are hosted.
         </p>
         <ul className="check-list">
           <li>The macOS app is ad-hoc signed, strictly sealed, Apple-silicon only, and not notarized.</li>

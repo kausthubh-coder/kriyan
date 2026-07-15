@@ -121,7 +121,7 @@ The current DigitalOcean host is healthy on exact source candidate `3bf3ec273a3b
 bun run verify:docs
 ```
 
-After the release owner publishes `v0.1.0`, verify that the tag page and four advertised artifacts are reachable and that checksums match the locally frozen artifacts. Deploy only `apps/docs/` publicly, then check the canonical page, install, desktop, VPS, status, `robots.txt`, and `sitemap.xml`. The product apps, Convex deployment, node, vault, and local web UI are not hosted by the documentation deployment.
+Verify that the `v0.1.0` app release exposes the macOS DMG and Android APK, and that the `v0.1.1` tooling patch exposes the exact promoted Linux node archive and Darwin operator. Require each advertised checksum to match its frozen artifact. Deploy only `apps/docs/` publicly, then check the canonical page, install, desktop, VPS, status, `robots.txt`, and `sitemap.xml`. The product apps, Convex deployment, node, vault, and local web UI are not hosted by the documentation deployment.
 
 ## Required evidence and cleanup
 
