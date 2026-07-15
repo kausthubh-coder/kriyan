@@ -150,6 +150,16 @@ export function assertPositiveInteger(
   }
 }
 
+export function assertNonNegativeInteger(
+  value: number,
+  name: string,
+  maximum: number,
+): void {
+  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+    throw new Error(`${name} must be an integer between 0 and ${maximum}`)
+  }
+}
+
 export function assertExpectedRevision(value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error('expectedRevision must be a non-negative safe integer')

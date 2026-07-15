@@ -7,6 +7,7 @@ import { v } from 'convex/values'
 import { query } from './_generated/server'
 import {
   assertId,
+  assertNonNegativeInteger,
   assertPositiveInteger,
   MAX_PAGE_SIZE,
   withoutSystemFields,
@@ -82,7 +83,7 @@ export const connectionProbe = query({
   ),
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
-    assertPositiveInteger(
+    assertNonNegativeInteger(
       args.connectionCount,
       'connectionCount',
       Number.MAX_SAFE_INTEGER,
