@@ -56,7 +56,7 @@ export default function VpsPage(): JSX.Element {
         <div className="mode-comparison">
           <div>
             <h3>DigitalOcean</h3>
-            <p>The existing service is enabled, active, and healthy on its prior release. Candidate promotion failed repeatedly and rolled back healthy, so the candidate is not described as deployed.</p>
+            <p>The reference service is enabled, active, and healthy on the exact promoted node build. Its release identity, process health, fresh heartbeat, and deterministic Agent round trip passed after capability renegotiation was deployed.</p>
           </div>
           <div>
             <h3>Hetzner</h3>
@@ -74,6 +74,15 @@ export default function VpsPage(): JSX.Element {
         </p>
       </aside>
 
+      <aside className="notice notice-saffron">
+        <strong>Run one service process per stable node ID.</strong>
+        <p>
+          The verified V1 topology is one systemd worker for each node identity.
+          Do not launch overlapping workers with the same node ID; process-generation
+          fencing for that unsupported topology is not implemented yet.
+        </p>
+      </aside>
+
       <section id="operate">
         <h2>Inspect the running service</h2>
         <pre className="code-block" aria-label="VPS inspection commands"><code>{inspectCommands}</code></pre>
@@ -86,11 +95,12 @@ export default function VpsPage(): JSX.Element {
       </section>
 
       <aside className="notice notice-saffron">
-        <strong>Do not repeat the current candidate update loop.</strong>
+        <strong>Upgrade in dependency order.</strong>
         <p>
-          The same operator update path returned <code>remote vps update failed</code>
-          more than once. Per the V1 stopping rule, preserve the healthy prior
-          release and reopen deployment debugging only with a new hypothesis.
+          Upgrade Convex coordination contracts before a node binary that depends on
+          them. The reference upgrade proved this order: capability renegotiation first,
+          then one node update requiring the new release identity, a fresh heartbeat,
+          and a completed app-to-node round trip.
         </p>
       </aside>
 
@@ -99,6 +109,7 @@ export default function VpsPage(): JSX.Element {
         <ol className="install-steps">
           <li><strong>Preserve evidence.</strong> Record release identity, service state, disk space, and a bounded sanitized journal.</li>
           <li><strong>Separate transport from execution.</strong> Check DNS and Convex reachability before blaming the runtime.</li>
+          <li><strong>Check contract compatibility.</strong> A stable node identity must be able to renegotiate its advertised capabilities during an upgrade.</li>
           <li><strong>Restart once and verify identity.</strong> Require a post-restart heartbeat from a new process, not a stale record.</li>
           <li><strong>Roll back if the release is at fault.</strong> Restore the previous immutable release and run the same health gate.</li>
           <li><strong>Restore data only when necessary.</strong> Validate a backup into an empty temporary directory before replacing durable state.</li>

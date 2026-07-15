@@ -7,6 +7,7 @@ import type {
   AgentWorkspacePortResult,
   AgentWorkspacePreviewScenario,
   AgentWorkspaceSnapshot,
+  CreateAgentInput,
   CreateAgentThreadInput,
   DemoAgentWorkspacePort,
   ReviseAgentInput,
@@ -416,6 +417,40 @@ export class DeterministicAgentWorkspacePort implements DemoAgentWorkspacePort {
     this.scenario = 'ready'
     this.publish({ tone: 'success', message: 'The deterministic workspace recovered.' })
     return success(undefined)
+  }
+
+  createAgent = async (
+    input: CreateAgentInput,
+  ): Promise<AgentWorkspacePortResult<AgentDefinitionView>> => {
+    const displayName = input.displayName.trim()
+    const systemPromptSummary = input.systemPromptSummary.trim()
+    if (!displayName || !systemPromptSummary) {
+      return failure('invalid_input', 'A name and instruction summary are required.')
+    }
+    const unavailable = this.writeUnavailable()
+    if (unavailable) return unavailable
+    const slug = displayName.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `agent-${this.sequence + 1}`
+    const agentId = `agent:demo:${slug}:${++this.sequence}`
+    const revisionId = `agent-revision:demo:${++this.sequence}`
+    const createdAt = Date.now()
+    const agent: AgentDefinitionView = {
+      agentId,
+      displayName,
+      currentRevisionId: revisionId,
+      revision: 0,
+      revisions: [{
+        revisionId,
+        ordinal: 0,
+        displayName,
+        systemPromptSummary,
+        toolCapabilities: [...new Set(input.toolCapabilities.map((item) => item.trim()).filter(Boolean))],
+        createdAt,
+      }],
+    }
+    this.canonical = { ...this.canonical, agents: [agent, ...this.canonical.agents] }
+    if (this.scenario === 'empty') this.scenario = 'ready'
+    this.publish({ tone: 'success', message: `${displayName} is ready for its first durable thread.` })
+    return success(agent)
   }
 
   createThread = async (

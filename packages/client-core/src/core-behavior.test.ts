@@ -62,11 +62,18 @@ describe('connection generation state machine', () => {
       type: 'mounted',
       browserOnline: true,
       clientGeneration: 0,
-      observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 1 },
+      observation: { isWebSocketConnected: false, hasEverConnected: false, connectionCount: 0 },
       now: 0,
     })
-    expect(deriveConnectionMode(state)).toBe('reconnecting')
-    state = updateConnectionTracker(state, { type: 'subscription-confirmed', clientGeneration: 0, connectionCount: 1 })
+    expect(deriveConnectionMode(state)).toBe('connecting')
+    state = updateConnectionTracker(state, {
+      type: 'observed',
+      clientGeneration: 0,
+      observation: { isWebSocketConnected: true, hasEverConnected: true, connectionCount: 0 },
+      now: 1,
+    })
+    expect(state.recovery).toBe('awaiting-subscription')
+    state = updateConnectionTracker(state, { type: 'subscription-confirmed', clientGeneration: 0, connectionCount: 0 })
     expect(deriveConnectionMode(state)).toBe('online')
   })
 

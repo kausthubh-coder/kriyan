@@ -105,6 +105,27 @@ async function submit(
   })
 }
 
+describe('node registration', () => {
+  test('renegotiates capabilities for a stable node identity across releases', async () => {
+    const t = backend()
+    await createInstallation(t)
+    const first = await registerNode(t, 'node-upgrade')
+    const upgraded = await t.mutation(api.worker.registerNode, {
+      installationId: 'installation-a',
+      nodeId: 'node-upgrade',
+      displayName: 'node-upgrade',
+      capabilities: ['reminders', 'agent.chat.v1'],
+      protocolVersion: '1',
+    })
+
+    expect(first).toMatchObject({ created: true, node: { revision: 0 } })
+    expect(upgraded).toMatchObject({
+      created: false,
+      node: { capabilities: ['reminders', 'agent.chat.v1'], revision: 1 },
+    })
+  })
+})
+
 describe('command submission', () => {
   test('creates at most one job and rejects idempotency conflicts', async () => {
     const t = backend()

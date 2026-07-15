@@ -2,7 +2,7 @@
 
 Kriyan is an open-source, local-first productivity system and personal agent runtime. It combines tasks, reminders, calendar, notes, a Markdown second brain, and an agent workspace while keeping the product apps and agent node under the owner's control.
 
-Version 0.1.0 is a practical direct-download release for Apple-silicon macOS, Android, and an Ubuntu 24.04 x64 node. Only the documentation site is hosted publicly; the product UI, Convex deployment, vault, and agent runtime are owner-operated.
+Version 0.1.0 provides the practical direct-download apps for Apple-silicon macOS and Android. Version 0.1.1 patches the Ubuntu 24.04 x64 node and Darwin operator used by the live reference deployment. Only the documentation site is hosted publicly; the product UI, Convex deployment, vault, and agent runtime are owner-operated.
 
 ## Architecture
 
@@ -27,11 +27,14 @@ macOS / Android / local web
 
 ## Download V1
 
-The [v0.1.0 release page](https://github.com/kausthubh-coder/kriyan/releases/tag/v0.1.0) contains:
+The [v0.1.0 app release](https://github.com/kausthubh-coder/kriyan/releases/tag/v0.1.0) contains:
 
 - `Kriyan_0.1.0_aarch64.dmg` — Apple-silicon macOS desktop app.
 - `kriyan-android-v1.0.0.apk` — Android direct-install APK.
-- `kriyan-node-v0.1.0-linux-x64.tar.gz` plus checksum — Ubuntu 24.04 x64 CLI/node archive.
+
+The [v0.1.1 tooling patch](https://github.com/kausthubh-coder/kriyan/releases/tag/v0.1.1) contains the exact live-proven node/operator build:
+
+- `kriyan-node-v0.1.1-linux-x64.tar.gz` plus checksum — Ubuntu 24.04 x64 CLI/node archive.
 - `kriyan-darwin-arm64` plus checksum — macOS operator CLI for setup and remote VPS lifecycle commands.
 
 The macOS app is ad-hoc signed and strictly sealed, but has no Apple Developer ID signature and is not notarized. Control-click **Open** on first launch if macOS blocks a normal double-click. The Android APK is debug-signed for direct V1 installation; it is not a Play Store/AAB release.
@@ -112,9 +115,10 @@ Focused test commands are documented in [`test.md`](test.md). The codebase map a
 
 - macOS is Apple-silicon only, ad-hoc signed, and not notarized.
 - Android is a debug-signed direct-download APK; iOS and app-store distribution are not included.
-- The existing DigitalOcean service is healthy on its prior release, but promotion of this V1 candidate stopped after repeated `remote vps update failed` results and a healthy rollback. Do not claim the candidate is running there.
-- Live Agent Settings and `/agents` route preflight passed after the Strict Mode repair. A complete visible chat-to-node-to-result round trip is not claimed because both bounded browser-automation attempts failed in their tooling sessions.
-- Agent history windows are bounded for V1; large installations need explicit pagination and truncation UI.
+- The DigitalOcean reference service is healthy on exact node build `3bf3ec273a3b9fb407747a5ba1eed1857c2bca29`, published in v0.1.1. The earlier capability-registration failure rolled back safely before the corrected promotion passed.
+- A live local-browser Agent flow passed through Convex and the promoted VPS with a response and four ordered public events. It used the deterministic fake runtime, not Pi or a real model provider.
+- Agent history windows are bounded and disclosed in the UI; large installations still need full user-driven pagination.
+- V1 verifies one systemd process per stable node ID. Concurrent workers sharing a node ID do not yet have a process-generation fence.
 - Hetzner and self-hosted Convex follow the same architecture but do not yet have release-specific host proof.
 
 ## License

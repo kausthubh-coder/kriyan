@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { JSX } from 'react'
 
-import { releaseAssetUrls, releasePageUrl } from '@/lib/release'
+import { appReleasePageUrl, nodeReleasePageUrl, releaseAssetUrls } from '@/lib/release'
 
 export const metadata: Metadata = {
   title: 'Install and standalone CLI',
@@ -27,8 +27,8 @@ bun run kriyan setup \\
 bun run kriyan pair --config <private-config-path>`
 
 const standaloneCommands = `# Download the Linux archive, checksum, and macOS operator CLI
-# from v0.1.0. Verify every artifact before use.
-sha256sum --check kriyan-node-v0.1.0-linux-x64.tar.gz.sha256
+# from v0.1.1. Verify every artifact before use.
+sha256sum --check kriyan-node-v0.1.1-linux-x64.tar.gz.sha256
 shasum -a 256 --check kriyan-darwin-arm64.sha256
 chmod +x kriyan-darwin-arm64
 
@@ -40,8 +40,8 @@ chmod +x kriyan-darwin-arm64
   --host <host> --user <admin-user> \\
   --identity <ssh-private-key> --known-hosts <known-hosts-file> \\
   --host-key-policy strict \\
-  --release kriyan-node-v0.1.0-linux-x64.tar.gz \\
-  --checksum kriyan-node-v0.1.0-linux-x64.tar.gz.sha256 \\
+  --release kriyan-node-v0.1.1-linux-x64.tar.gz \\
+  --checksum kriyan-node-v0.1.1-linux-x64.tar.gz.sha256 \\
   --version <release-commit> --config <private-node-json>`
 
 const dataDirectoryChecks = `# Use the dataDir reported by doctor. The packaged default is shown here.
@@ -75,8 +75,8 @@ export default function InstallPage(): JSX.Element {
         <strong>Direct download, with explicit V1 signing boundaries.</strong>
         <p>
           macOS is ad-hoc signed and not notarized. Android is debug-signed for
-          direct installation. Verify checksums from the <a href={releasePageUrl}>release page</a>;
-          never pipe an unverified URL into a shell.
+          direct installation. Verify app checksums on <a href={appReleasePageUrl}>v0.1.0</a> and
+          node/operator checksums on <a href={nodeReleasePageUrl}>v0.1.1</a>; never pipe an unverified URL into a shell.
         </p>
       </aside>
 
@@ -128,9 +128,10 @@ export default function InstallPage(): JSX.Element {
           in the release archive.
         </p>
         <p>
-          The existing DigitalOcean service is healthy on its previous release.
-          Promotion of this candidate stopped after repeated <code>remote vps update failed</code>
-          results and a healthy rollback, so the candidate is not claimed as running there.
+          The reference DigitalOcean service is healthy on the exact promoted node build.
+          An earlier attempt failed because the stable node ID could not renegotiate
+          its legacy capability list; rollback restored the service, the Convex contract
+          was repaired, and the rebuilt candidate later passed promotion health gates.
         </p>
       </section>
 

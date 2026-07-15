@@ -112,7 +112,7 @@ export function useConvexRepository(
   const installation = useQuery(api.installations.get, { installationId })
   const connectionProbe = useQuery(
     api.read.connectionProbe,
-    connection.isWebSocketConnected && connection.connectionCount > 0
+    connection.isWebSocketConnected
       ? { installationId, connectionCount: connection.connectionCount }
       : 'skip',
   )

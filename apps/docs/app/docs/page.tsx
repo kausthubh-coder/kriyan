@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { JSX } from 'react'
 
-import { releasePageUrl } from '@/lib/release'
+import { appReleasePageUrl, nodeReleasePageUrl } from '@/lib/release'
 
 export const metadata: Metadata = {
   title: 'Documentation',
@@ -28,10 +28,9 @@ export default function DocsOverviewPage(): JSX.Element {
       <aside className="notice notice-cinnabar" aria-label="Release status">
         <strong>Open-source V1 is a direct-download release</strong>
         <p>
-          Download the macOS app, Android APK, Linux node archive, and Darwin
-          operator CLI from the <a href={releasePageUrl}>v0.1.0 release</a>. Only
-          this documentation is publicly hosted; the product remains local and
-          owner-operated.
+          Download the macOS app and Android APK from the <a href={appReleasePageUrl}>v0.1.0 app release</a>,
+          and the live-proven Linux node plus Darwin operator CLI from the <a href={nodeReleasePageUrl}>v0.1.1 tooling patch</a>.
+          Only this documentation is publicly hosted; the product remains local and owner-operated.
         </p>
       </aside>
 

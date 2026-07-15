@@ -231,6 +231,7 @@ export function useLiveWebRepository(
   }
 
   const reactive = useMemo(() => createSnapshotBridge(), [])
+  const reactiveLifecycleGeneration = useRef(0)
   useEffect(() => {
     if (!contractSnapshot) return
     const wire = parseClientSnapshotWire(contractSnapshot)
@@ -249,7 +250,17 @@ export function useLiveWebRepository(
       connection: base.connectionMode,
     })
   }, [base.connectionMode, contractSnapshot, reactive])
-  useEffect(() => () => reactive.repository.dispose(), [reactive])
+  useEffect(() => {
+    const generation = reactiveLifecycleGeneration.current + 1
+    reactiveLifecycleGeneration.current = generation
+    return () => {
+      queueMicrotask(() => {
+        if (reactiveLifecycleGeneration.current === generation) {
+          reactive.repository.dispose()
+        }
+      })
+    }
+  }, [reactive])
 
   return { repository, reactiveRepository: reactive.repository, connectionMode: base.connectionMode, connectionRecoveryRequired: base.connectionRecoveryRequired }
 }

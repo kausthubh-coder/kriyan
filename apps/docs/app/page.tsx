@@ -120,9 +120,9 @@ export default function HomePage(): JSX.Element {
             <h2 id="status-heading">Download the apps; operate the infrastructure.</h2>
           </div>
           <p>
-            V1 packages the local product clients and node tooling. The existing
-            DigitalOcean service remains healthy on its prior release after this
-            candidate&apos;s repeated update failure and rollback.
+            V1 packages the local product clients and node tooling. The current
+            candidate is healthy on the reference DigitalOcean node, and its
+            browser-to-node Agent path has passed with the deterministic runtime.
           </p>
         </div>
 
@@ -140,8 +140,8 @@ export default function HomePage(): JSX.Element {
             <h3><span className="status-mark planned" />Boundaries</h3>
             <ul>
               <li>macOS is ad-hoc signed and not notarized; Android is debug-signed for direct installation.</li>
-              <li>The candidate is not promoted to the existing VPS; it remains healthy on the prior release.</li>
-              <li>A complete visible live Agent chat round trip, iOS, Hetzner, and self-hosted Convex remain unproven.</li>
+              <li>The promoted node and Agent UI round trip use a deterministic fake runtime; Pi and a real model provider remain separate proof.</li>
+              <li>iOS, physical Android, Hetzner, self-hosted Convex, and app-store distribution remain unproven.</li>
             </ul>
           </section>
         </div>

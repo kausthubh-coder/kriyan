@@ -24,6 +24,7 @@ afterEach(async () => {
 class FakeRunner implements CommandRunner {
   readonly calls: Array<{ command: string; args: string[] }> = []
   failScp = false
+  failRemoteUpdate = false
 
   async run(
     command: string,
@@ -47,6 +48,13 @@ class FakeRunner implements CommandRunner {
     }
     if (command === 'scp' && this.failScp) {
       return { exitCode: 1, stdout: '', stderr: 'transfer detail must stay private' }
+    }
+    if (command === 'ssh' && this.failRemoteUpdate && args.at(-1)?.includes('update.sh')) {
+      return {
+        exitCode: 1,
+        stdout: '',
+        stderr: 'untrusted detail\nupdate failed at health stage (status 1); previous release restored and healthy\n',
+      }
     }
     if (command === 'ssh' && args.at(-1)?.includes("'vps' 'doctor' '--local'")) {
       return {
@@ -170,6 +178,20 @@ test('failed transfer returns a stable error and still cleans remote staging', a
   ], { runner, randomId: () => 'failed-transfer' })).rejects.toBeInstanceOf(VpsRuntimeError)
   expect(runner.calls.at(-1)?.command).toBe('ssh')
   expect(runner.calls.at(-1)?.args.at(-1)).toContain('/tmp/kriyan-transfer-failed-transfer')
+})
+
+test('failed remote update reports its controlled lifecycle stage without arbitrary stderr', async () => {
+  const item = await fixture('/var/lib/kriyan/node')
+  const runner = new FakeRunner()
+  runner.failRemoteUpdate = true
+  await expect(runVpsCommand('update', [
+    ...remoteOptions(),
+    '--release', item.archive,
+    '--checksum', item.checksum,
+    '--version', RELEASE_SHA,
+  ], { runner, randomId: () => 'failed-update' })).rejects.toThrow(
+    'remote vps update failed: update failed at health stage (status 1); previous release restored and healthy',
+  )
 })
 
 test('local status and doctor report release, systemd, and process identity without config contents', async () => {

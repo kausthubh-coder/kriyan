@@ -7,6 +7,7 @@ import { v } from 'convex/values'
 import { query } from './_generated/server'
 import {
   assertId,
+  assertNonNegativeInteger,
   assertPositiveInteger,
   MAX_PAGE_SIZE,
   withoutSystemFields,
@@ -82,7 +83,7 @@ export const connectionProbe = query({
   ),
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
-    assertPositiveInteger(
+    assertNonNegativeInteger(
       args.connectionCount,
       'connectionCount',
       Number.MAX_SAFE_INTEGER,
@@ -224,10 +225,18 @@ export const agentRunEvents = query({
     installationId: v.string(),
     runIds: v.array(v.string()),
   },
-  returns: v.array(runEventValue),
+  returns: v.object({
+    items: v.array(runEventValue),
+    queriedRunIds: v.array(v.string()),
+    runIdLimit: v.number(),
+    truncatedRunIds: v.array(v.string()),
+  }),
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
-    if (args.runIds.length > 20) throw new Error('runIds must contain at most 20 values')
+    const runIdLimit = 20
+    if (args.runIds.length > runIdLimit) {
+      throw new Error(`runIds must contain at most ${runIdLimit} values`)
+    }
     if (new Set(args.runIds).size !== args.runIds.length) throw new Error('runIds must not contain duplicates')
     for (const runId of args.runIds) assertId(runId, 'runId')
     const pages = await Promise.all(args.runIds.map(async (runId) => {
@@ -237,10 +246,19 @@ export const agentRunEvents = query({
           .eq('installationId', args.installationId)
           .eq('runId', runId))
         .order('desc')
-        .take(50)
-      return events.reverse().map(withoutSystemFields)
+        .take(51)
+      return {
+        items: events.slice(0, 50).reverse().map(withoutSystemFields),
+        truncated: events.length > 50,
+        runId,
+      }
     }))
-    return pages.flat()
+    return {
+      items: pages.flatMap((page) => page.items),
+      queriedRunIds: args.runIds,
+      runIdLimit,
+      truncatedRunIds: pages.filter((page) => page.truncated).map((page) => page.runId),
+    }
   },
 })
 

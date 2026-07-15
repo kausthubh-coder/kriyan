@@ -95,7 +95,9 @@ export function updateConnectionTracker(
       : {
           ...mounted,
           clientGeneration: event.clientGeneration,
-          disconnectCount: event.observation.connectionCount,
+          disconnectCount: event.observation.hasEverConnected
+            ? event.observation.connectionCount
+            : -1,
           recovery: 'awaiting-ready',
           confirmationDeadlineAt: event.browserOnline
             ? event.now + RECONNECT_CONFIRMATION_TIMEOUT_MS
@@ -110,7 +112,7 @@ export function updateConnectionTracker(
       mounted: true,
       browserOnline: event.browserOnline,
       hasEverConnected: state.hasEverConnected,
-      disconnectCount: 0,
+      disconnectCount: -1,
       recovery: 'awaiting-ready',
       confirmationDeadlineAt: event.browserOnline
         ? event.now + RECONNECT_CONFIRMATION_TIMEOUT_MS

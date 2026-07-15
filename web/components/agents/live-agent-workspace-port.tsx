@@ -1,6 +1,6 @@
 'use client'
 
-import { createClientId } from '@kriyan/client-core'
+import { createClientId, nextClockDelay } from '@kriyan/client-core'
 import type { FunctionReturnType } from 'convex/server'
 import {
   useConvexConnectionState,
@@ -26,6 +26,7 @@ import type {
   AgentWorkspacePortErrorCode,
   AgentWorkspacePortResult,
   AgentWorkspaceSnapshot,
+  CreateAgentInput,
   CreateAgentThreadInput,
   ReviseAgentInput,
   SubmitAgentMessageInput,
@@ -97,7 +98,7 @@ function currentRun(activity: ActivityWire): ActivityWire['run'] {
   return activity.run
 }
 
-function eventKind(event: RecentRunEvents[number]): AgentRunEventView['kind'] {
+function eventKind(event: RecentRunEvents['items'][number]): AgentRunEventView['kind'] {
   if (event.type === 'status') return 'run.started'
   if (event.type === 'message') return 'message.delta'
   if (event.type === 'error') return 'run.failed'
@@ -130,7 +131,7 @@ function eventSummary(data: string): string {
   return data || 'Runtime update received.'
 }
 
-function mapEvent(event: RecentRunEvents[number]): AgentRunEventView {
+function mapEvent(event: RecentRunEvents['items'][number]): AgentRunEventView {
   const kind = eventKind(event)
   const title: Record<AgentRunEventView['kind'], string> = {
     'run.claimed': 'Run claimed',
@@ -297,6 +298,8 @@ function mapWorkspace(
   wire: ClientSnapshotWire | undefined,
   definitions: DefinitionRows | undefined,
   recentEvents: RecentRunEvents | undefined,
+  requestedRunIds: readonly string[],
+  now: number,
 ): MappedWorkspace {
   const connectionDetail = connection === 'online'
     ? 'Reactive Convex subscriptions are connected.'
@@ -327,13 +330,12 @@ function mapWorkspace(
     }
   }
 
-  const now = Date.now()
   const agents = definitions.map(mapDefinition)
   const messages = wire.agents.messages.map(mapMessage)
     .sort((left, right) => left.turnOrdinal - right.turnOrdinal || left.createdAt - right.createdAt)
   const nodes = wire.nodes.items.map((node) => mapNode(node, now))
   const eventsByRun = new Map<string, AgentRunEventView[]>()
-  for (const event of (recentEvents ?? []).map(mapEvent)) {
+  for (const event of (recentEvents?.items ?? []).map(mapEvent)) {
     eventsByRun.set(event.runId, [...(eventsByRun.get(event.runId) ?? []), event])
   }
   const runs = wire.nodes.activity
@@ -346,6 +348,33 @@ function mapWorkspace(
     .sort((left, right) => right.updatedAt - left.updatedAt)
   const activityByRunId = new Map<string, ActivityWire>()
   for (const activity of wire.nodes.activity) activityByRunId.set(syntheticRunId(activity), activity)
+  const requestedRunIdSet = new Set(recentEvents?.queriedRunIds ?? requestedRunIds)
+  const visibleRunIds = wire.nodes.activity.flatMap((activity) => {
+    const run = currentRun(activity)
+    return run ? [run.runId] : []
+  })
+  const queriedVisibleRunCount = visibleRunIds.filter((runId) => requestedRunIdSet.has(runId)).length
+  const unqueriedRunCount = visibleRunIds.length - queriedVisibleRunCount
+  const coverageNotices = [
+    wire.windows.threads.truncated
+      ? `Threads are limited to ${wire.windows.threads.returned} records in identifier-index order; this window is not guaranteed to contain the most recently updated threads.`
+      : undefined,
+    wire.windows.messages.truncated
+      ? `Messages are limited to ${wire.windows.messages.returned} records in identifier-index order; this window is not guaranteed to contain the most recently updated messages.`
+      : undefined,
+    wire.windows.activity.truncated
+      ? `Runs are derived from the newest ${wire.windows.activity.returned} commands by creation time; older command activity is not loaded.`
+      : undefined,
+    wire.windows.nodes.truncated
+      ? `Nodes are limited to ${wire.windows.nodes.returned} records in identifier-index order.`
+      : undefined,
+    unqueriedRunCount > 0
+      ? `Run-event subscriptions cover ${queriedVisibleRunCount} of ${visibleRunIds.length} visible run histories (maximum ${recentEvents?.runIdLimit ?? 20}), starting from the newest command activity. For the other ${unqueriedRunCount}, an empty timeline means history was not loaded—not that the run had no events.`
+      : undefined,
+    recentEvents && recentEvents.truncatedRunIds.length > 0
+      ? `${recentEvents.truncatedRunIds.length} subscribed run ${recentEvents.truncatedRunIds.length === 1 ? 'timeline is' : 'timelines are'} limited to the newest 50 public events.`
+      : undefined,
+  ].filter((item): item is string => item !== undefined)
   return {
     snapshot: {
       mode: 'live',
@@ -357,6 +386,9 @@ function mapWorkspace(
       messages,
       runs,
       nodes,
+      coverageNotice: coverageNotices.length > 0
+        ? coverageNotices.join(' ')
+        : undefined,
     },
     activityByRunId,
     threadsById: new Map(wire.agents.threads.map((thread) => [thread.threadId, thread])),
@@ -366,6 +398,7 @@ function mapWorkspace(
 
 interface LiveOperations {
   refresh(): Promise<AgentWorkspacePortResult>
+  createAgent(input: CreateAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>>
   createThread(input: CreateAgentThreadInput): Promise<AgentWorkspacePortResult<AgentThreadView>>
   renameThread(threadId: string, title: string): Promise<AgentWorkspacePortResult<AgentThreadView>>
   reviseAgent(input: ReviseAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>>
@@ -377,6 +410,7 @@ interface LiveOperations {
 
 const UNAVAILABLE_OPERATIONS: LiveOperations = {
   refresh: async () => failure('offline', 'The live adapter is still loading.'),
+  createAgent: async () => failure('offline', 'The live adapter is still loading.'),
   createThread: async () => failure('offline', 'The live adapter is still loading.'),
   renameThread: async () => failure('offline', 'The live adapter is still loading.'),
   reviseAgent: async () => failure('offline', 'The live adapter is still loading.'),
@@ -402,6 +436,7 @@ class ReactiveAgentWorkspacePort implements AgentWorkspacePort {
     for (const listener of [...this.listeners]) listener()
   }
   refresh = (): Promise<AgentWorkspacePortResult> => this.operations.refresh()
+  createAgent = (input: CreateAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>> => this.operations.createAgent(input)
   createThread = (input: CreateAgentThreadInput): Promise<AgentWorkspacePortResult<AgentThreadView>> => this.operations.createThread(input)
   renameThread = (threadId: string, title: string): Promise<AgentWorkspacePortResult<AgentThreadView>> => this.operations.renameThread(threadId, title)
   reviseAgent = (input: ReviseAgentInput): Promise<AgentWorkspacePortResult<AgentDefinitionView>> => this.operations.reviseAgent(input)
@@ -434,7 +469,20 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
     api.read.agentRunEvents,
     installation && wire ? { installationId, runIds: recentRunIds } : 'skip',
   )
+  const [clock, setClock] = useState(() => Date.now())
+  const heartbeatTimestamps = useMemo(
+    () => wire?.nodes.items.map((node) => node.lastHeartbeatAt) ?? [],
+    [wire],
+  )
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setClock(Date.now()),
+      nextClockDelay(clock, heartbeatTimestamps),
+    )
+    return () => window.clearTimeout(timeout)
+  }, [clock, heartbeatTimestamps])
 
+  const createAgentMutation = useMutation(api.agents.create)
   const createThreadMutation = useMutation(api.agents.createThread)
   const renameThreadMutation = useMutation(api.agents.renameThread)
   const reviseAgentMutation = useMutation(api.agents.revise)
@@ -444,14 +492,48 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
   const resetSessionMutation = useMutation(api.agents.resetSession)
 
   const mapped = useMemo(
-    () => mapWorkspace(connection, installation, wire, definitions, recentEvents),
-    [connection, definitions, installation, recentEvents, wire],
+    () => mapWorkspace(connection, installation, wire, definitions, recentEvents, recentRunIds, clock),
+    [clock, connection, definitions, installation, recentEvents, recentRunIds, wire],
   )
   const online = connection === 'online'
   const operations = useMemo<LiveOperations>(() => ({
     refresh: async () => {
       controls.recreate()
       return success(undefined)
+    },
+    createAgent: async (input) => {
+      const displayName = input.displayName.trim()
+      const systemPrompt = input.systemPromptSummary.trim()
+      if (!displayName || !systemPrompt) return failure('invalid_input', 'Name and instructions are required.')
+      const agentId = createClientId('agent')
+      const agentRevisionId = createClientId('agent-revision')
+      const toolCapabilities = [...new Set(input.toolCapabilities.map((item) => item.trim()).filter(Boolean))]
+      try {
+        const result = await createAgentMutation({
+          installationId,
+          agentId,
+          agentRevisionId,
+          displayName,
+          systemPrompt,
+          toolCapabilities,
+        })
+        return success({
+          agentId: result.agent.agentId,
+          displayName: result.agent.displayName,
+          currentRevisionId: result.agent.currentRevisionId,
+          revision: result.agent.revision,
+          revisions: [{
+            revisionId: result.revision.agentRevisionId,
+            ordinal: result.revision.ordinal,
+            displayName: result.revision.displayName,
+            systemPromptSummary: result.revision.systemPrompt,
+            toolCapabilities: result.revision.toolCapabilities,
+            createdAt: result.revision.createdAt,
+          }],
+        })
+      } catch (error) {
+        return exceptionFailure(error, online)
+      }
     },
     createThread: async (input) => {
       const title = input.title.trim()
@@ -627,6 +709,7 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
   }), [
     cancelMutation,
     controls,
+    createAgentMutation,
     createThreadMutation,
     installationId,
     mapped,

@@ -70,10 +70,11 @@ export default function DesktopPage(): JSX.Element {
           <li>A temporary node stop leaves queued work visible and recovery completes it.</li>
         </ul>
         <p>
-          An earlier accepted release proved the full desktop → Convex → Ubuntu
-          VPS → reminder → desktop path. This V1 candidate is not promoted to the
-          existing VPS after its repeated update failure and healthy rollback, so
-          that candidate-specific round trip is not claimed. Check <Link href="/docs/status">current status</Link> for the exact boundary.
+          The promoted node candidate and local browser client proved
+          the complete Agent → Convex → Ubuntu VPS → Convex → Agent path with the
+          deterministic runtime. The exact packaged Tauri app has not repeated that
+          live Agent proof, so keep browser-client and packaged-desktop evidence distinct.
+          Check <Link href="/docs/status">current status</Link> for the exact boundary.
         </p>
       </section>
     </article>
