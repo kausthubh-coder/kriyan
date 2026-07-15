@@ -11,8 +11,10 @@ The release command creates an Apple-silicon macOS application and a drag-to-ins
 
 - `apps/desktop/src-tauri/target/release/bundle/macos/Kriyan.app`
 - `apps/desktop/src-tauri/target/release/bundle/dmg/Kriyan_0.1.0_aarch64.dmg`
+- `apps/desktop/dist/release/Kriyan_0.1.0_aarch64.dmg`
+- `apps/desktop/dist/release/Kriyan_0.1.0_aarch64.dmg.sha256`
 
-The build receives a local ad-hoc signature so the bundle is internally sealed, but it has no Apple Developer ID signature and is not notarized for V1. A user may need to control-click the app and choose **Open** the first time. Developer ID signing and App Store distribution are separate release steps.
+The build ad-hoc signs both the executable and app bundle, then fails unless `codesign --verify --deep --strict` confirms the resource seal. It has no Apple Developer ID signature and is not notarized for V1. A user may need to control-click the app and choose **Open** the first time. Developer ID signing and App Store distribution are separate release steps.
 
 On first launch, Kriyan asks for the owner's Convex deployment URL and installation ID, or offers a fully offline demo. No Next.js server or bundled credential is required.
 

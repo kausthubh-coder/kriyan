@@ -17,6 +17,7 @@ import {
   persistDemoNote,
   restoreDemoKnowledge,
 } from '@/components/knowledge/demo-knowledge-persistence'
+import { knowledgeDetailHref } from '@/components/knowledge/route-id'
 import type { WebRepository } from '@/src/client-core/web-repository'
 
 import { NoteEditor } from './note-editor'
@@ -490,7 +491,10 @@ export function NotesWorkspace({
                         </div>
                         <Link
                           className={styles.textLink}
-                          href={`/artifacts/${encodeURIComponent(artifact.artifactId)}`}
+                          href={knowledgeDetailHref(
+                            'artifact',
+                            artifact.artifactId,
+                          )}
                         >
                           Inspect
                         </Link>

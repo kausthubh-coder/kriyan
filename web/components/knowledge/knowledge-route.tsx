@@ -24,6 +24,7 @@ import styles from '@/components/productivity/productivity.module.css'
 import { ProductRouteFrame } from '@/components/layout/product-navigation'
 
 import { restoreDemoKnowledge } from './demo-knowledge-persistence'
+import { knowledgeDetailHref } from './route-id'
 
 export type KnowledgeRouteView =
   | { kind: 'today' }
@@ -380,7 +381,10 @@ function TodayKnowledge({ repository }: { repository: WebRepository }) {
                     </div>
                     <Link
                       className={styles.textLink}
-                      href={`/sources/${encodeURIComponent(source.sourceRefId)}`}
+                      href={knowledgeDetailHref(
+                        'source',
+                        source.sourceRefId,
+                      )}
                     >
                       Inspect
                     </Link>
@@ -569,7 +573,7 @@ function ArtifactList({ repository }: { repository: WebRepository }) {
               </div>
               <Link
                 className={styles.textLink}
-                href={`/artifacts/${encodeURIComponent(artifact.artifactId)}`}
+                href={knowledgeDetailHref('artifact', artifact.artifactId)}
               >
                 Inspect history
               </Link>
@@ -879,7 +883,7 @@ function MemoryRow({ item }: { item: KnowledgeDocumentItem }) {
       </div>
       <Link
         className={styles.textLink}
-        href={`/entities/${encodeURIComponent(item.knowledgeDocumentId)}`}
+        href={knowledgeDetailHref('entity', item.knowledgeDocumentId)}
       >
         Open entity
       </Link>
@@ -1069,7 +1073,7 @@ function EntityDetail({
                   </div>
                   <Link
                     className={styles.textLink}
-                    href={`/sources/${encodeURIComponent(item.sourceRefId)}`}
+                    href={knowledgeDetailHref('source', item.sourceRefId)}
                   >
                     Open source
                   </Link>

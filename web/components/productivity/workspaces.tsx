@@ -13,6 +13,7 @@ import {
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 
+import { knowledgeDetailHref } from '@/components/knowledge/route-id'
 import type {
   CalendarDraft,
   ReminderDraft,
@@ -1229,7 +1230,10 @@ export function SourcesWorkspace({
                 </div>
                 <div className="row-actions">
                   <Link
-                    href={`/sources/${encodeURIComponent(source.sourceRefId)}`}
+                    href={knowledgeDetailHref(
+                      'source',
+                      source.sourceRefId,
+                    )}
                   >
                     Inspect evidence
                   </Link>
@@ -1346,7 +1350,10 @@ export function EntitiesWorkspace({
               </div>
               <h2>
                 <Link
-                  href={`/entities/${encodeURIComponent(document.knowledgeDocumentId)}`}
+                  href={knowledgeDetailHref(
+                    'entity',
+                    document.knowledgeDocumentId,
+                  )}
                 >
                   {document.title}
                 </Link>
@@ -1363,7 +1370,7 @@ export function EntitiesWorkspace({
                   return (
                     <Link
                       key={sourceId}
-                      href={`/sources/${encodeURIComponent(sourceId)}`}
+                      href={knowledgeDetailHref('source', sourceId)}
                     >
                       {source?.displayName ?? sourceId}
                     </Link>
