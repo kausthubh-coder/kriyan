@@ -81,6 +81,36 @@ export const revise = mutation({
   },
 })
 
+export const listDefinitions = query({
+  args: { installationId: v.string() },
+  returns: v.array(v.object({
+    agent: agentValue,
+    revisions: v.array(agentRevisionValue),
+  })),
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    const agents = await ctx.db
+      .query('agents')
+      .withIndex('by_installation_agent', (q) => q.eq('installationId', args.installationId))
+      .take(MAX_PAGE_SIZE)
+    return await Promise.all(agents
+      .filter((agent) => agent.deletedAt === undefined)
+      .map(async (agent) => {
+        const revisions = await ctx.db
+          .query('agentRevisions')
+          .withIndex('by_installation_agent_ordinal', (q) => q
+            .eq('installationId', args.installationId)
+            .eq('agentId', agent.agentId))
+          .order('desc')
+          .take(MAX_PAGE_SIZE)
+        return {
+          agent: withoutSystemFields(agent),
+          revisions: revisions.map(withoutSystemFields),
+        }
+      }))
+  },
+})
+
 export const createThread = mutation({
   args: { installationId: v.string(), threadId: v.string(), agentId: v.string(), title: v.optional(v.string()), preferredNodeId: v.optional(v.string()) },
   returns: v.object({ created: v.boolean(), thread: agentThreadValue }),
@@ -100,6 +130,35 @@ export const createThread = mutation({
     await ctx.db.insert('agentThreads', thread)
     await advanceClientSnapshotRevision(ctx, args.installationId)
     return { created: true, thread }
+  },
+})
+
+export const renameThread = mutation({
+  args: { installationId: v.string(), threadId: v.string(), title: v.string() },
+  returns: v.union(
+    v.object({ ok: v.literal(true), thread: agentThreadValue }),
+    v.object({ ok: v.literal(false), reason: v.literal('not_found') }),
+  ),
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    assertId(args.threadId, 'threadId')
+    assertShortText(args.title, 'title')
+    const thread = await ctx.db
+      .query('agentThreads')
+      .withIndex('by_installation_thread', (q) => q
+        .eq('installationId', args.installationId)
+        .eq('threadId', args.threadId))
+      .unique()
+    if (thread === null || thread.deletedAt !== undefined) {
+      return { ok: false as const, reason: 'not_found' as const }
+    }
+    const now = Date.now()
+    await ctx.db.patch(thread._id, { title: args.title, updatedAt: now })
+    await advanceClientSnapshotRevision(ctx, args.installationId)
+    return {
+      ok: true as const,
+      thread: withoutSystemFields({ ...thread, title: args.title, updatedAt: now }),
+    }
   },
 })
 

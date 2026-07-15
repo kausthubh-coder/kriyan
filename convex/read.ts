@@ -219,6 +219,31 @@ export const runEvents = query({
   },
 })
 
+export const agentRunEvents = query({
+  args: {
+    installationId: v.string(),
+    runIds: v.array(v.string()),
+  },
+  returns: v.array(runEventValue),
+  handler: async (ctx, args) => {
+    assertId(args.installationId, 'installationId')
+    if (args.runIds.length > 20) throw new Error('runIds must contain at most 20 values')
+    if (new Set(args.runIds).size !== args.runIds.length) throw new Error('runIds must not contain duplicates')
+    for (const runId of args.runIds) assertId(runId, 'runId')
+    const pages = await Promise.all(args.runIds.map(async (runId) => {
+      const events = await ctx.db
+        .query('runEvents')
+        .withIndex('by_installation_run_sequence', (q) => q
+          .eq('installationId', args.installationId)
+          .eq('runId', runId))
+        .order('desc')
+        .take(50)
+      return events.reverse().map(withoutSystemFields)
+    }))
+    return pages.flat()
+  },
+})
+
 export const clientSnapshot = query({
   args: { installationId: v.string() },
   returns: clientSnapshotValue,
