@@ -1,5 +1,5 @@
-import { TodayApp } from '@/components/today/today-app'
+import { redirect } from 'next/navigation'
 
 export default function RootPage() {
-  return <TodayApp initialSection="today" />
+  redirect('/today')
 }

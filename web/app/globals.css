@@ -98,6 +98,11 @@ svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
 .node-summary .node-state-label { flex-direction: row; color: var(--ink-soft); }
 
 .mobile-header, .mobile-nav { display: none; }
+.route-shell { grid-template-columns: 224px minmax(0, 1fr); }
+.route-content { min-width: 0; grid-column: 2; }
+.brand-copy { min-width: 0; display: flex; flex-direction: column; }
+.route-boundary { margin-top: auto; min-height: 44px; padding: 0.75rem; display: flex; align-items: center; gap: 0.55rem; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.68rem; }
+.route-mobile-label { color: var(--ink-muted); font-size: 0.7rem; font-weight: 620; }
 .main-content { min-width: 0; padding: 3.2rem clamp(1.5rem, 5vw, 4.8rem) 5rem; background: var(--canvas); }
 .page-header { margin-bottom: 2rem; }
 .page-header p { margin: 0 0 0.42rem; color: var(--primary); font-size: 0.76rem; font-weight: 650; }
@@ -250,12 +255,14 @@ svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
 
 @media (max-width: 1120px) {
   .app-shell { grid-template-columns: 204px minmax(0, 1fr); }
+  .route-shell { grid-template-columns: 204px minmax(0, 1fr); }
   .activity-rail { grid-column: 2; position: static; height: auto; padding: 1.25rem clamp(1.5rem, 5vw, 4.8rem) 4rem; overflow: visible; border-top: 1px solid var(--line); border-left: 0; }
 }
 
 @media (max-width: 720px) {
   html { scroll-padding-bottom: var(--mobile-navigation-clearance); }
   .app-shell { display: block; padding-bottom: var(--mobile-navigation-clearance); }
+  .route-content { display: block; }
   .side-rail { display: none; }
   .mobile-header { position: sticky; top: 0; min-height: 56px; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: color-mix(in oklch, var(--surface) 94%, transparent); backdrop-filter: blur(12px); z-index: var(--z-sticky); }
   .brand-compact { padding: 0; }

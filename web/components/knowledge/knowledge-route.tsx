@@ -21,6 +21,7 @@ import { useDemoRepository } from '@/src/client-core/demo-repository'
 import { useLiveWebRepository } from '@/src/client-core/live-web-repository'
 import type { WebRepository } from '@/src/client-core/web-repository'
 import styles from '@/components/productivity/productivity.module.css'
+import { ProductRouteFrame } from '@/components/layout/product-navigation'
 
 import { restoreDemoKnowledge } from './demo-knowledge-persistence'
 
@@ -110,10 +111,14 @@ function resultNotice(
 
 export function KnowledgeRoute({ view }: { view: KnowledgeRouteView }) {
   const { settings } = useRuntimeSettings()
-  return settings.demoMode ? (
-    <DemoKnowledgeRoute view={view} />
-  ) : (
-    <LiveKnowledgeRoute view={view} configuration={settings} />
+  return (
+    <ProductRouteFrame>
+      {settings.demoMode ? (
+        <DemoKnowledgeRoute view={view} />
+      ) : (
+        <LiveKnowledgeRoute view={view} configuration={settings} />
+      )}
+    </ProductRouteFrame>
   )
 }
 

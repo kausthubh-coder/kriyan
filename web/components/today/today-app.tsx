@@ -35,40 +35,24 @@ import {
   type ResultHandler,
 } from '@/components/productivity/workspaces'
 import { RuntimeSettingsWorkspace } from '@/components/productivity/runtime-settings'
+import { ProductNavigation } from '@/components/layout/product-navigation'
 
 import {
   ActivityIcon,
   BellIcon,
-  CalendarIcon,
   CheckIcon,
   ChevronIcon,
   CloseIcon,
   EditIcon,
-  EntityIcon,
   NodeIcon,
-  NoteIcon,
   PlusIcon,
   RetryIcon,
   SendIcon,
-  SettingsIcon,
-  SourceIcon,
   TaskIcon,
-  TodayIcon,
 } from './icons'
 
 export type Section = 'today' | 'tasks' | 'reminders' | 'calendar' | 'notes' | 'sources' | 'entities' | 'settings'
 type NoticeValue = { tone: 'error' | 'success'; text: string }
-
-const NAV_ITEMS: Array<{ key: Section; label: string; href: string; icon: typeof TodayIcon }> = [
-  { key: 'today', label: 'Today', href: '/', icon: TodayIcon },
-  { key: 'tasks', label: 'Tasks', href: '/tasks', icon: TaskIcon },
-  { key: 'reminders', label: 'Reminders', href: '/reminders', icon: BellIcon },
-  { key: 'calendar', label: 'Calendar', href: '/calendar', icon: CalendarIcon },
-  { key: 'notes', label: 'Notes', href: '/notes', icon: NoteIcon },
-  { key: 'sources', label: 'Sources', href: '/sources', icon: SourceIcon },
-  { key: 'entities', label: 'Entities', href: '/entities', icon: EntityIcon },
-  { key: 'settings', label: 'Settings', href: '/settings', icon: SettingsIcon },
-]
 
 function eventData(data: string): string {
   try {
@@ -199,9 +183,7 @@ function RepositoryTodayApp({ initialSection, repository, connectionMode, connec
     <div className="app-shell">
       <aside className="side-rail" aria-label="Primary navigation">
         <Brand connectionMode={connectionMode} displayName={displayName} demoMode={demoMode} />
-        <nav className="primary-nav">
-          {NAV_ITEMS.map((item) => <NavItem key={item.key} item={item} active={item.key === initialSection} />)}
-        </nav>
+        <ProductNavigation className="primary-nav" />
         <NodeSummary nodes={repository.nodes} liveNodes={liveNodes} now={now} demoMode={demoMode} />
       </aside>
 
@@ -290,9 +272,7 @@ function RepositoryTodayApp({ initialSection, repository, connectionMode, connec
         />
       </aside>
 
-      <nav className="mobile-nav" aria-label="Primary navigation">
-        {NAV_ITEMS.map((item) => <NavItem key={item.key} item={item} active={item.key === initialSection} />)}
-      </nav>
+      <ProductNavigation className="mobile-nav" />
     </div>
   )
 }
@@ -321,11 +301,6 @@ export function Brand({ connectionMode, displayName = 'Personal agent', demoMode
       </span>
     </div>
   )
-}
-
-function NavItem({ item, active }: { item: (typeof NAV_ITEMS)[number]; active: boolean }) {
-  const Icon = item.icon
-  return <Link href={item.href} className={`nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined}><Icon /><span>{item.label}</span></Link>
 }
 
 export function NodeSummary({ nodes, liveNodes, now, demoMode = false, compact = false }: { nodes: NodeItem[]; liveNodes: NodeItem[]; now: number | null; demoMode?: boolean; compact?: boolean }) {
