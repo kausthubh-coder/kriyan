@@ -14,7 +14,7 @@ import {
   type FauxProviderHandle,
 } from '@earendil-works/pi-ai/providers/faux'
 
-import type { ReminderProduct } from '@kriyan/tools'
+import type { ProductToolCall, ReminderProduct } from '@kriyan/tools'
 import type { CitationMetadata, SearchMode, SearchResponse } from '@kriyan/knowledge-vault'
 
 export interface KnowledgeRetriever {
@@ -59,11 +59,18 @@ export interface RuntimeRequest {
   input: string
   workspace: string
   signal: AbortSignal
+  mode?: 'legacy-reminder' | 'agent-turn'
+  systemPrompt?: string
+  messages?: Array<{ role: 'user' | 'assistant' | 'system' | 'tool'; content: string }>
+  citedContext?: string
+  toolCapabilities?: string[]
 }
 
 export interface RuntimeResult {
   products: ReminderProduct[]
   summary: string
+  assistantContent?: string
+  toolCalls?: ProductToolCall[]
 }
 
 export interface AgentRuntimeSession {
@@ -108,6 +115,11 @@ export class FakeAgentRuntime implements AgentRuntime {
           await emit(event)
         }
         await step({ type: 'status', data: 'runtime_started' })
+        if (request.mode === 'agent-turn') {
+          const assistantContent = `Completed: ${request.input.trim()}`.slice(0, 8_192)
+          await step({ type: 'message', data: assistantContent })
+          return { products: [], summary: 'Agent turn completed', assistantContent, toolCalls: [] }
+        }
         await step({ type: 'message', data: 'Interpreting reminder command' })
         const reminder = deterministicReminder(request.input, now())
         await step({
@@ -162,6 +174,37 @@ function extractReminder(text: string): ReminderProduct[] {
   return [parsed as ReminderProduct]
 }
 
+function extractAgentOutput(text: string): {
+  assistantContent: string
+  toolCalls: ProductToolCall[]
+} {
+  const match = text.match(/<kriyan-result>(.*?)<\/kriyan-result>/s)
+  if (match?.[1] === undefined) return { assistantContent: text.trim(), toolCalls: [] }
+  const parsed: unknown = JSON.parse(match[1])
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('Pi returned an invalid agent result')
+  }
+  const value = parsed as { assistantContent?: unknown; toolCalls?: unknown }
+  if (typeof value.assistantContent !== 'string' || !Array.isArray(value.toolCalls)) {
+    throw new Error('Pi returned an invalid agent result')
+  }
+  const toolCalls: ProductToolCall[] = value.toolCalls.map((entry) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error('Pi returned an invalid tool call')
+    }
+    const call = entry as { tool?: unknown; input?: unknown }
+    if (
+      !['kriyan.task', 'kriyan.reminder', 'kriyan.note', 'kriyan.source', 'kriyan.knowledge']
+        .includes(String(call.tool)) ||
+      typeof call.input !== 'object' || call.input === null || Array.isArray(call.input)
+    ) {
+      throw new Error('Pi returned an invalid tool call')
+    }
+    return call as ProductToolCall
+  })
+  return { assistantContent: value.assistantContent.slice(0, 64 * 1024), toolCalls }
+}
+
 export class PiAgentRuntime implements AgentRuntime {
   constructor(private readonly sessions: PiSessionFactory) {}
 
@@ -188,8 +231,10 @@ export class PiAgentRuntime implements AgentRuntime {
           if (normalized !== null) {
             if (normalized.type === 'message') {
               chunks.push(normalized.data)
-              textBuffer += normalized.data
-              if (textBuffer.length >= 512) flushText()
+              if (request.mode !== 'agent-turn') {
+                textBuffer += normalized.data
+                if (textBuffer.length >= 512) flushText()
+              }
             } else {
               flushText()
               pending = pending.then(() => emit(normalized))
@@ -199,12 +244,27 @@ export class PiAgentRuntime implements AgentRuntime {
         const onAbort = (): void => void session.abort()
         request.signal.addEventListener('abort', onAbort, { once: true })
         try {
-          await session.prompt(
-            `${request.input}\nReturn product output only as <kriyan-reminder>{"kind":"reminder","message":"...","remindAt":0,"timezone":"UTC"}</kriyan-reminder>. Never include private reasoning.`,
-          )
+          const prompt = request.mode === 'agent-turn'
+            ? [
+                request.systemPrompt ?? 'You are Kriyan, the owner\'s personal agent.',
+                request.citedContext === undefined ? '' : `Cited context:\n${request.citedContext}`,
+                `Conversation:\n${JSON.stringify(request.messages ?? [])}`,
+                `Owner request:\n${request.input}`,
+                `Allowed tools: ${(request.toolCapabilities ?? []).join(', ')}`,
+                'Return only <kriyan-result>{"assistantContent":"...","toolCalls":[{"tool":"kriyan.task","input":{...}}]}</kriyan-result>. Never include private reasoning.',
+              ].filter(Boolean).join('\n\n')
+            : `${request.input}\nReturn product output only as <kriyan-reminder>{"kind":"reminder","message":"...","remindAt":0,"timezone":"UTC"}</kriyan-reminder>. Never include private reasoning.`
+          await session.prompt(prompt)
           flushText()
           await pending
           const text = chunks.join('')
+          if (request.mode === 'agent-turn') {
+            const output = extractAgentOutput(text)
+            for (let offset = 0; offset < output.assistantContent.length; offset += 512) {
+              await emit({ type: 'message', data: output.assistantContent.slice(offset, offset + 512) })
+            }
+            return { products: [], summary: 'Pi agent turn completed', ...output }
+          }
           return { products: extractReminder(text), summary: 'Pi run completed' }
         } finally {
           unsubscribe()
@@ -265,16 +325,12 @@ async function validatePiSession(path: string): Promise<void> {
   }
 }
 
-export function createFauxPiFactory(
-  response: ReminderProduct,
+function createFauxPiTextFactory(
+  response: string,
   options: { persistent?: boolean } = {},
 ): FauxPiFactory {
   const provider = fauxProvider()
-  provider.setResponses([
-    fauxAssistantMessage(
-      `<kriyan-reminder>${JSON.stringify(response)}</kriyan-reminder>`,
-    ),
-  ])
+  provider.setResponses([fauxAssistantMessage(response)])
   const model = provider.getModel()
   const authStorage = AuthStorage.inMemory()
   authStorage.setRuntimeApiKey(model.provider, 'faux-key')
@@ -319,4 +375,24 @@ export function createFauxPiFactory(
       modelRegistry.unregisterProvider(model.provider)
     },
   }
+}
+
+export function createFauxPiFactory(
+  response: ReminderProduct,
+  options: { persistent?: boolean } = {},
+): FauxPiFactory {
+  return createFauxPiTextFactory(
+    `<kriyan-reminder>${JSON.stringify(response)}</kriyan-reminder>`,
+    options,
+  )
+}
+
+export function createFauxPiConversationFactory(
+  response: { assistantContent: string; toolCalls: ProductToolCall[] },
+  options: { persistent?: boolean } = {},
+): FauxPiFactory {
+  return createFauxPiTextFactory(
+    `<kriyan-result>${JSON.stringify(response)}</kriyan-result>`,
+    options,
+  )
 }

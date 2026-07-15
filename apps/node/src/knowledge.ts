@@ -36,6 +36,16 @@ async function sourceFiles(root: string): Promise<string[]> {
   return output
 }
 
+async function optionalMarkdownFiles(root: string): Promise<string[]> {
+  const output: string[] = []
+  for (const entry of await readdir(root, { withFileTypes: true }).catch(() => [])) {
+    const path = join(root, entry.name)
+    if (entry.isDirectory()) output.push(...await optionalMarkdownFiles(path))
+    else if (entry.isFile() && entry.name.endsWith('.md')) output.push(path)
+  }
+  return output
+}
+
 async function transcriptBody(root: string): Promise<string> {
   const sections: string[] = []
   let total = 0
@@ -97,10 +107,10 @@ export class KnowledgeService {
   }
 
   async initialize(): Promise<{ recoveredWrites: number; staleWorkspacesRemoved: number }> {
-    const [recoveredWrites, staleWorkspacesRemoved] = await Promise.all([
-      this.vault.recover(),
-      this.materializer.reconcileStaleWorkspaces(),
-    ])
+    const recoveredWrites = await this.vault.recover()
+    const staleWorkspacesRemoved = await this.materializer.reconcileStaleWorkspaces()
+    const indexExists = await stat(this.index.databasePath).then(() => true).catch(() => false)
+    if (!indexExists) await this.index.rebuild()
     return { recoveredWrites, staleWorkspacesRemoved }
   }
 
@@ -153,6 +163,40 @@ export class KnowledgeService {
 
   async search(query: string, mode: SearchMode = 'lexical', limit = 10): Promise<SearchResponse> {
     return await this.index.search(query, { mode, limit })
+  }
+
+  async assembleCitedContext(query: string, limit = 8): Promise<string> {
+    const response = await this.search(query, 'lexical', limit)
+    const sections = response.results.map((result) => {
+      const citations = result.citations.map((citation) => citation.citationId).join(', ')
+      return `[${citations}] ${result.title}\n${result.excerpt}`
+    })
+    const terms = query.toLocaleLowerCase().match(/[\p{L}\p{N}_-]+/gu)?.slice(0, 16) ?? []
+    const artifacts = await optionalMarkdownFiles(join(this.vault.root, 'artifacts'))
+    const ranked: Array<{ score: number; section: string }> = []
+    for (const path of artifacts.slice(0, 512)) {
+      const info = await stat(path)
+      if (info.size > 2 * 1024 * 1024) continue
+      const content = await readFile(path, 'utf8')
+      const lower = content.toLocaleLowerCase()
+      const score = terms.reduce((total, term) => total + (lower.includes(term) ? 1 : 0), 0)
+      if (score === 0) continue
+      const metadataLine = content.match(/^---\n([^\n]+)\n---/)?.[1]
+      let metadata: { noteVersionId?: string; artifactId?: string } = {}
+      try {
+        if (metadataLine !== undefined) metadata = JSON.parse(metadataLine) as typeof metadata
+      } catch {
+        continue
+      }
+      const citation = metadata.noteVersionId ?? metadata.artifactId ?? relative(this.vault.root, path)
+      ranked.push({
+        score,
+        section: `[${citation}] ${relative(this.vault.root, path)}\n${content.replace(/^---[\s\S]*?---\n+/, '').replace(/\s+/g, ' ').trim().slice(0, 480)}`,
+      })
+    }
+    sections.push(...ranked.sort((left, right) => right.score - left.score)
+      .slice(0, Math.max(0, limit - sections.length)).map((entry) => entry.section))
+    return sections.join('\n\n')
   }
 
   private async syncProjections(

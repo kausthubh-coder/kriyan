@@ -10,11 +10,15 @@ import type {
   Job,
   Run,
   RunEventInput,
+  WorkerContractClient,
 } from '@kriyan/convex-client'
 import {
   minimalProductivityRegistry,
+  productToolRegistry,
   type EffectLinkage,
   type PreparedEffect,
+  type ProductEffectPayloadMap,
+  type ProductToolCall,
 } from '@kriyan/tools'
 
 import type { NodeConfig } from './config'
@@ -23,6 +27,7 @@ import {
   LocalRunStore,
   type RunCheckpoint,
 } from './store'
+import { executeArtifactWork, executeMemoryWork } from './product-work'
 
 export interface WorkerLogger {
   info(event: string, fields?: Record<string, unknown>): void
@@ -41,6 +46,8 @@ export interface WorkerOptions {
     boundary: EffectBoundary,
     effect: PreparedEffect,
   ) => Promise<void> | void
+  workerClient?: WorkerContractClient
+  assembleCitedContext?: (query: string, signal: AbortSignal) => Promise<string>
 }
 
 interface ActiveExecution {
@@ -101,6 +108,7 @@ function errorInfo(error: unknown): {
     | 'RUN_CANCELLED'
     | 'LEASE_LOST'
     | 'CHECKPOINT_CORRUPT'
+    | 'SESSION_UNAVAILABLE'
     | 'RUNTIME_FAILED'
   retryable: boolean
 } {
@@ -115,6 +123,9 @@ function errorInfo(error: unknown): {
   }
   if (error instanceof CorruptCheckpointError) {
     return { code: 'CHECKPOINT_CORRUPT', retryable: false }
+  }
+  if (error instanceof SessionUnavailableError) {
+    return { code: 'SESSION_UNAVAILABLE', retryable: false }
   }
   return { code: 'RUNTIME_FAILED', retryable: true }
 }
@@ -152,6 +163,7 @@ function safePublicEvent(event: NormalizedRuntimeEvent): NormalizedRuntimeEvent 
 
 export class LeaseLostError extends Error {}
 export class ShutdownError extends Error {}
+export class SessionUnavailableError extends Error {}
 
 export class KriyanWorker {
   private readonly store: LocalRunStore
@@ -179,7 +191,16 @@ export class KriyanWorker {
       installationId: this.config.installationId,
       nodeId: this.config.nodeId,
       displayName: this.config.displayName,
-      capabilities: ['reminders'],
+      capabilities: this.options.workerClient === undefined
+        ? ['reminders']
+        : [
+            'reminders',
+            'agent.chat.v1',
+            'artifact.materialization.v1',
+            'memory.project.v1',
+            'memory.reconcile.v1',
+            'memory.correction.apply.v1',
+          ],
       protocolVersion: this.config.protocolVersion,
     })
     this.nodeRevision = result.node.revision
@@ -312,6 +333,65 @@ export class KriyanWorker {
     return updated
   }
 
+  private async commitProductEffect(
+    effect: PreparedEffect,
+    checkpoint: RunCheckpoint,
+    job: Job,
+  ): Promise<{ checkpoint: RunCheckpoint; job: Job }> {
+    const client = this.options.workerClient
+    if (client === undefined || job.leaseToken === undefined) throw new Error('product worker contract is unavailable')
+    if (effect.phase === 'committed') return { checkpoint, job }
+    let current = effect
+    if (current.phase === 'prepared') {
+      await this.options.onEffectBoundary?.('prepared_before_commit', current)
+      current = { ...current, phase: 'committing' }
+      checkpoint = await this.persistEffect(checkpoint, current)
+    }
+    const lease = {
+      installationId: this.config.installationId,
+      jobId: job.jobId,
+      nodeId: this.config.nodeId,
+      expectedJobRevision: job.revision,
+      expectedLeaseToken: job.leaseToken,
+      effectId: current.effectId,
+      idempotencyKey: current.idempotencyKey,
+    }
+    let result
+    if (current.type === 'task') {
+      const payload = current.payload as ProductEffectPayloadMap['task']
+      result = await client.invoke('effect.task.commit', { ...lease, ...payload })
+    } else if (current.type === 'reminder') {
+      const payload = current.payload as ProductEffectPayloadMap['reminder']
+      result = await client.invoke('effect.reminder.commit', { ...lease, ...payload })
+    } else if (current.type === 'note') {
+      const payload = current.payload as ProductEffectPayloadMap['note']
+      result = await client.invoke('effect.note.commit', { ...lease, ...payload })
+    } else if (current.type === 'source') {
+      const payload = current.payload as ProductEffectPayloadMap['source']
+      result = await client.invoke('effect.source.commit', { ...lease, ...payload })
+    } else {
+      const payload = current.payload as ProductEffectPayloadMap['knowledge']
+      result = await client.invoke('effect.knowledge.commit', { ...lease, ...payload })
+    }
+    if (!result.ok) throw new LeaseLostError(`effect rejected: ${result.reason}`)
+    job = { ...job, revision: result.jobRevision }
+    await this.options.onEffectBoundary?.('server_committed_before_marker', current)
+    const marked = await client.invoke('effect.checkpoint', {
+      installationId: this.config.installationId,
+      jobId: job.jobId,
+      nodeId: this.config.nodeId,
+      expectedJobRevision: job.revision,
+      expectedLeaseToken: job.leaseToken,
+      checkpoint: `${current.effectId}:${current.payloadHash}`,
+    })
+    if (!marked.ok) throw new LeaseLostError(`effect checkpoint rejected: ${marked.reason}`)
+    job = { ...job, revision: marked.revision }
+    current = { ...current, phase: 'committed' }
+    checkpoint = await this.persistEffect(checkpoint, current)
+    await this.options.onEffectBoundary?.('committed_marker_saved', current)
+    return { checkpoint, job }
+  }
+
   private async disposeActive(active: ActiveExecution): Promise<void> {
     if (active.disposePromise === null) {
       active.disposePromise = active.session?.dispose().catch(() => undefined) ?? Promise.resolve()
@@ -393,6 +473,9 @@ export class KriyanWorker {
           preparedEffects: previous?.preparedEffects ?? {},
           completed: false,
           piSessionFile: previous?.piSessionFile,
+          piSessionRef: previous?.piSessionRef,
+          assistantContent: previous?.assistantContent,
+          pendingToolCalls: previous?.pendingToolCalls,
         }
     } catch (error) {
       await this.plane.failRun(
@@ -469,7 +552,7 @@ export class KriyanWorker {
       })
     }, Math.max(100, Math.floor(this.config.leaseDurationMs / 3)))
 
-    const pending: NormalizedRuntimeEvent[] = []
+    const pending: Array<{ type: RunEventInput['type']; data: string }> = []
     const flush = async (): Promise<void> => {
       if (pending.length === 0) return
       const batch = pending.slice(0, 16)
@@ -501,8 +584,189 @@ export class KriyanWorker {
 
     let retryableFailure = false
     try {
-      const hadPreparedEffects = Object.keys(checkpoint.preparedEffects).length > 0
-      if (hadPreparedEffects) {
+      if (job.kind === 'agent.turn.v1') {
+        const client = this.options.workerClient
+        if (client === undefined || job.leaseToken === undefined) throw new Error('agent worker contract is unavailable')
+        const context = await client.invoke('execution.context.read', {
+          installationId: this.config.installationId,
+          jobId: job.jobId,
+          nodeId: this.config.nodeId,
+          expectedJobRevision: job.revision,
+          expectedLeaseToken: job.leaseToken,
+          maxMessages: 64,
+        })
+        if (
+          context.job.jobId !== job.jobId ||
+          context.command.commandId !== job.commandId ||
+          context.job.threadId !== job.threadId ||
+          context.command.threadId !== job.threadId ||
+          context.job.turnId !== job.turnId ||
+          context.job.turnOrdinal !== job.turnOrdinal ||
+          context.agentRevision.agentRevisionId !== job.agentRevisionId ||
+          context.command.agentRevisionId !== job.agentRevisionId
+        ) {
+          throw new Error('frozen agent execution context does not match the claimed job')
+        }
+
+        let toolCalls = checkpoint.pendingToolCalls ?? []
+        if (checkpoint.assistantContent === undefined) {
+          const registeredSessionFile = context.thread.piSessionRef === undefined
+            ? undefined
+            : await this.store.resolvePiSession(context.thread.piSessionRef)
+          if (
+            context.thread.piSessionRef !== undefined &&
+            checkpoint.piSessionFile === undefined &&
+            registeredSessionFile === undefined
+          ) {
+            throw new SessionUnavailableError('thread-bound Pi session is unavailable; reset the session explicitly')
+          }
+          const resumeSessionFile = checkpoint.piSessionFile ?? registeredSessionFile
+          const session = await this.runtime.createSession(
+            run.runId,
+            this.store.workspace(run.runId),
+            resumeSessionFile,
+          )
+          active.session = session
+          if (session.sessionFile !== undefined && checkpoint.piSessionFile !== session.sessionFile) {
+            checkpoint = { ...checkpoint, piSessionFile: session.sessionFile }
+            active.checkpoint = checkpoint
+            await this.store.save(checkpoint)
+          }
+          if (session.sessionFile !== undefined && context.thread.piSessionRef !== undefined) {
+            checkpoint = { ...checkpoint, piSessionRef: context.thread.piSessionRef }
+            active.checkpoint = checkpoint
+            await this.store.save(checkpoint)
+            await this.store.bindPiSession(context.thread.piSessionRef, session.sessionFile)
+          }
+          pending.push({ type: 'run.started', data: JSON.stringify({ turnOrdinal: job.turnOrdinal }) })
+          await flush()
+          const citedContext = this.options.assembleCitedContext === undefined
+            ? undefined
+            : (await this.options.assembleCitedContext(context.command.input, controller.signal)).slice(0, 32 * 1024)
+          const result = await session.run(
+            {
+              runId: run.runId,
+              input: context.command.input,
+              workspace: this.store.workspace(run.runId),
+              signal: controller.signal,
+              mode: 'agent-turn',
+              systemPrompt: context.agentRevision.systemPrompt,
+              messages: context.messages.map((message) => ({ role: message.role, content: message.content })),
+              citedContext,
+              toolCapabilities: context.agentRevision.toolCapabilities,
+            },
+            async (event) => {
+              const safeEvent = safePublicEvent(event)
+              await this.store.appendLocalEvent(run.runId, safeEvent)
+              if (safeEvent.type === 'message') pending.push({ type: 'message.delta', data: safeEvent.data })
+              else if (safeEvent.type === 'tool') {
+                const status = JSON.parse(safeEvent.data) as { status?: string }
+                pending.push({
+                  type: status.status === 'started' ? 'tool.started' : 'tool.finished',
+                  data: safeEvent.data,
+                })
+              } else pending.push(safeEvent)
+              if (pending.length >= 8) await flush()
+            },
+          )
+          await flush()
+          if (leaseError !== null) throw leaseError
+          if (controller.signal.aborted) {
+            if (this.stopping) throw new ShutdownError('service shutdown')
+            throw new DOMException('cancelled', 'AbortError')
+          }
+          const assistantContent = (result.assistantContent ?? result.summary).trim().slice(0, 64 * 1024)
+          toolCalls = (result.toolCalls ?? []).slice(0, 32)
+          checkpoint = { ...checkpoint, assistantContent, pendingToolCalls: toolCalls }
+          active.checkpoint = checkpoint
+          await this.store.save(checkpoint)
+
+          if (session.sessionFile !== undefined && checkpoint.piSessionRef === undefined) {
+            const piSessionRef = `pi-session:${context.thread.threadId}`
+            const sessionResult = await withPlane(() => client.invoke('session.checkpoint', {
+              installationId: this.config.installationId,
+              jobId: job.jobId,
+              nodeId: this.config.nodeId,
+              expectedJobRevision: job.revision,
+              expectedLeaseToken: job.leaseToken,
+              expectedSessionRevision: context.thread.sessionRevision,
+              piSessionRef,
+            }))
+            if (!sessionResult.ok) throw new LeaseLostError(`session checkpoint rejected: ${sessionResult.reason}`)
+            job = { ...job, revision: sessionResult.revision }
+            active.job = job
+            checkpoint = { ...checkpoint, piSessionRef }
+            active.checkpoint = checkpoint
+            await this.store.save(checkpoint)
+            await this.store.bindPiSession(piSessionRef, session.sessionFile)
+          }
+        }
+
+        for (const effect of Object.values(checkpoint.preparedEffects)) {
+          const committed = await withPlane(() => this.commitProductEffect(effect, checkpoint, job))
+          checkpoint = committed.checkpoint
+          job = committed.job
+          active.checkpoint = checkpoint
+          active.job = job
+        }
+
+        const registry = productToolRegistry()
+        for (let index = 0; index < toolCalls.length; index += 1) {
+          const call = toolCalls[index] as ProductToolCall
+          const type = call.tool.slice('kriyan.'.length)
+          const capability = `${type}.write`
+          if (!context.agentRevision.toolCapabilities.includes(capability)) {
+            throw new Error(`agent revision does not allow ${capability}`)
+          }
+          const effectId = `effect:${job.turnId ?? job.jobId}:${index}:${type}`
+          if (checkpoint.preparedEffects[effectId] !== undefined) continue
+          const linkage: EffectLinkage = {
+            installationId: this.config.installationId,
+            commandId: job.commandId,
+            jobId: job.jobId,
+            runId: run.runId,
+            attempt: job.attempt,
+          }
+          const prepared = await registry.prepare(call.tool, call.input, {
+            signal: controller.signal,
+            effectId,
+            idempotencyKey: `intent:${job.turnId ?? job.jobId}:${index}:${type}`,
+            linkage,
+          })
+          if (!prepared.ok || prepared.value === undefined) {
+            throw new Error(prepared.error?.code ?? 'effect preparation failed')
+          }
+          checkpoint = await this.persistEffect(checkpoint, prepared.value)
+          const committed = await withPlane(() => this.commitProductEffect(prepared.value!, checkpoint, job))
+          checkpoint = committed.checkpoint
+          job = committed.job
+          active.checkpoint = checkpoint
+          active.job = job
+          pending.push({ type: 'tool.finished', data: JSON.stringify({ name: call.tool, status: 'committed' }) })
+        }
+        pending.push({ type: 'message.completed', data: checkpoint.assistantContent ?? '' })
+        await flush()
+      } else if (job.kind === 'artifact.materialize.v1' || job.kind === 'artifact.tombstone.v1') {
+        const client = this.options.workerClient
+        if (client === undefined || job.leaseToken === undefined) throw new Error('artifact worker contract is unavailable')
+        await executeArtifactWork(this.config, client, job)
+        checkpoint = { ...checkpoint, assistantContent: '' }
+        active.checkpoint = checkpoint
+        await this.store.save(checkpoint)
+      } else if (
+        job.kind === 'memory.project.v1' ||
+        job.kind === 'memory.reconcile.v1' ||
+        job.kind === 'memory.correction.apply.v1'
+      ) {
+        const client = this.options.workerClient
+        if (client === undefined || job.leaseToken === undefined) throw new Error('memory worker contract is unavailable')
+        const kind = await executeMemoryWork(this.config, client, job)
+        pending.push({ type: 'knowledge.changed', data: JSON.stringify({ kind }) })
+        await flush()
+        checkpoint = { ...checkpoint, assistantContent: '' }
+        active.checkpoint = checkpoint
+        await this.store.save(checkpoint)
+      } else if (Object.keys(checkpoint.preparedEffects).length > 0) {
         // A durable effect always wins over later model output. Reconcile it
         // before opening Pi so a retry cannot invent a different mutation.
         checkpoint = await this.reconcilePreparedEffects(checkpoint)
@@ -574,6 +838,7 @@ export class KriyanWorker {
               this.config.nodeId,
               job,
               run,
+              checkpoint.assistantContent,
             ),
           ),
         )
@@ -620,7 +885,7 @@ export class KriyanWorker {
         active.renewTimer = null
       }
       await this.disposeActive(active)
-      if (checkpoint.completed || !retryableFailure) {
+      if ((checkpoint.completed && checkpoint.piSessionFile === undefined) || !retryableFailure) {
         await this.store.cleanupWorkspace(run.runId)
       }
     }

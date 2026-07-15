@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 
 import {
   FakeAgentRuntime,
@@ -9,6 +10,7 @@ import {
 import { ConvexControlPlane, deriveNodeHealth } from '@kriyan/convex-client'
 
 import { loadConfig } from './config'
+import { KnowledgeService } from './knowledge'
 import {
   readProcessHealth,
   satisfiesProcessHealth,
@@ -48,6 +50,8 @@ export async function runNode(configPath: string): Promise<void> {
       ? new FakeAgentRuntime()
       : new PiAgentRuntime(new LocalPiSessionFactory())
   const startedAt = Date.now()
+  const knowledge = new KnowledgeService({ vaultRoot: join(config.dataDir, 'vault') })
+  await knowledge.initialize()
   const releaseId = await resolveReleaseIdentity()
   const health: ProcessHealthRecord = {
     schemaVersion: 1,
@@ -61,6 +65,11 @@ export async function runNode(configPath: string): Promise<void> {
     ready: true,
   }
   const worker = new KriyanWorker(config, plane, runtime, undefined, {
+    workerClient: plane,
+    assembleCitedContext: async (query, signal) => {
+      if (signal.aborted) throw new DOMException('cancelled', 'AbortError')
+      return await knowledge.assembleCitedContext(query, 8)
+    },
     onHeartbeat: async () => {
       health.heartbeatAt = Date.now()
       await writeProcessHealth(config.dataDir, health)

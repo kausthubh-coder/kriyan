@@ -8,7 +8,7 @@ import type {
   KnowledgeProjectionPlane,
   SourceRefProjectionInput,
 } from '@kriyan/convex-client'
-import type { EmbeddingProvider } from '@kriyan/knowledge-vault'
+import { ArtifactProjectionStore, type EmbeddingProvider } from '@kriyan/knowledge-vault'
 
 import { KnowledgeService } from '../src/knowledge'
 
@@ -94,6 +94,20 @@ test('temporary git source reaches a reproducible cited korean entity and compac
   expect(entities).toHaveLength(1)
   expect(JSON.stringify({ sources, entities })).not.toContain('Practice Hangul')
   expect(Object.keys(entities[0]!)).not.toContain('embedding')
+  await new ArtifactProjectionStore(vaultRoot).materialize({
+    artifactId: 'artifact:korean-plan',
+    noteId: 'note:korean-plan',
+    noteVersionId: 'note-version:korean-plan:1',
+    version: 1,
+    contentHash: 'sha256:korean-plan',
+    contentJson: '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Review Korean vocabulary on Friday."}]}]}',
+    title: 'Korean plan',
+    plainText: 'Review Korean vocabulary on Friday.',
+    projectedPath: 'artifacts/korean-plan.md',
+  })
+  const context = await service.assembleCitedContext('Korean Friday')
+  expect(context).toContain('[note-version:korean-plan:1]')
+  expect(context).toContain('Review Korean vocabulary on Friday.')
 
   await rm(sourceRoot, { recursive: true, force: true })
   const restarted = new KnowledgeService({ vaultRoot, workspaceRoot, embeddingProvider: embeddings })
