@@ -4,7 +4,7 @@ import type {
 } from '@kriyan/client-core'
 import React, { createContext, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { getDemoRepository } from '@/lib/demo-repository'
+import { getDemoRepository, persistDemoRepository } from '@/lib/demo-repository'
 import { createConvexRepository } from '@/lib/convex-repository'
 
 type Entity = TaskItem | ReminderItem | CalendarEventItem | AppNoteItem
@@ -76,6 +76,7 @@ export function ProductStoreProvider({
   const [sources, setSources] = useState<SourceRefItem[]>([])
   const [knowledge, setKnowledge] = useState<KnowledgeDocumentItem[]>([])
   const setupGeneration = useRef(0)
+  const writeQueue = useRef<Promise<void>>(Promise.resolve())
   const mode: ProductState['mode'] = process.env.EXPO_PUBLIC_CONVEX_URL ? 'convex' : 'demo'
 
   const refresh = useCallback(async () => {
@@ -136,12 +137,22 @@ export function ProductStoreProvider({
     return () => { unsubscribe(); repository.dispose() }
   }, [refresh, repository])
 
-  const runWrite = useCallback(async <T extends Entity,>(operation: (value: ProductRepository) => Promise<ProductMutationResult<T>>) => {
-    if (!repository) return { ok: false, reason: 'transport_error', message: 'Repository is still connecting.' } as ProductMutationResult<T>
-    const result = await operation(repository)
-    if (!result.ok) setError(result.message)
-    return result
-  }, [repository])
+  const runWrite = useCallback(<T extends Entity,>(operation: (value: ProductRepository) => Promise<ProductMutationResult<T>>): Promise<ProductMutationResult<T>> => {
+    const pending = writeQueue.current.then(async () => {
+      if (!repository) return { ok: false, reason: 'transport_error', message: 'Repository is still connecting.' } as ProductMutationResult<T>
+      const result = await operation(repository)
+      if (!result.ok) {
+        setError(result.message)
+        return result
+      }
+      if (mode === 'demo') await persistDemoRepository(repository)
+      setError(undefined)
+      await refresh()
+      return result
+    })
+    writeQueue.current = pending.then(() => undefined, () => undefined)
+    return pending
+  }, [mode, refresh, repository])
 
   const value = useMemo(() => ({ mode, connection, error, tasks, reminders, events, notes, sources, knowledge, repository, refresh, runWrite }),
     [mode, connection, error, tasks, reminders, events, notes, sources, knowledge, repository, refresh, runWrite])
