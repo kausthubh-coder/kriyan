@@ -227,7 +227,17 @@ async function checked(
   options?: { env?: Record<string, string> },
 ): Promise<CommandResult> {
   const result = await runner.run(command, args, options)
-  if (result.exitCode !== 0) throw new VpsRuntimeError(`${label} failed`)
+  if (result.exitCode !== 0) {
+    const diagnostic = result.stderr
+      .split('\n')
+      .map((line) => line.trim())
+      .findLast((line) => /^update failed at [a-z-]+ stage \(status [0-9]+\); (previous release restored and healthy|previous release recovery also failed)$/.test(line))
+    throw new VpsRuntimeError(
+      diagnostic === undefined
+        ? `${label} failed (status ${result.exitCode})`
+        : `${label} failed: ${diagnostic}`,
+    )
+  }
   return result
 }
 

@@ -259,8 +259,8 @@ try {
     .join(' ')
   for (const requiredCopy of [
     'The existing DigitalOcean service is healthy on its previous release.',
-    'Promotion of this candidate stopped after repeated remote vps update failed',
-    'the candidate is not claimed as running there',
+    'Candidate promotion failed because the node',
+    'The candidate is not promoted yet',
     'complete visible live Agent chat submission, completion, and event-rendering proof',
     'No hosted product workspace; the public production surface is documentation only.',
     'The macOS app is ad-hoc signed, strictly sealed, Apple-silicon only, and not notarized.',

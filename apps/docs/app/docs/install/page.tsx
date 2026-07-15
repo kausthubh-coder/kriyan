@@ -129,8 +129,9 @@ export default function InstallPage(): JSX.Element {
         </p>
         <p>
           The existing DigitalOcean service is healthy on its previous release.
-          Promotion of this candidate stopped after repeated <code>remote vps update failed</code>
-          results and a healthy rollback, so the candidate is not claimed as running there.
+          Candidate promotion failed because the node&apos;s newer capability contract
+          reached an older Convex backend. Rollback restored the service. Deploy the
+          matching Convex contract before promoting this node build.
         </p>
       </section>
 

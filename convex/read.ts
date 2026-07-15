@@ -224,7 +224,10 @@ export const agentRunEvents = query({
     installationId: v.string(),
     runIds: v.array(v.string()),
   },
-  returns: v.array(runEventValue),
+  returns: v.object({
+    items: v.array(runEventValue),
+    truncatedRunIds: v.array(v.string()),
+  }),
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
     if (args.runIds.length > 20) throw new Error('runIds must contain at most 20 values')
@@ -237,10 +240,17 @@ export const agentRunEvents = query({
           .eq('installationId', args.installationId)
           .eq('runId', runId))
         .order('desc')
-        .take(50)
-      return events.reverse().map(withoutSystemFields)
+        .take(51)
+      return {
+        items: events.slice(0, 50).reverse().map(withoutSystemFields),
+        truncated: events.length > 50,
+        runId,
+      }
     }))
-    return pages.flat()
+    return {
+      items: pages.flatMap((page) => page.items),
+      truncatedRunIds: pages.filter((page) => page.truncated).map((page) => page.runId),
+    }
   },
 })
 

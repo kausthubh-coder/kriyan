@@ -121,8 +121,8 @@ export default function HomePage(): JSX.Element {
           </div>
           <p>
             V1 packages the local product clients and node tooling. The existing
-            DigitalOcean service remains healthy on its prior release after this
-            candidate&apos;s repeated update failure and rollback.
+            DigitalOcean service remains healthy on its prior release. The candidate
+            exposed a backend compatibility mismatch and rolled back safely.
           </p>
         </div>
 
@@ -140,7 +140,7 @@ export default function HomePage(): JSX.Element {
             <h3><span className="status-mark planned" />Boundaries</h3>
             <ul>
               <li>macOS is ad-hoc signed and not notarized; Android is debug-signed for direct installation.</li>
-              <li>The candidate is not promoted to the existing VPS; it remains healthy on the prior release.</li>
+              <li>The candidate is not promoted yet: its new capability contract requires the matching Convex deployment first.</li>
               <li>A complete visible live Agent chat round trip, iOS, Hetzner, and self-hosted Convex remain unproven.</li>
             </ul>
           </section>

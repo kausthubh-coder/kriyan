@@ -128,6 +128,7 @@ export interface AgentWorkspaceSnapshot {
   messages: AgentMessageView[]
   runs: AgentRunView[]
   nodes: AgentNodeView[]
+  coverageNotice?: string
   operationNotice?: {
     tone: 'info' | 'success' | 'warning' | 'error'
     message: string

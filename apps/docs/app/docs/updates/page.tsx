@@ -34,6 +34,7 @@ export default function UpdatesPage(): JSX.Element {
       <section id="before">
         <h2>Before an update</h2>
         <ul className="check-list">
+          <li>Deploy and verify the matching Convex contract before a node release that adds capabilities, operations, or projections.</li>
           <li>Record the current release, process instance, latest healthy heartbeat, and Git provenance.</li>
           <li>Verify the new archive checksum and embedded source/build provenance.</li>
           <li>Create and validate a private backup when the release changes durable data.</li>
@@ -63,6 +64,16 @@ export default function UpdatesPage(): JSX.Element {
           <li><strong>Reboot when validating a release.</strong> Repeat identity and command proof after host restart.</li>
         </ol>
       </section>
+
+      <aside className="notice notice-cinnabar">
+        <strong>The V1 promotion failure was a compatibility failure, not a dead VPS.</strong>
+        <p>
+          The new node registered expanded capabilities against an older Convex
+          deployment. Convex rejected registration, so the release health check
+          failed and rollback restored the prior service. New builds report the
+          failed lifecycle stage; the operator still avoids exposing arbitrary remote stderr.
+        </p>
+      </aside>
 
       <aside className="notice notice-saffron">
         <strong>Backups are evidence only after restore validation.</strong>

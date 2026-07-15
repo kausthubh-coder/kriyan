@@ -56,7 +56,7 @@ export default function VpsPage(): JSX.Element {
         <div className="mode-comparison">
           <div>
             <h3>DigitalOcean</h3>
-            <p>The existing service is enabled, active, and healthy on its prior release. Candidate promotion failed repeatedly and rolled back healthy, so the candidate is not described as deployed.</p>
+            <p>The existing service is enabled, active, and healthy on its prior release. Candidate promotion exposed a Convex/node contract mismatch and rolled back safely; upgrade the backend before retrying the node.</p>
           </div>
           <div>
             <h3>Hetzner</h3>
@@ -86,11 +86,12 @@ export default function VpsPage(): JSX.Element {
       </section>
 
       <aside className="notice notice-saffron">
-        <strong>Do not repeat the current candidate update loop.</strong>
+        <strong>Upgrade in dependency order.</strong>
         <p>
-          The same operator update path returned <code>remote vps update failed</code>
-          more than once. Per the V1 stopping rule, preserve the healthy prior
-          release and reopen deployment debugging only with a new hypothesis.
+          The candidate node advertises Agent and product-work capabilities that the
+          older Convex backend rejects. Deploy and verify the matching Convex schema
+          and functions first. Then run one node update and require the new release
+          identity, a fresh heartbeat, and a completed app-to-node round trip.
         </p>
       </aside>
 
@@ -99,6 +100,7 @@ export default function VpsPage(): JSX.Element {
         <ol className="install-steps">
           <li><strong>Preserve evidence.</strong> Record release identity, service state, disk space, and a bounded sanitized journal.</li>
           <li><strong>Separate transport from execution.</strong> Check DNS and Convex reachability before blaming the runtime.</li>
+          <li><strong>Check contract compatibility.</strong> A healthy old node can coexist with a backend that rejects a newer node&apos;s capabilities.</li>
           <li><strong>Restart once and verify identity.</strong> Require a post-restart heartbeat from a new process, not a stale record.</li>
           <li><strong>Roll back if the release is at fault.</strong> Restore the previous immutable release and run the same health gate.</li>
           <li><strong>Restore data only when necessary.</strong> Validate a backup into an empty temporary directory before replacing durable state.</li>

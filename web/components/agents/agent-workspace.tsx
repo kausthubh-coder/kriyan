@@ -515,6 +515,7 @@ export function AgentWorkspace({ port }: { port: AgentWorkspacePort }): ReactNod
     </div>
 
     {snapshot.mode === 'demo' && <div className={styles.demoDisclosure}><strong>Deterministic preview</strong><span>This route demonstrates the integration contract. It does not contact Convex or a node until the integration owner supplies the live port.</span></div>}
+    {snapshot.coverageNotice && <div className={styles.coverageDisclosure} role="status"><Icon name="history" /><div><strong>Bounded history</strong><span>{snapshot.coverageNotice}</span></div></div>}
     {notice && <ResultNotice result={notice} />}
 
     {newThreadOpen && <form className={styles.inlineForm} onSubmit={createThread}>

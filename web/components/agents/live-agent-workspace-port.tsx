@@ -1,6 +1,6 @@
 'use client'
 
-import { createClientId } from '@kriyan/client-core'
+import { createClientId, nextClockDelay } from '@kriyan/client-core'
 import type { FunctionReturnType } from 'convex/server'
 import {
   useConvexConnectionState,
@@ -97,7 +97,7 @@ function currentRun(activity: ActivityWire): ActivityWire['run'] {
   return activity.run
 }
 
-function eventKind(event: RecentRunEvents[number]): AgentRunEventView['kind'] {
+function eventKind(event: RecentRunEvents['items'][number]): AgentRunEventView['kind'] {
   if (event.type === 'status') return 'run.started'
   if (event.type === 'message') return 'message.delta'
   if (event.type === 'error') return 'run.failed'
@@ -130,7 +130,7 @@ function eventSummary(data: string): string {
   return data || 'Runtime update received.'
 }
 
-function mapEvent(event: RecentRunEvents[number]): AgentRunEventView {
+function mapEvent(event: RecentRunEvents['items'][number]): AgentRunEventView {
   const kind = eventKind(event)
   const title: Record<AgentRunEventView['kind'], string> = {
     'run.claimed': 'Run claimed',
@@ -297,6 +297,7 @@ function mapWorkspace(
   wire: ClientSnapshotWire | undefined,
   definitions: DefinitionRows | undefined,
   recentEvents: RecentRunEvents | undefined,
+  now: number,
 ): MappedWorkspace {
   const connectionDetail = connection === 'online'
     ? 'Reactive Convex subscriptions are connected.'
@@ -327,13 +328,12 @@ function mapWorkspace(
     }
   }
 
-  const now = Date.now()
   const agents = definitions.map(mapDefinition)
   const messages = wire.agents.messages.map(mapMessage)
     .sort((left, right) => left.turnOrdinal - right.turnOrdinal || left.createdAt - right.createdAt)
   const nodes = wire.nodes.items.map((node) => mapNode(node, now))
   const eventsByRun = new Map<string, AgentRunEventView[]>()
-  for (const event of (recentEvents ?? []).map(mapEvent)) {
+  for (const event of (recentEvents?.items ?? []).map(mapEvent)) {
     eventsByRun.set(event.runId, [...(eventsByRun.get(event.runId) ?? []), event])
   }
   const runs = wire.nodes.activity
@@ -346,6 +346,13 @@ function mapWorkspace(
     .sort((left, right) => right.updatedAt - left.updatedAt)
   const activityByRunId = new Map<string, ActivityWire>()
   for (const activity of wire.nodes.activity) activityByRunId.set(syntheticRunId(activity), activity)
+  const limitedWindows = [
+    wire.windows.threads.truncated ? 'threads' : undefined,
+    wire.windows.messages.truncated ? 'messages' : undefined,
+    wire.windows.activity.truncated ? 'runs' : undefined,
+    wire.windows.nodes.truncated ? 'nodes' : undefined,
+    recentEvents && recentEvents.truncatedRunIds.length > 0 ? 'run events' : undefined,
+  ].filter((item): item is string => item !== undefined)
   return {
     snapshot: {
       mode: 'live',
@@ -357,6 +364,9 @@ function mapWorkspace(
       messages,
       runs,
       nodes,
+      coverageNotice: limitedWindows.length > 0
+        ? `Showing the newest bounded window for ${limitedWindows.join(', ')}. Older history is not loaded in this view.`
+        : undefined,
     },
     activityByRunId,
     threadsById: new Map(wire.agents.threads.map((thread) => [thread.threadId, thread])),
@@ -434,6 +444,18 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
     api.read.agentRunEvents,
     installation && wire ? { installationId, runIds: recentRunIds } : 'skip',
   )
+  const [clock, setClock] = useState(() => Date.now())
+  const heartbeatTimestamps = useMemo(
+    () => wire?.nodes.items.map((node) => node.lastHeartbeatAt) ?? [],
+    [wire],
+  )
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setClock(Date.now()),
+      nextClockDelay(clock, heartbeatTimestamps),
+    )
+    return () => window.clearTimeout(timeout)
+  }, [clock, heartbeatTimestamps])
 
   const createThreadMutation = useMutation(api.agents.createThread)
   const renameThreadMutation = useMutation(api.agents.renameThread)
@@ -444,8 +466,8 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
   const resetSessionMutation = useMutation(api.agents.resetSession)
 
   const mapped = useMemo(
-    () => mapWorkspace(connection, installation, wire, definitions, recentEvents),
-    [connection, definitions, installation, recentEvents, wire],
+    () => mapWorkspace(connection, installation, wire, definitions, recentEvents, clock),
+    [clock, connection, definitions, installation, recentEvents, wire],
   )
   const online = connection === 'online'
   const operations = useMemo<LiveOperations>(() => ({

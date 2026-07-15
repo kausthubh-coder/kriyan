@@ -883,6 +883,75 @@ tbody td {
   max-width: 62ch;
 }
 
+.release-matrix {
+  border-bottom: 1px solid oklch(var(--border));
+  border-top: 1px solid oklch(var(--border));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 2rem 0 0;
+}
+
+.release-matrix > div {
+  display: grid;
+  gap: 0.15rem;
+  min-height: 8.5rem;
+  padding: 1.2rem 1rem 1.1rem 0;
+}
+
+.release-matrix > div + div {
+  border-left: 1px solid oklch(var(--border));
+  padding-left: 1rem;
+}
+
+.release-matrix span {
+  color: oklch(var(--muted));
+  font-size: 0.75rem;
+  font-weight: 720;
+}
+
+.release-matrix strong {
+  font-size: 1.03rem;
+}
+
+.release-matrix small {
+  color: oklch(var(--muted));
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.release-matrix > div::before {
+  border-radius: 999px;
+  content: '';
+  height: 0.55rem;
+  margin-bottom: 0.55rem;
+  width: 0.55rem;
+}
+
+.release-matrix [data-state='pass']::before { background: oklch(var(--good)); }
+.release-matrix [data-state='blocked']::before { background: oklch(var(--primary-fill)); }
+.release-matrix [data-state='partial']::before { background: oklch(var(--accent)); }
+
+.incident-strip {
+  border-left: 3px solid oklch(var(--primary-fill));
+  margin: 2rem 0 0;
+  padding: 0.4rem 0 0.4rem 1.2rem;
+}
+
+.incident-strip span {
+  color: oklch(var(--primary-foreground));
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.incident-strip p {
+  font-size: 1rem;
+  margin: 0.35rem 0;
+}
+
+.incident-strip strong {
+  font-size: 0.9rem;
+}
+
 .prose > section {
   border-top: 1px solid oklch(var(--border));
   margin-top: 4.5rem;
@@ -1372,7 +1441,6 @@ tbody td {
 
   .docs-status {
     max-width: 25rem;
-  }
 }
 
 @media (max-width: 760px) {
@@ -1431,9 +1499,21 @@ tbody td {
   }
 
   .status-track,
+  .release-matrix,
   .mode-comparison,
   .next-links {
     grid-template-columns: 1fr;
+  }
+
+  .release-matrix > div {
+    min-height: 0;
+    padding: 1rem 0;
+  }
+
+  .release-matrix > div + div {
+    border-left: 0;
+    border-top: 1px solid oklch(var(--border));
+    padding-left: 0;
   }
 
   .status-track section + section,
