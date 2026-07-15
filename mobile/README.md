@@ -1,50 +1,49 @@
-# Welcome to your Expo app 👋
+# Kriyan for Android
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Kriyan's Android client is an Expo Router app. Version 1 can be built as a
+standalone APK for direct installation; Play Store publication is a separate
+release step.
 
-## Get started
+## Build an installable APK
 
-1. Install dependencies
+Prerequisites:
 
-   ```bash
-   npm install
-   ```
+- Bun
+- Java 17
+- Android SDK 36 with NDK `27.1.12297006`
+- dependencies installed from the repository root with
+  `bun install --frozen-lockfile`
 
-2. Start the app
+From the repository root, run:
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+bun run --cwd mobile build:android:apk
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+The command generates an ignored native Android project, bundles the JavaScript
+into the app, and builds one 64-bit APK for modern Android phones (`arm64-v8a`)
+and the standard Android emulator (`x86_64`). The result is written to:
 
-## Learn more
+```text
+mobile/build/kriyan-android-v1.0.0.apk
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+The V1 APK uses the generated local debug signing key so it can be installed
+directly. It is not suitable for Play Store submission or future store updates;
+those require a protected release keystore and an AAB build.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Install it on a connected device or running emulator with:
 
-## Join the community
+```sh
+adb install -r mobile/build/kriyan-android-v1.0.0.apk
+```
 
-Join our community of developers creating universal apps.
+## Development
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```sh
+bun run --cwd mobile start
+bun run --cwd mobile android
+```
+
+The app starts in its explicit local demo mode unless a Convex URL and Kriyan
+installation identifier are supplied through the existing runtime configuration.
