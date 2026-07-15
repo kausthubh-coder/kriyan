@@ -259,7 +259,7 @@ try {
     .join(' ')
   for (const requiredCopy of [
     'The existing DigitalOcean service is healthy on its previous release.',
-    'Candidate promotion failed because the node',
+    'Candidate promotion failed because the stable node ID could not renegotiate',
     'The candidate is not promoted yet',
     'complete visible live Agent chat submission, completion, and event-rendering proof',
     'No hosted product workspace; the public production surface is documentation only.',

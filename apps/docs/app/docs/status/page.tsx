@@ -25,14 +25,14 @@ export default function StatusPage(): JSX.Element {
       <div className="release-matrix" aria-label="V1 release status summary">
         <div data-state="pass"><span>Public release</span><strong>Available</strong><small>Four checksum-linked downloads</small></div>
         <div data-state="pass"><span>VPS service</span><strong>Healthy</strong><small>Prior release restored and active</small></div>
-        <div data-state="blocked"><span>VPS promotion</span><strong>Blocked</strong><small>Convex contract must be upgraded first</small></div>
+        <div data-state="blocked"><span>VPS promotion</span><strong>Blocked</strong><small>Node capability renegotiation fix pending</small></div>
         <div data-state="partial"><span>Live Agent UI</span><strong>Partial proof</strong><small>Connected; visible completion still pending</small></div>
       </div>
 
       <aside className="incident-strip" aria-label="Current deployment diagnosis">
         <span>Why promotion failed</span>
-        <p>The candidate node advertised the new Agent capabilities to an older Convex backend. Convex rejected node registration, the health gate failed, and the transactional updater restored the healthy prior release.</p>
-        <strong>Next: deploy the matching Convex contract, then promote the node once.</strong>
+        <p>The stable node ID was already registered with legacy capabilities. The backend treated that registration as immutable, so it rejected the candidate&apos;s expanded Agent capabilities. The health gate failed and rollback restored the prior release.</p>
+        <strong>Next: deploy capability renegotiation, then promote the node once.</strong>
       </aside>
 
       <section id="released">
@@ -76,9 +76,9 @@ export default function StatusPage(): JSX.Element {
         <p>
           The systemd service is enabled and active, and status, doctor, and restart
           checks are healthy on the prior release. The candidate reached its health
-          gate, but its expanded capability registration was rejected by the older
-          Convex deployment. The updater rolled back correctly. Promotion now has a
-          concrete prerequisite: deploy the matching Convex functions and schema first.
+          gate, but its stable node ID was already bound to the legacy capability
+          list. Convex rejected the changed registration and the updater rolled back
+          correctly. The compatibility fix makes capabilities renegotiable across releases.
         </p>
       </section>
 

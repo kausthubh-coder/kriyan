@@ -553,9 +553,18 @@ export const registerNode = mutation({
         existing.protocolVersion !== args.protocolVersion ||
         !sameCapabilities
       ) {
-        throw new Error(
-          'nodeId already exists with different registration data',
-        )
+        const node = {
+          ...withoutSystemFields(existing),
+          displayName: args.displayName,
+          capabilities: args.capabilities,
+          protocolVersion: args.protocolVersion,
+          status: 'online' as const,
+          revision: existing.revision + 1,
+          updatedAt: now,
+        }
+        await ctx.db.patch(existing._id, node)
+        await advanceClientSnapshotRevision(ctx, args.installationId)
+        return { created: false, node }
       }
       return { created: false, node: withoutSystemFields(existing) }
     }

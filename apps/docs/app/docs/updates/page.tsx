@@ -68,8 +68,8 @@ export default function UpdatesPage(): JSX.Element {
       <aside className="notice notice-cinnabar">
         <strong>The V1 promotion failure was a compatibility failure, not a dead VPS.</strong>
         <p>
-          The new node registered expanded capabilities against an older Convex
-          deployment. Convex rejected registration, so the release health check
+          The stable node ID was already registered with the legacy capability list.
+          Convex treated registration data as immutable and rejected the expanded list, so the release health check
           failed and rollback restored the prior service. New builds report the
           failed lifecycle stage; the operator still avoids exposing arbitrary remote stderr.
         </p>

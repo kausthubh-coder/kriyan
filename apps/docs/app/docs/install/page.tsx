@@ -129,9 +129,9 @@ export default function InstallPage(): JSX.Element {
         </p>
         <p>
           The existing DigitalOcean service is healthy on its previous release.
-          Candidate promotion failed because the node&apos;s newer capability contract
-          reached an older Convex backend. Rollback restored the service. Deploy the
-          matching Convex contract before promoting this node build.
+          Candidate promotion failed because the stable node ID could not renegotiate
+          its legacy capability list. Rollback restored the service. Deploy the
+          capability-renegotiation contract before promoting this node build.
         </p>
       </section>
 
