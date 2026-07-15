@@ -18,6 +18,7 @@ interface PersistedArtifact {
 interface PersistedNote {
   key: string
   draft: NoteDraft
+  versions: NoteDraft[]
   artifacts: PersistedArtifact[]
 }
 
@@ -32,17 +33,35 @@ function readNotes(): PersistedNote[] {
   try {
     const value: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]')
     if (!Array.isArray(value)) return []
-    return value.filter((item): item is PersistedNote => {
-      if (!item || typeof item !== 'object') return false
+    return value.flatMap((item): PersistedNote[] => {
+      if (!item || typeof item !== 'object') return []
       const note = item as Partial<PersistedNote>
-      return (
-        typeof note.key === 'string' &&
-        note.draft !== undefined &&
-        typeof note.draft.contentJson === 'string' &&
-        typeof note.draft.plainTextPreview === 'string' &&
-        Array.isArray(note.draft.tags) &&
-        Array.isArray(note.artifacts)
-      )
+      const { key, draft, artifacts } = note
+      if (
+        typeof key !== 'string' ||
+        draft === undefined ||
+        typeof draft.contentJson !== 'string' ||
+        typeof draft.plainTextPreview !== 'string' ||
+        !Array.isArray(draft.tags) ||
+        !Array.isArray(artifacts)
+      ) return []
+
+      const versions = Array.isArray(note.versions)
+        ? note.versions.filter(
+            (version): version is NoteDraft =>
+              Boolean(version) &&
+              typeof version.contentJson === 'string' &&
+              typeof version.plainTextPreview === 'string' &&
+              Array.isArray(version.tags),
+          )
+        : [draft]
+      if (versions.length === 0) return []
+      return [{
+        key,
+        draft,
+        versions,
+        artifacts,
+      }]
     })
   } catch {
     return []
@@ -83,6 +102,7 @@ export function persistDemoNote(
   const next: PersistedNote = {
     key,
     draft,
+    versions: [...(current?.versions ?? []), draft],
     artifacts: current?.artifacts ?? [],
   }
   if (index >= 0) notes[index] = next
@@ -97,7 +117,9 @@ export function persistDemoArtifact(
   artifact: ArtifactItem,
 ): void {
   if (!isDemoRepository(repository)) return
-  persistDemoNote(repository, note.noteId, draftFromNote(note))
+  if (!runtimeNoteKeys.has(note.noteId)) {
+    persistDemoNote(repository, note.noteId, draftFromNote(note))
+  }
   const key = runtimeNoteKeys.get(note.noteId)
   if (!key) return
   const notes = readNotes()
@@ -122,6 +144,8 @@ export async function restoreDemoKnowledge(
 ): Promise<void> {
   if (!isDemoRepository(repository)) return
   for (const saved of readNotes()) {
+    const versions = saved.versions.length > 0 ? saved.versions : [saved.draft]
+    const firstVersion = versions[0]!
     const matchingNote = repository.notes.find(
       (note) =>
         note.title === saved.draft.title &&
@@ -129,8 +153,20 @@ export async function restoreDemoKnowledge(
     )
     const created = matchingNote
       ? { ok: true as const, value: matchingNote }
-      : await repository.createNote(saved.draft)
+      : await repository.createNote(firstVersion)
     if (!created.ok) continue
+    let currentNote = created.value
+    if (!matchingNote) {
+      for (const version of versions.slice(1)) {
+        const updated = await repository.updateNote(currentNote, version)
+        if (!updated.ok) break
+        currentNote = {
+          ...currentNote,
+          ...version,
+          revision: currentNote.revision + 1,
+        }
+      }
+    }
     runtimeNoteKeys.set(created.value.noteId, saved.key)
     const history = await repository.noteDetailsV1.getHistory(
       created.value.noteId,
