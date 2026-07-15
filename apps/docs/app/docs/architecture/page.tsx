@@ -188,11 +188,11 @@ export default function ArchitecturePage(): JSX.Element {
         </ul>
         <p>
           Deterministic tests cover lease, retry, cancellation, durable-effect,
-          signal, redaction, vault, and rebuild behavior. A prior reference release
-          also passed Convex Cloud production, Ubuntu systemd restart and reboot
-          recovery, and an exact-release desktop-to-node round trip. This V1
-          candidate is not promoted to that host, and neither layer proves iOS,
-          Hetzner, self-hosted Convex, or a real provider session.
+          signal, redaction, vault, and rebuild behavior. The promoted node candidate
+          passed Convex Cloud coordination, promotion to the Ubuntu systemd node, and
+          a visible local-browser Agent round trip through the deterministic runtime.
+          That does not prove iOS, Hetzner, self-hosted Convex, exact packaged-Tauri
+          transport, or a real Pi/model-provider session.
         </p>
       </section>
     </article>

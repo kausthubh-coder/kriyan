@@ -297,6 +297,7 @@ function mapWorkspace(
   wire: ClientSnapshotWire | undefined,
   definitions: DefinitionRows | undefined,
   recentEvents: RecentRunEvents | undefined,
+  requestedRunIds: readonly string[],
   now: number,
 ): MappedWorkspace {
   const connectionDetail = connection === 'online'
@@ -346,12 +347,32 @@ function mapWorkspace(
     .sort((left, right) => right.updatedAt - left.updatedAt)
   const activityByRunId = new Map<string, ActivityWire>()
   for (const activity of wire.nodes.activity) activityByRunId.set(syntheticRunId(activity), activity)
-  const limitedWindows = [
-    wire.windows.threads.truncated ? 'threads' : undefined,
-    wire.windows.messages.truncated ? 'messages' : undefined,
-    wire.windows.activity.truncated ? 'runs' : undefined,
-    wire.windows.nodes.truncated ? 'nodes' : undefined,
-    recentEvents && recentEvents.truncatedRunIds.length > 0 ? 'run events' : undefined,
+  const requestedRunIdSet = new Set(recentEvents?.queriedRunIds ?? requestedRunIds)
+  const visibleRunIds = wire.nodes.activity.flatMap((activity) => {
+    const run = currentRun(activity)
+    return run ? [run.runId] : []
+  })
+  const queriedVisibleRunCount = visibleRunIds.filter((runId) => requestedRunIdSet.has(runId)).length
+  const unqueriedRunCount = visibleRunIds.length - queriedVisibleRunCount
+  const coverageNotices = [
+    wire.windows.threads.truncated
+      ? `Threads are limited to ${wire.windows.threads.returned} records in identifier-index order; this window is not guaranteed to contain the most recently updated threads.`
+      : undefined,
+    wire.windows.messages.truncated
+      ? `Messages are limited to ${wire.windows.messages.returned} records in identifier-index order; this window is not guaranteed to contain the most recently updated messages.`
+      : undefined,
+    wire.windows.activity.truncated
+      ? `Runs are derived from the newest ${wire.windows.activity.returned} commands by creation time; older command activity is not loaded.`
+      : undefined,
+    wire.windows.nodes.truncated
+      ? `Nodes are limited to ${wire.windows.nodes.returned} records in identifier-index order.`
+      : undefined,
+    unqueriedRunCount > 0
+      ? `Run-event subscriptions cover ${queriedVisibleRunCount} of ${visibleRunIds.length} visible run histories (maximum ${recentEvents?.runIdLimit ?? 20}), starting from the newest command activity. For the other ${unqueriedRunCount}, an empty timeline means history was not loaded—not that the run had no events.`
+      : undefined,
+    recentEvents && recentEvents.truncatedRunIds.length > 0
+      ? `${recentEvents.truncatedRunIds.length} subscribed run ${recentEvents.truncatedRunIds.length === 1 ? 'timeline is' : 'timelines are'} limited to the newest 50 public events.`
+      : undefined,
   ].filter((item): item is string => item !== undefined)
   return {
     snapshot: {
@@ -364,8 +385,8 @@ function mapWorkspace(
       messages,
       runs,
       nodes,
-      coverageNotice: limitedWindows.length > 0
-        ? `Showing the newest bounded window for ${limitedWindows.join(', ')}. Older history is not loaded in this view.`
+      coverageNotice: coverageNotices.length > 0
+        ? coverageNotices.join(' ')
         : undefined,
     },
     activityByRunId,
@@ -466,8 +487,8 @@ function useLiveAgentWorkspacePort(configuration: KriyanWebConfiguration): Agent
   const resetSessionMutation = useMutation(api.agents.resetSession)
 
   const mapped = useMemo(
-    () => mapWorkspace(connection, installation, wire, definitions, recentEvents, clock),
-    [clock, connection, definitions, installation, recentEvents, wire],
+    () => mapWorkspace(connection, installation, wire, definitions, recentEvents, recentRunIds, clock),
+    [clock, connection, definitions, installation, recentEvents, recentRunIds, wire],
   )
   const online = connection === 'online'
   const operations = useMemo<LiveOperations>(() => ({

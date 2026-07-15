@@ -226,11 +226,16 @@ export const agentRunEvents = query({
   },
   returns: v.object({
     items: v.array(runEventValue),
+    queriedRunIds: v.array(v.string()),
+    runIdLimit: v.number(),
     truncatedRunIds: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
     assertId(args.installationId, 'installationId')
-    if (args.runIds.length > 20) throw new Error('runIds must contain at most 20 values')
+    const runIdLimit = 20
+    if (args.runIds.length > runIdLimit) {
+      throw new Error(`runIds must contain at most ${runIdLimit} values`)
+    }
     if (new Set(args.runIds).size !== args.runIds.length) throw new Error('runIds must not contain duplicates')
     for (const runId of args.runIds) assertId(runId, 'runId')
     const pages = await Promise.all(args.runIds.map(async (runId) => {
@@ -249,6 +254,8 @@ export const agentRunEvents = query({
     }))
     return {
       items: pages.flatMap((page) => page.items),
+      queriedRunIds: args.runIds,
+      runIdLimit,
       truncatedRunIds: pages.filter((page) => page.truncated).map((page) => page.runId),
     }
   },

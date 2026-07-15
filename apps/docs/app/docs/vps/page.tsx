@@ -56,7 +56,7 @@ export default function VpsPage(): JSX.Element {
         <div className="mode-comparison">
           <div>
             <h3>DigitalOcean</h3>
-            <p>The existing service is enabled, active, and healthy on its prior release. Candidate promotion exposed an immutable node-registration mismatch and rolled back safely; deploy capability renegotiation before retrying the node.</p>
+            <p>The reference service is enabled, active, and healthy on the exact promoted node build. Its release identity, process health, fresh heartbeat, and deterministic Agent round trip passed after capability renegotiation was deployed.</p>
           </div>
           <div>
             <h3>Hetzner</h3>
@@ -74,6 +74,15 @@ export default function VpsPage(): JSX.Element {
         </p>
       </aside>
 
+      <aside className="notice notice-saffron">
+        <strong>Run one service process per stable node ID.</strong>
+        <p>
+          The verified V1 topology is one systemd worker for each node identity.
+          Do not launch overlapping workers with the same node ID; process-generation
+          fencing for that unsupported topology is not implemented yet.
+        </p>
+      </aside>
+
       <section id="operate">
         <h2>Inspect the running service</h2>
         <pre className="code-block" aria-label="VPS inspection commands"><code>{inspectCommands}</code></pre>
@@ -88,10 +97,10 @@ export default function VpsPage(): JSX.Element {
       <aside className="notice notice-saffron">
         <strong>Upgrade in dependency order.</strong>
         <p>
-          The stable node ID was already registered with legacy capabilities, and the
-          backend rejected the candidate&apos;s expanded list as different registration
-          data. Deploy and verify capability renegotiation first. Then run one node update and require the new release
-          identity, a fresh heartbeat, and a completed app-to-node round trip.
+          Upgrade Convex coordination contracts before a node binary that depends on
+          them. The reference upgrade proved this order: capability renegotiation first,
+          then one node update requiring the new release identity, a fresh heartbeat,
+          and a completed app-to-node round trip.
         </p>
       </aside>
 

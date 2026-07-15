@@ -128,10 +128,10 @@ export default function InstallPage(): JSX.Element {
           in the release archive.
         </p>
         <p>
-          The existing DigitalOcean service is healthy on its previous release.
-          Candidate promotion failed because the stable node ID could not renegotiate
-          its legacy capability list. Rollback restored the service. Deploy the
-          capability-renegotiation contract before promoting this node build.
+          The reference DigitalOcean service is healthy on the exact promoted node build.
+          An earlier attempt failed because the stable node ID could not renegotiate
+          its legacy capability list; rollback restored the service, the Convex contract
+          was repaired, and the rebuilt candidate later passed promotion health gates.
         </p>
       </section>
 

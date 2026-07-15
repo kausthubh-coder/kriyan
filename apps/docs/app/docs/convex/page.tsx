@@ -87,11 +87,11 @@ export default function ConvexPage(): JSX.Element {
           <li>Cleanup is scoped to that deployment and installation, then a second cleanup removes zero rows.</li>
         </ul>
         <p>
-          A prior reference release passed these production coordination checks
-          with an isolated Convex Cloud project and a correlated desktop-to-VPS
-          command. This candidate is not promoted to the existing host. See the
-          <Link href="/docs/status"> current status</Link> for the exact release
-          boundary and unverified targets.
+          The promoted node candidate passed production Convex coordination with
+          the promoted DigitalOcean node and a correlated local-browser Agent run.
+          The deterministic runtime returned the visible response and ordered events.
+          See the <Link href="/docs/status"> current status</Link> for the exact
+          packaged-client, provider, and alternate-host boundaries.
         </p>
       </section>
     </article>

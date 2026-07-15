@@ -10,7 +10,7 @@ Testing must name the exact source SHA and artifact hash, operate the real user 
 - The macOS arm64 DMG is ad-hoc signed, strictly verifies, copies from a mounted image, launches, and completes one representative local flow.
 - The Android APK installs on the assigned emulator, completes a task/note flow, and preserves it through force-stop and cold launch.
 - Standalone Linux x64 CLI/node and Darwin arm64 operator artifacts match the frozen source identity and pass archive/operator verification.
-- The existing VPS is inspected only through one serialized operator session. Do not repeat the candidate update path in this run: it already failed repeatedly and rolled back healthy.
+- The assigned VPS is inspected only through one serialized operator session. Require the promoted release identity, enabled/active service state, process health, and a fresh post-restart heartbeat before claiming promotion.
 - Public docs accurately link the V1 release assets and state that only docs are hosted.
 - No result is described as a live agent chat round trip unless the visible thread, submission, run progression, response, and events were observed.
 
@@ -95,7 +95,7 @@ The complete visible flow is:
 4. Exercise one cancellation/retry or session-reset control when the fixture supports it.
 5. Inspect console/network errors, stop the local node/server, and clean only the isolated fixture.
 
-Current evidence proves Settings connection, fresh node preflight, `/agents` HTTP 200, and no recurrence of `ConvexReactClient has already been closed`. It does not prove the complete visible flow because two bounded browser-control sessions failed in their tooling layer. Do not start another identical automation loop without a healthy interactive browser session or a new hypothesis.
+The July 15 live browser smoke completed this flow against the promoted DigitalOcean node: Settings connected, the node was fresh, a new durable thread accepted a message, the deterministic fake runtime completed it, and the UI rendered the assistant response plus four ordered public events. This proves the application/Convex/VPS transport and reactive state path. It does not prove Pi, model-provider credentials, provider output, or a provider-backed tool run.
 
 ## CLI and VPS release smoke
 
@@ -113,7 +113,7 @@ Construct and verify the Linux archive by following `packaging/README.md`. Recor
 
 For remote checks, use the separately obtained Darwin operator, strict known-hosts, one assigned host, and one serialized terminal session. Exercise `vps status`, `doctor`, and at most one authorized `restart`, then require enabled/active service state, expected release identity, current process health, and fresh node heartbeat. Never expose the host, installation ID, deployment URL, SSH path, or logs containing user material.
 
-The current DigitalOcean host is healthy on its previous release after rollback. Candidate update/promotion repeatedly returned `remote vps update failed`; the stopping condition has been reached. Do not retry update, and do not describe the integrated candidate as deployed on the VPS.
+The current DigitalOcean host is healthy on exact source candidate `3bf3ec273a3b9fb407747a5ba1eed1857c2bca29`. The earlier update failure was traced to immutable legacy capability registration, not a dead VPS. After the Convex renegotiation repair, one rebuilt exact-source promotion passed release identity, enabled/active service, process-health, and fresh-heartbeat gates. Do not repeat promotion merely to accumulate evidence.
 
 ## Public docs and release verification
 
@@ -139,6 +139,7 @@ Never store tokens, private URLs, installation/node IDs, IPs, SSH keys, browser 
 
 - Android component: accepted after exact-APK emulator persistence proof.
 - Desktop component: accepted after arbitrary-ID route repair and strict copied-app signature proof; final copied-app visual/keyboard smoke remains post-integration because the Mac was locked.
-- CLI/node artifacts: locally verified; existing VPS healthy on the prior release; candidate promotion blocked and stopped after repetition.
-- Live Agent Workspace: code integrated with no confirmed P0/P1; complete visible live message round trip remains unproven.
+- CLI/node artifacts: locally verified; exact candidate `3bf3ec273a3b9fb407747a5ba1eed1857c2bca29` promoted to the assigned DigitalOcean host and healthy.
+- Live Agent Workspace: complete visible browser → Convex → DigitalOcean node → Convex → browser message completion passed with the deterministic fake runtime and four ordered public events.
+- Node concurrency: one systemd process per stable node ID is the verified topology; overlapping processes with the same node ID remain unproven and must not be intentionally run in V1.
 - No claim for Developer ID/notarization, Play Store/App Store, iOS, physical Android, Hetzner host proof, self-hosted Convex proof, or a real Pi/provider session.

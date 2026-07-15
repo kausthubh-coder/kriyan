@@ -258,10 +258,10 @@ try {
     .map(visibleText)
     .join(' ')
   for (const requiredCopy of [
-    'The existing DigitalOcean service is healthy on its previous release.',
-    'Candidate promotion failed because the stable node ID could not renegotiate',
-    'The candidate is not promoted yet',
-    'complete visible live Agent chat submission, completion, and event-rendering proof',
+    'The reference DigitalOcean service is healthy on the exact promoted node build.',
+    'The later promotion passed',
+    'deterministic Agent round trip passed',
+    'No exact packaged-Tauri-to-VPS Agent proof',
     'No hosted product workspace; the public production surface is documentation only.',
     'The macOS app is ad-hoc signed, strictly sealed, Apple-silicon only, and not notarized.',
     'The Android APK is debug-signed for direct installation',
@@ -290,7 +290,7 @@ try {
       throw new Error(`Docs contain stale operational copy: ${staleCopy}`)
     }
   }
-  console.log('PASS V1 distribution, VPS blocker, and stale-copy regression guard')
+  console.log('PASS V1 distribution, promoted VPS truth, and stale-copy regression guard')
 
   const missingResponse = await fetch(`${baseUrl}/outside-the-constellation`)
   const missingHtml = await missingResponse.text()

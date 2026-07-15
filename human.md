@@ -39,7 +39,7 @@ local clients <-> owner Convex deployment <-> owner node <-> providers/vault
 - The macOS release is a static Tauri app with query-based detail routes for arbitrary source, artifact, and entity IDs.
 - Android demo data survives force-stop and cold relaunch through a bounded local snapshot. Convex mode remains separate.
 - `/agents` uses the deterministic demo only in explicit demo mode. Live mode maps Convex definitions, revisions, threads, messages, runs, events, and nodes through `AgentWorkspacePort`, including create, rename, revise, submit, cancel, retry, and reset operations.
-- Live agent windows are bounded to 100 rows and the V1 UI does not yet surface truncation. Node freshness may remain visually stale until another reactive render occurs.
+- Live agent windows are bounded, the UI discloses bounded history, and node freshness advances from a time-driven clock instead of waiting for another reactive render.
 
 ## Install and develop
 
@@ -90,8 +90,9 @@ The macOS arm64 app is ad-hoc signed and its build fails unless strict signature
 - The accepted desktop component produced a strictly sealed arm64 DMG; its visible offline product flow and persistence passed Computer Use, while the exact copied-DMG app's final keyboard/detail smoke was blocked by a locked Mac and remains a post-integration check.
 - The accepted Android component installed on an API 36 emulator, completed a task and note flow without the prior stale-write retry, and preserved the changes after force-stop and cold relaunch.
 - Standalone Linux x64 node/CLI and Darwin operator artifacts pass local identity/archive verification.
-- The existing DigitalOcean systemd service is enabled, active, and healthy on its previous release. Promotion of this candidate stopped after repeated `remote vps update failed` results and a successful rollback; do not claim the candidate is running there.
-- Live Convex setup, node preflight, Settings connection, and `/agents` HTTP routing passed after the Strict Mode client-lifecycle repair. A complete visible agent thread/message/completion round trip is not claimed because two bounded browser-control sessions failed in their tooling layer.
+- The DigitalOcean systemd service is enabled, active, and healthy on exact source candidate `3bf3ec273a3b9fb407747a5ba1eed1857c2bca29`. The earlier promotion failed because a stable node identity could not renegotiate its legacy capability list; the updater rolled back safely, the Convex contract was repaired, and a single later promotion passed release identity, process-health, and fresh-heartbeat gates.
+- A live browser session connected through Settings, created a durable Agent thread, submitted a message, and observed the DigitalOcean node complete it through Convex with an assistant response and four ordered public run events. That proof used the deterministic fake runtime, not Pi or a real model provider.
+- V1 operates one process per stable node ID through systemd. Concurrent processes sharing the same node ID do not yet have a registration-generation fence and remain an explicit operational boundary.
 - Hetzner, self-hosted Convex, iOS, app-store distribution, and a real Pi/provider session require separate proof.
 
 ## Safe parallel ownership
