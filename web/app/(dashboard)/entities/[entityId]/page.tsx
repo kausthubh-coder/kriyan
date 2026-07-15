@@ -1,6 +1,10 @@
 import { KnowledgeRoute } from '@/components/knowledge/knowledge-route'
 import { decodeRouteId } from '@/components/knowledge/route-id'
 
+export function generateStaticParams(): Array<{ entityId: string }> {
+  return [{ entityId: 'entity:kriyan' }]
+}
+
 export default async function EntityDetailPage({
   params,
 }: {
