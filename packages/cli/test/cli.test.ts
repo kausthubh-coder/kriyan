@@ -15,7 +15,7 @@ const api = new FakeApi({
   add_task: () => ({ result: { taskId: "k57added00000000000000000000013" } }),
   complete_task: (b) =>
     b.taskId === f.ids.gym
-      ? { result: { taskId: b.taskId, finished: false } }
+      ? { result: { taskId: b.taskId, finished: false, next: "2026-10-15" } }
       : b.taskId === f.ids.rent
         ? { error: "That task is already done." }
         : { result: { taskId: b.taskId, finished: true } },
@@ -239,7 +239,7 @@ describe("changing tasks", () => {
   test("done on a repeating task says it moved on", async () => {
     await run("today");
     const r = await run("done", "1");
-    expect(r.stdout).toBe(`Done "Gym". It repeats, so it moved to its next date.\n`);
+    expect(r.stdout).toBe(`Done "Gym". Next: Thu 15 Oct.\n`);
   });
 
   test("done by part of a title looks through today and the week", async () => {

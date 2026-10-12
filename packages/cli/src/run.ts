@@ -8,6 +8,7 @@ import {
   describeReminder,
   describeRepeat,
   formatDate,
+  formatDay,
   formatDuration,
   formatTime,
   formatTimeRange,
@@ -266,11 +267,20 @@ async function done(s: Session): Promise<void> {
   const tasks = await resolveTasks(s, rest(s));
   const api = s.api();
   for (const t of tasks) {
-    const result = await api.call<{ taskId: string; finished: boolean }>("complete_task", { taskId: t.id });
+    const result = await api.call<{ taskId: string; finished: boolean; next?: string | null }>(
+      "complete_task",
+      {
+        taskId: t.id,
+      },
+    );
     if (s.args.json) s.printJson(result);
     else
       s.print(
-        result.finished ? `Done ${named(t)}.` : `Done ${named(t)}. It repeats, so it moved to its next date.`,
+        result.finished
+          ? `Done ${named(t)}.`
+          : result.next
+            ? `Done ${named(t)}. Next: ${formatDay(result.next, s.today())}.`
+            : `Done ${named(t)}. It repeats, so it moved to its next date.`,
       );
   }
 }

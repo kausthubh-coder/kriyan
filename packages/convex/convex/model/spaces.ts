@@ -117,9 +117,11 @@ export async function resolveSpacePath(
     const match =
       spaces.find((s) => s.name.toLowerCase() === part.toLowerCase() && s.parentId === parentId) ??
       (parentId ? undefined : spaces.find((s) => s.name.toLowerCase() === part.toLowerCase()));
+    // "#school" creates "School": a typed tag is lowercase by habit, not by choice.
+    const name = part === part.toLowerCase() ? part.charAt(0).toUpperCase() + part.slice(1) : part;
     parentId = match
       ? match._id
-      : await createSpace(ctx, ownerId, { name: part, ...(parentId ? { parentId } : {}) });
+      : await createSpace(ctx, ownerId, { name, ...(parentId ? { parentId } : {}) });
   }
   if (!parentId) throw new ConvexError("Give the space a name after #.");
   return parentId;

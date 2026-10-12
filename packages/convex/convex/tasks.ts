@@ -60,6 +60,7 @@ const completionV = v.object({
   date: v.union(v.string(), v.null()),
   completionId: v.id("completions"),
   finished: v.boolean(),
+  next: v.union(v.string(), v.null()),
 });
 
 export const complete = mutation({

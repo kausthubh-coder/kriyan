@@ -103,7 +103,7 @@ export const complete_task = internalMutation({
   args: { ...owner, taskId: v.id("tasks") },
   handler: async (ctx, { ownerId, taskId }) => {
     const done = await Tasks.completeTask(ctx, ownerId, taskId);
-    return { taskId, finished: done.finished };
+    return { taskId, finished: done.finished, next: done.next };
   },
 });
 
