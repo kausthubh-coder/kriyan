@@ -6,3 +6,6 @@ bun.lock
 docs/design/v3
 apps/app/android
 apps/app/ios
+apps/site/src/app/tokens.css
+apps/app/app.json
+.agents/skills

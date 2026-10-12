@@ -25,14 +25,14 @@ If a screen does not help answer one of these, it does not belong in the main na
 
 ## 3. The daily loop
 
-| Moment | When | Time it should take | Where |
-|---|---|---|---|
-| Capture | Any time an idea arrives | Under 3 seconds | `N` or `+` anywhere, phone share sheet, AI |
-| Plan the day | Morning or night before | Under 5 minutes | Today |
-| Do | All day | Glances | Today's Now card, reminders |
-| Fix the day | When something slips | One action | "Move to tomorrow", drag, "Reschedule late" |
-| Plan the week | Once a week | About 15 minutes | Upcoming |
-| Review progress | Weekly | A few minutes | Progress |
+| Moment          | When                     | Time it should take | Where                                       |
+| --------------- | ------------------------ | ------------------- | ------------------------------------------- |
+| Capture         | Any time an idea arrives | Under 3 seconds     | `N` or `+` anywhere, phone share sheet, AI  |
+| Plan the day    | Morning or night before  | Under 5 minutes     | Today                                       |
+| Do              | All day                  | Glances             | Today's Now card, reminders                 |
+| Fix the day     | When something slips     | One action          | "Move to tomorrow", drag, "Reschedule late" |
+| Plan the week   | Once a week              | About 15 minutes    | Upcoming                                    |
+| Review progress | Weekly                   | A few minutes       | Progress                                    |
 
 Capture never asks a question. Anything without a space or date goes to the Inbox, and the Inbox is emptied while planning, not while capturing.
 
@@ -42,11 +42,11 @@ Planning is optional. Today works without it. "Plan today" is a 60-second sheet 
 
 Three groups, always in this order:
 
-| Group | Destinations | Question it answers |
-|---|---|---|
-| Time | Inbox, Today, Upcoming | What and when |
-| Spaces | The person's own tree of spaces, nested as deep as they like | Where things belong |
-| Progress | Goals, Habits, Activity | Am I on track |
+| Group    | Destinations                                                 | Question it answers |
+| -------- | ------------------------------------------------------------ | ------------------- |
+| Time     | Inbox, Today, Upcoming                                       | What and when       |
+| Spaces   | The person's own tree of spaces, nested as deep as they like | Where things belong |
+| Progress | Goals, Habits, Activity                                      | Am I on track       |
 
 Search and every command live in one command menu (`Ctrl K`). Settings sits at the bottom of the sidebar and is never a tab.
 
@@ -123,17 +123,17 @@ A task can have any number. Timed tasks get the person's default reminder (10 mi
 
 ## 6. How things react
 
-| Action | What happens | Why |
-|---|---|---|
-| Tick a task | The circle fills at once, the title dims, the row stays in place for a moment, then moves to Done. Undo in a toast. | Instant feedback, and the list does not jump under the pointer. |
-| Delete | Happens at once, Undo for 5 seconds, Trash for 30 days. No "Are you sure?". | Undo instead of asking. |
-| Drag a task onto the timeline | The task lifts with a shadow, snaps to 15 minutes, and shows its start and end while moving. Escape cancels. | Precision without fiddling. |
-| Drop or reschedule on the phone | A light haptic on drop. | Feel the moment the eye confirms. |
-| Resize a block | The end time follows the pointer in 15-minute steps. | Length is optional, so resizing adds one. |
-| Open the command menu | Opens with no animation, cursor in the field. | Used dozens of times a day. |
-| Open a task | Side panel slides in over 200 ms with ease-out. Keyboard opens it without animation. | Occasional and spatial. |
-| An AI changes the plan | Its changes show as proposed blocks with "Accept" and "Undo", and a log line names the agent. | People stay in charge of their own time. |
-| Reduced motion | Slides become fades. | Less movement, not no feedback. |
+| Action                          | What happens                                                                                                        | Why                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Tick a task                     | The circle fills at once, the title dims, the row stays in place for a moment, then moves to Done. Undo in a toast. | Instant feedback, and the list does not jump under the pointer. |
+| Delete                          | Happens at once, Undo for 5 seconds, Trash for 30 days. No "Are you sure?".                                         | Undo instead of asking.                                         |
+| Drag a task onto the timeline   | The task lifts with a shadow, snaps to 15 minutes, and shows its start and end while moving. Escape cancels.        | Precision without fiddling.                                     |
+| Drop or reschedule on the phone | A light haptic on drop.                                                                                             | Feel the moment the eye confirms.                               |
+| Resize a block                  | The end time follows the pointer in 15-minute steps.                                                                | Length is optional, so resizing adds one.                       |
+| Open the command menu           | Opens with no animation, cursor in the field.                                                                       | Used dozens of times a day.                                     |
+| Open a task                     | Side panel slides in over 200 ms with ease-out. Keyboard opens it without animation.                                | Occasional and spatial.                                         |
+| An AI changes the plan          | Its changes show as proposed blocks with "Accept" and "Undo", and a log line names the agent.                       | People stay in charge of their own time.                        |
+| Reduced motion                  | Slides become fades.                                                                                                | Less movement, not no feedback.                                 |
 
 Every gesture has a visible twin: swipe right to complete has a checkbox, swipe left to reschedule has a "Move" button, long-press to drag has a "Schedule" field.
 
