@@ -1,0 +1,14 @@
+import { BASE, launch, artifact, EMAIL, PASSWORD } from "./lib.mjs";
+const browser = await launch();
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+page.setDefaultTimeout(120000);
+page.on("console", (m) => m.type() !== "info" && console.log(`[${m.type()}] ${m.text().slice(0, 300)}`));
+await page.goto(`${BASE}/sign-in`);
+await page.getByRole("button", { name: "New to Kriyan? Create an account" }).click();
+await page.getByRole("textbox", { name: "Email" }).fill(EMAIL);
+await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+await page.getByRole("button", { name: "Create account" }).click();
+await page.waitForTimeout(8000);
+console.log("TEXT:", (await page.evaluate(() => document.body.innerText)).slice(0, 800));
+await page.screenshot({ path: artifact("debug.png") });
+await browser.close();
