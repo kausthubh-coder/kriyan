@@ -461,6 +461,7 @@ describe("signing in", () => {
     const out = await kriyan(["logout"], { env: { KRIYAN_CONFIG_DIR: dir, KRIYAN_TOKEN: undefined } });
     expect(out.stdout).toBe(`Signed out. Removed your token from ${path}\n`);
     expect(existsSync(path)).toBe(false);
+    expect(existsSync(join(dir, "last-listing.json"))).toBe(false);
   });
 
   test("login reads a piped token", async () => {

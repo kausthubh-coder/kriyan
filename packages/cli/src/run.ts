@@ -430,7 +430,7 @@ async function login(s: Session): Promise<void> {
 async function logout(s: Session): Promise<void> {
   if (!s.config.token) s.print("You weren't signed in on this computer.");
   else {
-    s.store.removeConfig();
+    s.store.clear();
     s.print(`Signed out. Removed your token from ${s.store.configPath}`);
   }
   if (s.io.env.KRIYAN_TOKEN) s.print("KRIYAN_TOKEN is still set in this shell, so commands keep using it.");

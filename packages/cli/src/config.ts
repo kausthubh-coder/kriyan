@@ -63,8 +63,10 @@ export class Store {
     writePrivate(this.configPath, this.dir, config);
   }
 
-  removeConfig(): void {
+  /** Forgets the token and the last listing, which holds that account's task titles. */
+  clear(): void {
     rmSync(this.configPath, { force: true });
+    rmSync(this.listingPath, { force: true });
   }
 
   /** Task ids from the last listing; the number shown next to a task is its index plus one. */
