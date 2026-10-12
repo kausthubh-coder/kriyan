@@ -1,7 +1,7 @@
 // Builds the npm package in dist/: one ESM file for Node 20+ with @kriyan/core bundled in,
 // plus the manifest, README and licence. Publish from dist/ (see README.md).
 
-import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");

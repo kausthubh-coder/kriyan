@@ -42,17 +42,25 @@ export class RefBook {
 const ANSI = /\x1b\[[0-9;]*m/g;
 const visible = (s: string) => s.replace(ANSI, "").length;
 
-export function dot(color: string | null, on: boolean): string {
-  if (!on || !color || !(color in spaceColor)) return "";
+function dot(color: string | null): string {
+  if (!color || !(color in spaceColor)) return " ";
   const hex = spaceColor[color as SpaceColor].dot;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `\x1b[38;2;${r};${g};${b}m●\x1b[39m`;
 }
 
+/** "● School" in the space's colour when colour is on (a blank where there's no space), else "School". */
+function dotted(color: string | null, text: string, view: View): string {
+  return view.color ? `${dot(color)} ${text}` : text;
+}
+
 type Line = { text: string } | { cells: string[] };
 
-/** Aligns every row of a view on the same columns. Columns empty in every row are dropped. */
-function table(lines: Line[], indent = "  "): string {
+/**
+ * Aligns every row of a view on the same columns. Columns empty in every row are dropped;
+ * columns listed in `right` (task numbers) align right.
+ */
+function table(lines: Line[], { indent = "  ", right = [] as number[] } = {}): string {
   const rows = lines.filter((l): l is { cells: string[] } => "cells" in l);
   const count = Math.max(0, ...rows.map((r) => r.cells.length));
   const used = Array.from({ length: count }, (_, c) => rows.some((r) => (r.cells[c] ?? "") !== ""));
@@ -65,18 +73,22 @@ function table(lines: Line[], indent = "  "): string {
       const cells = line.cells
         .map((cell, c) => ({ cell, c }))
         .filter(({ c }) => used[c])
-        .map(({ cell, c }) => cell + " ".repeat(width[c]! - visible(cell)));
+        .map(({ cell, c }) => {
+          const pad = " ".repeat(width[c]! - visible(cell));
+          return right.includes(c) ? pad + cell : cell + pad;
+        });
       return (indent + cells.join("  ")).trimEnd();
     })
     .join("\n");
 }
 
-function taskRow(t: TaskView, when: string, refs: RefBook, view: View): Line {
-  const status = t.done ? "done" : t.proposedBy ? `proposed by ${t.proposedBy}` : "";
-  return {
-    cells: [refs.ref(t).padStart(2), when, dot(t.color, view.color), t.title, t.spacePath ?? "", status],
-  };
+/** Number, when, title (with its dot), space, status. Use with `table(lines, TASKS)`. */
+function taskRow(t: TaskView, when: string, refs: RefBook, view: View, showDone = true): Line {
+  const status = t.done && showDone ? "done" : t.proposedBy ? `proposed by ${t.proposedBy}` : "";
+  return { cells: [refs.ref(t), when, dotted(t.color, t.title, view), t.spacePath ?? "", status] };
 }
+
+const TASKS = { right: [0] };
 
 const when = (t: TaskView) => (t.time === null ? "" : formatTimeRange(t.time, t.length ?? undefined));
 
@@ -112,21 +124,21 @@ export function renderToday(day: TodayResult, view: View, refs: RefBook): string
           `${next.title} at ${formatTime(next.time!)}, in ${formatDuration(next.time! - nowMinutes)}`,
         ],
       });
-    if (lines.length) out.push("", table(lines, ""));
+    if (lines.length) out.push("", table(lines, { indent: "" }));
   }
 
   const lines: Line[] = [];
-  const section = (title: string, tasks: TaskView[], whenOf: (t: TaskView) => string) => {
+  const section = (title: string, tasks: TaskView[], whenOf: (t: TaskView) => string, showDone = true) => {
     if (!tasks.length) return;
     if (lines.length) lines.push({ text: "" });
     lines.push({ text: title });
-    for (const t of tasks) lines.push(taskRow(t, whenOf(t), refs, view));
+    for (const t of tasks) lines.push(taskRow(t, whenOf(t), refs, view, showDone));
   };
   section("Schedule", day.scheduled, when);
   section("Anytime", day.anytime, () => "");
   section("From earlier", day.earlier, (t) => (t.date ? formatDate(t.date, today) : ""));
-  section("Done", day.done, () => "");
-  if (lines.length) out.push("", table(lines));
+  section("Done", day.done, () => "", false);
+  if (lines.length) out.push("", table(lines, TASKS));
 
   const left = day.scheduled.filter((t) => !t.done).length + day.anytime.length + day.earlier.length;
   if (left === 0)
@@ -145,8 +157,7 @@ export function renderToday(day: TodayResult, view: View, refs: RefBook): string
       table(
         day.habits.map((h) => ({
           cells: [
-            dot(h.color, view.color),
-            h.title,
+            dotted(h.color, h.title, view),
             `${h.thisWeek} of ${h.target} this week`,
             h.doneToday ? "done today" : "",
           ],
@@ -211,7 +222,7 @@ export function renderWeek(week: WeekResult, view: View, refs: RefBook, today: C
   };
   section("Inbox", week.inbox);
   section("No date yet", week.unscheduled);
-  out.push(table(lines));
+  out.push(table(lines, TASKS));
   if (week.proposals > 0)
     out.push(
       "",
@@ -222,15 +233,20 @@ export function renderWeek(week: WeekResult, view: View, refs: RefBook, today: C
 
 export function renderInbox(inbox: InboxResult, view: View, refs: RefBook): string {
   if (!inbox.length) return 'Your inbox is empty. Capture a task with: kriyan add "buy stamps"';
-  return ["Inbox", table(inbox.map((t) => taskRow(t, "", refs, view)))].join("\n");
+  return [
+    "Inbox",
+    table(
+      inbox.map((t) => taskRow(t, "", refs, view)),
+      TASKS,
+    ),
+  ].join("\n");
 }
 
 export function renderSpaces(spaces: SpacesResult, view: View): string {
   if (!spaces.length) return 'No spaces yet. Add one with: kriyan add "first task #school"';
   return spaces
     .map((s) => {
-      const d = dot(s.color, view.color);
-      return `${"  ".repeat(s.depth)}${d ? `${d} ` : ""}${s.name}`;
+      return `${"  ".repeat(s.depth)}${dotted(s.color, s.name, view)}`;
     })
     .join("\n");
 }
@@ -259,7 +275,7 @@ export function renderProgress(p: ProgressResult, view: View): string {
   if (p.bySpace.length) {
     out.push("", "By space");
     out.push(
-      table(p.bySpace.map((s) => ({ cells: [dot(s.color, view.color), s.name, formatDuration(s.minutes)] }))),
+      table(p.bySpace.map((s) => ({ cells: [dotted(s.color, s.name, view), formatDuration(s.minutes)] }))),
     );
   }
   if (p.goals.length) out.push("", "Goals", table(p.goals.map((g) => goalLine(g, p.today))));
@@ -271,8 +287,7 @@ export function renderProgress(p: ProgressResult, view: View): string {
           const last30 = h.days.slice(-30).filter((d) => d.done).length;
           return {
             cells: [
-              dot(h.color, view.color),
-              h.title,
+              dotted(h.color, h.title, view),
               `${h.thisWeek} of ${h.target} this week`,
               `${last30} in the last 30 days`,
             ],
@@ -284,4 +299,18 @@ export function renderProgress(p: ProgressResult, view: View): string {
   if (!p.weekMinutes && !p.yearMinutes && !p.goals.length && !p.habits.length)
     return "Nothing done yet. Tick off a task with: kriyan done <task>";
   return out.join("\n");
+}
+
+export interface Block {
+  title: string;
+  date: CivilDate;
+  time: number;
+  length?: number;
+}
+
+/** Proposed blocks, one aligned line each. */
+export function renderBlocks(blocks: Block[], today: CivilDate): string {
+  return table(
+    blocks.map((b) => ({ cells: [formatDate(b.date, today), formatTimeRange(b.time, b.length), b.title] })),
+  );
 }

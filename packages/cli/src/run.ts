@@ -19,15 +19,17 @@ import { ApiError, client, DEFAULT_API_URL, NetworkError, type Client } from "./
 import { parseArgs, UsageError, type Args } from "./args.ts";
 import { configDir, Store, type Config, type Listed } from "./config.ts";
 import { COMMAND_HELP, MAIN_HELP } from "./help.ts";
-import { classifyRef, matchTitle, splitMove, type Candidate } from "./refs.ts";
+import { classifyRef, matchTitle, splitMove } from "./refs.ts";
 import {
   dayLabel,
   RefBook,
+  renderBlocks,
   renderInbox,
   renderProgress,
   renderSpaces,
   renderToday,
   renderWeek,
+  type Block,
   type View,
 } from "./render.ts";
 import type {
@@ -217,7 +219,7 @@ function ambiguous(s: Session, text: string, tasks: TaskView[], noun = "tasks"):
     const when = t.date
       ? `${formatDate(t.date, s.today())}${t.time !== null ? ` ${formatTime(t.time)}` : ""}`
       : "";
-    return `  ${refs.ref(t).padStart(2)}  ${t.title}${when ? `  ${when}` : ""}`;
+    return `  ${refs.ref(t).padStart(String(tasks.length).length)}  ${t.title}${when ? `  ${when}` : ""}`;
   });
   s.saveListing(refs);
   return new UsageError(
@@ -281,13 +283,11 @@ async function move(s: Session): Promise<void> {
     );
   const tasks = await resolveTasks(s, split.refs);
   const { date, time } = split.when;
-  const result = await s
-    .api()
-    .call<{ moved: number }>("move_tasks", {
-      taskIds: tasks.map((t) => t.id),
-      date,
-      ...(time !== undefined ? { time } : {}),
-    });
+  const result = await s.api().call<{ moved: number }>("move_tasks", {
+    taskIds: tasks.map((t) => t.id),
+    date,
+    ...(time !== undefined ? { time } : {}),
+  });
   if (s.args.json) return s.printJson(result);
   s.print(
     `Moved ${several(tasks)} to ${formatDate(date, s.today())}${time !== undefined ? ` at ${formatTime(time)}` : ""}.`,
@@ -344,13 +344,6 @@ async function readInput(io: Io, path: string): Promise<string> {
   return text;
 }
 
-interface Block {
-  title: string;
-  date: string;
-  time: number;
-  length?: number;
-}
-
 async function propose(s: Session): Promise<void> {
   if (!s.args.file)
     throw new UsageError("Pass the plan with --file plan.json. Run kriyan propose --help for its shape.");
@@ -379,8 +372,7 @@ async function propose(s: Session): Promise<void> {
       ? `Proposed ${n} from ${agent}. Accept or discard them in the app.`
       : `Added ${n} from ${agent} to your plan.`,
   );
-  for (const b of blocks as Block[])
-    s.print(`  ${formatDate(b.date, today)}  ${formatTimeRange(b.time, b.length)}  ${b.title}`);
+  s.print(renderBlocks(blocks as Block[], today));
 }
 
 async function call(s: Session): Promise<void> {
