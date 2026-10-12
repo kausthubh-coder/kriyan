@@ -1,7 +1,9 @@
 // Profile, push tokens and access tokens for the signed-in person.
 
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { cancelReminders } from "./model/reminders";
 import { DEFAULT_PROFILE, getProfile, requireOwner } from "./model/owner";
 import * as Tokens from "./model/tokens";
 import { reminderV } from "./validators";
@@ -96,4 +98,85 @@ export const createToken = mutation({
 export const revokeToken = mutation({
   args: { id: v.id("accessTokens") },
   handler: async (ctx, { id }) => Tokens.revokeToken(ctx, await requireOwner(ctx), id),
+});
+
+/**
+ * Deletes everything the signed-in person owns: tasks (and their pending reminders), spaces,
+ * habits, goals, history, devices, tokens and the profile. Runs in batches until done.
+ * The Clerk account itself is deleted by the app through Clerk.
+ */
+export const deleteMyData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const ownerId = await requireOwner(ctx);
+    await ctx.scheduler.runAfter(0, internal.account.deleteDataBatch, { ownerId });
+  },
+});
+
+const BATCH = 200;
+
+export const deleteDataBatch = internalMutation({
+  args: { ownerId: v.string() },
+  handler: async (ctx, { ownerId }) => {
+    let left = BATCH;
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId))
+      .take(left);
+    for (const t of tasks) {
+      await cancelReminders(ctx, t._id);
+      await ctx.db.delete(t._id);
+    }
+    left -= tasks.length;
+    // Explicit per table: every index here starts with ownerId.
+    const batches = [
+      () =>
+        ctx.db
+          .query("completions")
+          .withIndex("by_owner_and_doneOn", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("habitChecks")
+          .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("habits")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("goals")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("spaces")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("pushTokens")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("accessTokens")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("profiles")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+    ];
+    for (const next of batches) {
+      if (left <= 0) break;
+      const rows = await next();
+      for (const row of rows) await ctx.db.delete(row._id);
+      left -= rows.length;
+    }
+    if (left <= 0) await ctx.scheduler.runAfter(0, internal.account.deleteDataBatch, { ownerId });
+  },
 });

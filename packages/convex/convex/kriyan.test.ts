@@ -39,7 +39,7 @@ describe("quick add and today", () => {
     });
     const day = await alice.query(api.views.today, { today });
     expect(day.scheduled.map((t) => [t.title, t.time, t.length, t.spacePath, t.repeatText, t.color])).toEqual(
-      [["Calculus lecture", 840, 90, "school", "Every Tue and Thu", "blue"]],
+      [["Calculus lecture", 840, 90, "School", "Every Tue and Thu", "blue"]],
     );
     expect(day.anytime).toEqual([]);
   });
@@ -75,7 +75,7 @@ describe("completing", () => {
     const { alice } = await setup();
     const id = await alice.mutation(api.tasks.addText, { text: "Water plants every 3 days" });
     const done = await alice.mutation(api.tasks.complete, { id });
-    expect(done).toMatchObject({ date: "2026-10-13", finished: false });
+    expect(done).toMatchObject({ date: "2026-10-13", finished: false, next: "2026-10-16" });
     expect((await alice.query(api.views.task, { id }))?.date).toBe("2026-10-16");
     await alice.mutation(api.tasks.undoComplete, { id, completion: done });
     expect((await alice.query(api.views.task, { id }))?.date).toBe("2026-10-13");
@@ -213,6 +213,62 @@ describe("habits and progress", () => {
     await alice.mutation(api.tasks.complete, { id });
     const progress = await alice.query(api.views.progress, { today });
     expect(progress.weekMinutes).toBe(120);
-    expect(progress.bySpace.map((s) => [s.name, s.minutes])).toEqual([["work", 120]]);
+    expect(progress.bySpace.map((s) => [s.name, s.minutes])).toEqual([["Work", 120]]);
+  });
+});
+
+describe("moving a repeating task", () => {
+  test("moves only this occurrence; the next one keeps its usual day", async () => {
+    const { alice, today } = await setup();
+    const id = await alice.mutation(api.tasks.addText, { text: "Calculus every tue and thu 9am" });
+    await alice.mutation(api.tasks.move, { ids: [id], date: "2026-10-16" });
+    const week = await alice.query(api.views.week, { start: "2026-10-12", today });
+    expect(week.days.map((d) => [d.date, d.scheduled.map((t) => t.title)])).toEqual([
+      ["2026-10-12", []],
+      ["2026-10-13", []],
+      ["2026-10-14", []],
+      ["2026-10-15", []],
+      ["2026-10-16", ["Calculus"]],
+      ["2026-10-17", []],
+      ["2026-10-18", []],
+    ]);
+    const done = await alice.mutation(api.tasks.complete, { id });
+    expect(done.next).toBe("2026-10-20");
+  });
+});
+
+describe("deleting my data", () => {
+  test("removes every row the person owns, and nobody else's", async () => {
+    const { t, alice } = await setup();
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    await bob.mutation(api.tasks.addText, { text: "Bob's task today" });
+    const id = await alice.mutation(api.tasks.addText, {
+      text: "Call Mum today 18:00 remind 10m before #life",
+    });
+    await alice.mutation(api.tasks.complete, { id });
+    const habit = await alice.mutation(api.organize.addHabit, { title: "Read", target: 3 });
+    await alice.mutation(api.organize.checkHabit, { id: habit, done: true });
+    await alice.mutation(api.account.createToken, { name: "CLI" });
+    await alice.mutation(api.account.deleteMyData, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const owners = await t.run(async (ctx) => {
+      const all = await Promise.all(
+        (
+          [
+            "profiles",
+            "spaces",
+            "tasks",
+            "completions",
+            "habits",
+            "habitChecks",
+            "accessTokens",
+            "reminderJobs",
+          ] as const
+        ).map((table) => ctx.db.query(table).collect()),
+      );
+      return all.flat().map((row) => ("ownerId" in row ? row.ownerId : "?"));
+    });
+    expect([...new Set(owners)]).toEqual([BOB.tokenIdentifier]);
   });
 });

@@ -11,14 +11,14 @@ A planner that turns everything a person has to do into a plan for their time, a
 
 ## Map
 
-| Where | What |
-|---|---|
-| `packages/core` | Pure logic shared by everything: dates, repeat rules, reminders, the quick-add parser, formatting, layout, design tokens, the agent operation registry (`ops.ts`) |
-| `packages/convex/convex` | Backend. `model/` holds every rule (one place); `tasks.ts`, `views.ts`, `organize.ts`, `account.ts` are the app's functions; `agent.ts` + `http.ts` are the agent API |
-| `apps/app` | Expo Router app for Android and the web app, one feature per folder in `src/features` |
-| `apps/site` | Next.js: landing page, docs, `/mcp` server |
-| `packages/cli` | The `kriyan` command |
-| `docs/design/ux.md`, `docs/design/v3/` | How the app works, and how it looks (open `brand.html`) |
+| Where                                  | What                                                                                                                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core`                        | Pure logic shared by everything: dates, repeat rules, reminders, the quick-add parser, formatting, layout, design tokens, the agent operation registry (`ops.ts`)     |
+| `packages/convex/convex`               | Backend. `model/` holds every rule (one place); `tasks.ts`, `views.ts`, `organize.ts`, `account.ts` are the app's functions; `agent.ts` + `http.ts` are the agent API |
+| `apps/app`                             | Expo Router app for Android and the web app, one feature per folder in `src/features`                                                                                 |
+| `apps/site`                            | Next.js: landing page, docs, `/mcp` server                                                                                                                            |
+| `packages/cli`                         | The `kriyan` command                                                                                                                                                  |
+| `docs/design/ux.md`, `docs/design/v3/` | How the app works, and how it looks (open `brand.html`)                                                                                                               |
 
 Business logic lives once, in `packages/core` or `packages/convex/convex/model`. Apps, MCP and the CLI call it.
 

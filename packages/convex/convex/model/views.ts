@@ -104,10 +104,13 @@ async function plan(
     if (!t.repeat || t.doneAt !== undefined) push(t.date!, view(t, spaces));
   for (const t of await repeating(ctx, ownerId)) {
     if (!t.date || t.date > to) continue;
-    // From the task's pending date onwards; earlier occurrences are either done or "from earlier".
-    const start = t.date > from ? t.date : from;
-    for (const d of occurrencesBetween(t.repeat!, t.repeatFirst ?? t.date, start, to))
-      push(d, view(t, spaces, d));
+    // The pending date shows even when it was moved off the rule's usual days; later
+    // occurrences follow the rule. Earlier ones are either done or "from earlier".
+    if (t.date >= from) push(t.date, view(t, spaces, t.date));
+    const after = t.date >= from ? t.date : from;
+    for (const d of occurrencesBetween(t.repeat!, t.repeatFirst ?? t.date, after, to)) {
+      if (d > t.date) push(d, view(t, spaces, d));
+    }
   }
   // Repeats done earlier in the range show as done on their day.
   const done = await ctx.db

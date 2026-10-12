@@ -76,6 +76,19 @@
         "typescript": "~6.0.3",
       },
     },
+    "packages/cli": {
+      "name": "@kriyan/cli",
+      "version": "0.1.0",
+      "bin": {
+        "kriyan": "./src/main.ts",
+      },
+      "devDependencies": {
+        "@kriyan/convex": "workspace:*",
+        "@kriyan/core": "workspace:*",
+        "@types/bun": "^1.3.0",
+        "vitest": "^4.1.11",
+      },
+    },
     "packages/convex": {
       "name": "@kriyan/convex",
       "version": "0.0.0",
@@ -512,6 +525,8 @@
     "@keyv/serialize": ["@keyv/serialize@1.1.1", "", {}, "sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA=="],
 
     "@kriyan/app": ["@kriyan/app@workspace:apps/app"],
+
+    "@kriyan/cli": ["@kriyan/cli@workspace:packages/cli"],
 
     "@kriyan/convex": ["@kriyan/convex@workspace:packages/convex"],
 

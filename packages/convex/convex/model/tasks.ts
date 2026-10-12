@@ -161,8 +161,10 @@ export async function updateTask(
   const repeat = patch.repeat === null ? undefined : (patch.repeat ?? task.repeat);
   const date = patch.date === null ? undefined : (patch.date ?? task.date);
   if (repeat && !date) throw new ConvexError("A repeating task needs a date.");
-  // Changing the rule or the date re-anchors the repeat on the new date.
-  if (patch.repeat !== undefined || patch.date !== undefined) next.repeatFirst = repeat ? date : undefined;
+  // A new rule starts on the task's date. Moving a repeating task moves only this occurrence:
+  // the rule keeps its anchor, so the next one still lands on its usual day.
+  if (patch.repeat !== undefined || (repeat && !task.repeatFirst))
+    next.repeatFirst = repeat ? date : undefined;
   await ctx.db.patch(id, next);
   await scheduleReminders(ctx, id);
 }
@@ -172,6 +174,8 @@ export interface Completion {
   date: string | null;
   completionId: Id<"completions">;
   finished: boolean;
+  /** Where a repeating task moved to; null when it finished. */
+  next: string | null;
 }
 
 /** Ticks a task off. A repeating task moves to its next date; it finishes when the repeat ends. */
@@ -197,7 +201,7 @@ export async function completeTask(ctx: MutationCtx, ownerId: string, id: Id<"ta
     if (goal && goal.kind === "tasks") await ctx.db.patch(goal._id, { current: goal.current + 1 });
   }
   await scheduleReminders(ctx, id);
-  return { date: task.date ?? null, completionId, finished: !next };
+  return { date: task.date ?? null, completionId, finished: !next, next };
 }
 
 /** Undoes `completeTask`. */
