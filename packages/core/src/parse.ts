@@ -151,7 +151,8 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
         re.lastIndex = m.index + 1;
         continue;
       }
-      out.spans.push({ start: m.index, end: m.index + m[0].length, kind });
+      // A span ends at its last word: trailing spaces may be a phrase already taken (masked).
+      out.spans.push({ start: m.index, end: m.index + m[0].trimEnd().length, kind });
       masked = masked.slice(0, m.index) + " ".repeat(m[0].length) + masked.slice(m.index + m[0].length);
       if (!pattern.global) break;
     }

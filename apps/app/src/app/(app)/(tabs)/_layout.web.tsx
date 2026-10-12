@@ -2,6 +2,8 @@
 
 import { Slot } from "expo-router";
 
+export const unstable_settings = { initialRouteName: "today" };
+
 export default function TabsLayout() {
   return <Slot />;
 }

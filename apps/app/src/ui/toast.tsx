@@ -1,6 +1,5 @@
 // Toasts: news from somewhere else, with one action (Undo). Five seconds, then gone.
 
-import { useEffect } from "react";
 import { View } from "react-native";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, shadows } from "@/theme/tokens";
@@ -24,14 +23,18 @@ export function showToast(text: string, action?: Toast["action"], ms = 5000): nu
   return id;
 }
 
+/** Changes a toast's text in place (e.g. once the server says when a repeat comes next). */
+export function updateToast(id: number, text: string) {
+  toasts.set((list) => list.map((t) => (t.id === id ? { ...t, text } : t)));
+}
+
 export function dismissToast(id: number) {
   toasts.set((list) => list.filter((t) => t.id !== id));
 }
 
 export function ToastHost({ bottom }: { bottom: number }) {
-  const list = toasts.use((t) => t);
+  const list = toasts.useValue((t) => t);
   const phone = useIsPhone();
-  useEffect(() => undefined, []);
   if (!list.length) return null;
   return (
     <View

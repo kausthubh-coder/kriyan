@@ -36,7 +36,7 @@ export function SignIn() {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [step, setStep] = useState<Step>("form");
-  const [codeFor, setCodeFor] = useState<"sign-in" | "sign-up">("sign-in");
+  const [codeFor, setCodeFor] = useState<"sign-in" | "sign-up" | "trust">("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -68,7 +68,16 @@ export function SignIn() {
           const done = await signIn.finalize();
           return message(done, "Couldn't finish signing in. Try again.");
         }
-        return "This account needs another step that Kriyan doesn't support yet. Sign in with a code instead.";
+        if (signIn.status === "needs_client_trust" || signIn.status === "needs_second_factor") {
+          // A new device: confirm it with a code by email (Device Trust).
+          const sent = await signIn.mfa.sendEmailCode();
+          const sendErr = message(sent, "Couldn't send the code. Try again.");
+          if (sendErr) return sendErr;
+          setCodeFor("trust");
+          setStep("code");
+          return null;
+        }
+        return "This account needs a step Kriyan can't do yet. Sign in with a code instead.";
       }
       const res = await signUp.password({ emailAddress: email.trim(), password });
       const err = message(res, "Couldn't create the account. Check the email and try a longer password.");
@@ -95,6 +104,12 @@ export function SignIn() {
   const verify = () =>
     run(async () => {
       if (!code.trim()) return "Enter the code from the email.";
+      if (codeFor === "trust") {
+        const res = await signIn.mfa.verifyEmailCode({ code: code.trim() });
+        const err = message(res, "That code didn't work. Check it or send a new one.");
+        if (err) return err;
+        return message(await signIn.finalize(), "Couldn't finish signing in. Try again.");
+      }
       if (codeFor === "sign-in") {
         const res = await signIn.emailCode.verifyCode({ code: code.trim() });
         const err = message(res, "That code didn't work. Check it or send a new one.");

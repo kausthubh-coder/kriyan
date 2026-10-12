@@ -168,3 +168,23 @@ export function Kbd({ children }: { children: string }) {
     </Txt>
   );
 }
+
+/** The checkbox's look without the control, for rows that are themselves the control. */
+export function Ring({ color, done, size = 16 }: { color: string; done: boolean; size?: number }) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: done ? 0 : 1.5,
+        borderColor: color,
+        backgroundColor: done ? color : "transparent",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {done ? <CheckGlyph size={size * 0.62} color={hex.bg} strokeWidth={3} /> : null}
+    </View>
+  );
+}

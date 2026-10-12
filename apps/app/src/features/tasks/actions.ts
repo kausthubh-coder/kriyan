@@ -1,12 +1,15 @@
 // What happens when a person ticks, deletes or moves a task. Undo instead of asking.
 // These run outside components (the command menu and shortcuts call them too).
 
-import type { FunctionReturnType } from "convex/server";
+import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { convex } from "@/data/convex";
 import { createStore } from "@/data/store";
-import { showToast } from "@/ui/toast";
+import { formatDay } from "@kriyan/core/format";
+import { todayIn } from "@kriyan/core/dates";
+import { deviceTimeZone } from "@/data/time";
+import { showToast, updateToast } from "@/ui/toast";
 import { commitHaptic } from "./haptics";
 
 type Completion = FunctionReturnType<typeof api.tasks.complete>;
@@ -44,13 +47,14 @@ export function completeTask(task: { _id: Id<"tasks">; title: string }) {
       .mutation(api.tasks.complete, { id })
       .then((result) => {
         completion = result;
+        if (result.next) updateToast(toast, `Done: ${task.title}. Next: ${formatDay(result.next, todayIn(deviceTimeZone()))}`);
       })
       .catch((error: unknown) => {
         showToast(errorText(error));
       })
       .finally(() => setTicking(id, false));
   }, LINGER_MS);
-  showToast(`Done: ${task.title}`, {
+  const toast = showToast(`Done: ${task.title}`, {
     label: "Undo",
     run: () => {
       if (!completion) {
@@ -93,5 +97,3 @@ export function updateTask(args: FunctionArgs<typeof api.tasks.update>) {
     showToast(errorText(e));
   });
 }
-
-type FunctionArgs<F> = F extends { _args: infer A } ? A : never;

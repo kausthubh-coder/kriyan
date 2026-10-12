@@ -88,6 +88,8 @@ html, body { background: var(--bg); margin: 0; height: 100%; -webkit-font-smooth
 #root { display: flex; min-height: 100%; }
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--ink-2) !important; outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible { outline: none !important; }
+:has(> input:focus-visible), :has(> textarea:focus-visible) { outline: 2px solid var(--ink-2); outline-offset: 2px; }
 input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
 ::selection { background: var(--line-strong); }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0ms !important; animation-duration: 0ms !important; } }`;

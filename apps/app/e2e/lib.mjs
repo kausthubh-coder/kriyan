@@ -52,17 +52,26 @@ export async function signIn(page) {
   page.setDefaultTimeout(120000);
   await page.goto(`${BASE}/sign-in`);
   await page.getByRole("textbox", { name: "Email" }).fill(EMAIL);
-  await page.getByRole("textbox", { name: "Password" }).fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   const outcome = await Promise.race([
     page.waitForURL((u) => !u.pathname.startsWith("/sign-in"), { timeout: 15000 }).then(() => "in"),
     page.getByRole("alert").waitFor({ timeout: 15000 }).then(() => "error"),
+    page.getByLabel("Code from the email").waitFor({ timeout: 15000 }).then(() => "code"),
   ]);
   if (outcome === "in") return;
+  if (outcome === "code") {
+    // A new browser counts as a new device: confirm it with the test code.
+    await page.getByLabel("Code from the email").fill("424242");
+    await page.getByRole("button", { name: "Verify" }).click();
+    await page.waitForURL((u) => !u.pathname.startsWith("/sign-in"), { timeout: 30000 });
+    return;
+  }
+  console.log(`sign-in said: ${await page.getByRole("alert").innerText()}`);
   // No account yet: create it, then verify with the test code.
   await page.getByRole("button", { name: "New to Kriyan? Create an account" }).click();
   await page.getByRole("textbox", { name: "Email" }).fill(EMAIL);
-  await page.getByRole("textbox", { name: "Password" }).fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByLabel("Code from the email").fill("424242", { timeout: 20000 });
   await page.getByRole("button", { name: "Verify" }).click();

@@ -1,10 +1,4 @@
-import { Screen } from "@/ui/Screen";
-import { Txt } from "@/ui/Txt";
+import { TodayScreen } from "@/features/today/TodayScreen";
 
-export default function Page() {
-  return (
-    <Screen title="today" fab>
-      <Txt>today</Txt>
-    </Screen>
-  );
-}
+export { RouteError as ErrorBoundary } from "@/ui/RouteError";
+export default TodayScreen;

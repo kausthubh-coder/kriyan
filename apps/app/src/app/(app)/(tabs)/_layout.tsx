@@ -4,6 +4,8 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { c, hex } from "@/theme/tokens";
 
+export const unstable_settings = { initialRouteName: "today" };
+
 export default function TabsLayout() {
   return (
     <NativeTabs
