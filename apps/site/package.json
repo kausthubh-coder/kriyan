@@ -11,12 +11,19 @@
     "test": "echo no site unit tests yet"
   },
   "dependencies": {
+    "@clerk/mcp-tools": "^0.6.0",
+    "@clerk/nextjs": "^7.9.14",
+    "@kriyan/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/server": "^2.3.1",
+    "mcp-handler": "^2.3.0",
     "next": "16.4.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "@kriyan/core": "workspace:*"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",

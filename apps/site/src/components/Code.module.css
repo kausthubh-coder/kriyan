@@ -1,0 +1,34 @@
+.block {
+  display: grid;
+  border-radius: var(--r-card);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s1) var(--s1) var(--s1) var(--s4);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.caption {
+  font: var(--caption);
+  color: var(--ink-3);
+}
+
+.pre {
+  padding: var(--s3) var(--s4);
+  overflow-x: auto;
+  font: var(--body);
+  color: var(--ink);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.pre code {
+  font: inherit;
+}

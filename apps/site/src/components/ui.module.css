@@ -1,0 +1,92 @@
+/* Shared controls, after docs/design/v3/app.css. Hover is instant; press scales (Button Press). */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  height: var(--ctl);
+  padding: 0 var(--s3);
+  border-radius: var(--r-ctl);
+  font: var(--label);
+  color: var(--ink-2);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--press) var(--out);
+}
+.btn:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.primary {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.primary:hover {
+  background: oklch(from var(--ink) calc(l + 0.03) c h);
+  color: var(--on-ink);
+}
+
+.secondary {
+  background: var(--raised);
+  box-shadow: var(--shadow-raised);
+  color: var(--ink);
+}
+.secondary:hover {
+  background: var(--overlay);
+}
+
+/* Big calls to action: 44px everywhere, so they read as the main thing on the page. */
+.large {
+  height: var(--touch);
+  padding: 0 var(--s4);
+}
+
+.icon {
+  width: var(--ctl);
+  padding: 0;
+  color: var(--ink-3);
+}
+.icon:hover {
+  color: var(--ink);
+}
+
+@media (pointer: coarse) {
+  .btn {
+    min-height: var(--touch);
+  }
+  .icon {
+    min-width: var(--touch);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active {
+    transform: none;
+  }
+}
+
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
