@@ -1,0 +1,48 @@
+{
+  "fonts": [
+    "Figtree"
+  ],
+  "typeScale": [
+    12,
+    14,
+    16,
+    20,
+    28,
+    40
+  ],
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+  ],
+  "schemes": {
+    "dark": {}
+  },
+  "pages": [
+    "/brand.html",
+    "/today.html",
+    "/panel.html",
+    "/task.html",
+    "/upcoming.html",
+    "/space.html",
+    "/progress.html",
+    "/command.html"
+  ],
+  "bannedPhrases": [
+    "overdue",
+    "garden",
+    "Oops"
+  ],
+  "rules": {
+    "spacing-scale": "error",
+    "nested-radius": "error",
+    "off-token-color": "error",
+    "focus-ring": "error"
+  },
+  "note": "Tokens live in docs/design/v3/tokens.css; components in app.css."
+}

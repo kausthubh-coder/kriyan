@@ -1,2 +1,3 @@
 [install]
+# Expo warns that isolated installs break some React Native libraries.
 linker = "hoisted"

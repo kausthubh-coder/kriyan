@@ -1,0 +1,28 @@
+{
+  "name": "@kriyan/convex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": "./convex/_generated/api.js",
+    "./dataModel": "./convex/_generated/dataModel.d.ts",
+    "./*": "./convex/*.ts"
+  },
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "typecheck": "tsc -p convex/tsconfig.json",
+    "lint": "tsc -p convex/tsconfig.json --noUnusedLocals --noUnusedParameters",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kriyan/core": "workspace:*",
+    "convex": "^1.46.0"
+  },
+  "devDependencies": {
+    "convex-test": "^0.0.61",
+    "@edge-runtime/vm": "^5.0.0",
+    "vitest": "^4.1.11",
+    "@types/node": "^24"
+  }
+}

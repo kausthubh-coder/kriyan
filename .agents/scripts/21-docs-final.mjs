@@ -1,5 +1,0 @@
-﻿import {spawn} from 'node:child_process';import {resolve} from 'node:path';
-async function step(name,command,args=[],cwd=process.cwd(),env={}){console.log('Starting '+name);const exit=await new Promise((done,reject)=>{const p=spawn(process.execPath,[resolve('.agents/scripts/21-command.mjs'),name,command,...args],{cwd,windowsHide:true,stdio:'inherit',env:{...process.env,...env}});p.on('error',reject);p.on('close',done)});console.log(name+': '+exit);if(exit!==0)process.exitCode=1;}
-for(const gate of ['typecheck','lint','build'])await step('web-docs-'+gate,'bun',['run',gate],resolve('apps/web'));
-await step('public-docs-after',process.execPath,[resolve('.agents/scripts/21-local-public.mjs'),'public-docs-complete','after']);
-await step('local-rate-docs-zoom',process.execPath,[resolve('.agents/scripts/21-local-services.mjs')],process.cwd(),{QA_ONLY:'read limiter',QA_SUFFIX:'-rate-final',QA_GALLERY:'1',QA_GALLERY_FILTER:'^/(docs/quick-add|docs/self-hosting|docs/privacy|docs/terms) ',QA_ZOOM:'1'});

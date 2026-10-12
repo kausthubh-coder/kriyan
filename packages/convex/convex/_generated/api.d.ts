@@ -1,0 +1,77 @@
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
+
+import type * as account from "../account.js";
+import type * as agent from "../agent.js";
+import type * as http from "../http.js";
+import type * as model_owner from "../model/owner.js";
+import type * as model_progress from "../model/progress.js";
+import type * as model_reminders from "../model/reminders.js";
+import type * as model_spaces from "../model/spaces.js";
+import type * as model_tasks from "../model/tasks.js";
+import type * as model_tokens from "../model/tokens.js";
+import type * as model_views from "../model/views.js";
+import type * as organize from "../organize.js";
+import type * as reminders from "../reminders.js";
+import type * as tasks from "../tasks.js";
+import type * as validators from "../validators.js";
+import type * as views from "../views.js";
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
+declare const fullApi: ApiFromModules<{
+  account: typeof account;
+  agent: typeof agent;
+  http: typeof http;
+  "model/owner": typeof model_owner;
+  "model/progress": typeof model_progress;
+  "model/reminders": typeof model_reminders;
+  "model/spaces": typeof model_spaces;
+  "model/tasks": typeof model_tasks;
+  "model/tokens": typeof model_tokens;
+  "model/views": typeof model_views;
+  organize: typeof organize;
+  reminders: typeof reminders;
+  tasks: typeof tasks;
+  validators: typeof validators;
+  views: typeof views;
+}>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
+
+export declare const components: {};

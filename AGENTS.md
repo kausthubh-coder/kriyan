@@ -1,52 +1,62 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# Kriyan
 
-# This is NOT the Next.js you know
+A planner that turns everything a person has to do into a plan for their time, and helps them keep it: tasks, nested spaces, repeats, reminders, notes, goals and habits, with a calm Today view at the centre. The person's AI agents plan with them through MCP and a CLI. Open source (MIT). Bun workspaces: Expo (Android and app.kriyan.app), Next.js (kriyan.app, docs, MCP), Convex, Clerk.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## Words we use
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+- **you**: the agent reading this. **me**: the developer. **user** or **person**: whoever uses Kriyan.
+- **space**: a coloured container for tasks; spaces nest. Never "area", "project" or "garden".
+- **event**: a task you attend (class, meeting) rather than tick off. **occurrence**: one date of a repeating task.
+- **proposal**: a task an agent suggested that waits for the person to accept it.
 
-<!-- END:nextjs-agent-rules -->
+## Map
 
-# Kriyan project rules
+| Where | What |
+|---|---|
+| `packages/core` | Pure logic shared by everything: dates, repeat rules, reminders, the quick-add parser, formatting, layout, design tokens, the agent operation registry (`ops.ts`) |
+| `packages/convex/convex` | Backend. `model/` holds every rule (one place); `tasks.ts`, `views.ts`, `organize.ts`, `account.ts` are the app's functions; `agent.ts` + `http.ts` are the agent API |
+| `apps/app` | Expo Router app for Android and the web app, one feature per folder in `src/features` |
+| `apps/site` | Next.js: landing page, docs, `/mcp` server |
+| `packages/cli` | The `kriyan` command |
+| `docs/design/ux.md`, `docs/design/v3/` | How the app works, and how it looks (open `brand.html`) |
 
-Kriyan is an open-source (MIT) planner that makes organising and planning your life easy, and lets the AI you already use (ChatGPT, Claude, Cursor and others) plan with you. Areas are whatever the person chooses; School, Business and Life are only the suggested defaults, never the product's frame. It ships as a web app, an Android app, an MCP server and a CLI, all on one Convex backend with Clerk for identity.
+Business logic lives once, in `packages/core` or `packages/convex/convex/model`. Apps, MCP and the CLI call it.
 
-## Read first
+## Commands
 
-- `docs/PLAN.md` is the implementation plan. Follow its architecture, data model and auth design.
-- `docs/design/proposals/prototype/` is the approved design as a working HTML prototype (`index.html`, `app.css`, `app.js`). It is the source of truth for layout, colour, type, spacing, copy and interaction. Port it; do not reinterpret it.
-- `docs/design/reference/` holds newer reference designs for specific screens (`web.html`, `android.html`, `landing.html`, sharing `ref.css`). Where a reference covers a screen, it overrides the prototype. Open them in a browser before writing code. `docs/design/reference/audit/` holds screenshots of what the references replace.
-- Task briefs live in `.agents/briefs/`. Do exactly what the brief asks and nothing outside its scope.
+- Set up a fresh checkout or worktree: `bun run setup` (installs, copies dev env from `~/.kriyan/dev-env`, picks ports)
+- Doctor: `bun run doctor` (run it first when anything looks off)
+- Dev: `bun run dev` (backend, app on the web, site; ports in `.env.ports`)
+- Tests for one package: `bun run --filter @kriyan/core test` (also `@kriyan/convex`, `@kriyan/cli`)
+- Full check, what CI runs: `bun run check`
+- UI check against the running app: `bun run lint:ui`
+- Design tokens changed: `bun run tokens`
 
-## Product rules
+## Proving a change works
 
-- Dark theme only. Do not build a light theme.
-- No garden language anywhere: no "garden", "plant", "stone", "seed", "bed", "grow". Use plain words: task, area, project, course, goal, day, week.
-- The length of a task is optional. Never require a duration, and never invent one.
-- Android only for mobile. Do not add iOS-specific work.
+- Done means you saw it work. Drive the feature the way a person would with the `verify-kriyan` skill and look at the result.
+- Test with real-shaped data: a few spaces, a repeating class, a birthday, reminders, a habit with history.
+- A test calls the code the way its users do and asserts the exact result. Never edit a test to make it pass; say why it's wrong instead.
+- A skipped check is not a pass. Report what you ran, what you saw and what you didn't check.
 
-## Design rules
+## Design
 
-- Colours, spacing, radii, type sizes and motion come from the tokens in `packages/core`. Do not hard-code values that a token covers.
-- One typeface: Schibsted Grotesk, weights 400 to 700. No monospace for labels.
-- Colour only ever means an area (each area has one of the eight named colours; the defaults are School blue, Business orange, Life green) or a status (hot red for late or over). Primary buttons are neutral ink.
-- Copy never assumes the three default areas. Say "your areas" or name the person's own areas; sample data may use the defaults.
-- Never: gradients, glow, glassmorphism, coloured side stripes on cards, nested cards, uppercase eyebrow labels, emoji as icons, bounce or elastic easing.
-- Motion: press feedback 160ms, transitions 150 to 250ms, ease-out `cubic-bezier(0.23, 1, 0.32, 1)`. Animate only `transform` and `opacity`. No animation on keyboard-triggered actions. Respect `prefers-reduced-motion`.
-- On touch devices (`pointer: coarse`, and always in the Android app) every target is at least 44px. On desktop with a fine pointer, controls are 32 to 36px tall. Text contrast is at least 4.5:1. Status is never shown by colour alone.
-- Every control has hover, focus-visible, active and disabled states. Every view has loading, empty and error states.
-- Dates shown to people read like "Thu 1 Oct" or "Today"; times read like "14:30". Never show a raw ISO date or the browser's native date format as a value.
-- Area filters and area labels are a coloured dot plus a neutral text label. Never colour the text itself.
-- Copy: sentence case, buttons are verb plus object ("Add task"), no em dashes, no middle-dot separators, errors say what happened and what to do.
+- Read `docs/design/v3/README.md` before UI work. Values come from `packages/core/src/tokens.ts` only.
+- UI work: use the `critly` skill. Read `.critly/policy.json` before choosing spacing, type or colour, use only its values, and never edit it to pass.
+- After any UI change, run `bun run lint:ui` and fix every error until it exits 0. Exit 2 means it couldn't run; say so, it is not a pass. Then screenshot each changed screen at 390 and 1440, blur it, and check one thing leads.
+- Copy: sentence case, verb plus object on buttons, dates like "Tue 13 Oct", times like "14:30", no em dashes, no guilt ("2 from earlier", never "overdue"). Never invent a task's length.
 
-## Engineering rules
+## How we write code
 
-- Package manager is Bun. Use Bun workspaces. Do not add npm, pnpm or yarn lockfiles.
-- TypeScript strict. No `any`, no `@ts-ignore`, no non-null assertions on values that can really be null.
-- Every Convex function checks identity first and reads or writes only rows owned by that identity. Queries use an index that starts with `ownerId`.
-- Business logic lives once, in the shared operations layer in the backend or in `packages/core`. Web, mobile, MCP and CLI call it; they do not reimplement it.
-- "Today" always comes from the local date or timezone of the user, never from the UTC date of the server.
-- Never commit secrets. `.env*` files stay ignored except `.env.example`. Never print the contents of an env file.
-- Do not commit, push, deploy or change cloud settings unless the brief says so. Leave changes in the working tree for review.
-- Before you finish, run the verification commands in the brief and report their real output, including failures.
+- TypeScript strict. Boring and explicit; one way to do each thing; names you can grep; no barrel files.
+- Every Convex function checks identity first (`requireOwner`) and reads through an index starting with `ownerId`. Agent functions take the owner the HTTP layer authenticated, never one from a request body.
+- "Today" comes from the person's time zone (`todayIn`), never the server's UTC date. Queries take `today` as an argument.
+- Comments say why, never what.
+
+## Safety
+
+- Production needs my explicit go: `convex deploy`, `--prod`, Vercel production, EAS submit, Clerk production settings. Commands live in `docs/ops.md`.
+- Your worktree pushes Convex functions only to its own deployment: the shared dev deployment from the main `rebuild` checkout, or `CONVEX_AGENT_MODE=anonymous bunx convex dev --local` in other worktrees.
+- Secrets live in `.env.local` files (ignored) and `~/.kriyan/dev-env`. Never print, log, screenshot or commit them.
+- Stop only processes you started, by PID. Use `git stash push -u -m <tag>` and apply by SHA, never a bare `git stash`.
+- Git: branch per change, PR into `rebuild` (later `main`) with CI green.

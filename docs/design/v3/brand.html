@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kriyan brand kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<style>
+  .kit { max-width: 1120px; margin: 0 auto; padding: var(--s16) var(--s8); display: grid; gap: var(--s16); }
+  .kit section { display: grid; gap: var(--s6); }
+  .kit h2 { font: var(--title); letter-spacing: var(--tight); }
+  .kit .lede { font: var(--body); color: var(--ink-2); max-width: 52ch; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s6); }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s6); }
+  .tile { background: var(--raised); border-radius: var(--r-card); box-shadow: var(--shadow-raised); padding: var(--s6); display: grid; gap: var(--s4); align-content: start; }
+  .tile .caption { display: block; }
+
+  .hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--s12); align-items: center; }
+  .wordmark { display: flex; align-items: center; gap: var(--s3); font: var(--display); letter-spacing: var(--tightest); }
+  .wordmark [data-mark] svg { width: 38px; height: 38px; display: block; }
+  .tagline { font: var(--display); letter-spacing: var(--tightest); margin-top: var(--s8); max-width: 14ch; }
+  .hero p { margin-top: var(--s4); }
+  .construct { aspect-ratio: 1; border-radius: var(--r-card); background: var(--sunken); position: relative; }
+  .construct svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .sizes { display: flex; align-items: flex-end; gap: var(--s6); flex-wrap: wrap; }
+  .sizes figure { display: grid; justify-items: center; gap: var(--s2); }
+  .sizes figcaption, .icons figcaption { font: var(--meta); color: var(--ink-3); }
+  .sizes [data-mark] svg { display: block; width: 100%; height: 100%; }
+  .icons { display: flex; align-items: flex-end; gap: var(--s6); flex-wrap: wrap; }
+  .icons figure { display: grid; justify-items: center; gap: var(--s2); }
+  .appicon { border-radius: 24%; background: var(--bg); color: var(--ink); display: grid; place-items: center; box-shadow: var(--shadow-raised); }
+  .appicon.inverse { background: var(--ink); color: var(--bg); }
+  .appicon [data-mark] { width: 56%; height: 56%; }
+  .appicon [data-mark] svg { width: 100%; height: 100%; display: block; }
+
+  .swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s4); }
+  .swatch { display: grid; gap: var(--s2); }
+  .swatch i { height: 56px; border-radius: var(--r-ctl); background: var(--x); box-shadow: inset 0 0 0 1px var(--line); }
+  .swatch b { font: var(--label); }
+  .swatch span { font: var(--meta); color: var(--ink-3); }
+  .spaces { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--s3); }
+  .spaces .swatch i { height: 40px; }
+  .spaces .swatch i + i { height: 24px; margin-top: -4px; }
+
+  .type-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 140px; gap: var(--s4); align-items: baseline; padding: var(--s3) 0; box-shadow: inset 0 -1px 0 var(--line); }
+  .type-row .meta:last-child { text-align: right; }
+
+  .scale { display: flex; align-items: flex-end; gap: var(--s3); flex-wrap: wrap; }
+  .scale figure { display: grid; justify-items: center; gap: var(--s2); }
+  .scale i { display: block; width: var(--n); height: var(--n); border-radius: 2px; background: var(--select); box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+  .elev { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s6); }
+  .elev div { height: 96px; border-radius: var(--r-card); display: grid; place-items: center; font: var(--meta); color: var(--ink-2); }
+
+  .spec { display: grid; }
+  .spec div { display: flex; justify-content: space-between; gap: var(--s4); padding: var(--s3) 0; box-shadow: inset 0 -1px 0 var(--line); font: var(--body); }
+  .spec div span:last-child { color: var(--ink-3); text-align: right; }
+
+  .components { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: center; }
+  .voice { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s3) var(--s6); font: var(--body); }
+  .voice .no { color: var(--ink-3); text-decoration: line-through; }
+  .principles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s6); }
+  .principles div { display: grid; gap: var(--s2); align-content: start; }
+  .principles b { font: var(--label); }
+  .principles span { font: var(--body); color: var(--ink-2); }
+  .fake-focus { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+
+  @media (max-width: 760px) {
+    .kit { padding: var(--s8) var(--s4) var(--s16); gap: var(--s12); }
+    .hero, .grid2, .grid3, .elev, .principles, .voice { grid-template-columns: 1fr; }
+    .tagline { font: var(--headline); letter-spacing: var(--tighter); }
+    .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .spaces { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .type-row { grid-template-columns: 1fr; gap: var(--s1); }
+    .type-row .meta:last-child { text-align: left; }
+    .construct { max-width: 320px; }
+  }
+</style>
+</head>
+<body data-screen="brand">
+<main class="kit">
+
+  <section class="hero" aria-label="Kriyan">
+    <div>
+      <div class="wordmark"><span data-mark></span>kriyan</div>
+      <p class="tagline">Plan the day calmly. Then do it.</p>
+      <p class="lede">Kriyan is Sanskrit for action. It turns everything you have to do into a plan for your time, and keeps that plan quiet enough to follow. Your AI can plan with you.</p>
+    </div>
+    <div class="construct" role="img" aria-label="How the mark is built">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <g fill="none" stroke="var(--line-strong)" stroke-width="0.05">
+          <circle cx="12" cy="12" r="9.2"/>
+          <circle cx="12.66" cy="10.94" r="6.35" stroke-dasharray="0.25 0.25"/>
+          <path d="M12 1V23M1 12H23"/>
+          <path d="M12 12L15.76 1.66M12 12L22.76 9.71" stroke="var(--now)" stroke-width="0.06"/>
+        </g>
+        <g id="construct-mark"></g>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>The mark</h2>
+    <p class="lede">An ensō, the circle drawn in one breath. Here it is a day: one stroke that thickens through the hours you have planned and opens where you are now. It is drawn from two circles, the inner one shifted towards one o'clock, and the gap opens between one and half past two. Use it as it is: never rotate it, outline it, or fill it with a space colour.</p>
+    <div class="grid2">
+      <div class="tile">
+        <span class="caption">Sizes</span>
+        <div class="sizes">
+          <figure><span data-mark style="width:16px;height:16px"></span><figcaption>16</figcaption></figure>
+          <figure><span data-mark style="width:20px;height:20px"></span><figcaption>20</figcaption></figure>
+          <figure><span data-mark style="width:24px;height:24px"></span><figcaption>24</figcaption></figure>
+          <figure><span data-mark style="width:32px;height:32px"></span><figcaption>32</figcaption></figure>
+          <figure><span data-mark style="width:48px;height:48px"></span><figcaption>48</figcaption></figure>
+          <figure><span data-mark style="width:64px;height:64px"></span><figcaption>64</figcaption></figure>
+        </div>
+      </div>
+      <div class="tile">
+        <span class="caption">App icon</span>
+        <div class="icons">
+          <figure><span class="appicon" style="width:96px;height:96px"><span data-mark></span></span><figcaption>Android</figcaption></figure>
+          <figure><span class="appicon inverse" style="width:96px;height:96px"><span data-mark></span></span><figcaption>Light surfaces</figcaption></figure>
+          <figure><span class="appicon" style="width:48px;height:48px"><span data-mark></span></span><figcaption>48</figcaption></figure>
+          <figure><span class="appicon" style="width:32px;height:32px"><span data-mark></span></span><figcaption>Favicon</figcaption></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Colour</h2>
+    <p class="lede">Warm neutrals do almost all the work, like ink on dark paper. Surfaces get lighter as they come closer. There is no brand accent: the primary button is ink, and the only interface colour is vermilion, which means now, or late.</p>
+    <div class="swatches">
+      <div class="swatch"><i style="--x:var(--bg)"></i><b>Page</b><span>oklch 17% 0.005 70</span></div>
+      <div class="swatch"><i style="--x:var(--raised)"></i><b>Raised</b><span>Cards and panels, 20.5%</span></div>
+      <div class="swatch"><i style="--x:var(--overlay)"></i><b>Overlay</b><span>Menus and sheets, 24%</span></div>
+      <div class="swatch"><i style="--x:var(--sunken)"></i><b>Sunken</b><span>Fields and nav bar, 14.5%</span></div>
+      <div class="swatch"><i style="--x:var(--ink)"></i><b>Ink</b><span>Titles and the primary button</span></div>
+      <div class="swatch"><i style="--x:var(--ink-2)"></i><b>Ink 2</b><span>Details</span></div>
+      <div class="swatch"><i style="--x:var(--ink-3)"></i><b>Ink 3</b><span>Metadata, 4.5:1 on every surface</span></div>
+      <div class="swatch"><i style="--x:var(--now)"></i><b>Now</b><span>The current time, and late work</span></div>
+    </div>
+    <span class="caption">Space colours, chosen by each person, with the surface each one tints on the timeline</span>
+    <div class="spaces">
+      <div class="swatch"><i style="--x:var(--blue)"></i><i style="--x:var(--blue-surface)"></i><b>Blue</b></div>
+      <div class="swatch"><i style="--x:var(--green)"></i><i style="--x:var(--green-surface)"></i><b>Green</b></div>
+      <div class="swatch"><i style="--x:var(--orange)"></i><i style="--x:var(--orange-surface)"></i><b>Orange</b></div>
+      <div class="swatch"><i style="--x:var(--purple)"></i><i style="--x:var(--purple-surface)"></i><b>Purple</b></div>
+      <div class="swatch"><i style="--x:var(--red)"></i><i style="--x:var(--red-surface)"></i><b>Red</b></div>
+      <div class="swatch"><i style="--x:var(--yellow)"></i><i style="--x:var(--yellow-surface)"></i><b>Yellow</b></div>
+      <div class="swatch"><i style="--x:var(--teal)"></i><i style="--x:var(--teal-surface)"></i><b>Teal</b></div>
+      <div class="swatch"><i style="--x:var(--pink)"></i><i style="--x:var(--pink-surface)"></i><b>Pink</b></div>
+    </div>
+    <p class="lede">A space colour appears only as a dot, a checkbox ring, a timeline surface or a chart. Never as text, and never as the only way to tell two things apart.</p>
+  </section>
+
+  <section>
+    <h2>Type</h2>
+    <p class="lede">Figtree, one family, three weights: 400 to read, 500 for labels, 600 for headings and the wordmark. Six sizes, each with one job. On phones body text grows to 16 and follows the system text size.</p>
+    <div>
+      <div class="type-row"><span class="meta">Display</span><span style="font:var(--display);letter-spacing:var(--tightest)">This week</span><span class="meta">40 / 44, 600</span></div>
+      <div class="type-row"><span class="meta">Headline</span><span style="font:var(--headline);letter-spacing:var(--tighter)">Write MCP tools</span><span class="meta">28 / 32, 600</span></div>
+      <div class="type-row"><span class="meta">Title</span><span style="font:var(--title);letter-spacing:var(--tight)">Calculus II lecture</span><span class="meta">20 / 28, 600</span></div>
+      <div class="type-row"><span class="meta">Subhead</span><span style="font:var(--subhead);letter-spacing:var(--tight)">Anytime today</span><span class="meta">16 / 24, 600</span></div>
+      <div class="type-row"><span class="meta">Body and label</span><span style="font:var(--body)">Bring problem set 4 to the lecture</span><span class="meta">14 / 20, 400 and 500</span></div>
+      <div class="type-row"><span class="meta">Meta and caption</span><span class="meta tnum">Every Tue and Thu, 09:00–10:30</span><span class="meta">12 / 16, 400 and 500</span></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="tile">
+      <h2>Space and shape</h2>
+      <div class="scale">
+        <figure><i style="--n:4px"></i><figcaption class="meta">4</figcaption></figure>
+        <figure><i style="--n:8px"></i><figcaption class="meta">8</figcaption></figure>
+        <figure><i style="--n:12px"></i><figcaption class="meta">12</figcaption></figure>
+        <figure><i style="--n:16px"></i><figcaption class="meta">16</figcaption></figure>
+        <figure><i style="--n:24px"></i><figcaption class="meta">24</figcaption></figure>
+        <figure><i style="--n:32px"></i><figcaption class="meta">32</figcaption></figure>
+        <figure><i style="--n:48px"></i><figcaption class="meta">48</figcaption></figure>
+        <figure><i style="--n:64px"></i><figcaption class="meta">64</figcaption></figure>
+      </div>
+      <div class="spec">
+        <div><span>Groups</span><span>Space inside a group is half the space between groups</span></div>
+        <div><span>Controls</span><span>8 radius, 32 tall, 44 on touch</span></div>
+        <div><span>Cards and popovers</span><span>12 radius</span></div>
+        <div><span>Sheets</span><span>24 radius on top</span></div>
+        <div><span>Edges</span><span>Light from above, never a border line</span></div>
+        <div><span>Focus</span><span>2 px ring in ink 2, 2 px away, on every control</span></div>
+      </div>
+    </div>
+    <div class="tile">
+      <h2>Motion</h2>
+      <div class="spec">
+        <div><span>Hover, selection, tabs</span><span>Instant</span></div>
+        <div><span>Press</span><span>160 ms, scale 0.97</span></div>
+        <div><span>Panels and popovers</span><span>220 ms, ease-out</span></div>
+        <div><span>Sheets</span><span>Spring with no bounce, follows the finger</span></div>
+        <div><span>Leaving</span><span>150 ms fade</span></div>
+        <div><span>Command menu, keyboard actions</span><span>No animation</span></div>
+        <div><span>Reduced motion</span><span>Slides become fades</span></div>
+        <div><span>Ease-out</span><span>cubic-bezier(0.23, 1, 0.32, 1)</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Elevation</h2>
+    <div class="elev">
+      <div style="background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)">Page</div>
+      <div style="background:var(--raised);box-shadow:var(--shadow-raised)">Raised</div>
+      <div style="background:var(--overlay);box-shadow:var(--shadow-overlay)">Overlay</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Components</h2>
+    <div class="tile">
+      <div class="components">
+        <button class="btn primary press">Add task</button>
+        <button class="btn">Pick a day</button>
+        <button class="btn quiet">Cancel</button>
+        <button class="btn icon" aria-label="More">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+        <button class="btn" disabled>Not available</button>
+      </div>
+      <div class="components">
+        <button class="check press" style="--c:var(--blue)" aria-label="Complete: example task"></button>
+        <button class="check done press" style="--c:var(--green)" aria-label="Mark not done: example task"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button>
+        <button class="chip">Weekdays</button>
+        <button class="chip on" aria-pressed="true">Weekly</button>
+        <label class="field" style="width:280px"><span class="vh">Example field</span><input placeholder="Every last Friday"></label>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="tile">
+      <h2>Voice</h2>
+      <p class="lede">Plain, calm and exact. Sentence case. Buttons are a verb and a thing. No exclamation marks, no guilt, no em dashes.</p>
+      <div class="voice">
+        <span>3 h 20 min free</span><span class="no">You're crushing it</span>
+        <span>2 from earlier</span><span class="no">You missed 6 tasks</span>
+        <span>Nothing left today.</span><span class="no">Inbox zero achieved</span>
+        <span>Couldn't save. Check your connection and try again.</span><span class="no">Something went wrong</span>
+      </div>
+    </div>
+    <div class="tile">
+      <h2>Icons</h2>
+      <p class="lede">Lucide, one set, 1.75 stroke, 18px next to 14px text and 22px in the phone navigation. An icon always sits beside a word, except in a button with an accessible name.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Principles</h2>
+    <div class="principles">
+      <div><b>Now first</b><span>Every screen answers what now, what next, and does it fit, before anything else.</span></div>
+      <div><b>Quiet by default</b><span>Neutrals do the work. Colour means one of your spaces, or the time.</span></div>
+      <div><b>No guilt</b><span>Late work is one quiet line with a way out. Habits count weeks, not streaks.</span></div>
+      <div><b>Instant</b><span>Every action shows on the next frame and can be undone. Nothing waits on the network.</span></div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+<script>document.getElementById("construct-mark").outerHTML = `<g fill="var(--ink)" opacity="0.92">${window.KRIYAN_MARK.replace(/<svg[^>]*>|<\/svg>/g, "")}</g>`;</script>
+</body>
+</html>
