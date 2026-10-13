@@ -3,6 +3,10 @@ bun.lock
 **/_generated
 **/.next
 **/.expo
+# Written by `bun run dev` and ignored by the apps' own .gitignore files, which Prettier doesn't read.
+apps/app/expo-env.d.ts
+apps/site/next-env.d.ts
+.artifacts
 docs/design/v3
 apps/app/android
 apps/app/ios

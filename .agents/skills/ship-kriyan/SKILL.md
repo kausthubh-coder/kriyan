@@ -24,7 +24,7 @@ git diff --name-only origin/main...HEAD
 | `packages/convex/**` | Convex |
 | `packages/core/**` | Every surface: core is bundled into each one |
 | `apps/site/**` | Site |
-| `apps/app/**` | Web app; Android at the next release |
+| `apps/app/**` outside `e2e/` | Web app; Android at the next release |
 | `packages/cli/**` | CLI |
 | `docs/**`, `.agents/**`, `scripts/**`, tests only | Nothing beyond landing |
 
