@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/Chrome";
 import { Code } from "@/components/Code";
@@ -12,6 +13,10 @@ import upcomingPhone from "@/assets/product/upcoming-phone.png";
 import progressDesktop from "@/assets/product/progress-desktop.png";
 import progressPhone from "@/assets/product/progress-phone.png";
 import css from "./page.module.css";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default function Home() {
   return (

@@ -16,13 +16,11 @@ export const metadata: Metadata = {
   title: { default: `${SITE_NAME}: ${HEADLINE}`, template: `%s | ${SITE_NAME}` },
   description: DESCRIPTION,
   applicationName: SITE_NAME,
-  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
     title: HEADLINE,
     description: DESCRIPTION,
-    url: "/",
   },
   twitter: { card: "summary_large_image", title: HEADLINE, description: DESCRIPTION },
 };
