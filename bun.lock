@@ -5,7 +5,7 @@
     "": {
       "name": "kriyan",
       "devDependencies": {
-        "@kausthubh/critly": "^0.1.0",
+        "@kausthubh/critly": "^0.2.0",
         "prettier": "^3.6.2",
         "typescript": "~6.0.3",
       },
@@ -528,7 +528,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@kausthubh/critly": ["@kausthubh/critly@0.1.0", "", { "dependencies": { "playwright-core": "^1.64.0" }, "bin": { "critly": "bin/critly.js" } }, "sha512-Ph/OWqh/mdCBhNJkQ/PbX+wpu+Vz6ye8g8UelhT/rfm/JC8S0IiJynWCxnBY5wM1JNYjZYZuef/CnR2HjVz7UA=="],
+    "@kausthubh/critly": ["@kausthubh/critly@0.2.0", "", { "dependencies": { "playwright-core": "^1.64.0" }, "bin": { "critly": "bin/critly.js" } }, "sha512-Xu1BCx/uWUYtxX2gNS7OlE66Bw9rSlklgiRa84CeH+sQQ457k9xZGkc5Oy/agWkP++PmsAeMYLPbBmpqE1x3qQ=="],
 
     "@kriyan/app": ["@kriyan/app@workspace:apps/app"],
 
