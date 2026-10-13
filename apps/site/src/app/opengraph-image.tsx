@@ -22,38 +22,47 @@ async function loadFonts(): Promise<[Uint8Array, Uint8Array]> {
 export default async function OpenGraphImage() {
   const [medium, semibold] = await loadFonts();
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        padding: 96,
+        background: color.bg,
+        color: color.ink,
+        fontFamily: "Figtree",
+      }}
+    >
       <div
         style={{
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          padding: 96,
-          background: color.bg,
-          color: color.ink,
-          fontFamily: "Figtree",
+          alignItems: "center",
+          gap: 20,
+          fontSize: 48,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 48, fontWeight: 600, letterSpacing: "-0.02em" }}>
-          <svg width="56" height="56" viewBox="0 0 24 24" fill={color.ink}>
-            <path d="M21.00 10.09A9.2 9.2 0 1 1 15.15 3.35L14.83 4.97A6.35 6.35 0 1 0 18.87 9.62Z" />
-            <circle cx="19.94" cy="9.85" r="1.09" />
-            <circle cx="14.99" cy="4.16" r="0.82" />
-          </svg>
-          kriyan
+        <svg width="56" height="56" viewBox="0 0 24 24" fill={color.ink}>
+          <path d="M21.00 10.09A9.2 9.2 0 1 1 15.15 3.35L14.83 4.97A6.35 6.35 0 1 0 18.87 9.62Z" />
+          <circle cx="19.94" cy="9.85" r="1.09" />
+          <circle cx="14.99" cy="4.16" r="0.82" />
+        </svg>
+        kriyan
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div
+          style={{ fontSize: 88, fontWeight: 600, lineHeight: 1.05, letterSpacing: "-0.03em", maxWidth: 900 }}
+        >
+          {HEADLINE}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ fontSize: 88, fontWeight: 600, lineHeight: 1.05, letterSpacing: "-0.03em", maxWidth: 900 }}>
-            {HEADLINE}
-          </div>
-          <div style={{ fontSize: 32, fontWeight: 500, color: color.ink3 }}>
-            Your plan for the day, and your AI to plan it with.
-          </div>
+        <div style={{ fontSize: 32, fontWeight: 500, color: color.ink3 }}>
+          Your plan for the day, and your AI to plan it with.
         </div>
       </div>
-    ),
+    </div>,
     {
       ...size,
       fonts: [

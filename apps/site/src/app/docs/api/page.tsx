@@ -71,15 +71,15 @@ export default function ApiDocs() {
       <h1>Agent API</h1>
       <p className={css.lede}>
         Every operation is one HTTP call. These are the same operations your AI uses over{" "}
-        <Link href="/docs/mcp">MCP</Link> and the <Link href="/docs/cli">CLI</Link> runs, so anything one can do, the
-        others can too.
+        <Link href="/docs/mcp">MCP</Link> and the <Link href="/docs/cli">CLI</Link> runs, so anything one can
+        do, the others can too.
       </p>
 
       <h2 id="requests">Requests</h2>
       <p>
-        Send <code>POST {API}/&lt;operation&gt;</code> with a JSON object as the body and a personal access token from
-        Settings in the <code>Authorization</code> header. <code>GET {API}</code> lists every operation with its JSON
-        Schema.
+        Send <code>POST {API}/&lt;operation&gt;</code> with a JSON object as the body and a personal access
+        token from Settings in the <code>Authorization</code> header. <code>GET {API}</code> lists every
+        operation with its JSON Schema.
       </p>
       <Code caption="Read today">
         {`curl -X POST ${API}/get_today \\
@@ -101,7 +101,8 @@ export default function ApiDocs() {
       </p>
       <ul>
         <li>
-          <strong>400:</strong> the body isn&apos;t valid, or Kriyan refused the change. The message names the field.
+          <strong>400:</strong> the body isn&apos;t valid, or Kriyan refused the change. The message names the
+          field.
         </li>
         <li>
           <strong>401:</strong> no token, or the token was revoked.
@@ -114,9 +115,9 @@ export default function ApiDocs() {
         </li>
       </ul>
       <p>
-        Dates are dates in your own calendar, like <code>2026-10-13</code>, and &ldquo;today&rdquo; is today in the
-        time zone from your profile. Times are minutes after midnight: 14:30 is <code>870</code>. Lengths are minutes,
-        and are only set when you know them.
+        Dates are dates in your own calendar, like <code>2026-10-13</code>, and &ldquo;today&rdquo; is today
+        in the time zone from your profile. Times are minutes after midnight: 14:30 is <code>870</code>.
+        Lengths are minutes, and are only set when you know them.
       </p>
 
       <h2 id="operations">Operations</h2>

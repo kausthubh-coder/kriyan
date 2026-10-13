@@ -16,7 +16,10 @@ for (const [w, h] of [
 
   await page.goto(`${BASE}/today`);
   await settle(page);
-  await page.getByRole("button", { name: /^Open Write MCP tools/ }).first().click();
+  await page
+    .getByRole("button", { name: /^Open Write MCP tools/ })
+    .first()
+    .click();
   await page.waitForTimeout(800);
   await shot("panel");
   await page.getByRole("button", { name: /^When:/ }).click();
@@ -24,16 +27,26 @@ for (const [w, h] of [
   await shot("when-editor");
   if (w === 390) await page.getByRole("button", { name: "Back to the task" }).click();
   else await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: /^Reminders|^Add reminder|^Reminder:/ }).first().click();
+  await page
+    .getByRole("button", { name: /^Reminders|^Add reminder|^Reminder:/ })
+    .first()
+    .click();
   await page.waitForTimeout(500);
   await shot("reminders-editor");
 
   await page.goto(`${BASE}/today`);
   await settle(page);
-  await page.getByRole("button", { name: /^Open Calculus II lecture|^Open Run/ }).first().click().catch(() => undefined);
+  await page
+    .getByRole("button", { name: /^Open Calculus II lecture|^Open Run/ })
+    .first()
+    .click()
+    .catch(() => undefined);
   await page.goto(`${BASE}/upcoming`);
   await settle(page);
-  await page.getByRole("button", { name: /^Open Calculus II lecture/ }).first().click();
+  await page
+    .getByRole("button", { name: /^Open Calculus II lecture/ })
+    .first()
+    .click();
   await page.waitForTimeout(800);
   await page.getByRole("button", { name: /^Repeat:/ }).click();
   await page.waitForTimeout(500);
@@ -49,7 +62,9 @@ for (const [w, h] of [
     await page.keyboard.press("Escape");
   } else {
     await page.getByRole("button", { name: "Add task" }).click();
-    await page.getByRole("textbox", { name: "Add a task" }).fill("Essay fri 5pm #school every week remind 1h before");
+    await page
+      .getByRole("textbox", { name: "Add a task" })
+      .fill("Essay fri 5pm #school every week remind 1h before");
     await page.waitForTimeout(400);
     await shot("add-sheet");
   }

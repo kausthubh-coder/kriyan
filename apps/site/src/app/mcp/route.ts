@@ -21,7 +21,11 @@ function withCors(res: Response): Response {
 async function handle(req: Request): Promise<Response> {
   const origin = new URL(req.url).origin;
   // Someone opened the address in a browser: show them how to connect instead of a JSON error.
-  if (req.method === "GET" && req.headers.get("accept")?.includes("text/html") && !req.headers.get("authorization"))
+  if (
+    req.method === "GET" &&
+    req.headers.get("accept")?.includes("text/html") &&
+    !req.headers.get("authorization")
+  )
     return Response.redirect(`${origin}/docs/mcp`, 302);
 
   const auth = await authenticate(req, origin);

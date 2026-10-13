@@ -39,8 +39,20 @@ export function ProductShot({
         } as CSSProperties
       }
     >
-      <source media="(max-width: 760px)" srcSet={phoneProps.srcSet} sizes={phoneProps.sizes} width={phone.width} height={phone.height} />
-      <source media="(min-width: 761px)" srcSet={desktopSet} sizes={rest.sizes} width={desktop.width} height={desktop.height} />
+      <source
+        media="(max-width: 760px)"
+        srcSet={phoneProps.srcSet}
+        sizes={phoneProps.sizes}
+        width={phone.width}
+        height={phone.height}
+      />
+      <source
+        media="(min-width: 761px)"
+        srcSet={desktopSet}
+        sizes={rest.sizes}
+        width={desktop.width}
+        height={desktop.height}
+      />
       {/* eslint-disable-next-line jsx-a11y/alt-text -- alt comes from getImageProps */}
       <img {...rest} className={css.img} />
     </picture>

@@ -1,45 +1,13 @@
 {
   "$schema": "../../../node_modules/@kausthubh/critly/policy.schema.json",
-  "fonts": [
-    "Figtree"
-  ],
-  "typeScale": [
-    12,
-    14,
-    16,
-    20,
-    28,
-    40
-  ],
-  "spacing": [
-    4,
-    8,
-    12,
-    16,
-    24,
-    32,
-    48,
-    64
-  ],
+  "fonts": ["Figtree"],
+  "typeScale": [12, 14, 16, 20, 28, 40],
+  "spacing": [4, 8, 12, 16, 24, 32, 48, 64],
   "schemes": {
     "dark": {}
   },
-  "pages": [
-    "/",
-    "/docs",
-    "/docs/quick-add",
-    "/docs/mcp",
-    "/docs/cli",
-    "/docs/api",
-    "/privacy",
-    "/terms"
-  ],
-  "bannedPhrases": [
-    "overdue",
-    "garden",
-    "Oops",
-    "lorem"
-  ],
+  "pages": ["/", "/docs", "/docs/quick-add", "/docs/mcp", "/docs/cli", "/docs/api", "/privacy", "/terms"],
+  "bannedPhrases": ["overdue", "garden", "Oops", "lorem"],
   "rules": {
     "spacing-scale": "error",
     "nested-radius": "error",

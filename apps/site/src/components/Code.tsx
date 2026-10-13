@@ -2,7 +2,15 @@ import { CopyButton } from "./CopyButton";
 import css from "./Code.module.css";
 
 /** A copyable snippet. Set in Figtree like everything else; there is one typeface. */
-export function Code({ children, caption, copy = true }: { children: string; caption?: string; copy?: boolean }) {
+export function Code({
+  children,
+  caption,
+  copy = true,
+}: {
+  children: string;
+  caption?: string;
+  copy?: boolean;
+}) {
   return (
     <figure className={css.block}>
       {(caption || copy) && (

@@ -134,13 +134,13 @@ export default function QuickAddDocs() {
     <article className={css.prose}>
       <h1>Quick add</h1>
       <p className={css.lede}>
-        Type a task the way you would say it. Kriyan takes out the date, time, length, space, repeat, reminders and
-        deadline, and what is left is the title. The same rules run in the app, the <code>kriyan add</code> command and
-        the <code>add_task</code> tool your AI uses.
+        Type a task the way you would say it. Kriyan takes out the date, time, length, space, repeat,
+        reminders and deadline, and what is left is the title. The same rules run in the app, the{" "}
+        <code>kriyan add</code> command and the <code>add_task</code> tool your AI uses.
       </p>
       <p>
-        Every example below was read by the parser itself, as if today were {formatDate(TODAY)} 2026. Phrases can come
-        in any order.
+        Every example below was read by the parser itself, as if today were {formatDate(TODAY)} 2026. Phrases
+        can come in any order.
       </p>
 
       {SECTIONS.map((section) => (
@@ -168,7 +168,9 @@ export default function QuickAddDocs() {
       <h2 id="good-to-know">Good to know</h2>
       <ul>
         <li>Anything without a date or a space goes to your inbox.</li>
-        <li>“on the 31st” falls on the last day of shorter months, so a monthly repeat never skips a month.</li>
+        <li>
+          “on the 31st” falls on the last day of shorter months, so a monthly repeat never skips a month.
+        </li>
         <li>Words quick add doesn&apos;t recognise stay in the title, so nothing you type is lost.</li>
       </ul>
     </article>

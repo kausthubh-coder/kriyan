@@ -50,8 +50,8 @@ export default function Home() {
           <div className={css.intro}>
             <h2 id="now">What am I doing now?</h2>
             <p>
-              Today opens on the one thing you&apos;re doing, when it ends, and what comes next. Everything else
-              stays quiet until you need it.
+              Today opens on the one thing you&apos;re doing, when it ends, and what comes next. Everything
+              else stays quiet until you need it.
             </p>
           </div>
           <ul className={css.points}>
@@ -61,11 +61,15 @@ export default function Home() {
             </li>
             <li>
               <b>Free time left</b>
-              <span>&ldquo;3 h 20 min free&rdquo; tells you if one more thing fits, before you say yes to it.</span>
+              <span>
+                &ldquo;3 h 20 min free&rdquo; tells you if one more thing fits, before you say yes to it.
+              </span>
             </li>
             <li>
               <b>2 from earlier</b>
-              <span>Unfinished tasks wait in one quiet line with &ldquo;Move to today&rdquo;. Never a red list.</span>
+              <span>
+                Unfinished tasks wait in one quiet line with &ldquo;Move to today&rdquo;. Never a red list.
+              </span>
             </li>
           </ul>
         </section>
@@ -74,8 +78,8 @@ export default function Home() {
           <div className={css.intro}>
             <h2 id="week">Does the week fit?</h2>
             <p>
-              Upcoming lays out seven days with your classes, meetings and deadlines, and a load bar for each day:
-              planned hours against free hours. When a day is over, you see it before it happens.
+              Upcoming lays out seven days with your classes, meetings and deadlines, and a load bar for each
+              day: planned hours against free hours. When a day is over, you see it before it happens.
             </p>
           </div>
           <ProductShot
@@ -89,8 +93,8 @@ export default function Home() {
           <div className={css.intro}>
             <h2 id="track">Am I on track?</h2>
             <p>
-              Progress shows where your time went, goals against their pace, and habits counted by the week. Missing
-              a day never resets anything.
+              Progress shows where your time went, goals against their pace, and habits counted by the week.
+              Missing a day never resets anything.
             </p>
           </div>
           <ProductShot
@@ -104,8 +108,8 @@ export default function Home() {
           <div className={css.intro}>
             <h2 id="capture">Capture it in one sentence</h2>
             <p>
-              Quick add reads dates, times, lengths, repeats and reminders from what you type. The same words work
-              in the app, the command line and your AI. A length is only set when you say one.{" "}
+              Quick add reads dates, times, lengths, repeats and reminders from what you type. The same words
+              work in the app, the command line and your AI. A length is only set when you say one.{" "}
               <Link href="/docs/quick-add" className={css.link}>
                 See every phrase
               </Link>
@@ -118,8 +122,8 @@ export default function Home() {
           <div className={css.intro}>
             <h2 id="ai">Plan with your AI</h2>
             <p>
-              Claude, ChatGPT, Cursor or a script can read your plan and suggest changes through MCP or the command
-              line. A plan from an agent arrives as a proposal, and nothing moves until you accept it.
+              Claude, ChatGPT, Cursor or a script can read your plan and suggest changes through MCP or the
+              command line. A plan from an agent arrives as a proposal, and nothing moves until you accept it.
             </p>
           </div>
           <div className={css.setup}>
@@ -136,10 +140,12 @@ export default function Home() {
             <div className={css.setupItem}>
               <h3>Cursor and other clients</h3>
               <p>
-                Paste this into your MCP settings. Clients without sign-in can send a personal access token from
-                Settings instead.
+                Paste this into your MCP settings. Clients without sign-in can send a personal access token
+                from Settings instead.
               </p>
-              <Code caption="mcp.json">{JSON.stringify({ mcpServers: { kriyan: { url: MCP_URL } } }, null, 2)}</Code>
+              <Code caption="mcp.json">
+                {JSON.stringify({ mcpServers: { kriyan: { url: MCP_URL } } }, null, 2)}
+              </Code>
             </div>
             <div className={css.setupItem}>
               <h3>The command line</h3>

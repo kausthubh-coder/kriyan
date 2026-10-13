@@ -9,6 +9,9 @@ import { c, s, shadows } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
+import { NAVBAR_HEIGHT } from "./navbarHeight";
+
+export { NAVBAR_HEIGHT };
 
 const TABS: { href: Href; match: (p: string) => boolean; icon: LucideIcon; label: string }[] = [
   { href: "/today", match: (p) => p === "/today" || p === "/", icon: Sun, label: "Today" },
@@ -21,9 +24,6 @@ const TABS: { href: Href; match: (p: string) => boolean; icon: LucideIcon; label
     label: "Browse",
   },
 ];
-
-export { NAVBAR_HEIGHT } from "./navbarHeight";
-import { NAVBAR_HEIGHT } from "./navbarHeight";
 
 export function NavBar() {
   const path = usePathname();

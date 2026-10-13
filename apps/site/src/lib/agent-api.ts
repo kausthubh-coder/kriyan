@@ -31,6 +31,8 @@ export async function callOp(op: string, input: unknown, headers: Record<string,
   const reply = (body ?? {}) as { result?: unknown; error?: unknown };
   if (res.ok && "result" in reply) return { ok: true, result: reply.result };
   const error =
-    typeof reply.error === "string" ? reply.error : `Kriyan answered ${res.status} without a reply. Try again.`;
+    typeof reply.error === "string"
+      ? reply.error
+      : `Kriyan answered ${res.status} without a reply. Try again.`;
   return { ok: false, status: res.status, error };
 }

@@ -6,7 +6,10 @@ const page = await ctx.newPage();
 await page.goto(`${BASE}/progress`);
 await settle(page);
 while ((await page.getByRole("button", { name: /^Launch Kriyan by 1 Nov,/ }).count()) > 1) {
-  await page.getByRole("button", { name: /^Launch Kriyan by 1 Nov,/ }).last().click();
+  await page
+    .getByRole("button", { name: /^Launch Kriyan by 1 Nov,/ })
+    .last()
+    .click();
   await page.getByRole("button", { name: "Archive goal" }).click();
   await page.waitForTimeout(800);
 }

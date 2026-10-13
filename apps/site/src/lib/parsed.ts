@@ -17,7 +17,8 @@ export function describeParsed(parsed: ParsedTask, today: string): ParsedPart[] 
   if (parsed.length !== undefined) parts.push({ label: "Length", value: formatDuration(parsed.length) });
   if (parsed.repeat && parsed.date)
     parts.push({ label: "Repeats", value: describeRepeat(parsed.repeat, parsed.date, today) });
-  for (const reminder of parsed.reminders) parts.push({ label: "Reminder", value: describeReminder(reminder) });
+  for (const reminder of parsed.reminders)
+    parts.push({ label: "Reminder", value: describeReminder(reminder) });
   if (parsed.deadline) parts.push({ label: "Due", value: formatDay(parsed.deadline, today) });
   return parts;
 }

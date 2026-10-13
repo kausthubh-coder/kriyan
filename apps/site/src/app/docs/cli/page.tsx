@@ -6,7 +6,8 @@ import { GITHUB_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "CLI",
-  description: "Plan your days with Kriyan from a terminal: today, the week, quick add, and JSON for scripts.",
+  description:
+    "Plan your days with Kriyan from a terminal: today, the week, quick add, and JSON for scripts.",
   alternates: { canonical: "/docs/cli" },
 };
 
@@ -48,13 +49,14 @@ export default function CliDocs() {
     <article className={css.prose}>
       <h1>The kriyan command</h1>
       <p className={css.lede}>
-        Everything you can see and change in Kriyan, from a terminal. Add <code>--json</code> to any command for output
-        a script or an agent can read.
+        Everything you can see and change in Kriyan, from a terminal. Add <code>--json</code> to any command
+        for output a script or an agent can read.
       </p>
 
       <h2 id="install">Install</h2>
       <p>
-        The CLI runs on <a href="https://bun.sh">Bun</a>. Until it is published as a package, run it from the source:
+        The CLI runs on <a href="https://bun.sh">Bun</a>. Until it is published as a package, run it from the
+        source:
       </p>
       <Code caption="Terminal">{`git clone ${GITHUB_URL}\ncd kriyan\nbun install\nbun run kriyan --help`}</Code>
 
@@ -64,8 +66,8 @@ export default function CliDocs() {
       </p>
       <Code caption="Terminal">{`kriyan login\n# or\nkriyan login --token kriyan_...`}</Code>
       <p>
-        The token is checked before it is saved, and kept only on this computer. <code>kriyan logout</code> removes it;
-        revoke it in Settings to stop it working everywhere.
+        The token is checked before it is saved, and kept only on this computer. <code>kriyan logout</code>{" "}
+        removes it; revoke it in Settings to stop it working everywhere.
       </p>
 
       <h2 id="examples">Examples</h2>
@@ -79,8 +81,8 @@ kriyan move 3 5 tomorrow 9am
 kriyan today --json`}
       </Code>
       <p>
-        A task is the number shown next to it in your last listing, part of its title, or its id. <code>add</code>{" "}
-        reads the same phrases as <Link href="/docs/quick-add">quick add</Link> in the app.
+        A task is the number shown next to it in your last listing, part of its title, or its id.{" "}
+        <code>add</code> reads the same phrases as <Link href="/docs/quick-add">quick add</Link> in the app.
       </p>
 
       <h2 id="commands">Commands</h2>
@@ -132,9 +134,7 @@ kriyan today --json`}
           </tbody>
         </table>
       </div>
-      <p>
-        Exit codes: 0 when it worked, 1 when Kriyan refused the change, 2 for a usage or network problem.
-      </p>
+      <p>Exit codes: 0 when it worked, 1 when Kriyan refused the change, 2 for a usage or network problem.</p>
     </article>
   );
 }

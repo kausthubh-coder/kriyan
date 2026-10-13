@@ -25,8 +25,8 @@ export function resourceMetadataUrl(origin: string): string {
 export function oauthConfigured(): boolean {
   return Boolean(
     process.env.CLERK_SECRET_KEY &&
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-      process.env.KRIYAN_SERVICE_SECRET,
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+    process.env.KRIYAN_SERVICE_SECRET,
   );
 }
 

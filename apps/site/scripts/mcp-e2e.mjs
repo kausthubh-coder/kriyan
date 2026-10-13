@@ -50,8 +50,20 @@ console.log("get_today after:", summary(after));
 const all = JSON.stringify(after);
 const found = all.includes(added.taskId);
 console.log("new task is in today's plan:", found);
-const task = [...(after.scheduled ?? []), ...(after.anytime ?? [])].find((t) => (t.id ?? t._id ?? t.taskId) === added.taskId);
-if (task) console.log("as stored:", JSON.stringify({ title: task.title, date: task.date, time: task.time, length: task.length, reminders: task.reminders }));
+const task = [...(after.scheduled ?? []), ...(after.anytime ?? [])].find(
+  (t) => (t.id ?? t._id ?? t.taskId) === added.taskId,
+);
+if (task)
+  console.log(
+    "as stored:",
+    JSON.stringify({
+      title: task.title,
+      date: task.date,
+      time: task.time,
+      length: task.length,
+      reminders: task.reminders,
+    }),
+  );
 
 result = await client.callTool({ name: "delete_task", arguments: { taskId: added.taskId } });
 console.log("delete_task:", result.isError ? `error ${text(result)}` : text(result));

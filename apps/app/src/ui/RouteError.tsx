@@ -1,7 +1,7 @@
 // What a screen shows when its data fails to load: what happened and what to do.
 
 import { View } from "react-native";
-import { router, type ErrorBoundaryProps } from "expo-router";
+import type { ErrorBoundaryProps } from "expo-router";
 import { CloudOff } from "lucide-react-native";
 import { c, s } from "@/theme/tokens";
 import { Button } from "./Button";
@@ -12,7 +12,12 @@ export function RouteError({ error, retry }: ErrorBoundaryProps) {
   const data = (error as { data?: unknown }).data;
   // A link with an id that isn't a real task or space fails validation, not the network.
   const badLink = /ArgumentValidationError|Value does not match validator/.test(error.message);
-  const detail = typeof data === "string" ? data : badLink ? "This link doesn't open anything in your plan. It may be mistyped, or from another account." : null;
+  const detail =
+    typeof data === "string"
+      ? data
+      : badLink
+        ? "This link doesn't open anything in your plan. It may be mistyped, or from another account."
+        : null;
   return (
     <View
       style={{

@@ -19,7 +19,11 @@ export function DocsNav() {
       <ul>
         {PAGES.map((page) => (
           <li key={page.href}>
-            <Link href={page.href} className={css.link} aria-current={pathname === page.href ? "page" : undefined}>
+            <Link
+              href={page.href}
+              className={css.link}
+              aria-current={pathname === page.href ? "page" : undefined}
+            >
               {page.label}
             </Link>
           </li>

@@ -14,7 +14,9 @@ export function protectedResource(req: Request): Response {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   if (!publishableKey)
     return Response.json(
-      { error: "This server has no NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, so it can't point to a sign-in server." },
+      {
+        error: "This server has no NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, so it can't point to a sign-in server.",
+      },
       { status: 500, headers: METADATA_CORS },
     );
   const metadata = generateClerkProtectedResourceMetadata({

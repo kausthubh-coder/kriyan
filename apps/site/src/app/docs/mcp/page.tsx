@@ -24,20 +24,20 @@ export default function McpDocs() {
     <article className={css.prose}>
       <h1>Plan with your AI over MCP</h1>
       <p className={css.lede}>
-        Kriyan runs a hosted MCP server. Connect it once and your assistant can read your day and week, capture tasks,
-        and propose plans you accept in the app.
+        Kriyan runs a hosted MCP server. Connect it once and your assistant can read your day and week,
+        capture tasks, and propose plans you accept in the app.
       </p>
       <Code caption="MCP server address">{MCP_URL}</Code>
       <p>
-        It speaks streamable HTTP, protocol 2026-07-28, and the 2025 versions older clients use. There is nothing to
-        install.
+        It speaks streamable HTTP, protocol 2026-07-28, and the 2025 versions older clients use. There is
+        nothing to install.
       </p>
 
       <h2 id="connect">Connect</h2>
       <h3>Claude and ChatGPT</h3>
       <p>
-        Add a custom connector with the address above. When asked, sign in to Kriyan and allow access. The connector
-        acts as you and only ever sees your own plan.
+        Add a custom connector with the address above. When asked, sign in to Kriyan and allow access. The
+        connector acts as you and only ever sees your own plan.
       </p>
       <h3>Claude Code</h3>
       <Code caption="Terminal">{`claude mcp add --transport http --scope user kriyan ${MCP_URL}`}</Code>
@@ -57,9 +57,9 @@ export default function McpDocs() {
 
       <h2 id="tokens">Use a personal access token</h2>
       <p>
-        Clients that can&apos;t sign in, and your own scripts, can send a token instead. Create one in Kriyan under
-        Settings, name it after where you&apos;ll use it, and send it as a bearer token. You can revoke it there at any
-        time.
+        Clients that can&apos;t sign in, and your own scripts, can send a token instead. Create one in Kriyan
+        under Settings, name it after where you&apos;ll use it, and send it as a bearer token. You can revoke
+        it there at any time.
       </p>
       <Code caption="mcp.json with a token">{tokenConfig}</Code>
       <Code caption="Claude Code with a token">
@@ -72,13 +72,13 @@ export default function McpDocs() {
       <h2 id="how-agents-plan">How agents plan with you</h2>
       <ul>
         <li>
-          Agents read first. The server tells them to call <code>get_today</code> or <code>get_week</code> before
-          suggesting anything about your time.
+          Agents read first. The server tells them to call <code>get_today</code> or <code>get_week</code>{" "}
+          before suggesting anything about your time.
         </li>
         <li>
-          Plans arrive as proposals. <code>propose_plan</code> puts blocks on Today and Upcoming with Accept and
-          Discard, and names the agent. Nothing moves until you accept, unless you turn on &ldquo;Let agents edit
-          directly&rdquo; in Settings.
+          Plans arrive as proposals. <code>propose_plan</code> puts blocks on Today and Upcoming with Accept
+          and Discard, and names the agent. Nothing moves until you accept, unless you turn on &ldquo;Let
+          agents edit directly&rdquo; in Settings.
         </li>
         <li>Agents never guess how long something takes. A length is only set when you said one.</li>
         <li>
@@ -89,8 +89,8 @@ export default function McpDocs() {
 
       <h2 id="tools">Tools</h2>
       <p>
-        One tool for each operation of the <Link href="/docs/api">agent API</Link>. Read tools are marked read-only,
-        so clients can run them without asking.
+        One tool for each operation of the <Link href="/docs/api">agent API</Link>. Read tools are marked
+        read-only, so clients can run them without asking.
       </p>
       <div className={css.tableWrap}>
         <table className={css.table}>
@@ -127,16 +127,17 @@ export default function McpDocs() {
       <h2 id="trouble">If it doesn&apos;t connect</h2>
       <ul>
         <li>
-          <strong>401 from the server:</strong> the sign-in expired or the token was revoked. Connect again, or create
-          a new token in Settings.
+          <strong>401 from the server:</strong> the sign-in expired or the token was revoked. Connect again,
+          or create a new token in Settings.
         </li>
         <li>
           <strong>The client can&apos;t find sign-in:</strong> it reads{" "}
-          <code>/.well-known/oauth-protected-resource/mcp</code> to find Kriyan&apos;s sign-in server. Use a token if
-          your client doesn&apos;t support MCP sign-in yet.
+          <code>/.well-known/oauth-protected-resource/mcp</code> to find Kriyan&apos;s sign-in server. Use a
+          token if your client doesn&apos;t support MCP sign-in yet.
         </li>
         <li>
-          <strong>Opening the address in a browser</strong> brings you to this page. MCP clients connect with POST.
+          <strong>Opening the address in a browser</strong> brings you to this page. MCP clients connect with
+          POST.
         </li>
       </ul>
     </article>

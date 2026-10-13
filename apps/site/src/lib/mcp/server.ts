@@ -1,7 +1,12 @@
 // The Kriyan MCP server: one tool per operation in @kriyan/core/ops, each forwarded to the agent API.
 // A fresh server is built per request (the transport is stateless), bound to the authenticated caller.
 
-import { createMcpHandler, fromJsonSchema, McpServer, type CallToolResult } from "@modelcontextprotocol/server";
+import {
+  createMcpHandler,
+  fromJsonSchema,
+  McpServer,
+  type CallToolResult,
+} from "@modelcontextprotocol/server";
 import { OPS } from "@kriyan/core/ops";
 import { callOp } from "@/lib/agent-api";
 import type { Caller } from "./auth";
@@ -26,7 +31,10 @@ function toolResult(reply: Awaited<ReturnType<typeof callOp>>): CallToolResult {
 }
 
 export function buildServer(caller: Caller | undefined): McpServer {
-  const server = new McpServer({ name: "kriyan", title: "Kriyan", version: "1.0.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer(
+    { name: "kriyan", title: "Kriyan", version: "1.0.0" },
+    { instructions: INSTRUCTIONS },
+  );
   for (const op of OPS) {
     server.registerTool(
       op.name,
