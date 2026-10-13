@@ -66,6 +66,8 @@ export default defineSchema({
     .index("by_owner_and_spaceId", ["ownerId", "spaceId"])
     .index("by_owner_and_deadline", ["ownerId", "deadline"])
     .index("by_owner_and_repeatFirst", ["ownerId", "repeatFirst"])
+    // Maintenance only (emptying the Trash), never read for a person.
+    .index("by_deletedAt", ["deletedAt"])
     .index("by_owner_and_proposedBy", ["ownerId", "proposedBy"]),
 
   /** One row per occurrence done: a single task, or one date of a repeating one. */

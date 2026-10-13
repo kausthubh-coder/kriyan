@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { todayIn } from "@kriyan/core/dates";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -270,5 +270,22 @@ describe("deleting my data", () => {
       return all.flat().map((row) => ("ownerId" in row ? row.ownerId : "?"));
     });
     expect([...new Set(owners)]).toEqual([BOB.tokenIdentifier]);
+  });
+});
+
+describe("the trash", () => {
+  test("a deleted task can be restored for 30 days, then it is gone for good", async () => {
+    const { t, alice } = await setup();
+    const old = await alice.mutation(api.tasks.addText, { text: "Old idea" });
+    const recent = await alice.mutation(api.tasks.addText, { text: "Recent idea" });
+    await alice.mutation(api.tasks.remove, { id: old });
+    vi.setSystemTime(new Date("2026-11-03T12:00:00Z"));
+    await alice.mutation(api.tasks.remove, { id: recent });
+    vi.setSystemTime(new Date("2026-11-13T13:00:00Z"));
+    await t.mutation(internal.maintenance.emptyTrash, {});
+    const left = await t.run((ctx) => ctx.db.query("tasks").collect());
+    expect(left.map((x) => x.title)).toEqual(["Recent idea"]);
+    await alice.mutation(api.tasks.restore, { id: recent });
+    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Recent idea"]);
   });
 });
