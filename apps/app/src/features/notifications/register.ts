@@ -36,7 +36,6 @@ async function channel() {
   await Notifications.setNotificationChannelAsync("reminders", {
     name: "Reminders",
     importance: Notifications.AndroidImportance.HIGH,
-    sound: "default",
   });
 }
 

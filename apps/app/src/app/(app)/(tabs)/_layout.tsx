@@ -14,6 +14,7 @@ export default function TabsLayout() {
       iconColor={{ default: hex.ink3, selected: hex.ink }}
       labelStyle={{ default: { color: hex.ink3 }, selected: { color: hex.ink } }}
       backBehavior="initialRoute"
+      labelVisibilityMode="labeled"
     >
       <NativeTabs.Trigger name="today">
         <NativeTabs.Trigger.Icon md="light_mode" />

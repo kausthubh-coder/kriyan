@@ -253,33 +253,35 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
     );
   }
 
+  // The field and its button share a row, so both stay above the keyboard (Soft Keyboard).
   return (
     <View style={{ gap: s.s3 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: s.s3,
-          paddingHorizontal: s.s3,
-          borderRadius: r.ctl,
-          backgroundColor: c.sunken,
-          boxShadow: `inset 0 0 0 1px ${c.line}`,
-        }}
-      >
-        {field}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: s.s3,
+            borderRadius: r.ctl,
+            backgroundColor: c.sunken,
+            boxShadow: `inset 0 0 0 1px ${c.line}`,
+          }}
+        >
+          {field}
+        </View>
+        <Button
+          variant="primary"
+          icon={Plus}
+          label={phone ? undefined : "Add task"}
+          accessibilityLabel="Add task"
+          onPress={() => void submit()}
+          disabled={!text.trim() || busy}
+          style={{ height: 48, minWidth: 48 }}
+        />
       </View>
       {highlight}
       {chipRow}
-      <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: s.s2 }}>
-        <Button
-          variant="primary"
-          label="Add task"
-          icon={Plus}
-          onPress={() => void submit()}
-          disabled={!text.trim() || busy}
-          style={phone ? { height: 48 } : undefined}
-        />
-      </View>
     </View>
   );
 });

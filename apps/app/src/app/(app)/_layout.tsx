@@ -52,7 +52,8 @@ export default function AppLayout() {
           }}
         />
       </Stack>
-      <ToastHost bottom={insets.bottom + 80 + 16} />
+      {/* Above the navigation bar and the floating add button. */}
+      <ToastHost bottom={insets.bottom + 80 + 16 + 56 + 8} />
       <CommandMenu />
     </View>
   );

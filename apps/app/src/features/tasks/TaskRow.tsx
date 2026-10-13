@@ -2,7 +2,7 @@
 // (when, due, repeat, reminders, note) and its length. Tap opens it; tick completes it.
 
 import { memo, useEffect, type ReactNode } from "react";
-import { Platform, View } from "react-native";
+import { View } from "react-native";
 import { router } from "expo-router";
 import { Bell, Bot, Cake, Flag, NotebookText, Repeat2 } from "lucide-react-native";
 import { formatDay, formatDuration, formatTimeRange } from "@kriyan/core/format";
@@ -117,7 +117,6 @@ export const TaskRow = memo(function TaskRow({ task, today, showWhen = false, tr
         onPress={() => openTask(task._id)}
         hoverBg={null}
         scale={false}
-        unstable_pressDelay={Platform.OS === "web" ? 0 : 100}
         style={{ flex: 1, minWidth: 0, minHeight: phone ? 44 : 24, justifyContent: "center", gap: 2 }}
       >
         <Txt variant="body" tone={done ? "ink3" : "ink"} strike={done}>

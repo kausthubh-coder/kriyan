@@ -278,7 +278,7 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
-          <View style={{ paddingTop: 4 }}>
+          <View style={{ paddingTop: phone ? s.s3 : s.s1 }}>
             {task.event ? (
               <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center" }}>
                 <Dot color={tone.dot} size={10} />
