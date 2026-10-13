@@ -20,7 +20,9 @@ type Goal = ProgressView["goals"][number];
 
 function amount(goal: Goal, n: number) {
   const v = Math.round(n * 10) / 10;
-  return goal.kind === "tasks" ? `${v} ${v === 1 ? "task" : "tasks"}` : `${v}${goal.unit ? ` ${goal.unit}` : ""}`;
+  return goal.kind === "tasks"
+    ? `${v} ${v === 1 ? "task" : "tasks"}`
+    : `${v}${goal.unit ? ` ${goal.unit}` : ""}`;
 }
 
 export function paceText(goal: Goal, today: string): string {
@@ -39,10 +41,21 @@ export function GoalView({ goal, color, today }: { goal: Goal; color: string; to
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(String(goal.current));
   const ref = useRef<View>(null);
-  const meta = goal.kind === "tasks" ? `${goal.current} of ${goal.target} tasks` : `${goal.current} of ${goal.target}${goal.unit ? ` ${goal.unit}` : ""}`;
+  const meta =
+    goal.kind === "tasks"
+      ? `${goal.current} of ${goal.target} tasks`
+      : `${goal.current} of ${goal.target}${goal.unit ? ` ${goal.unit}` : ""}`;
   return (
     <View style={{ gap: s.s2 }}>
-      <Press ref={ref} role="button" accessibilityLabel={`${goal.title}, ${meta}. Update progress`} onPress={() => setOpen(true)} hoverBg={null} scale={false} style={{ gap: s.s2 }}>
+      <Press
+        ref={ref}
+        role="button"
+        accessibilityLabel={`${goal.title}, ${meta}. Update progress`}
+        onPress={() => setOpen(true)}
+        hoverBg={null}
+        scale={false}
+        style={{ gap: s.s2 }}
+      >
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: s.s3 }}>
           <Txt variant="label" style={{ flex: 1 }}>
             {goal.title}
@@ -52,11 +65,29 @@ export function GoalView({ goal, color, today }: { goal: Goal; color: string; to
           </Txt>
         </View>
         <View style={{ height: 4, borderRadius: 2, backgroundColor: c.lineStrong }}>
-          <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.round(goal.progress * 100)}%`, borderRadius: 2, backgroundColor: color }} />
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${Math.round(goal.progress * 100)}%`,
+              borderRadius: 2,
+              backgroundColor: color,
+            }}
+          />
           {goal.pace !== null ? (
             <View
               accessibilityLabel="Where a steady pace would be today"
-              style={{ position: "absolute", top: -4, bottom: -4, left: `${Math.round(goal.pace * 100)}%`, width: 2, borderRadius: 1, backgroundColor: c.ink2 }}
+              style={{
+                position: "absolute",
+                top: -4,
+                bottom: -4,
+                left: `${Math.round(goal.pace * 100)}%`,
+                width: 2,
+                borderRadius: 1,
+                backgroundColor: c.ink2,
+              }}
             />
           ) : null}
         </View>
@@ -67,14 +98,22 @@ export function GoalView({ goal, color, today }: { goal: Goal; color: string; to
       <Popover open={open} onClose={() => setOpen(false)} anchor={ref} title={goal.title} width={300}>
         {goal.kind === "number" ? (
           <View style={{ gap: s.s3 }}>
-            <Field label={`Progress${goal.unit ? ` in ${goal.unit}` : ""}`} value={value} onChangeText={setValue} keyboardType="decimal-pad" autoFocus />
+            <Field
+              label={`Progress${goal.unit ? ` in ${goal.unit}` : ""}`}
+              value={value}
+              onChangeText={setValue}
+              keyboardType="decimal-pad"
+              autoFocus
+            />
             <Button
               variant="primary"
               label="Save progress"
               disabled={!(Number(value) >= 0)}
               onPress={() => {
                 setOpen(false);
-                void update({ id: goal._id, current: Number(value) }).catch((e: unknown) => showToast(errorText(e)));
+                void update({ id: goal._id, current: Number(value) }).catch((e: unknown) =>
+                  showToast(errorText(e)),
+                );
               }}
             />
           </View>
@@ -107,16 +146,41 @@ export function AddGoal({ today, onDone }: { today: string; onDone: () => void }
   const valid = title.trim() && Number(target) > 0;
   return (
     <View style={{ gap: s.s3, padding: s.s3, borderRadius: r.card, backgroundColor: c.raised }}>
-      <Field label="Goal" value={title} onChangeText={setTitle} placeholder="Run 100 km this term" autoFocus />
+      <Field
+        label="Goal"
+        value={title}
+        onChangeText={setTitle}
+        placeholder="Run 100 km this term"
+        autoFocus
+      />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
         <Chip label="Count tasks done" on={kind === "tasks"} onPress={() => setKind("tasks")} />
         <Chip label="Track a number" on={kind === "number"} onPress={() => setKind("number")} />
       </View>
       <View style={{ flexDirection: "row", gap: s.s2 }}>
-        <Field label="Target" value={target} onChangeText={setTarget} placeholder={kind === "tasks" ? "14" : "100"} keyboardType="decimal-pad" containerStyle={{ flex: 1 }} />
-        {kind === "number" ? <Field label="Unit" value={unit} onChangeText={setUnit} placeholder="km" containerStyle={{ flex: 1 }} /> : null}
+        <Field
+          label="Target"
+          value={target}
+          onChangeText={setTarget}
+          placeholder={kind === "tasks" ? "14" : "100"}
+          keyboardType="decimal-pad"
+          containerStyle={{ flex: 1 }}
+        />
+        {kind === "number" ? (
+          <Field
+            label="Unit"
+            value={unit}
+            onChangeText={setUnit}
+            placeholder="km"
+            containerStyle={{ flex: 1 }}
+          />
+        ) : null}
       </View>
-      <Chip label={due ? `Due ${formatDate(due, today)}` : "Add a due date"} on={Boolean(due)} onPress={() => setPickDue(!pickDue)} />
+      <Chip
+        label={due ? `Due ${formatDate(due, today)}` : "Add a due date"}
+        on={Boolean(due)}
+        onPress={() => setPickDue(!pickDue)}
+      />
       {pickDue ? (
         <DayPicker
           value={due}
@@ -134,7 +198,13 @@ export function AddGoal({ today, onDone }: { today: string; onDone: () => void }
           label="Add goal"
           disabled={!valid}
           onPress={() =>
-            void add({ title: title.trim(), kind, target: Number(target), ...(kind === "number" && unit.trim() ? { unit: unit.trim() } : {}), ...(due ? { dueDate: due } : {}) })
+            void add({
+              title: title.trim(),
+              kind,
+              target: Number(target),
+              ...(kind === "number" && unit.trim() ? { unit: unit.trim() } : {}),
+              ...(due ? { dueDate: due } : {}),
+            })
               .then(onDone)
               .catch((e: unknown) => showToast(errorText(e)))
           }

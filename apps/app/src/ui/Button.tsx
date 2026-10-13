@@ -28,7 +28,20 @@ interface Props {
 }
 
 export const Button = forwardRef<View, Props>(function Button(
-  { label, icon, trailing, onPress, variant = "default", accessibilityLabel, disabled, style, kbd, children, expanded, testID },
+  {
+    label,
+    icon,
+    trailing,
+    onPress,
+    variant = "default",
+    accessibilityLabel,
+    disabled,
+    style,
+    kbd,
+    children,
+    expanded,
+    testID,
+  },
   ref,
 ) {
   const { ctl } = useControl();
@@ -64,9 +77,28 @@ export const Button = forwardRef<View, Props>(function Button(
     >
       {({ hovered }: { hovered?: boolean }) => (
         <>
-          {icon ? <Icon icon={icon} tone={primary ? "onInk" : hovered ? "ink" : variant === "quiet" ? "ink3" : iconOnly ? "ink3" : "ink2"} /> : null}
+          {icon ? (
+            <Icon
+              icon={icon}
+              tone={
+                primary
+                  ? "onInk"
+                  : hovered
+                    ? "ink"
+                    : variant === "quiet"
+                      ? "ink3"
+                      : iconOnly
+                        ? "ink3"
+                        : "ink2"
+              }
+            />
+          ) : null}
           {label ? (
-            <Txt variant="label" tone={primary ? "onInk" : hovered ? "ink" : variant === "quiet" ? "ink3" : "ink2"} numberOfLines={1}>
+            <Txt
+              variant="label"
+              tone={primary ? "onInk" : hovered ? "ink" : variant === "quiet" ? "ink3" : "ink2"}
+              numberOfLines={1}
+            >
               {label}
             </Txt>
           ) : null}

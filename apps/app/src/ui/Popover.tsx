@@ -59,8 +59,19 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
 
   if (phone) {
     return (
-      <Modal transparent visible animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-        <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: c.scrim }}>
+      <Modal
+        transparent
+        visible
+        animationType="none"
+        onRequestClose={onClose}
+        statusBarTranslucent
+        navigationBarTranslucent
+      >
+        <Animated.View
+          entering={FadeIn.duration(150)}
+          exiting={FadeOut.duration(150)}
+          style={{ flex: 1, backgroundColor: c.scrim }}
+        >
           <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
           <Animated.View
             ref={layer}
@@ -82,7 +93,10 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
             <Txt variant="subhead" heading={2} style={{ paddingHorizontal: s.s4, paddingBottom: s.s2 }}>
               {title}
             </Txt>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: s.s4, gap: s.s3 }}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingHorizontal: s.s4, gap: s.s3 }}
+            >
               {children}
             </ScrollView>
           </Animated.View>
@@ -96,11 +110,20 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
       ? Math.max(s.s3, box.x - width - s.s3)
       : Math.min(Math.max(s.s3, box.x), win.width - width - s.s3)
     : (win.width - width) / 2;
-  const top = box ? (side === "left" ? Math.max(s.s3, box.y - s.s3) : box.y + box.height + s.s1) : win.height * 0.2;
+  const top = box
+    ? side === "left"
+      ? Math.max(s.s3, box.y - s.s3)
+      : box.y + box.height + s.s1
+    : win.height * 0.2;
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
-      <Pressable accessibilityLabel="Close" onPress={onClose} style={{ position: "absolute", inset: 0 } as object} focusable={false} />
+      <Pressable
+        accessibilityLabel="Close"
+        onPress={onClose}
+        style={{ position: "absolute", inset: 0 } as object}
+        focusable={false}
+      />
       <Animated.View
         ref={layer}
         entering={FadeIn.duration(150)}

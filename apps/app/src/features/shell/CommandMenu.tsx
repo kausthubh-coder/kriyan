@@ -5,7 +5,18 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { useMutation } from "convex/react";
-import { Bot, CalendarDays, Inbox, Layers, Plus, Search, SlidersHorizontal, Sun, Target, type LucideIcon } from "lucide-react-native";
+import {
+  Bot,
+  CalendarDays,
+  Inbox,
+  Layers,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Sun,
+  Target,
+  type LucideIcon,
+} from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import { startOfWeek } from "@kriyan/core/dates";
 import { formatDay } from "@kriyan/core/format";
@@ -82,9 +93,15 @@ function Menu() {
       const space = parsed.spaceName ? findSpace(spaces, parsed.spaceName) : undefined;
       const bits = [
         ...(parsed.spaceName ? [space?.path ?? `New space ${parsed.spaceName}`] : []),
-        ...(parsed.date ? [`${formatDay(parsed.date, today)}${parsed.time !== undefined ? `, ${String(Math.floor(parsed.time / 60)).padStart(2, "0")}:${String(parsed.time % 60).padStart(2, "0")}` : ""}`] : []),
+        ...(parsed.date
+          ? [
+              `${formatDay(parsed.date, today)}${parsed.time !== undefined ? `, ${String(Math.floor(parsed.time / 60)).padStart(2, "0")}:${String(parsed.time % 60).padStart(2, "0")}` : ""}`,
+            ]
+          : []),
         ...(parsed.repeat ? ["Repeats"] : []),
-        ...(parsed.reminders.length ? [`${parsed.reminders.length} ${parsed.reminders.length === 1 ? "reminder" : "reminders"}`] : []),
+        ...(parsed.reminders.length
+          ? [`${parsed.reminders.length} ${parsed.reminders.length === 1 ? "reminder" : "reminders"}`]
+          : []),
       ];
       out.push({
         key: "add",
@@ -95,7 +112,18 @@ function Menu() {
         sub: bits.length ? (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
             {bits.map((b, i) => (
-              <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: s.s1, paddingHorizontal: s.s2, height: 24, borderRadius: 12, backgroundColor: c.hover }}>
+              <View
+                key={i}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: s.s1,
+                  paddingHorizontal: s.s2,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: c.hover,
+                }}
+              >
                 {i === 0 && space ? <Dot color={spaceTone(space.color).dot} /> : null}
                 <Txt variant="meta" tone="ink2">
                   {b}
@@ -116,12 +144,26 @@ function Menu() {
     }
     for (const g of GO) {
       if (q && !`${g.label} ${g.keywords ?? ""}`.toLowerCase().includes(q)) continue;
-      out.push({ key: `go-${g.label}`, group: "Go to", label: g.label, icon: g.icon, kbd: g.kbd, hint: q ? undefined : g.keywords, run: () => router.navigate(g.href) });
+      out.push({
+        key: `go-${g.label}`,
+        group: "Go to",
+        label: g.label,
+        icon: g.icon,
+        kbd: g.kbd,
+        hint: q ? undefined : g.keywords,
+        run: () => router.navigate(g.href),
+      });
     }
     if (q) {
       for (const sp of spaces ?? []) {
         if (!sp.name.toLowerCase().includes(q)) continue;
-        out.push({ key: `sp-${sp._id}`, group: "Spaces", label: sp.path, leading: <Dot color={spaceTone(sp.color).dot} />, run: () => router.navigate(`/space/${sp._id}`) });
+        out.push({
+          key: `sp-${sp._id}`,
+          group: "Spaces",
+          label: sp.path,
+          leading: <Dot color={spaceTone(sp.color).dot} />,
+          run: () => router.navigate(`/space/${sp._id}`),
+        });
       }
       const seen = new Set<string>();
       const pool: TaskView[] = [
@@ -156,7 +198,12 @@ function Menu() {
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={closeCommand}>
-      <Pressable accessibilityLabel="Close" onPress={closeCommand} focusable={false} style={{ position: "absolute", inset: 0, backgroundColor: c.scrim } as object} />
+      <Pressable
+        accessibilityLabel="Close"
+        onPress={closeCommand}
+        focusable={false}
+        style={{ position: "absolute", inset: 0, backgroundColor: c.scrim } as object}
+      />
       <View
         ref={layer}
         role="dialog"
@@ -176,7 +223,17 @@ function Menu() {
           overflow: "hidden",
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: s.s3, height: 56, paddingHorizontal: s.s4, borderBottomWidth: 1, borderBottomColor: c.line }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: s.s3,
+            height: 56,
+            paddingHorizontal: s.s4,
+            borderBottomWidth: 1,
+            borderBottomColor: c.line,
+          }}
+        >
           <Icon icon={Search} />
           <TextInput
             ref={input}
@@ -195,13 +252,24 @@ function Menu() {
               const key = e.nativeEvent.key;
               if (key === "ArrowDown" || key === "ArrowUp") {
                 (e as unknown as { preventDefault?: () => void }).preventDefault?.();
-                setIndex((i) => (items.length ? (i + (key === "ArrowDown" ? 1 : items.length - 1)) % items.length : 0));
+                setIndex((i) =>
+                  items.length ? (i + (key === "ArrowDown" ? 1 : items.length - 1)) % items.length : 0,
+                );
               } else if (key === "Escape") closeCommand();
             }}
-            style={[roles.body, { flex: 1, height: "100%", color: c.ink, fontSize: 16, lineHeight: 24 }, Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null]}
+            style={[
+              roles.body,
+              { flex: 1, height: "100%", color: c.ink, fontSize: 16, lineHeight: 24 },
+              Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null,
+            ]}
           />
         </View>
-        <ScrollView role="menu" aria-label="Results" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: s.s2 }}>
+        <ScrollView
+          role="menu"
+          aria-label="Results"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: s.s2 }}
+        >
           {items.length === 0 ? (
             <Txt variant="body" tone="ink3" style={{ padding: s.s3 }}>
               Nothing matches “{query.trim()}”. Clear the search to see everything.
@@ -210,7 +278,11 @@ function Menu() {
           {items.map((item, i) => (
             <View key={item.key}>
               {i === 0 || items[i - 1]?.group !== item.group ? (
-                <Txt variant="caption" tone="ink3" style={{ paddingHorizontal: s.s2, paddingTop: s.s2, paddingBottom: s.s1 }}>
+                <Txt
+                  variant="caption"
+                  tone="ink3"
+                  style={{ paddingHorizontal: s.s2, paddingTop: s.s2, paddingBottom: s.s1 }}
+                >
                   {item.group}
                 </Txt>
               ) : null}
@@ -232,7 +304,9 @@ function Menu() {
                   backgroundColor: i === current ? c.select : "transparent",
                 }}
               >
-                <View style={{ width: 18, alignItems: "center", paddingTop: item.sub ? 1 : 0 }}>{item.leading ?? (item.icon ? <Icon icon={item.icon} /> : null)}</View>
+                <View style={{ width: 18, alignItems: "center", paddingTop: item.sub ? 1 : 0 }}>
+                  {item.leading ?? (item.icon ? <Icon icon={item.icon} /> : null)}
+                </View>
                 <View style={{ flex: 1, gap: s.s2 }}>
                   <Txt variant="body" tone={i === current ? "ink" : "ink2"} numberOfLines={1}>
                     {item.label}
@@ -254,7 +328,16 @@ function Menu() {
           ))}
         </ScrollView>
         {phone ? null : (
-          <View style={{ flexDirection: "row", gap: s.s4, paddingVertical: s.s3, paddingHorizontal: s.s4, borderTopWidth: 1, borderTopColor: c.line }}>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: s.s4,
+              paddingVertical: s.s3,
+              paddingHorizontal: s.s4,
+              borderTopWidth: 1,
+              borderTopColor: c.line,
+            }}
+          >
             <Txt variant="meta" tone="ink3">
               Enter to run
             </Txt>

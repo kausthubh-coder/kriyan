@@ -58,7 +58,12 @@ export function serializeNote(blocks: Block[]): string {
       quote: "> ",
     }[b.kind];
     // Lists stay together; everything else gets a blank line between, as Markdown expects.
-    if (prev && !(LIST.includes(prev.kind) && LIST.includes(b.kind)) && !(prev.kind === "quote" && b.kind === "quote")) out.push("");
+    if (
+      prev &&
+      !(LIST.includes(prev.kind) && LIST.includes(b.kind)) &&
+      !(prev.kind === "quote" && b.kind === "quote")
+    )
+      out.push("");
     out.push(prefix + b.text);
   });
   while (out.length && out[out.length - 1] === "") out.pop();

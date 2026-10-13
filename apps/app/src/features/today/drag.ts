@@ -5,7 +5,8 @@ import { createStore } from "@/data/store";
 
 export const STEP = 15;
 export const snap = (minutes: number) => Math.round(minutes / STEP) * STEP;
-export const clampDay = (minutes: number, length = 0) => Math.max(0, Math.min(1440 - Math.max(length, STEP), minutes));
+export const clampDay = (minutes: number, length = 0) =>
+  Math.max(0, Math.min(1440 - Math.max(length, STEP), minutes));
 
 export interface DropZone {
   /** Window coordinates of the timeline's top-left, and its size. */

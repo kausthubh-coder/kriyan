@@ -67,10 +67,16 @@ export const shadows = {
 } as const;
 
 /** Font family per weight. The web registers one "Figtree" family with three weights. */
-export function family(weight: "400" | "500" | "600"): { fontFamily: string; fontWeight?: "400" | "500" | "600" } {
-  if (isWeb) return { fontFamily: `${font.family}, ui-sans-serif, system-ui, sans-serif`, fontWeight: weight };
+export function family(weight: "400" | "500" | "600"): {
+  fontFamily: string;
+  fontWeight?: "400" | "500" | "600";
+} {
+  if (isWeb)
+    return { fontFamily: `${font.family}, ui-sans-serif, system-ui, sans-serif`, fontWeight: weight };
   return {
-    fontFamily: { "400": "Figtree_400Regular", "500": "Figtree_500Medium", "600": "Figtree_600SemiBold" }[weight],
+    fontFamily: { "400": "Figtree_400Regular", "500": "Figtree_500Medium", "600": "Figtree_600SemiBold" }[
+      weight
+    ],
   };
 }
 

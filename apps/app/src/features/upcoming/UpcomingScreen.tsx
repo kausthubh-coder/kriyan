@@ -8,6 +8,7 @@ import { useMutation } from "convex/react";
 import { Bot, Cake, ChevronLeft, ChevronRight, Flag } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import { addDays, diffDays, formatClock, parts, startOfWeek, weekday } from "@kriyan/core/dates";
+import { layoutDay } from "@kriyan/core/layout";
 import { formatDate, formatDay, MONTH_SHORT, WEEKDAY_LONG, WEEKDAY_SHORT } from "@kriyan/core/format";
 import { useClock } from "@/data/time";
 import { useWeekView, type TaskView, type WeekView } from "@/data/views";
@@ -30,14 +31,18 @@ const hours = (m: number) => {
 
 function loadText(day: WeekView["days"][number]) {
   const over = day.plannedMinutes - day.capacity;
-  return over > 0 ? `${hours(day.plannedMinutes)} h, ${hours(over)} h over` : `${hours(day.plannedMinutes)} of ${hours(day.capacity)} h`;
+  return over > 0
+    ? `${hours(day.plannedMinutes)} h, ${hours(over)} h over`
+    : `${hours(day.plannedMinutes)} of ${hours(day.capacity)} h`;
 }
 
 function rangeTitle(start: string) {
   const end = addDays(start, 6);
   const [, sm, sd] = parts(start);
   const [, em, ed] = parts(end);
-  return sm === em ? `${sd} to ${ed} ${MONTH_SHORT[em - 1]}` : `${sd} ${MONTH_SHORT[sm - 1]} to ${ed} ${MONTH_SHORT[em - 1]}`;
+  return sm === em
+    ? `${sd} to ${ed} ${MONTH_SHORT[em - 1]}`
+    : `${sd} ${MONTH_SHORT[sm - 1]} to ${ed} ${MONTH_SHORT[em - 1]}`;
 }
 
 export function UpcomingScreen() {
@@ -49,7 +54,9 @@ export function UpcomingScreen() {
   const thisWeek = start === startOfWeek(today);
   const planned = week ? week.days.reduce((sum, d) => sum + d.plannedMinutes, 0) : 0;
   const capacity = week ? week.days.reduce((sum, d) => sum + d.capacity, 0) : 0;
-  const proposals = week ? week.days.flatMap((d) => [...d.scheduled, ...d.anytime]).filter((t) => t.proposedBy) : [];
+  const proposals = week
+    ? week.days.flatMap((d) => [...d.scheduled, ...d.anytime]).filter((t) => t.proposedBy)
+    : [];
 
   return (
     <Screen
@@ -64,9 +71,17 @@ export function UpcomingScreen() {
         sub={week ? `${hours(planned)} h planned of ${hours(capacity)} h` : " "}
         right={
           <>
-            <Button icon={ChevronLeft} accessibilityLabel="Previous week" onPress={() => setStart(addDays(start, -7))} />
+            <Button
+              icon={ChevronLeft}
+              accessibilityLabel="Previous week"
+              onPress={() => setStart(addDays(start, -7))}
+            />
             <Button label="This week" onPress={() => setStart(startOfWeek(today))} disabled={thisWeek} />
-            <Button icon={ChevronRight} accessibilityLabel="Next week" onPress={() => setStart(addDays(start, 7))} />
+            <Button
+              icon={ChevronRight}
+              accessibilityLabel="Next week"
+              onPress={() => setStart(addDays(start, 7))}
+            />
           </>
         }
       />
@@ -81,7 +96,12 @@ export function UpcomingScreen() {
           ))}
         </View>
       ) : phone ? (
-        <Agenda days={[...week.days, ...(next?.days ?? [])].filter((d) => d.date > today && diffDays(d.date, today) <= 7)} today={today} />
+        <Agenda
+          days={[...week.days, ...(next?.days ?? [])].filter(
+            (d) => d.date > today && diffDays(d.date, today) <= 7,
+          )}
+          today={today}
+        />
       ) : (
         <WeekGrid week={week} today={today} />
       )}
@@ -92,7 +112,9 @@ export function UpcomingScreen() {
 function ProposalBanner({ proposals, phone }: { proposals: TaskView[]; phone: boolean }) {
   const settle = useMutation(api.tasks.settleProposals);
   const who = proposals[0]?.proposedBy ?? "An agent";
-  const days = [...new Set(proposals.map((t) => t.date).filter((d): d is string => Boolean(d)))].sort().map((d) => WEEKDAY_SHORT[weekday(d)]);
+  const days = [...new Set(proposals.map((t) => t.date).filter((d): d is string => Boolean(d)))]
+    .sort()
+    .map((d) => WEEKDAY_SHORT[weekday(d)]);
   const run = (accept: boolean) =>
     void settle({ accept, ids: proposals.map((t) => t._id) })
       .then((n) => showToast(accept ? `Added ${n} to your plan` : `Discarded ${n} proposed`))
@@ -126,7 +148,8 @@ function ProposalBanner({ proposals, phone }: { proposals: TaskView[]; phone: bo
       >
         <Icon icon={Bot} />
         <Txt variant="body" style={phone ? { flexBasis: "80%" } : undefined}>
-          {who} proposed {proposals.length} {proposals.length === 1 ? "block" : "blocks"} for {[...new Set(days)].join(" and ")}
+          {who} proposed {proposals.length} {proposals.length === 1 ? "block" : "blocks"} for{" "}
+          {[...new Set(days)].join(" and ")}
         </Txt>
         <Button label="Review" onPress={() => proposals[0] && openTask(proposals[0]._id)} />
         <Button label="Discard" onPress={() => run(false)} />
@@ -141,7 +164,9 @@ function LoadLine({ day }: { day: WeekView["days"][number] }) {
   const p = day.capacity > 0 ? Math.min(1, day.plannedMinutes / day.capacity) : 0;
   return (
     <View style={{ height: 2, borderRadius: 1, backgroundColor: c.lineStrong, overflow: "hidden" }}>
-      <View style={{ width: `${Math.round(p * 100)}%`, height: "100%", backgroundColor: over ? c.now : c.ink3 }} />
+      <View
+        style={{ width: `${Math.round(p * 100)}%`, height: "100%", backgroundColor: over ? c.now : c.ink3 }}
+      />
     </View>
   );
 }
@@ -149,7 +174,14 @@ function LoadLine({ day }: { day: WeekView["days"][number] }) {
 function Due({ task }: { task: TaskView }) {
   const birthday = task.repeat?.freq === "year";
   return (
-    <Press role="button" accessibilityLabel={`Open ${task.title}`} onPress={() => openTask(task._id)} hoverBg={null} scale={false} style={{ flexDirection: "row", alignItems: "center", gap: s.s1, minHeight: 24 }}>
+    <Press
+      role="button"
+      accessibilityLabel={`Open ${task.title}`}
+      onPress={() => openTask(task._id)}
+      hoverBg={null}
+      scale={false}
+      style={{ flexDirection: "row", alignItems: "center", gap: s.s1, minHeight: 24 }}
+    >
       <Icon icon={birthday ? Cake : Flag} size={14} />
       <Txt variant="meta" tone="ink2" numberOfLines={1} style={{ flexShrink: 1 }}>
         {birthday ? task.title : `${task.title} due`}
@@ -162,7 +194,10 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
   const H = 44;
   const allTimed = week.days.flatMap((d) => d.scheduled);
   const from = Math.min(8, ...allTimed.map((t) => Math.floor((t.time ?? 480) / 60)));
-  const to = Math.max(20, ...allTimed.map((t) => Math.ceil(((t.time ?? 0) + Math.max(t.length ?? 0, 30)) / 60)));
+  const to = Math.max(
+    20,
+    ...allTimed.map((t) => Math.ceil(((t.time ?? 0) + Math.max(t.length ?? 0, 30)) / 60)),
+  );
   const y = (m: number) => ((m - from * 60) / 60) * H;
   return (
     <View>
@@ -203,58 +238,104 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
         <View style={{ width: 56 }}>
           {Array.from({ length: to - from }, (_, k) =>
             k ? (
-              <Txt key={k} variant="meta" tone="ink3" tnum style={{ position: "absolute", top: k * H, transform: [{ translateY: -8 }] }}>
+              <Txt
+                key={k}
+                variant="meta"
+                tone="ink3"
+                tnum
+                style={{ position: "absolute", top: k * H, transform: [{ translateY: -8 }] }}
+              >
                 {String(from + k).padStart(2, "0")}:00
               </Txt>
             ) : null,
           )}
         </View>
         {week.days.map((d) => (
-          <View key={d.date} style={{ flex: 1, position: "relative", borderLeftWidth: 1, borderLeftColor: c.line }}>
-            {d.scheduled.map((t) => {
-              const tone = spaceTone(t.color);
-              const top = y(t.time ?? 0) + 1;
-              const h = Math.max(24, (Math.max(t.length ?? 0, 30) / 60) * H - 2);
-              const proposed = Boolean(t.proposedBy);
-              return (
-                <Press
-                  key={`${t._id}:${t.date}`}
-                  role="button"
-                  accessibilityLabel={`Open ${t.title}, ${formatDay(d.date, today)} ${formatClock(t.time ?? 0)}${proposed ? `, proposed by ${t.proposedBy}` : ""}`}
-                  onPress={() => openTask(t._id)}
-                  hoverBg={null}
-                  scale={false}
-                  style={({ hovered }) => ({
-                    position: "absolute",
-                    top,
-                    left: 4,
-                    right: 4,
-                    height: h,
-                    flexDirection: "row",
-                    gap: s.s1,
-                    paddingVertical: s.s1,
-                    paddingHorizontal: s.s2,
-                    borderRadius: r.ctl,
-                    overflow: "hidden",
-                    backgroundColor: proposed ? c.bg : t.done ? "transparent" : tone.surface,
-                    borderWidth: proposed || t.done || hovered ? 1 : 0,
-                    borderColor: proposed ? tone.dot : c.lineStrong,
-                  })}
-                >
-                  {t.event ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tone.dot, marginTop: 5 }} /> : null}
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Txt variant="caption" tone={t.done ? "ink3" : "ink"} strike={t.done} numberOfLines={1}>
-                      {t.title}
-                    </Txt>
-                    {h >= 40 ? (
-                      <Txt variant="meta" tone="ink2" tnum numberOfLines={1}>
-                        {formatClock(t.time ?? 0)}
-                      </Txt>
-                    ) : null}
-                  </View>
-                </Press>
+          <View
+            key={d.date}
+            style={{ flex: 1, position: "relative", borderLeftWidth: 1, borderLeftColor: c.line }}
+          >
+            {(() => {
+              // Overlapping blocks sit side by side, never behind each other.
+              const placed = new Map(
+                layoutDay(
+                  d.scheduled.map((t) => ({
+                    id: `${t._id}:${t.date}`,
+                    start: t.time ?? 0,
+                    length: t.length ?? undefined,
+                  })),
+                ).map((p) => [p.id, p]),
               );
-            })}
+              return d.scheduled.map((t) => {
+                const p = placed.get(`${t._id}:${t.date}`);
+                const cols = p?.columns ?? 1;
+                const col = p?.column ?? 0;
+                const tone = spaceTone(t.color);
+                const top = y(t.time ?? 0) + 1;
+                const h = Math.max(24, (Math.max(t.length ?? 0, 30) / 60) * H - 2);
+                const proposed = Boolean(t.proposedBy);
+                return (
+                  <View
+                    key={`${t._id}:${t.date}`}
+                    style={{
+                      position: "absolute",
+                      top,
+                      height: h,
+                      left: `${(col / cols) * 100}%`,
+                      width: `${100 / cols}%`,
+                      paddingHorizontal: s.s1,
+                    }}
+                  >
+                    <Press
+                      role="button"
+                      accessibilityLabel={`Open ${t.title}, ${formatDay(d.date, today)} ${formatClock(t.time ?? 0)}${proposed ? `, proposed by ${t.proposedBy}` : ""}`}
+                      onPress={() => openTask(t._id)}
+                      hoverBg={null}
+                      scale={false}
+                      style={({ hovered }) => ({
+                        flex: 1,
+                        flexDirection: "row",
+                        gap: s.s1,
+                        paddingVertical: s.s1,
+                        paddingHorizontal: s.s2,
+                        borderRadius: r.ctl,
+                        overflow: "hidden",
+                        backgroundColor: proposed ? c.bg : t.done ? "transparent" : tone.surface,
+                        borderWidth: proposed || t.done || hovered ? 1 : 0,
+                        borderColor: proposed ? tone.dot : c.lineStrong,
+                      })}
+                    >
+                      {t.event ? (
+                        <View
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: tone.dot,
+                            marginTop: 5,
+                          }}
+                        />
+                      ) : null}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Txt
+                          variant="caption"
+                          tone={t.done ? "ink3" : "ink"}
+                          strike={t.done}
+                          numberOfLines={1}
+                        >
+                          {t.title}
+                        </Txt>
+                        {h >= 40 ? (
+                          <Txt variant="meta" tone="ink2" tnum numberOfLines={1}>
+                            {formatClock(t.time ?? 0)}
+                          </Txt>
+                        ) : null}
+                      </View>
+                    </Press>
+                  </View>
+                );
+              });
+            })()}
             {d.isToday ? <NowLine y={y} /> : null}
           </View>
         ))}
@@ -265,7 +346,12 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
 
 function NowLine({ y }: { y: (m: number) => number }) {
   const { now } = useClock();
-  return <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: y(now), height: 1, backgroundColor: c.now }} />;
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: "absolute", left: 0, right: 0, top: y(now), height: 1, backgroundColor: c.now }}
+    />
+  );
 }
 
 function Agenda({ days, today }: { days: WeekView["days"]; today: string }) {
@@ -286,9 +372,13 @@ function Agenda({ days, today }: { days: WeekView["days"]; today: string }) {
         const label = formatDay(d.date, today);
         const items: { key: string; when: string; task: TaskView; due?: boolean }[] = [
           ...d.deadlines.map((t) => ({ key: `due-${t._id}`, when: "All day", task: t, due: true })),
-          ...d.anytime.filter((t) => t.repeat?.freq === "year").map((t) => ({ key: `bd-${t._id}`, when: "All day", task: t })),
+          ...d.anytime
+            .filter((t) => t.repeat?.freq === "year")
+            .map((t) => ({ key: `bd-${t._id}`, when: "All day", task: t })),
           ...d.scheduled.map((t) => ({ key: `${t._id}:${t.date}`, when: formatClock(t.time ?? 0), task: t })),
-          ...d.anytime.filter((t) => t.repeat?.freq !== "year").map((t) => ({ key: `any-${t._id}:${t.date}`, when: "Any time", task: t })),
+          ...d.anytime
+            .filter((t) => t.repeat?.freq !== "year")
+            .map((t) => ({ key: `any-${t._id}:${t.date}`, when: "Any time", task: t })),
         ];
         return (
           <View key={d.date} style={{ gap: s.s2 }}>
@@ -297,7 +387,9 @@ function Agenda({ days, today }: { days: WeekView["days"]; today: string }) {
                 {label === "Tomorrow" ? "Tomorrow" : WEEKDAY_LONG[weekday(d.date)]}
               </Txt>
               <Txt variant="meta" tone="ink3">
-                {label === "Tomorrow" ? formatDate(d.date, today) : `${parts(d.date)[2]} ${MONTH_SHORT[parts(d.date)[1] - 1]}`}
+                {label === "Tomorrow"
+                  ? formatDate(d.date, today)
+                  : `${parts(d.date)[2]} ${MONTH_SHORT[parts(d.date)[1] - 1]}`}
               </Txt>
               <Txt variant="meta" tone={over ? "now" : "ink3"} tnum style={{ marginLeft: "auto" }}>
                 {loadText(d)}
@@ -320,7 +412,14 @@ function Agenda({ days, today }: { days: WeekView["days"]; today: string }) {
                   <Txt variant="meta" tone="ink3" tnum style={{ width: 64 }}>
                     {when}
                   </Txt>
-                  <View style={{ width: 3, height: 24, borderRadius: 2, backgroundColor: spaceTone(task.color).dot }} />
+                  <View
+                    style={{
+                      width: 3,
+                      height: 24,
+                      borderRadius: 2,
+                      backgroundColor: spaceTone(task.color).dot,
+                    }}
+                  />
                   <Txt variant="body" style={{ flex: 1 }} numberOfLines={2}>
                     {due ? `${task.title} due` : task.title}
                   </Txt>

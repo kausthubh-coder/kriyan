@@ -25,7 +25,13 @@ import {
 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
-import { formatDay, formatDuration, formatTimeRange, describeReminder, describeRepeat } from "@kriyan/core/format";
+import {
+  formatDay,
+  formatDuration,
+  formatTimeRange,
+  describeReminder,
+  describeRepeat,
+} from "@kriyan/core/format";
 import { firstOccurrence, parseTask } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import type { Repeat } from "@kriyan/core/repeat";
@@ -122,7 +128,11 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           ),
         };
       case "when":
-        return { title: "When", body: <WhenEditor task={task} today={today} save={save} onDone={() => setSub(null)} />, width: 340 };
+        return {
+          title: "When",
+          body: <WhenEditor task={task} today={today} save={save} onDone={() => setSub(null)} />,
+          width: 340,
+        };
       case "repeat":
         return {
           title: "Repeat",
@@ -173,7 +183,15 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           ),
         };
       case "goal":
-        return { title: "Goal", body: <GoalPicker value={task.goalId ?? null} onPick={(id) => (setSub(null), void save({ goalId: id }))} /> };
+        return {
+          title: "Goal",
+          body: (
+            <GoalPicker
+              value={task.goalId ?? null}
+              onPick={(id) => (setSub(null), void save({ goalId: id }))}
+            />
+          ),
+        };
       case "more":
         return {
           title: "Task",
@@ -206,7 +224,10 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
   const open = sub ? subEditor(sub) : null;
   if (phone && open && sub !== "more") {
     return (
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: s.s4, paddingTop: s.s2, gap: s.s4 }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: s.s4, paddingTop: s.s2, gap: s.s4 }}
+      >
         <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1, marginLeft: -s.s3 }}>
           <Button icon={ArrowLeft} accessibilityLabel="Back to the task" onPress={() => setSub(null)} />
           <Txt variant="subhead" heading={2} style={{ flex: 1 }}>
@@ -220,7 +241,16 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
 
   return (
     <>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1, height: phone ? 52 : 56, paddingLeft: phone ? s.s4 : s.s6, paddingRight: phone ? s.s1 : s.s3 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: s.s1,
+          height: phone ? 52 : 56,
+          paddingLeft: phone ? s.s4 : s.s6,
+          paddingRight: phone ? s.s1 : s.s3,
+        }}
+      >
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: s.s2, minWidth: 0 }}>
           {space ? <Dot color={tone.dot} /> : null}
           <Txt variant="meta" tone="ink3" numberOfLines={1}>
@@ -228,11 +258,25 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           </Txt>
         </View>
         <View ref={moreRef} collapsable={false}>
-          <Button icon={Ellipsis} accessibilityLabel="More" expanded={sub === "more"} onPress={() => setSub(sub === "more" ? null : "more")} />
+          <Button
+            icon={Ellipsis}
+            accessibilityLabel="More"
+            expanded={sub === "more"}
+            onPress={() => setSub(sub === "more" ? null : "more")}
+          />
         </View>
         <Button icon={X} accessibilityLabel="Close" onPress={onClose} />
       </View>
-      <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: phone ? s.s4 : s.s6, paddingTop: s.s2, paddingBottom: s.s16, gap: s.s6 }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: phone ? s.s4 : s.s6,
+          paddingTop: s.s2,
+          paddingBottom: s.s16,
+          gap: s.s6,
+        }}
+      >
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
           <View style={{ paddingTop: 4 }}>
             {task.event ? (
@@ -245,7 +289,9 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
                 color={space ? tone.dot : c.ink3}
                 done={done}
                 label={`${done ? "Mark not done" : "Complete"}: ${task.title}`}
-                onPress={() => (task.doneAt !== undefined ? reopenTask(task._id) : !isTicking && completeTask(task))}
+                onPress={() =>
+                  task.doneAt !== undefined ? reopenTask(task._id) : !isTicking && completeTask(task)
+                }
               />
             )}
           </View>
@@ -274,12 +320,24 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             expanded={sub === "space"}
             onPress={() => setSub(sub === "space" ? null : "space")}
           />
-          <FieldRow anchor={whenRef} icon={Clock} label="When" value={when} empty="Add a date" expanded={sub === "when"} onPress={() => setSub(sub === "when" ? null : "when")} />
+          <FieldRow
+            anchor={whenRef}
+            icon={Clock}
+            label="When"
+            value={when}
+            empty="Add a date"
+            expanded={sub === "when"}
+            onPress={() => setSub(sub === "when" ? null : "when")}
+          />
           <FieldRow
             anchor={repeatRef}
             icon={Repeat2}
             label="Repeat"
-            value={task.repeat ? describeRepeat(task.repeat as Repeat, task.repeatFirst ?? task.date ?? today, today) : null}
+            value={
+              task.repeat
+                ? describeRepeat(task.repeat as Repeat, task.repeatFirst ?? task.date ?? today, today)
+                : null
+            }
             empty="Add repeat"
             expanded={sub === "repeat"}
             onPress={() => setSub(sub === "repeat" ? null : "repeat")}
@@ -289,16 +347,27 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
               {(task.reminders as Reminder[]).map((rem, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
                   <View style={{ flex: 1 }}>
-                    <ValueButton text={describeReminder(rem)} label={`Reminder: ${describeReminder(rem)}. Edit reminders`} onPress={() => setSub("reminders")} />
+                    <ValueButton
+                      text={describeReminder(rem)}
+                      label={`Reminder: ${describeReminder(rem)}. Edit reminders`}
+                      onPress={() => setSub("reminders")}
+                    />
                   </View>
                   <Button
                     icon={X}
                     accessibilityLabel={`Remove reminder: ${describeReminder(rem)}`}
-                    onPress={() => void save({ reminders: (task.reminders as Reminder[]).filter((_, k) => k !== i) })}
+                    onPress={() =>
+                      void save({ reminders: (task.reminders as Reminder[]).filter((_, k) => k !== i) })
+                    }
                   />
                 </View>
               ))}
-              <ValueButton text="Add reminder" empty expanded={sub === "reminders"} onPress={() => setSub(sub === "reminders" ? null : "reminders")} />
+              <ValueButton
+                text="Add reminder"
+                empty
+                expanded={sub === "reminders"}
+                onPress={() => setSub(sub === "reminders" ? null : "reminders")}
+              />
             </View>
           </Prop>
           <FieldRow
@@ -310,11 +379,20 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             expanded={sub === "deadline"}
             onPress={() => setSub(sub === "deadline" ? null : "deadline")}
           />
-          <GoalRow task={task} anchor={goalRef} expanded={sub === "goal"} onPress={() => setSub(sub === "goal" ? null : "goal")} />
+          <GoalRow
+            task={task}
+            anchor={goalRef}
+            expanded={sub === "goal"}
+            onPress={() => setSub(sub === "goal" ? null : "goal")}
+          />
         </View>
 
         <View style={{ height: 1, backgroundColor: c.line }} />
-        <NoteEditor key={task._id} value={task.note ?? ""} onChange={(note) => void save({ note: note || null })} />
+        <NoteEditor
+          key={task._id}
+          value={task.note ?? ""}
+          onChange={(note) => void save({ note: note || null })}
+        />
       </ScrollView>
 
       {!phone || sub === "more" ? (
@@ -355,7 +433,14 @@ function FieldRow({
   return (
     <Prop icon={icon} label={label}>
       <View ref={anchor} collapsable={false}>
-        <ValueButton text={value ?? empty} empty={!value} expanded={expanded} onPress={onPress} leading={leading} label={`${label}: ${value ?? empty}`} />
+        <ValueButton
+          text={value ?? empty}
+          empty={!value}
+          expanded={expanded}
+          onPress={onPress}
+          leading={leading}
+          label={`${label}: ${value ?? empty}`}
+        />
       </View>
     </Prop>
   );
@@ -365,7 +450,15 @@ function Prop({ icon, label, children }: { icon: LucideIcon; label: string; chil
   const phone = useIsPhone();
   return (
     <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-      <View style={{ width: phone ? 112 : 120, height: phone ? 48 : 36, flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+      <View
+        style={{
+          width: phone ? 112 : 120,
+          height: phone ? 48 : 36,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: s.s2,
+        }}
+      >
         <Icon icon={icon} size={16} />
         <Txt variant="body" tone="ink3">
           {label}
@@ -421,13 +514,29 @@ function ValueButton({
   );
 }
 
-function GoalRow({ task, anchor, expanded, onPress }: { task: TaskDoc; anchor: RefObject<View | null>; expanded: boolean; onPress: () => void }) {
+function GoalRow({
+  task,
+  anchor,
+  expanded,
+  onPress,
+}: {
+  task: TaskDoc;
+  anchor: RefObject<View | null>;
+  expanded: boolean;
+  onPress: () => void;
+}) {
   const progress = useProgressView();
   const goal = progress?.goals.find((g) => g._id === task.goalId);
   return (
     <Prop icon={Target} label="Goal">
       <View ref={anchor} collapsable={false}>
-        <ValueButton text={goal?.title ?? "Add to a goal"} label={`Goal: ${goal?.title ?? "Add to a goal"}`} empty={!goal} expanded={expanded} onPress={onPress} />
+        <ValueButton
+          text={goal?.title ?? "Add to a goal"}
+          label={`Goal: ${goal?.title ?? "Add to a goal"}`}
+          empty={!goal}
+          expanded={expanded}
+          onPress={onPress}
+        />
       </View>
     </Prop>
   );
@@ -440,7 +549,13 @@ function GoalPicker({ value, onPick }: { value: string | null; onPick: (id: Id<"
     <View style={{ gap: 2 }}>
       <Option label="No goal" selected={value === null} onPress={() => onPick(null)} />
       {goals.map((g) => (
-        <Option key={g._id} label={g.title} selected={value === g._id} onPress={() => onPick(g._id)} leading={<Icon icon={Target} size={16} />} />
+        <Option
+          key={g._id}
+          label={g.title}
+          selected={value === g._id}
+          onPress={() => onPick(g._id)}
+          leading={<Icon icon={Target} size={16} />}
+        />
       ))}
       {progress && goals.length === 0 ? (
         <Txt variant="meta" tone="ink3" style={{ padding: s.s2 }}>
@@ -488,7 +603,12 @@ function WhenEditor({
         </Txt>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
           {times.map((m) => (
-            <Chip key={m} label={formatTimeRange(m, undefined)} on={task.time === m} onPress={() => void save({ time: m, ...(task.date ? {} : { date: today }) })} />
+            <Chip
+              key={m}
+              label={formatTimeRange(m, undefined)}
+              on={task.time === m}
+              onPress={() => void save({ time: m, ...(task.date ? {} : { date: today }) })}
+            />
           ))}
           <Chip label="No time" on={task.time === undefined} onPress={() => void save({ time: null })} />
         </View>
@@ -506,7 +626,9 @@ function WhenEditor({
           trailing={
             timeText.trim() ? (
               <Txt variant="meta" tone="ink3">
-                {typedTime !== undefined ? `Enter for ${formatTimeRange(typedTime, undefined)}` : "Not a time yet"}
+                {typedTime !== undefined
+                  ? `Enter for ${formatTimeRange(typedTime, undefined)}`
+                  : "Not a time yet"}
               </Txt>
             ) : null
           }
@@ -518,9 +640,18 @@ function WhenEditor({
         </Txt>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
           {LENGTHS.map((m) => (
-            <Chip key={m} label={formatDuration(m)} on={task.length === m} onPress={() => void save({ length: m })} />
+            <Chip
+              key={m}
+              label={formatDuration(m)}
+              on={task.length === m}
+              onPress={() => void save({ length: m })}
+            />
           ))}
-          <Chip label="No length" on={task.length === undefined} onPress={() => void save({ length: null })} />
+          <Chip
+            label="No length"
+            on={task.length === undefined}
+            onPress={() => void save({ length: null })}
+          />
         </View>
         <Field
           label="Length"

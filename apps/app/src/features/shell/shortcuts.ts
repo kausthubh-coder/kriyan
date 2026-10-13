@@ -16,7 +16,9 @@ function typing(target: EventTarget | null): boolean {
 }
 
 function rows(): HTMLElement[] {
-  return [...document.querySelectorAll<HTMLElement>('[data-testid^="task-"]')].filter((el) => el.offsetParent !== null);
+  return [...document.querySelectorAll<HTMLElement>('[data-testid^="task-"]')].filter(
+    (el) => el.offsetParent !== null,
+  );
 }
 
 function openSelected(edit?: "when" | "repeat" | "space") {
@@ -67,7 +69,12 @@ export function useShortcuts() {
           const ids = list.map((el) => (el.dataset.testid ?? "").slice(5));
           const at = selected ? ids.indexOf(selected) : -1;
           const down = key === "j" || key === "ArrowDown";
-          const next = at === -1 ? (down ? 0 : ids.length - 1) : Math.max(0, Math.min(ids.length - 1, at + (down ? 1 : -1)));
+          const next =
+            at === -1
+              ? down
+                ? 0
+                : ids.length - 1
+              : Math.max(0, Math.min(ids.length - 1, at + (down ? 1 : -1)));
           selection.set({ taskId: ids[next] ?? null });
           list[next]?.scrollIntoView({ block: "nearest" });
           return;

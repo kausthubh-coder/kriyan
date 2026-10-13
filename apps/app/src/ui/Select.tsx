@@ -23,9 +23,20 @@ export function Select<T extends string>({ value, options, onChange, label }: Pr
   const current = options.find((o) => o.value === value)?.label ?? value;
   return (
     <View style={{ position: "relative" }}>
-      <SelectButton label={`${label}: ${current}`} text={current} onPress={() => setOpen(!open)} expanded={open} chevron height={ctl} />
+      <SelectButton
+        label={`${label}: ${current}`}
+        text={current}
+        onPress={() => setOpen(!open)}
+        expanded={open}
+        chevron
+        height={ctl}
+      />
       {open ? (
-        <View role="menu" aria-label={label} style={{ marginTop: s.s1, padding: s.s1, borderRadius: r.ctl, backgroundColor: c.bg, gap: 2 }}>
+        <View
+          role="menu"
+          aria-label={label}
+          style={{ marginTop: s.s1, padding: s.s1, borderRadius: r.ctl, backgroundColor: c.bg, gap: 2 }}
+        >
           {options.map((o) => (
             <Press
               key={o.value}

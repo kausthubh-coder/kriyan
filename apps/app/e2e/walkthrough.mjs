@@ -37,12 +37,15 @@ async function colour(space, name) {
   await page.waitForTimeout(600);
 }
 
-await step("space colours: Work orange, Kriyan purple, Life green, Calculus and Physics stay School blue", async () => {
-  await colour("Work", "Orange");
-  await colour("Kriyan", "Purple");
-  await colour("Clients", "Orange");
-  await colour("Life", "Green");
-});
+await step(
+  "space colours: Work orange, Kriyan purple, Life green, Calculus and Physics stay School blue",
+  async () => {
+    await colour("Work", "Orange");
+    await colour("Kriyan", "Purple");
+    await colour("Clients", "Orange");
+    await colour("Life", "Green");
+  },
+);
 
 await step("add a habit from Progress and check it on Today", async () => {
   await page.goto(`${BASE}/progress`);
@@ -59,7 +62,12 @@ await step("add a habit from Progress and check it on Today", async () => {
   const habit = page.getByRole("switch", { name: /^Read 20 min/ });
   const before = await habit.getAttribute("aria-checked");
   await habit.click();
-  await page.waitForFunction((b) => document.querySelector('[role="switch"][aria-label^="Read 20 min"]')?.getAttribute("aria-checked") !== b, before);
+  await page.waitForFunction(
+    (b) =>
+      document.querySelector('[role="switch"][aria-label^="Read 20 min"]')?.getAttribute("aria-checked") !==
+      b,
+    before,
+  );
 });
 
 await step("add a goal from Progress and link a task to it", async () => {
@@ -77,24 +85,30 @@ await step("add a goal from Progress and link a task to it", async () => {
   }
   await page.goto(`${BASE}/today`);
   await settle(page);
-  await page.getByRole("button", { name: /^Open Write MCP tools/ }).first().click();
+  await page
+    .getByRole("button", { name: /^Open Write MCP tools/ })
+    .first()
+    .click();
   await page.getByRole("button", { name: /^Goal:/ }).click();
   await page.getByRole("menuitem", { name: "Launch Kriyan by 1 Nov" }).first().click();
   await page.getByRole("button", { name: "Goal: Launch Kriyan by 1 Nov" }).waitFor();
   await page.keyboard.press("Escape");
 });
 
-await step("tick a repeating task: it shows done at once, the toast names the next date, Undo brings it back", async () => {
-  await page.goto(`${BASE}/today`);
-  await settle(page);
-  await page.getByRole("checkbox", { name: "Complete: Run" }).click();
-  await page.getByRole("checkbox", { name: "Mark not done: Run" }).first().waitFor({ timeout: 1000 });
-  await toast("Done: Run");
-  await toast("Next: Wed 14 Oct");
-  await page.screenshot({ path: artifact("flow-complete-toast-1440.png") });
-  await page.getByRole("button", { name: "Undo" }).click();
-  await page.getByRole("checkbox", { name: "Complete: Run" }).waitFor();
-});
+await step(
+  "tick a repeating task: it shows done at once, the toast names the next date, Undo brings it back",
+  async () => {
+    await page.goto(`${BASE}/today`);
+    await settle(page);
+    await page.getByRole("checkbox", { name: "Complete: Run" }).click();
+    await page.getByRole("checkbox", { name: "Mark not done: Run" }).first().waitFor({ timeout: 1000 });
+    await toast("Done: Run");
+    await toast("Next: Wed 14 Oct");
+    await page.screenshot({ path: artifact("flow-complete-toast-1440.png") });
+    await page.getByRole("button", { name: "Undo" }).click();
+    await page.getByRole("checkbox", { name: "Complete: Run" }).waitFor();
+  },
+);
 
 await step("tick and untick before the row moves (Undo during the moment it stays)", async () => {
   await page.getByRole("checkbox", { name: "Complete: Book the dentist" }).click();
@@ -111,7 +125,8 @@ await step("drag an anytime task onto the timeline at a 15-minute step", async (
   await page.getByRole("textbox", { name: "Add a task" }).fill(dragTitle);
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: `Open ${dragTitle}` }).waitFor();
-  if (await page.getByRole("button", { name: /^Earlier today/ }).count()) await page.getByRole("button", { name: /^Earlier today/ }).click();
+  if (await page.getByRole("button", { name: /^Earlier today/ }).count())
+    await page.getByRole("button", { name: /^Earlier today/ }).click();
   const row = page.getByRole("button", { name: `Open ${dragTitle}` });
   const box = await row.boundingBox();
   const timeline = page.getByLabel("Schedule");
@@ -144,26 +159,37 @@ await step("resize a block by its bottom edge to set a length", async () => {
   await page.mouse.up();
   // 30px down is 30 minutes longer at 56px an hour.
   await page.waitForFunction(
-    ([b, prefix]) => [...document.querySelectorAll("[aria-label]")].some((e) => (e.getAttribute("aria-label") ?? "").startsWith(prefix) && e.getAttribute("aria-label") !== b),
+    ([b, prefix]) =>
+      [...document.querySelectorAll("[aria-label]")].some(
+        (e) => (e.getAttribute("aria-label") ?? "").startsWith(prefix) && e.getAttribute("aria-label") !== b,
+      ),
     [before, `Open ${dragTitle}, 18:00–`],
   );
   console.log(`     ${before} -> ${await block.getAttribute("aria-label")}`);
 });
 
 await step("delete from the panel, then Undo restores it", async () => {
-  await page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}`) }).first().click();
+  await page
+    .getByRole("button", { name: new RegExp(`^Open ${dragTitle}`) })
+    .first()
+    .click();
   await page.getByRole("button", { name: "More" }).click();
   await page.getByRole("menuitem", { name: "Delete task" }).click();
   await toast(`Deleted: ${dragTitle}`);
   await page.getByRole("button", { name: "Undo" }).click();
-  await page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}`) }).first().waitFor();
+  await page
+    .getByRole("button", { name: new RegExp(`^Open ${dragTitle}`) })
+    .first()
+    .waitFor();
 });
 
 await step("command menu adds a task from one sentence", async () => {
   await page.goto(`${BASE}/today`);
   await settle(page);
   await page.keyboard.press("Control+k");
-  await page.getByRole("textbox", { name: "Search or type a task" }).fill("call mum fri 6pm #life every week");
+  await page
+    .getByRole("textbox", { name: "Search or type a task" })
+    .fill("call mum fri 6pm #life every week");
   await page.screenshot({ path: artifact("command-1440.png") });
   await page.keyboard.press("Enter");
   await toast("Added: call mum");
@@ -175,7 +201,12 @@ await step("keyboard: J selects, X completes, Undo, T and U navigate", async () 
   await page.locator("body").click({ position: { x: 1300, y: 600 } });
   await page.keyboard.press("j");
   await page.keyboard.press("j");
-  const selected = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="task-"]')].filter((e) => getComputedStyle(e).backgroundColor !== "rgba(0, 0, 0, 0)").length);
+  const selected = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('[data-testid^="task-"]')].filter(
+        (e) => getComputedStyle(e).backgroundColor !== "rgba(0, 0, 0, 0)",
+      ).length,
+  );
   if (selected < 1) throw new Error("nothing selected");
   await page.keyboard.press("x");
   await toast("Done:");

@@ -29,7 +29,10 @@ const screens = [
     go: async (p) => {
       await p.goto(`${BASE}/today`);
       await settle(p);
-      await p.getByRole("button", { name: /^Open Run/ }).first().click();
+      await p
+        .getByRole("button", { name: /^Open Run/ })
+        .first()
+        .click();
       await p.waitForURL(/\/task\//);
     },
   },
@@ -38,7 +41,10 @@ const screens = [
     go: async (p) => {
       await p.goto(`${BASE}/today`);
       await settle(p);
-      await p.getByRole("button", { name: /^Open Run/ }).first().click();
+      await p
+        .getByRole("button", { name: /^Open Run/ })
+        .first()
+        .click();
       await p.waitForURL(/\/task\//);
       await settle(p);
       await p.getByRole("button", { name: /^Repeat:/ }).click();
@@ -68,7 +74,10 @@ delete policy.$schema;
 
 async function focusPass(page, viewport) {
   const findings = [];
-  const count = await page.evaluate(([p, c]) => window.__critlyCheck.focusStart(p, c), [policy, { viewport: `${viewport.width}x${viewport.height}`, scheme: "dark" }]);
+  const count = await page.evaluate(
+    ([p, c]) => window.__critlyCheck.focusStart(p, c),
+    [policy, { viewport: `${viewport.width}x${viewport.height}`, scheme: "dark" }],
+  );
   for (let i = 0; i < Math.min(count + 1, 80); i++) {
     await page.keyboard.press("Tab");
     const step = await page.evaluate(() => window.__critlyCheck.focusStep());
@@ -95,7 +104,10 @@ for (const viewport of [
     try {
       await expectCritly(page, undefined, { scheme: "dark" });
       const focus = await focusPass(page, viewport);
-      if (focus.length) throw new Error(focus.map((f) => `✕ focus-ring\n  where ${f.where}\n  actual ${f.actual}`).join("\n"));
+      if (focus.length)
+        throw new Error(
+          focus.map((f) => `✕ focus-ring\n  where ${f.where}\n  actual ${f.actual}`).join("\n"),
+        );
       console.log(`ok   ${screen.name} ${viewport.width}`);
     } catch (error) {
       failures++;

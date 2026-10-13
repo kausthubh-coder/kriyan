@@ -18,7 +18,15 @@ const sheetIn = new Keyframe({
   100: { opacity: 1, transform: [{ translateY: 0 }] },
 }).duration(220);
 
-export function TaskPanel({ children, onClose, label }: { children: ReactNode; onClose: () => void; label: string }) {
+export function TaskPanel({
+  children,
+  onClose,
+  label,
+}: {
+  children: ReactNode;
+  onClose: () => void;
+  label: string;
+}) {
   const phone = useIsPhone();
   // Opened with the keyboard: no animation (frequent and intentional).
   const animate = !panelOpenedByKeyboard.get();
@@ -30,7 +38,10 @@ export function TaskPanel({ children, onClose, label }: { children: ReactNode; o
   if (phone) {
     return (
       <View ref={layer} style={{ flex: 1 }}>
-        <Animated.View entering={animate ? FadeIn.duration(150) : undefined} style={{ position: "absolute", inset: 0, backgroundColor: c.scrim, zIndex: 10 } as object}>
+        <Animated.View
+          entering={animate ? FadeIn.duration(150) : undefined}
+          style={{ position: "absolute", inset: 0, backgroundColor: c.scrim, zIndex: 10 } as object}
+        >
           <Pressable accessibilityLabel="Close task" onPress={onClose} style={{ flex: 1 }} />
         </Animated.View>
         <Animated.View

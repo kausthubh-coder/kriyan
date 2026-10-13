@@ -27,7 +27,12 @@ export function InboxScreen() {
   const phone = useIsPhone();
   return (
     <Screen title="Inbox" fab>
-      <PageHead title="Inbox" sub={inbox ? (inbox.length ? `${inbox.length} without a day or a space` : "Everything has a home") : " "} />
+      <PageHead
+        title="Inbox"
+        sub={
+          inbox ? (inbox.length ? `${inbox.length} without a day or a space` : "Everything has a home") : " "
+        }
+      />
       {phone ? null : <QuickAdd variant="inline" placeholder="Capture anything, sort it later" />}
       {inbox === undefined ? (
         <View testID="skeleton" style={{ gap: s.s4 }}>
@@ -44,7 +49,14 @@ export function InboxScreen() {
           <Txt variant="body" tone="ink3" style={{ maxWidth: 420 }}>
             Everything you’ve captured has a day or a space. New ideas without either land here.
           </Txt>
-          {phone ? <Button icon={Plus} label="Capture a task" onPress={() => router.push("/add")} style={{ marginLeft: -s.s3 }} /> : null}
+          {phone ? (
+            <Button
+              icon={Plus}
+              label="Capture a task"
+              onPress={() => router.push("/add")}
+              style={{ marginLeft: -s.s3 }}
+            />
+          ) : null}
         </View>
       ) : (
         <View>
@@ -62,10 +74,29 @@ function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone
   const dayRef = useRef<View>(null);
   const spaceRef = useRef<View>(null);
   const actions = (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1, ...(phone ? { marginLeft: 34, marginTop: -s.s1 } : {}) }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s1,
+        ...(phone ? { marginLeft: 34, marginTop: -s.s1 } : {}),
+      }}
+    >
       <Button icon={Sun} label="Today" onPress={() => void moveTasks([task._id], today)} />
-      <Button ref={dayRef} icon={CalendarDays} label={phone ? "Pick a day" : undefined} accessibilityLabel="Pick a day" onPress={() => setOpen("day")} />
-      <Button ref={spaceRef} icon={Layers} label={phone ? "Move to space" : undefined} accessibilityLabel="Move to space" onPress={() => setOpen("space")} />
+      <Button
+        ref={dayRef}
+        icon={CalendarDays}
+        label={phone ? "Pick a day" : undefined}
+        accessibilityLabel="Pick a day"
+        onPress={() => setOpen("day")}
+      />
+      <Button
+        ref={spaceRef}
+        icon={Layers}
+        label={phone ? "Move to space" : undefined}
+        accessibilityLabel="Move to space"
+        onPress={() => setOpen("space")}
+      />
     </View>
   );
   return (
@@ -83,7 +114,13 @@ function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone
           }}
         />
       </Popover>
-      <Popover open={open === "space"} onClose={() => setOpen(null)} anchor={spaceRef} title="Move to space" width={280}>
+      <Popover
+        open={open === "space"}
+        onClose={() => setOpen(null)}
+        anchor={spaceRef}
+        title="Move to space"
+        width={280}
+      >
         <SpacePicker
           value={null}
           allowNone={false}

@@ -137,12 +137,23 @@ describe("repeatPhrase", () => {
   const cases: [Repeat, string][] = [
     [{ freq: "day", interval: 1 }, "every day"],
     [{ freq: "day", interval: 2, fromCompletion: true }, "every 2 days after done"],
-    [{ freq: "week", interval: 1, weekdays: [1, 3], end: { kind: "on", date: "2026-12-11" } }, "every tue and thu until dec 11"],
+    [
+      { freq: "week", interval: 1, weekdays: [1, 3], end: { kind: "on", date: "2026-12-11" } },
+      "every tue and thu until dec 11",
+    ],
     [{ freq: "week", interval: 1, weekdays: [0, 1, 2, 3, 4] }, "every weekday"],
     [{ freq: "week", interval: 2, weekdays: [0] }, "every 2 weeks on mon"],
     [{ freq: "month", interval: 1, monthly: { kind: "day", day: 15 } }, "every 15th"],
     [{ freq: "month", interval: 1, monthly: { kind: "last" } }, "every last day"],
-    [{ freq: "month", interval: 1, monthly: { kind: "nth", n: 2, weekday: 1 }, end: { kind: "count", count: 10 } }, "every second tue for 10 times"],
+    [
+      {
+        freq: "month",
+        interval: 1,
+        monthly: { kind: "nth", n: 2, weekday: 1 },
+        end: { kind: "count", count: 10 },
+      },
+      "every second tue for 10 times",
+    ],
     [{ freq: "year", interval: 1 }, "every year"],
   ];
   test.each(cases)("%o reads as %s and parses back to the same rule", (rule, phrase) => {

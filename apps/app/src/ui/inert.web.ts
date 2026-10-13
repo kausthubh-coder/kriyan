@@ -11,7 +11,8 @@ export function useInertOutside(ref: RefObject<View | null>, active = true) {
     let node = ref.current as unknown as HTMLElement | null;
     while (node && node.parentElement && node !== document.body) {
       for (const sibling of Array.from(node.parentElement.children) as HTMLElement[]) {
-        if (sibling === node || sibling.inert || sibling.tagName === "SCRIPT" || sibling.tagName === "STYLE") continue;
+        if (sibling === node || sibling.inert || sibling.tagName === "SCRIPT" || sibling.tagName === "STYLE")
+          continue;
         sibling.inert = true;
         changed.push(sibling);
       }

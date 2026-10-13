@@ -27,7 +27,10 @@ for (const { name, viewport } of widths) {
       // A space by name: open it from Browse, the way a person would.
       await page.goto(`${BASE}/browse`);
       await settle(page);
-      await page.getByRole("link", { name: route.slice(7), exact: true }).last().click();
+      await page
+        .getByRole("link", { name: route.slice(7), exact: true })
+        .last()
+        .click();
       await page.waitForURL(/\/space\//);
     } else await page.goto(`${BASE}${route}`);
     await settle(page);
@@ -35,7 +38,8 @@ for (const { name, viewport } of widths) {
     await page.screenshot({ path: artifact(file), fullPage: process.env.FULL === "1" });
     console.log(`shot ${file}`);
   }
-  if (errors.length) console.log(`console errors at ${name}:\n  ${[...new Set(errors)].slice(0, 10).join("\n  ")}`);
+  if (errors.length)
+    console.log(`console errors at ${name}:\n  ${[...new Set(errors)].slice(0, 10).join("\n  ")}`);
   await ctx.close();
 }
 await browser.close();

@@ -107,12 +107,17 @@ function useLocalReminders() {
     void (async () => {
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       for (const n of scheduled) {
-        if (n.identifier.startsWith(LOCAL_PREFIX)) await Notifications.cancelScheduledNotificationAsync(n.identifier);
+        if (n.identifier.startsWith(LOCAL_PREFIX))
+          await Notifications.cancelScheduledNotificationAsync(n.identifier);
       }
       const now = Date.now();
       for (const t of tasks) {
         if (cancelled) return;
-        for (const at of reminderInstants({ date: t.date as string, time: t.time ?? undefined }, t.reminders, timeZone)) {
+        for (const at of reminderInstants(
+          { date: t.date as string, time: t.time ?? undefined },
+          t.reminders,
+          timeZone,
+        )) {
           if (at <= now) continue;
           await Notifications.scheduleNotificationAsync({
             identifier: `${LOCAL_PREFIX}${t._id}-${t.date}-${at}`,
@@ -121,7 +126,11 @@ function useLocalReminders() {
               body: t.time !== null ? `Starts at ${formatClock(t.time)}` : "Today",
               data: { taskId: t._id },
             },
-            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at), channelId: "reminders" },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: new Date(at),
+              channelId: "reminders",
+            },
           });
         }
       }

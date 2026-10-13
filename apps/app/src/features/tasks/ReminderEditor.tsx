@@ -29,10 +29,20 @@ const QUICK_DAY: Reminder[] = [
   { kind: "before", minutes: 2 * 1440 },
 ];
 
-export function ReminderEditor({ reminders, timed, onChange }: { reminders: Reminder[]; timed: boolean; onChange: (next: Reminder[]) => void }) {
+export function ReminderEditor({
+  reminders,
+  timed,
+  onChange,
+}: {
+  reminders: Reminder[];
+  timed: boolean;
+  onChange: (next: Reminder[]) => void;
+}) {
   const { row } = useControl();
   const [text, setText] = useState("");
-  const custom = text.trim() ? (parseTask(`x remind ${text.trim()}`, "2026-01-01").reminders[0] ?? null) : null;
+  const custom = text.trim()
+    ? (parseTask(`x remind ${text.trim()}`, "2026-01-01").reminders[0] ?? null)
+    : null;
   const add = (rem: Reminder) => {
     if (reminders.some((x) => sameReminder(x, rem))) return;
     onChange([...reminders, rem]);
@@ -47,7 +57,11 @@ export function ReminderEditor({ reminders, timed, onChange }: { reminders: Remi
               <Txt variant="body" style={{ flex: 1 }}>
                 {describeReminder(rem)}
               </Txt>
-              <Button icon={X} accessibilityLabel={`Remove reminder: ${describeReminder(rem)}`} onPress={() => onChange(reminders.filter((_, k) => k !== i))} />
+              <Button
+                icon={X}
+                accessibilityLabel={`Remove reminder: ${describeReminder(rem)}`}
+                onPress={() => onChange(reminders.filter((_, k) => k !== i))}
+              />
             </View>
           ))}
         </View>
@@ -60,7 +74,12 @@ export function ReminderEditor({ reminders, timed, onChange }: { reminders: Remi
         {(timed ? QUICK_TIMED : QUICK_DAY)
           .filter((q) => !reminders.some((x) => sameReminder(x, q)))
           .map((q) => (
-            <Chip key={describeReminder(q)} label={describeReminder(q)} onPress={() => add(q)} accessibilityLabel={`Add reminder: ${describeReminder(q)}`} />
+            <Chip
+              key={describeReminder(q)}
+              label={describeReminder(q)}
+              onPress={() => add(q)}
+              accessibilityLabel={`Add reminder: ${describeReminder(q)}`}
+            />
           ))}
       </View>
       <Field

@@ -39,7 +39,13 @@ export function Check({
       disabled={disabled}
       hoverBg={null}
       rippleRadius={target / 2}
-      style={{ width: target, height: target, margin: -inset, alignItems: "center", justifyContent: "center" }}
+      style={{
+        width: target,
+        height: target,
+        margin: -inset,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
       {({ hovered }: { hovered?: boolean }) => (
         <View
@@ -56,7 +62,15 @@ export function Check({
         >
           {done ? <CheckGlyph size={d * 0.62} color={hex.bg} strokeWidth={3} /> : null}
           {!done && hovered ? (
-            <View style={{ position: "absolute", inset: 0, borderRadius: d / 2, backgroundColor: color, opacity: 0.14 }} />
+            <View
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: d / 2,
+                backgroundColor: color,
+                opacity: 0.14,
+              }}
+            />
           ) : null}
         </View>
       )}
@@ -111,10 +125,18 @@ export function Chip({
         >
           {leading}
           {icon ? <Icon icon={icon} size={14} tone={on ? "onInk" : "ink3"} /> : null}
-          <Txt style={[roles.label, { fontSize: 12, lineHeight: 16 }]} tone={on ? "onInk" : "ink2"} numberOfLines={1}>
+          <Txt
+            style={[roles.label, { fontSize: 12, lineHeight: 16 }]}
+            tone={on ? "onInk" : "ink2"}
+            numberOfLines={1}
+          >
             {label}
           </Txt>
-          {onRemove ? <Txt variant="caption" tone="ink3">×</Txt> : null}
+          {onRemove ? (
+            <Txt variant="caption" tone="ink3">
+              ×
+            </Txt>
+          ) : null}
         </View>
       )}
     </Press>
@@ -124,7 +146,12 @@ export function Chip({
 /** A text field on the sunken surface. */
 export const Field = forwardRef<
   TextInput,
-  TextInputProps & { icon?: LucideIcon; label: string; containerStyle?: StyleProp<ViewStyle>; trailing?: ReactNode }
+  TextInputProps & {
+    icon?: LucideIcon;
+    label: string;
+    containerStyle?: StyleProp<ViewStyle>;
+    trailing?: ReactNode;
+  }
 >(function Field({ icon, label, containerStyle, trailing, style, ...rest }, ref) {
   const { ctl } = useControl();
   const roles = useType();
@@ -164,7 +191,15 @@ export const Field = forwardRef<
   );
 });
 
-export function Skeleton({ width, height = 14, style }: { width: number | `${number}%`; height?: number; style?: StyleProp<ViewStyle> }) {
+export function Skeleton({
+  width,
+  height = 14,
+  style,
+}: {
+  width: number | `${number}%`;
+  height?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
   return <View style={[{ width, height, borderRadius: r.sm, backgroundColor: c.hover }, style]} />;
 }
 

@@ -16,7 +16,11 @@ import { ToastHost } from "@/ui/toast";
 
 export const unstable_settings = { anchor: "(tabs)" };
 
-const overlay = { presentation: "transparentModal" as const, animation: "none" as const, contentStyle: { backgroundColor: "transparent" } };
+const overlay = {
+  presentation: "transparentModal" as const,
+  animation: "none" as const,
+  contentStyle: { backgroundColor: "transparent" },
+};
 
 export default function AppLayout() {
   useSession();
@@ -27,7 +31,9 @@ export default function AppLayout() {
       {phone ? null : <Sidebar />}
       <View style={{ flex: 1, minWidth: 0 }}>
         <OfflineNotice />
-        <Stack screenOptions={{ headerShown: false, animation: "none", contentStyle: { backgroundColor: c.bg } }}>
+        <Stack
+          screenOptions={{ headerShown: false, animation: "none", contentStyle: { backgroundColor: c.bg } }}
+        >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="index" />
           <Stack.Screen name="space/[id]" />

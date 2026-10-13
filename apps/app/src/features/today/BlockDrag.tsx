@@ -27,7 +27,19 @@ export interface BlockDragProps {
   children: ReactNode;
 }
 
-export function BlockDrag({ top, height, left, width, start, length, hourPx, disabled, onMove, onResize, children }: BlockDragProps) {
+export function BlockDrag({
+  top,
+  height,
+  left,
+  width,
+  start,
+  length,
+  hourPx,
+  disabled,
+  onMove,
+  onResize,
+  children,
+}: BlockDragProps) {
   const dy = useSharedValue(0);
   const dh = useSharedValue(0);
   const lift = useSharedValue(0);
@@ -104,7 +116,13 @@ export function BlockDrag({ top, height, left, width, start, length, hourPx, dis
 
   return (
     <GestureDetector gesture={move}>
-      <Animated.View style={[{ position: "absolute", top, left, width, height, borderRadius: r.ctl }, style, label ? { boxShadow: shadows.overlay } : null]}>
+      <Animated.View
+        style={[
+          { position: "absolute", top, left, width, height, borderRadius: r.ctl },
+          style,
+          label ? { boxShadow: shadows.overlay } : null,
+        ]}
+      >
         {children}
         {disabled ? null : (
           <GestureDetector gesture={resize}>
@@ -117,7 +135,15 @@ export function BlockDrag({ top, height, left, width, start, length, hourPx, dis
         {label ? (
           <View
             pointerEvents="none"
-            style={{ position: "absolute", right: s.s3, top: -30, paddingHorizontal: s.s2, paddingVertical: 2, borderRadius: r.sm, backgroundColor: c.overlay }}
+            style={{
+              position: "absolute",
+              right: s.s3,
+              top: -30,
+              paddingHorizontal: s.s2,
+              paddingVertical: 2,
+              borderRadius: r.sm,
+              backgroundColor: c.overlay,
+            }}
           >
             <Txt variant="caption" tnum>
               {label}

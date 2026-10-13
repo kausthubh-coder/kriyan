@@ -61,7 +61,9 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
       measure: () =>
         new Promise((resolve) => {
           if (!ref.current) return resolve(null);
-          ref.current.measureInWindow((x, yy, w, h) => resolve({ x: x + GUTTER, y: yy, width: w - GUTTER, height: h }));
+          ref.current.measureInWindow((x, yy, w, h) =>
+            resolve({ x: x + GUTTER, y: yy, width: w - GUTTER, height: h }),
+          );
         }),
       startMinutes: fromH * 60,
       hourPx,
@@ -71,8 +73,12 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
     return () => registerDropZone(null);
   }, [fromH, hourPx, onDrop]);
 
-  const visible = items.filter((t) => t.time !== null && (t.time ?? 0) + Math.max(t.length ?? 0, 30) > fromH * 60);
-  const placed = layoutDay(visible.map((t) => ({ id: `${t._id}:${t.date}`, start: t.time ?? 0, length: t.length ?? undefined })));
+  const visible = items.filter(
+    (t) => t.time !== null && (t.time ?? 0) + Math.max(t.length ?? 0, 30) > fromH * 60,
+  );
+  const placed = layoutDay(
+    visible.map((t) => ({ id: `${t._id}:${t.date}`, start: t.time ?? 0, length: t.length ?? undefined })),
+  );
   const byId = new Map(visible.map((t) => [`${t._id}:${t.date}`, t]));
   const laneWidth = Math.max(0, width - GUTTER);
 
@@ -80,7 +86,17 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
   for (let h = fromH; h <= toH; h++) {
     const near = now !== null && Math.abs(h * 60 - now) <= 20;
     hours.push(
-      <View key={h} style={{ position: "absolute", left: 0, right: 0, top: y(h * 60), flexDirection: "row", alignItems: "flex-start" }}>
+      <View
+        key={h}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: y(h * 60),
+          flexDirection: "row",
+          alignItems: "flex-start",
+        }}
+      >
         <Txt variant="meta" tone="ink3" tnum style={{ width: GUTTER, transform: [{ translateY: -8 }] }}>
           {near ? "" : `${String(h).padStart(2, "0")}:00`}
         </Txt>
@@ -148,7 +164,9 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                         done={done}
                         disabled={t.projected}
                         label={`${done ? "Mark not done" : "Complete"}: ${t.title}`}
-                        onPress={() => (t.done ? !t.repeat && reopenTask(t._id) : !ticked[t._id] && completeTask(t))}
+                        onPress={() =>
+                          t.done ? !t.repeat && reopenTask(t._id) : !ticked[t._id] && completeTask(t)
+                        }
                       />
                     </View>
                   )}
@@ -158,14 +176,21 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                     onPress={() => openTask(t._id)}
                     hoverBg={null}
                     scale={false}
-                    style={{ flex: 1, minWidth: 0, alignSelf: "stretch", paddingVertical: h < 28 ? s.s1 : s.s2 }}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      alignSelf: "stretch",
+                      paddingVertical: h < 28 ? s.s1 : s.s2,
+                    }}
                   >
                     <Txt variant="label" tone={done ? "ink3" : "ink"} strike={done} numberOfLines={1}>
                       {t.title}
                     </Txt>
                     {tall ? (
                       <Txt variant="meta" tone="ink2" tnum numberOfLines={1}>
-                        {t.repeatText && !t.length ? t.repeatText : formatTimeRange(p.start, t.length ?? undefined)}
+                        {t.repeatText && !t.length
+                          ? t.repeatText
+                          : formatTimeRange(p.start, t.length ?? undefined)}
                       </Txt>
                     ) : null}
                   </Press>
@@ -189,7 +214,17 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
             backgroundColor: c.hover,
           }}
         >
-          <View style={{ position: "absolute", right: s.s3, top: -30, paddingHorizontal: s.s2, paddingVertical: 2, borderRadius: r.sm, backgroundColor: c.overlay }}>
+          <View
+            style={{
+              position: "absolute",
+              right: s.s3,
+              top: -30,
+              paddingHorizontal: s.s2,
+              paddingVertical: 2,
+              borderRadius: r.sm,
+              backgroundColor: c.overlay,
+            }}
+          >
             <Txt variant="caption" tnum>
               {formatTimeRange(drag.over, drag.length ?? undefined)}
             </Txt>
@@ -198,8 +233,29 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
       ) : null}
       {now !== null && now >= fromH * 60 && now <= toH * 60 ? (
         <>
-          <View pointerEvents="none" style={{ position: "absolute", left: GUTTER - 6, right: 0, top: y(now), height: 1, backgroundColor: c.now, zIndex: 2 }}>
-            <View style={{ position: "absolute", left: 0, top: -3, width: 7, height: 7, borderRadius: 4, backgroundColor: c.now }} />
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: GUTTER - 6,
+              right: 0,
+              top: y(now),
+              height: 1,
+              backgroundColor: c.now,
+              zIndex: 2,
+            }}
+          >
+            <View
+              style={{
+                position: "absolute",
+                left: 0,
+                top: -3,
+                width: 7,
+                height: 7,
+                borderRadius: 4,
+                backgroundColor: c.now,
+              }}
+            />
           </View>
           <Txt
             variant="caption"

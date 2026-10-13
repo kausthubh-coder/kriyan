@@ -43,11 +43,17 @@ function Fact({ icon, text }: { icon?: Parameters<typeof Icon>[0]["icon"]; text:
   );
 }
 
-export function facts(task: TaskView, today: string, showWhen: boolean): { icon?: Parameters<typeof Icon>[0]["icon"]; text: string }[] {
+export function facts(
+  task: TaskView,
+  today: string,
+  showWhen: boolean,
+): { icon?: Parameters<typeof Icon>[0]["icon"]; text: string }[] {
   const out: { icon?: Parameters<typeof Icon>[0]["icon"]; text: string }[] = [];
   if (showWhen && task.date) {
     const day = formatDay(task.date, today);
-    out.push({ text: task.time !== null ? `${day}, ${formatTimeRange(task.time, task.length ?? undefined)}` : day });
+    out.push({
+      text: task.time !== null ? `${day}, ${formatTimeRange(task.time, task.length ?? undefined)}` : day,
+    });
   }
   if (task.deadline) out.push({ icon: Flag, text: `Due ${formatDay(task.deadline, today)}` });
   if (task.repeat?.freq === "year" && task.date) out.push({ icon: Cake, text: formatDay(task.date, today) });
@@ -85,7 +91,14 @@ export const TaskRow = memo(function TaskRow({ task, today, showWhen = false, tr
     <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
       <View style={{ marginTop: phone ? 11 : 1 }}>
         {task.event ? (
-          <View style={{ width: phone ? 22 : 18, height: phone ? 22 : 18, alignItems: "center", justifyContent: "center" }}>
+          <View
+            style={{
+              width: phone ? 22 : 18,
+              height: phone ? 22 : 18,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <Dot color={tone.dot} />
           </View>
         ) : (

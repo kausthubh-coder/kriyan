@@ -33,7 +33,17 @@ function begin(taskId: string, title: string, color: string, length: number | nu
   const z = dropZone();
   zone.value = { ...zone.value, ready: false };
   void z?.measure().then((r) => {
-    if (r) zone.value = { x: r.x, y: r.y, w: r.width, h: r.height, start: z.startMinutes, hourPx: z.hourPx, pad: z.topPad, ready: true };
+    if (r)
+      zone.value = {
+        x: r.x,
+        y: r.y,
+        w: r.width,
+        h: r.height,
+        start: z.startMinutes,
+        hourPx: z.hourPx,
+        pad: z.topPad,
+        ready: true,
+      };
   });
   externalDrag.set({ taskId, title, color, length, x: 0, y: 0, over: null });
 }
@@ -73,7 +83,13 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
       f.y.value = e.absoluteY;
       const z = z0.value;
       let next = -1;
-      if (z.ready && e.absoluteX >= z.x && e.absoluteX <= z.x + z.w && e.absoluteY >= z.y - 24 && e.absoluteY <= z.y + z.h + 24) {
+      if (
+        z.ready &&
+        e.absoluteX >= z.x &&
+        e.absoluteX <= z.x + z.w &&
+        e.absoluteY >= z.y - 24 &&
+        e.absoluteY <= z.y + z.h + 24
+      ) {
         const minutes = z.start + ((e.absoluteY - z.y - z.pad) / z.hourPx) * 60;
         next = Math.max(0, Math.min(1440 - STEP, Math.round(minutes / STEP) * STEP));
       }

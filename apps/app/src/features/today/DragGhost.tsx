@@ -16,7 +16,10 @@ export function DragGhost() {
   const origin = useSharedValue({ x: 0, y: 0 });
   const style = useAnimatedStyle(() => ({
     opacity: dragging.value,
-    transform: [{ translateX: fingerX.value - origin.value.x - 40 }, { translateY: fingerY.value - origin.value.y - 56 }],
+    transform: [
+      { translateX: fingerX.value - origin.value.x - 40 },
+      { translateY: fingerY.value - origin.value.y - 56 },
+    ],
   }));
   return (
     <View

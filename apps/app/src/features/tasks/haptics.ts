@@ -23,7 +23,7 @@ export function dropHaptic() {
 
 export function toggleHaptic(on: boolean) {
   if (Platform.OS !== "android") return;
-  void Haptics.performAndroidHapticsAsync(on ? Haptics.AndroidHaptics.Toggle_On : Haptics.AndroidHaptics.Toggle_Off).catch(
-    () => undefined,
-  );
+  void Haptics.performAndroidHapticsAsync(
+    on ? Haptics.AndroidHaptics.Toggle_On : Haptics.AndroidHaptics.Toggle_Off,
+  ).catch(() => undefined);
 }

@@ -12,7 +12,10 @@ const out = new URL("apps/app/assets/icons/", root);
 mkdirSync(out, { recursive: true });
 
 // The full icon uses the app's own background token, so it matches the adaptive background.
-const fullIcon = logo("app-icon.svg").replace(/<rect([^>]*)fill="#[0-9a-f]{6}"/i, `<rect$1fill="${color.bg}"`);
+const fullIcon = logo("app-icon.svg").replace(
+  /<rect([^>]*)fill="#[0-9a-f]{6}"/i,
+  `<rect$1fill="${color.bg}"`,
+);
 // The splash mark sits on the splash background colour, so it is only the ink mark.
 const splashMark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 36 36">${logo("mark-ink.svg")
   .replace(/^<svg[^>]*>/, "")
@@ -37,7 +40,10 @@ for (const job of jobs) {
   await page.setContent(
     `<style>html,body{margin:0;background:transparent}svg{display:block;width:${job.size}px;height:${job.size}px}</style>${job.svg}`,
   );
-  await page.screenshot({ path: new URL(job.file, out).pathname.replace(/^\/([A-Z]:)/, "$1"), omitBackground: true });
+  await page.screenshot({
+    path: new URL(job.file, out).pathname.replace(/^\/([A-Z]:)/, "$1"),
+    omitBackground: true,
+  });
   console.log(`wrote assets/icons/${job.file}`);
 }
 await browser.close();

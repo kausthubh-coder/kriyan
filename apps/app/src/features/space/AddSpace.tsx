@@ -14,7 +14,13 @@ import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 
-export function ColorPicker({ value, onPick }: { value: SpaceColor | null; onPick: (color: SpaceColor) => void }) {
+export function ColorPicker({
+  value,
+  onPick,
+}: {
+  value: SpaceColor | null;
+  onPick: (color: SpaceColor) => void;
+}) {
   return (
     <View role="radiogroup" aria-label="Colour" style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s1 }}>
       {SPACE_COLORS.map((name) => (
@@ -41,7 +47,15 @@ export function ColorPicker({ value, onPick }: { value: SpaceColor | null; onPic
   );
 }
 
-export function AddSpace({ parentId, parentName, onDone }: { parentId?: Id<"spaces">; parentName?: string; onDone: (id: Id<"spaces"> | null) => void }) {
+export function AddSpace({
+  parentId,
+  parentName,
+  onDone,
+}: {
+  parentId?: Id<"spaces">;
+  parentName?: string;
+  onDone: (id: Id<"spaces"> | null) => void;
+}) {
   const add = useMutation(api.organize.addSpace);
   const [name, setName] = useState("");
   const [color, setColor] = useState<SpaceColor | null>(null);
@@ -50,7 +64,11 @@ export function AddSpace({ parentId, parentName, onDone }: { parentId?: Id<"spac
     if (!name.trim() || busy) return;
     setBusy(true);
     try {
-      const id = await add({ name: name.trim(), ...(color ? { color } : {}), ...(parentId ? { parentId } : {}) });
+      const id = await add({
+        name: name.trim(),
+        ...(color ? { color } : {}),
+        ...(parentId ? { parentId } : {}),
+      });
       onDone(id);
     } catch (e) {
       showToast(errorText(e));
@@ -60,7 +78,14 @@ export function AddSpace({ parentId, parentName, onDone }: { parentId?: Id<"spac
   };
   return (
     <View style={{ gap: s.s3, padding: s.s3, borderRadius: r.card, backgroundColor: c.raised }}>
-      <Field label="Space name" value={name} onChangeText={setName} placeholder={parentName ? `A space inside ${parentName}` : "Physics, Clients, Home"} autoFocus onSubmitEditing={() => void submit()} />
+      <Field
+        label="Space name"
+        value={name}
+        onChangeText={setName}
+        placeholder={parentName ? `A space inside ${parentName}` : "Physics, Clients, Home"}
+        autoFocus
+        onSubmitEditing={() => void submit()}
+      />
       <View style={{ gap: s.s1 }}>
         <Txt variant="caption" tone="ink3">
           {parentName ? `Colour (leave it to use ${parentName}'s)` : "Colour"}
@@ -69,7 +94,12 @@ export function AddSpace({ parentId, parentName, onDone }: { parentId?: Id<"spac
       </View>
       <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: s.s2 }}>
         <Button label="Cancel" onPress={() => onDone(null)} />
-        <Button variant="primary" label="Add space" onPress={() => void submit()} disabled={!name.trim() || busy} />
+        <Button
+          variant="primary"
+          label="Add space"
+          onPress={() => void submit()}
+          disabled={!name.trim() || busy}
+        />
       </View>
     </View>
   );

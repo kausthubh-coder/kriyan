@@ -21,7 +21,10 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
   useInertOutside(layer);
   return (
     <View ref={layer} style={{ flex: 1 }}>
-      <Animated.View entering={FadeIn.duration(150)} style={{ position: "absolute", inset: 0, backgroundColor: c.scrim } as object}>
+      <Animated.View
+        entering={FadeIn.duration(150)}
+        style={{ position: "absolute", inset: 0, backgroundColor: c.scrim } as object}
+      >
         <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
       </Animated.View>
       <Animated.View
@@ -31,8 +34,30 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
         aria-label="Add a task"
         style={
           phone
-            ? { position: "absolute", left: 0, right: 0, bottom: 0, padding: s.s4, paddingTop: s.s3, gap: s.s3, borderTopLeftRadius: r.sheet, borderTopRightRadius: r.sheet, backgroundColor: c.raised, boxShadow: shadows.overlay }
-            : { position: "absolute", top: "15%", alignSelf: "center", width: 560, padding: s.s4, gap: s.s3, borderRadius: r.card, backgroundColor: c.overlay, boxShadow: shadows.overlay }
+            ? {
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                padding: s.s4,
+                paddingTop: s.s3,
+                gap: s.s3,
+                borderTopLeftRadius: r.sheet,
+                borderTopRightRadius: r.sheet,
+                backgroundColor: c.raised,
+                boxShadow: shadows.overlay,
+              }
+            : {
+                position: "absolute",
+                top: "15%",
+                alignSelf: "center",
+                width: 560,
+                padding: s.s4,
+                gap: s.s3,
+                borderRadius: r.card,
+                backgroundColor: c.overlay,
+                boxShadow: shadows.overlay,
+              }
         }
       >
         {phone ? (

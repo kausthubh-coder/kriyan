@@ -39,7 +39,16 @@ export function ToastHost({ bottom }: { bottom: number }) {
   return (
     <View
       pointerEvents="box-none"
-      style={{ position: "absolute", left: 0, right: 0, bottom, alignItems: "center", gap: s.s2, paddingHorizontal: s.s4, zIndex: 20 }}
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom,
+        alignItems: "center",
+        gap: s.s2,
+        paddingHorizontal: s.s4,
+        zIndex: 20,
+      }}
     >
       {list.map((t) => (
         <View

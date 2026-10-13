@@ -16,7 +16,11 @@ export function createStore<T>(initial: T) {
       return () => listeners.delete(listener);
     },
     useValue<S>(select: (state: T) => S): S {
-      return useSyncExternalStore(this.subscribe, () => select(state), () => select(state));
+      return useSyncExternalStore(
+        this.subscribe,
+        () => select(state),
+        () => select(state),
+      );
     },
   };
 }

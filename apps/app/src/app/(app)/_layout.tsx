@@ -19,7 +19,10 @@ export default function AppLayout() {
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <View style={{ paddingTop: insets.top, position: "absolute", top: 0, left: 0, right: 0, zIndex: 20 }} pointerEvents="none">
+      <View
+        style={{ paddingTop: insets.top, position: "absolute", top: 0, left: 0, right: 0, zIndex: 20 }}
+        pointerEvents="none"
+      >
         <OfflineNotice />
       </View>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>

@@ -62,7 +62,8 @@ function SpaceBody({ view }: { view: SpaceView }) {
   const [name, setName] = useState(view.space.name);
   const moreRef = useRef<View>(null);
   const tone = spaceTone(view.space.color);
-  const save = (patch: Omit<Parameters<typeof update>[0], "id">) => update({ id: view.space._id, ...patch }).catch((e: unknown) => showToast(errorText(e)));
+  const save = (patch: Omit<Parameters<typeof update>[0], "id">) =>
+    update({ id: view.space._id, ...patch }).catch((e: unknown) => showToast(errorText(e)));
 
   const stats = [
     `${view.stats.open} open`,
@@ -72,7 +73,14 @@ function SpaceBody({ view }: { view: SpaceView }) {
 
   const left = (
     <View style={{ gap: phone ? s.s8 : s.s12 }}>
-      {adding === "task" ? <QuickAdd variant={phone ? "sheet" : "inline"} placeholder={`Add to ${view.space.name}, like “read 7.4 thu”`} autoFocus onAdded={() => setAdding(null)} /> : null}
+      {adding === "task" ? (
+        <QuickAdd
+          variant={phone ? "sheet" : "inline"}
+          placeholder={`Add to ${view.space.name}, like “read 7.4 thu”`}
+          autoFocus
+          onAdded={() => setAdding(null)}
+        />
+      ) : null}
       <View style={{ gap: s.s2 }}>
         <SectionHead title="Next" meta={view.next.length ? String(view.next.length) : undefined} />
         {view.next.length ? (
@@ -98,7 +106,15 @@ function SpaceBody({ view }: { view: SpaceView }) {
             <Press
               role="link"
               scale={false}
-              style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: row, paddingHorizontal: s.s2, marginHorizontal: -s.s2, borderRadius: r.ctl }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: s.s3,
+                minHeight: row,
+                paddingHorizontal: s.s2,
+                marginHorizontal: -s.s2,
+                borderRadius: r.ctl,
+              }}
             >
               <View style={{ width: 18, alignItems: "center" }}>
                 <Dot color={spaceTone(child.color).dot} />
@@ -120,7 +136,15 @@ function SpaceBody({ view }: { view: SpaceView }) {
             role="button"
             onPress={() => setAdding("space")}
             scale={false}
-            style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: row, paddingHorizontal: s.s2, marginHorizontal: -s.s2, borderRadius: r.ctl }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: s.s3,
+              minHeight: row,
+              paddingHorizontal: s.s2,
+              marginHorizontal: -s.s2,
+              borderRadius: r.ctl,
+            }}
           >
             <View style={{ width: 18, alignItems: "center" }}>
               <Icon icon={Plus} size={16} />
@@ -147,7 +171,12 @@ function SpaceBody({ view }: { view: SpaceView }) {
   const note = (
     <View style={{ gap: s.s2 }}>
       <SectionHead title="Note" />
-      <NoteEditor key={view.space._id} value={view.space.note} onChange={(md) => void save({ note: md })} placeholder={phone ? "Add a note: plans, links, a checklist" : undefined} />
+      <NoteEditor
+        key={view.space._id}
+        value={view.space.note}
+        onChange={(md) => void save({ note: md })}
+        placeholder={phone ? "Add a note: plans, links, a checklist" : undefined}
+      />
     </View>
   );
 
@@ -165,7 +194,16 @@ function SpaceBody({ view }: { view: SpaceView }) {
                 ) : null}
                 <Dot color={spaceTone(b.color).dot} />
                 <Link href={`/space/${b._id}`} asChild>
-                  <Press role="link" hoverBg={null} scale={false} style={{ minHeight: phone ? 44 : 24, minWidth: phone ? 44 : undefined, justifyContent: "center" }}>
+                  <Press
+                    role="link"
+                    hoverBg={null}
+                    scale={false}
+                    style={{
+                      minHeight: phone ? 44 : 24,
+                      minWidth: phone ? 44 : undefined,
+                      justifyContent: "center",
+                    }}
+                  >
                     <Txt variant="body" tone="ink3">
                       {b.name}
                     </Txt>
@@ -183,10 +221,24 @@ function SpaceBody({ view }: { view: SpaceView }) {
             </Txt>
           )}
           <View style={{ flexDirection: "row", gap: s.s2, marginLeft: phone ? -s.s3 : 0 }}>
-            <Button icon={Plus} label="Add space" onPress={() => setAdding(adding === "space" ? null : "space")} />
-            <Button variant={phone ? "default" : "primary"} icon={Plus} label="Add task" onPress={() => setAdding(adding === "task" ? null : "task")} />
+            <Button
+              icon={Plus}
+              label="Add space"
+              onPress={() => setAdding(adding === "space" ? null : "space")}
+            />
+            <Button
+              variant={phone ? "default" : "primary"}
+              icon={Plus}
+              label="Add task"
+              onPress={() => setAdding(adding === "task" ? null : "task")}
+            />
             <View ref={moreRef} collapsable={false}>
-              <Button icon={Ellipsis} accessibilityLabel="Space options" onPress={() => setMenu("more")} expanded={menu !== null} />
+              <Button
+                icon={Ellipsis}
+                accessibilityLabel="Space options"
+                onPress={() => setMenu("more")}
+                expanded={menu !== null}
+              />
             </View>
           </View>
         </View>
@@ -209,18 +261,43 @@ function SpaceBody({ view }: { view: SpaceView }) {
           <View style={{ flex: 1, minWidth: 0 }}>{note}</View>
         </View>
       )}
-      <Popover open={menu !== null} onClose={() => setMenu(null)} anchor={moreRef} title={view.space.name} width={300}>
+      <Popover
+        open={menu !== null}
+        onClose={() => setMenu(null)}
+        anchor={moreRef}
+        title={view.space.name}
+        width={300}
+      >
         {menu === "rename" ? (
           <View style={{ gap: s.s3 }}>
-            <Field label="Space name" value={name} onChangeText={setName} autoFocus onSubmitEditing={() => (void save({ name }), setMenu(null))} />
-            <Button variant="primary" label="Rename" onPress={() => (void save({ name }), setMenu(null))} disabled={!name.trim()} />
+            <Field
+              label="Space name"
+              value={name}
+              onChangeText={setName}
+              autoFocus
+              onSubmitEditing={() => (void save({ name }), setMenu(null))}
+            />
+            <Button
+              variant="primary"
+              label="Rename"
+              onPress={() => (void save({ name }), setMenu(null))}
+              disabled={!name.trim()}
+            />
           </View>
         ) : menu === "color" ? (
           <ColorPicker value={view.space.color} onPick={(color) => (void save({ color }), setMenu(null))} />
         ) : (
           <View style={{ gap: 2 }}>
-            <Option label="Rename" leading={<Icon icon={Pencil} size={16} />} onPress={() => setMenu("rename")} />
-            <Option label="Change colour" leading={<Icon icon={Palette} size={16} />} onPress={() => setMenu("color")} />
+            <Option
+              label="Rename"
+              leading={<Icon icon={Pencil} size={16} />}
+              onPress={() => setMenu("rename")}
+            />
+            <Option
+              label="Change colour"
+              leading={<Icon icon={Palette} size={16} />}
+              onPress={() => setMenu("color")}
+            />
             <Option
               label="Archive space"
               hint="Its tasks stay"

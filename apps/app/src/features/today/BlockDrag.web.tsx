@@ -25,7 +25,19 @@ export interface BlockDragProps {
 
 type Mode = "move" | "resize";
 
-export function BlockDrag({ top, height, left, width, start, length, hourPx, disabled, onMove, onResize, children }: BlockDragProps) {
+export function BlockDrag({
+  top,
+  height,
+  left,
+  width,
+  start,
+  length,
+  hourPx,
+  disabled,
+  onMove,
+  onResize,
+  children,
+}: BlockDragProps) {
   const [drag, setDrag] = useState<{ mode: Mode; dMin: number } | null>(null);
   const moved = useRef(false);
 
@@ -79,13 +91,22 @@ export function BlockDrag({ top, height, left, width, start, length, hourPx, dis
   const liveStart = drag?.mode === "move" ? clampDay(start + dMin, length ?? 0) : start;
   const liveLength = drag?.mode === "resize" ? Math.max(STEP, (length ?? 0) + dMin) : length;
   const liveTop = drag?.mode === "move" ? top + (dMin / 60) * hourPx : top;
-  const liveHeight = drag?.mode === "resize" ? Math.max((STEP / 60) * hourPx - 2, height + (dMin / 60) * hourPx) : height;
+  const liveHeight =
+    drag?.mode === "resize" ? Math.max((STEP / 60) * hourPx - 2, height + (dMin / 60) * hourPx) : height;
 
   return (
     <View
       {...({ onPointerDown: begin("move") } as object)}
       style={[
-        { position: "absolute", top: liveTop, left, width, height: liveHeight, borderRadius: r.ctl, cursor: disabled ? "default" : "grab" } as object,
+        {
+          position: "absolute",
+          top: liveTop,
+          left,
+          width,
+          height: liveHeight,
+          borderRadius: r.ctl,
+          cursor: disabled ? "default" : "grab",
+        } as object,
         drag ? { boxShadow: shadows.overlay, zIndex: 3, transform: [{ scale: 1.01 }] } : null,
       ]}
     >
@@ -94,7 +115,9 @@ export function BlockDrag({ top, height, left, width, start, length, hourPx, dis
         <View
           aria-hidden
           {...({ onPointerDown: begin("resize") } as object)}
-          style={{ position: "absolute", left: 0, right: 0, bottom: -3, height: 8, cursor: "ns-resize" } as object}
+          style={
+            { position: "absolute", left: 0, right: 0, bottom: -3, height: 8, cursor: "ns-resize" } as object
+          }
         />
       )}
       {drag ? (

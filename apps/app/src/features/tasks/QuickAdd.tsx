@@ -48,8 +48,11 @@ export function findSpace(spaces: SpaceNode[] | undefined, name: string): SpaceN
   if (!spaces) return undefined;
   const parts = name.split("/").map((p) => p.trim().toLowerCase());
   const last = parts[parts.length - 1];
-  return spaces.find((sp) => sp.path.toLowerCase().split(" / ").slice(-parts.length).join("/") === parts.join("/")) ??
-    spaces.find((sp) => sp.name.toLowerCase() === last);
+  return (
+    spaces.find(
+      (sp) => sp.path.toLowerCase().split(" / ").slice(-parts.length).join("/") === parts.join("/"),
+    ) ?? spaces.find((sp) => sp.name.toLowerCase() === last)
+  );
 }
 
 function chipsFor(parsed: ParsedTask, today: string, spaces: SpaceNode[] | undefined): ChipSpec[] {
@@ -58,7 +61,12 @@ function chipsFor(parsed: ParsedTask, today: string, spaces: SpaceNode[] | undef
     const match = findSpace(spaces, parsed.spaceName);
     out.push({
       key: "space",
-      label: match ? match.path : `New space: ${parsed.spaceName.split("/").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" / ")}`,
+      label: match
+        ? match.path
+        : `New space: ${parsed.spaceName
+            .split("/")
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join(" / ")}`,
       dot: match ? spaceTone(match.color).dot : c.ink3,
       kinds: ["space"],
     });
@@ -66,21 +74,46 @@ function chipsFor(parsed: ParsedTask, today: string, spaces: SpaceNode[] | undef
   if (parsed.date || parsed.time !== undefined) {
     const day = parsed.date ? formatDay(parsed.date, today) : "";
     const time = parsed.time !== undefined ? formatClock(parsed.time) : "";
-    out.push({ key: "when", label: [day, time].filter(Boolean).join(", "), icon: CalendarDays, kinds: ["date", "time"] });
+    out.push({
+      key: "when",
+      label: [day, time].filter(Boolean).join(", "),
+      icon: CalendarDays,
+      kinds: ["date", "time"],
+    });
   }
-  if (parsed.length) out.push({ key: "length", label: formatDuration(parsed.length), icon: Hourglass, kinds: ["length"] });
-  if (parsed.repeat) out.push({ key: "repeat", label: describeRepeat(parsed.repeat, parsed.date ?? today, today), icon: Repeat2, kinds: ["repeat"] });
+  if (parsed.length)
+    out.push({ key: "length", label: formatDuration(parsed.length), icon: Hourglass, kinds: ["length"] });
+  if (parsed.repeat)
+    out.push({
+      key: "repeat",
+      label: describeRepeat(parsed.repeat, parsed.date ?? today, today),
+      icon: Repeat2,
+      kinds: ["repeat"],
+    });
   parsed.reminders.forEach((rem, i) =>
-    out.push({ key: `rem${i}`, label: describeReminder(rem), icon: i === 0 ? Bell : AlarmClock, kinds: ["reminder"] }),
+    out.push({
+      key: `rem${i}`,
+      label: describeReminder(rem),
+      icon: i === 0 ? Bell : AlarmClock,
+      kinds: ["reminder"],
+    }),
   );
-  if (parsed.deadline) out.push({ key: "deadline", label: `Due ${formatDay(parsed.deadline, today)}`, icon: Flag, kinds: ["deadline"] });
+  if (parsed.deadline)
+    out.push({
+      key: "deadline",
+      label: `Due ${formatDay(parsed.deadline, today)}`,
+      icon: Flag,
+      kinds: ["deadline"],
+    });
   return out;
 }
 
 /** The input with every span of the given kinds cut out. */
 function without(text: string, parsed: ParsedTask, kinds: SpanKind[]): string {
   let out = text;
-  for (const span of [...parsed.spans].filter((sp) => kinds.includes(sp.kind)).sort((a, b) => b.start - a.start)) {
+  for (const span of [...parsed.spans]
+    .filter((sp) => kinds.includes(sp.kind))
+    .sort((a, b) => b.start - a.start)) {
     out = out.slice(0, span.start) + out.slice(span.end);
   }
   return out.replace(/\s+/g, " ").trimStart();
@@ -238,7 +271,14 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
       {highlight}
       {chipRow}
       <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: s.s2 }}>
-        <Button variant="primary" label="Add task" icon={Plus} onPress={() => void submit()} disabled={!text.trim() || busy} style={phone ? { height: 48 } : undefined} />
+        <Button
+          variant="primary"
+          label="Add task"
+          icon={Plus}
+          onPress={() => void submit()}
+          disabled={!text.trim() || busy}
+          style={phone ? { height: 48 } : undefined}
+        />
       </View>
     </View>
   );

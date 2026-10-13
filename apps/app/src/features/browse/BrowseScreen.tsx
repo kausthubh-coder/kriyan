@@ -16,14 +16,35 @@ import { PageHead, Screen, SectionHead } from "@/ui/Screen";
 import { Txt } from "@/ui/Txt";
 import { AddSpace } from "@/features/space/AddSpace";
 
-function NavRow({ href, onPress, label, leading, indent = 0 }: { href?: Href; onPress?: () => void; label: string; leading: ReactNode; indent?: number }) {
+function NavRow({
+  href,
+  onPress,
+  label,
+  leading,
+  indent = 0,
+}: {
+  href?: Href;
+  onPress?: () => void;
+  label: string;
+  leading: ReactNode;
+  indent?: number;
+}) {
   const { row } = useControl();
   const body = (
     <Press
       role={href ? "link" : "button"}
       onPress={onPress}
       scale={false}
-      style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: row, paddingLeft: s.s2 + indent * s.s4, paddingRight: s.s2, marginHorizontal: -s.s2, borderRadius: r.ctl }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s3,
+        minHeight: row,
+        paddingLeft: s.s2 + indent * s.s4,
+        paddingRight: s.s2,
+        marginHorizontal: -s.s2,
+        borderRadius: r.ctl,
+      }}
     >
       <View style={{ width: 18, alignItems: "center" }}>{leading}</View>
       <Txt variant="body" style={{ flex: 1 }} numberOfLines={1}>
@@ -48,10 +69,19 @@ export function BrowseScreen() {
     <Screen title="Browse" fab>
       <PageHead title="Browse" />
       <View style={{ gap: s.s2 }}>
-        <NavRow label="Search and commands" leading={<Icon icon={Search} size={16} />} onPress={() => openCommand()} />
+        <NavRow
+          label="Search and commands"
+          leading={<Icon icon={Search} size={16} />}
+          onPress={() => openCommand()}
+        />
       </View>
       <View style={{ gap: s.s2 }}>
-        <SectionHead title="Spaces" right={<Button icon={Plus} label="Add space" onPress={() => setAdding(!adding)} expanded={adding} />} />
+        <SectionHead
+          title="Spaces"
+          right={
+            <Button icon={Plus} label="Add space" onPress={() => setAdding(!adding)} expanded={adding} />
+          }
+        />
         {adding ? <AddSpace onDone={(id) => (setAdding(false), id && router.push(`/space/${id}`))} /> : null}
         {spaces === undefined ? (
           <View testID="skeleton" style={{ gap: s.s3 }}>
@@ -64,12 +94,23 @@ export function BrowseScreen() {
             <Txt variant="body" tone="ink3">
               Spaces hold your tasks: a class, a client, a part of your life. They can sit inside each other.
             </Txt>
-            <Button icon={Plus} label="Add your first space" onPress={() => setAdding(true)} style={{ marginLeft: -s.s3 }} />
+            <Button
+              icon={Plus}
+              label="Add your first space"
+              onPress={() => setAdding(true)}
+              style={{ marginLeft: -s.s3 }}
+            />
           </View>
         ) : (
           <View>
             {spaces.map((sp) => (
-              <NavRow key={sp._id} href={`/space/${sp._id}`} label={sp.name} indent={sp.depth} leading={<Dot color={spaceTone(sp.color).dot} />} />
+              <NavRow
+                key={sp._id}
+                href={`/space/${sp._id}`}
+                label={sp.name}
+                indent={sp.depth}
+                leading={<Dot color={spaceTone(sp.color).dot} />}
+              />
             ))}
           </View>
         )}
@@ -77,7 +118,11 @@ export function BrowseScreen() {
       <View style={{ gap: s.s2 }}>
         <SectionHead title="More" />
         <View>
-          <NavRow href="/progress" label="Progress: goals, habits, time" leading={<Icon icon={Target} size={16} />} />
+          <NavRow
+            href="/progress"
+            label="Progress: goals, habits, time"
+            leading={<Icon icon={Target} size={16} />}
+          />
           <NavRow href="/settings" label="Settings" leading={<Icon icon={SlidersHorizontal} size={16} />} />
         </View>
       </View>

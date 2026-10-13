@@ -3,7 +3,16 @@
 
 import { ScrollView, View } from "react-native";
 import { Link, usePathname, type Href } from "expo-router";
-import { CalendarDays, Inbox, LayoutGrid, Search, SlidersHorizontal, Sun, Target, type LucideIcon } from "lucide-react-native";
+import {
+  CalendarDays,
+  Inbox,
+  LayoutGrid,
+  Search,
+  SlidersHorizontal,
+  Sun,
+  Target,
+  type LucideIcon,
+} from "lucide-react-native";
 import { useInboxView, useSpaces, useTodayView } from "@/data/views";
 import { c, r, s, spaceTone, sz } from "@/theme/tokens";
 import { Dot } from "@/ui/bits";
@@ -49,7 +58,12 @@ function NavItem({
       {({ hovered }: { hovered?: boolean }) => (
         <>
           <Icon icon={icon} tone={active || hovered ? "ink" : "ink3"} />
-          <Txt variant="label" tone={active || hovered ? "ink" : "ink2"} style={{ flex: 1 }} numberOfLines={1}>
+          <Txt
+            variant="label"
+            tone={active || hovered ? "ink" : "ink2"}
+            style={{ flex: 1 }}
+            numberOfLines={1}
+          >
             {label}
           </Txt>
           {count ? (
@@ -90,21 +104,38 @@ export function Sidebar() {
   const spaces = useSpaces();
   const inbox = useInboxView();
   const today = useTodayView();
-  const todayCount = today ? today.anytime.length + today.scheduled.filter((t) => !t.done && !t.event).length : 0;
+  const todayCount = today
+    ? today.anytime.length + today.scheduled.filter((t) => !t.done && !t.event).length
+    : 0;
   return (
     <View
       role="navigation"
       aria-label="Main"
       style={{ width: sz.sidebar, height: "100%", padding: s.s3, gap: 2, backgroundColor: c.bg }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, height: 40, paddingHorizontal: s.s2, marginBottom: s.s2 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: s.s2,
+          height: 40,
+          paddingHorizontal: s.s2,
+          marginBottom: s.s2,
+        }}
+      >
         <Mark size={22} />
         <Txt variant="title" style={{ letterSpacing: -0.4 }}>
           kriyan
         </Txt>
       </View>
       <NavItem href="/inbox" icon={Inbox} label="Inbox" count={inbox?.length} active={path === "/inbox"} />
-      <NavItem href="/today" icon={Sun} label="Today" count={todayCount} active={path === "/today" || path === "/"} />
+      <NavItem
+        href="/today"
+        icon={Sun}
+        label="Today"
+        count={todayCount}
+        active={path === "/today" || path === "/"}
+      />
       <NavItem href="/upcoming" icon={CalendarDays} label="Upcoming" active={path === "/upcoming"} />
       <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 2 }}>
         <Group label="Spaces" />
@@ -135,7 +166,12 @@ export function Sidebar() {
                         <View style={{ width: 18, alignItems: "center" }}>
                           <Dot color={spaceTone(sp.color).dot} />
                         </View>
-                        <Txt variant="body" tone={active || hovered ? "ink" : "ink2"} numberOfLines={1} style={{ flex: 1 }}>
+                        <Txt
+                          variant="body"
+                          tone={active || hovered ? "ink" : "ink2"}
+                          numberOfLines={1}
+                          style={{ flex: 1 }}
+                        >
                           {sp.name}
                         </Txt>
                       </>

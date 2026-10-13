@@ -47,7 +47,11 @@ export function completeTask(task: { _id: Id<"tasks">; title: string }) {
       .mutation(api.tasks.complete, { id })
       .then((result) => {
         completion = result;
-        if (result.next) updateToast(toast, `Done: ${task.title}. Next: ${formatDay(result.next, todayIn(deviceTimeZone()))}`);
+        if (result.next)
+          updateToast(
+            toast,
+            `Done: ${task.title}. Next: ${formatDay(result.next, todayIn(deviceTimeZone()))}`,
+          );
       })
       .catch((error: unknown) => {
         showToast(errorText(error));
@@ -63,7 +67,9 @@ export function completeTask(task: { _id: Id<"tasks">; title: string }) {
         setTicking(id, false);
         return;
       }
-      void convex.mutation(api.tasks.undoComplete, { id, completion }).catch((e: unknown) => showToast(errorText(e)));
+      void convex
+        .mutation(api.tasks.undoComplete, { id, completion })
+        .catch((e: unknown) => showToast(errorText(e)));
     },
   });
 }

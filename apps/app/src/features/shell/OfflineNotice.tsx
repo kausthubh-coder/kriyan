@@ -25,7 +25,15 @@ export function OfflineNotice() {
   return (
     <View
       role="status"
-      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: s.s2, paddingVertical: s.s2, paddingHorizontal: s.s4, backgroundColor: c.raised }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: s.s2,
+        paddingVertical: s.s2,
+        paddingHorizontal: s.s4,
+        backgroundColor: c.raised,
+      }}
     >
       <Icon icon={WifiOff} size={16} />
       <Txt variant="meta" tone="ink2">

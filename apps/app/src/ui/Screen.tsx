@@ -48,8 +48,19 @@ export function AppBar({ title, back, actions }: { title: string; back?: boolean
         ...(Platform.OS === "web" ? ({ position: "sticky", top: 0 } as object) : {}),
       }}
     >
-      <View style={{ height: 64, flexDirection: "row", alignItems: "center", gap: s.s1, paddingLeft: back ? s.s1 : s.s4, paddingRight: s.s1 }}>
-        {back ? <Button icon={ArrowLeft} accessibilityLabel="Back" onPress={() => goBack("/browse")} /> : null}
+      <View
+        style={{
+          height: 64,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: s.s1,
+          paddingLeft: back ? s.s1 : s.s4,
+          paddingRight: s.s1,
+        }}
+      >
+        {back ? (
+          <Button icon={ArrowLeft} accessibilityLabel="Back" onPress={() => goBack("/browse")} />
+        ) : null}
         <Txt variant="title" heading={1} numberOfLines={1} style={{ flex: 1 }}>
           {title}
         </Txt>
@@ -92,7 +103,16 @@ export function usePanelOpen(): boolean {
   return path.startsWith("/task/");
 }
 
-export function Screen({ title, back, actions, fab, width = "column", children, scrollProps, footer }: Props) {
+export function Screen({
+  title,
+  back,
+  actions,
+  fab,
+  width = "column",
+  children,
+  scrollProps,
+  footer,
+}: Props) {
   const phone = useIsPhone();
   const panelOpen = usePanelOpen();
   const maxWidth = width === "column" ? sz.column : width === "wide" ? undefined : width;
@@ -134,7 +154,17 @@ export function Screen({ title, back, actions, fab, width = "column", children, 
 }
 
 /** The desktop page head: title, a quiet line under it, and controls on the right. */
-export function PageHead({ title, sub, right, big }: { title: string; sub?: string; right?: ReactNode; big?: boolean }) {
+export function PageHead({
+  title,
+  sub,
+  right,
+  big,
+}: {
+  title: string;
+  sub?: string;
+  right?: ReactNode;
+  big?: boolean;
+}) {
   const phone = useIsPhone();
   if (phone) return null;
   return (
@@ -171,7 +201,17 @@ export function SectionHead({ title, meta, right }: { title: string; meta?: stri
 }
 
 /** A quiet surface for empty and error states: what goes here, and one action. */
-export function Notice({ title, body, action, icon }: { title: string; body?: string; action?: ReactNode; icon?: Parameters<typeof Icon>[0]["icon"] }) {
+export function Notice({
+  title,
+  body,
+  action,
+  icon,
+}: {
+  title: string;
+  body?: string;
+  action?: ReactNode;
+  icon?: Parameters<typeof Icon>[0]["icon"];
+}) {
   return (
     <View style={{ gap: s.s2, paddingVertical: s.s4, alignItems: "flex-start" }}>
       <View style={{ flexDirection: "row", gap: s.s2, alignItems: "center" }}>

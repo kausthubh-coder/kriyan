@@ -6,7 +6,14 @@ import { useMemo, useState } from "react";
 import { TextInput, View } from "react-native";
 import { Check, Info, Repeat2 } from "lucide-react-native";
 import { parts, weekday, type CivilDate, type Weekday } from "@kriyan/core/dates";
-import { describeRepeat, formatDate, formatTimeRange, MONTH_SHORT, repeatPhrase, WEEKDAY_LONG } from "@kriyan/core/format";
+import {
+  describeRepeat,
+  formatDate,
+  formatTimeRange,
+  MONTH_SHORT,
+  repeatPhrase,
+  WEEKDAY_LONG,
+} from "@kriyan/core/format";
 import { parseTask } from "@kriyan/core/parse";
 import { occurrences, validateRepeat, type MonthlyRule, type Repeat } from "@kriyan/core/repeat";
 import { useControl, useIsPhone, useType } from "@/theme/layout";
@@ -46,7 +53,9 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
   const phone = useIsPhone();
   const roles = useType();
   const { ctl } = useControl();
-  const [draft, setDraft] = useState<Repeat>(rule ?? { freq: "week", interval: 1, weekdays: [weekday(first)] });
+  const [draft, setDraft] = useState<Repeat>(
+    rule ?? { freq: "week", interval: 1, weekdays: [weekday(first)] },
+  );
   const [text, setText] = useState(rule ? repeatPhrase(rule, first) : "");
   const [textError, setTextError] = useState(false);
   const [pickEnd, setPickEnd] = useState(false);
@@ -60,7 +69,10 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
     { label: "Every day", rule: { freq: "day", interval: 1 } },
     { label: "Weekdays", rule: { freq: "week", interval: 1, weekdays: [0, 1, 2, 3, 4] } },
     { label: `Weekly on ${WEEKDAY_LONG[wd]}`, rule: { freq: "week", interval: 1, weekdays: [wd] } },
-    { label: `Monthly on the ${ordinal(fd)}`, rule: { freq: "month", interval: 1, monthly: { kind: "day", day: fd } } },
+    {
+      label: `Monthly on the ${ordinal(fd)}`,
+      rule: { freq: "month", interval: 1, monthly: { kind: "day", day: fd } },
+    },
     { label: "Last day of the month", rule: { freq: "month", interval: 1, monthly: { kind: "last" } } },
     { label: `Every year on ${fd} ${MONTH_SHORT[fm - 1]}`, rule: { freq: "year", interval: 1 } },
   ];
@@ -99,13 +111,38 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
 
   const monthlyOptions: { value: string; label: string; rule: MonthlyRule }[] = [
     { value: "day", label: `on day ${fd}`, rule: { kind: "day", day: fd } },
-    ...(nthOfMonth <= 4 ? [{ value: "nth", label: `on the ${ORD[nthOfMonth]} ${WEEKDAY_LONG[wd]}`, rule: { kind: "nth", n: nthOfMonth as 1 | 2 | 3 | 4, weekday: wd } as MonthlyRule }] : []),
-    ...(isLastWeek ? [{ value: "lastwd", label: `on the last ${WEEKDAY_LONG[wd]}`, rule: { kind: "nth", n: -1, weekday: wd } as MonthlyRule }] : []),
+    ...(nthOfMonth <= 4
+      ? [
+          {
+            value: "nth",
+            label: `on the ${ORD[nthOfMonth]} ${WEEKDAY_LONG[wd]}`,
+            rule: { kind: "nth", n: nthOfMonth as 1 | 2 | 3 | 4, weekday: wd } as MonthlyRule,
+          },
+        ]
+      : []),
+    ...(isLastWeek
+      ? [
+          {
+            value: "lastwd",
+            label: `on the last ${WEEKDAY_LONG[wd]}`,
+            rule: { kind: "nth", n: -1, weekday: wd } as MonthlyRule,
+          },
+        ]
+      : []),
     { value: "last", label: "on the last day", rule: { kind: "last" } },
   ];
   const monthlyValue =
-    draft.monthly?.kind === "last" ? "last" : draft.monthly?.kind === "nth" ? (draft.monthly.n === -1 ? "lastwd" : "nth") : "day";
-  const shortMonths = draft.freq === "month" && (draft.monthly?.kind ?? "day") === "day" && (draft.monthly?.kind === "day" ? draft.monthly.day : fd) > 28;
+    draft.monthly?.kind === "last"
+      ? "last"
+      : draft.monthly?.kind === "nth"
+        ? draft.monthly.n === -1
+          ? "lastwd"
+          : "nth"
+        : "day";
+  const shortMonths =
+    draft.freq === "month" &&
+    (draft.monthly?.kind ?? "day") === "day" &&
+    (draft.monthly?.kind === "day" ? draft.monthly.day : fd) > 28;
   const endKind = draft.end?.kind ?? "never";
 
   return (
@@ -122,13 +159,26 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
       <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingHorizontal: s.s1 }}>
         <Icon icon={textError ? Info : Check} size={14} />
         <Txt variant="meta" tone="ink2" style={{ flex: 1 }}>
-          {textError ? "Not a rule yet. Try “every 2 weeks on mon” or “every last fri”." : describeRepeat(draft, first, today)}
+          {textError
+            ? "Not a rule yet. Try “every 2 weeks on mon” or “every last fri”."
+            : describeRepeat(draft, first, today)}
         </Txt>
       </View>
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
         {presets.map((p) => (
-          <Chip key={p.label} label={p.label} on={same(core(draft), core(p.rule))} onPress={() => set({ ...p.rule, ...(draft.end ? { end: draft.end } : {}), ...(draft.fromCompletion ? { fromCompletion: true } : {}) })} />
+          <Chip
+            key={p.label}
+            label={p.label}
+            on={same(core(draft), core(p.rule))}
+            onPress={() =>
+              set({
+                ...p.rule,
+                ...(draft.end ? { end: draft.end } : {}),
+                ...(draft.fromCompletion ? { fromCompletion: true } : {}),
+              })
+            }
+          />
         ))}
       </View>
 
@@ -146,7 +196,17 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
           }}
           style={[
             roles.body,
-            { width: phone ? 48 : 44, height: ctl, textAlign: "center", color: c.ink, borderRadius: r.ctl, backgroundColor: c.bg, borderWidth: 1, borderColor: c.line, padding: 0 },
+            {
+              width: phone ? 48 : 44,
+              height: ctl,
+              textAlign: "center",
+              color: c.ink,
+              borderRadius: r.ctl,
+              backgroundColor: c.bg,
+              borderWidth: 1,
+              borderColor: c.line,
+              padding: 0,
+            },
           ]}
           selectionColor={hex.ink2}
         />
@@ -199,7 +259,14 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
                   if (days.size) set({ ...draft, weekdays: [...days].sort((a, b) => a - b) });
                 }}
                 hoverBg={on ? null : c.hover}
-                style={{ flex: 1, height: phone ? 44 : 32, borderRadius: r.ctl, alignItems: "center", justifyContent: "center", backgroundColor: on ? c.ink : c.bg }}
+                style={{
+                  flex: 1,
+                  height: phone ? 44 : 32,
+                  borderRadius: r.ctl,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: on ? c.ink : c.bg,
+                }}
               >
                 <Txt variant="label" style={{ fontSize: 12, lineHeight: 16 }} tone={on ? "onInk" : "ink3"}>
                   {letter}
@@ -223,7 +290,8 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
       ) : null}
       {shortMonths ? (
         <Txt variant="meta" tone="ink3">
-          In months without a {ordinal(draft.monthly?.kind === "day" ? draft.monthly.day : fd)}, it falls on the last day.
+          In months without a {ordinal(draft.monthly?.kind === "day" ? draft.monthly.day : fd)}, it falls on
+          the last day.
         </Txt>
       ) : null}
 
@@ -246,7 +314,14 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
             else set({ ...rest, end: { kind: "count", count: 10 } });
           }}
         />
-        {draft.end?.kind === "on" ? <SelectButton text={formatDate(draft.end.date, today)} label="End date" onPress={() => setPickEnd(!pickEnd)} expanded={pickEnd} /> : null}
+        {draft.end?.kind === "on" ? (
+          <SelectButton
+            text={formatDate(draft.end.date, today)}
+            label="End date"
+            onPress={() => setPickEnd(!pickEnd)}
+            expanded={pickEnd}
+          />
+        ) : null}
         {draft.end?.kind === "count" ? (
           <>
             <TextInput
@@ -257,7 +332,20 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
                 const n = Number(v.replace(/\D/g, ""));
                 if (n >= 1) set({ ...draft, end: { kind: "count", count: n } });
               }}
-              style={[roles.body, { width: 56, height: ctl, textAlign: "center", color: c.ink, borderRadius: r.ctl, backgroundColor: c.bg, borderWidth: 1, borderColor: c.line, padding: 0 }]}
+              style={[
+                roles.body,
+                {
+                  width: 56,
+                  height: ctl,
+                  textAlign: "center",
+                  color: c.ink,
+                  borderRadius: r.ctl,
+                  backgroundColor: c.bg,
+                  borderWidth: 1,
+                  borderColor: c.line,
+                  padding: 0,
+                },
+              ]}
             />
             <Txt variant="body" tone="ink2" style={{ lineHeight: ctl }}>
               times
@@ -297,7 +385,10 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
         />
       </View>
 
-      <View aria-label="Next five dates" style={{ gap: s.s1, padding: s.s3, borderRadius: r.ctl, backgroundColor: c.bg }}>
+      <View
+        aria-label="Next five dates"
+        style={{ gap: s.s1, padding: s.s3, borderRadius: r.ctl, backgroundColor: c.bg }}
+      >
         <Txt variant="caption" tone="ink3">
           {draft.fromCompletion ? "Next five, if you finish each on its day" : "Next five"}
         </Txt>
@@ -324,9 +415,21 @@ export function RepeatEditor({ rule, first, time, length, today, onSave, onCance
       </View>
 
       <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: s.s2 }}>
-        {rule ? <Button variant="quiet" label="Remove repeat" onPress={() => onSave(null)} style={{ marginRight: "auto" }} /> : null}
+        {rule ? (
+          <Button
+            variant="quiet"
+            label="Remove repeat"
+            onPress={() => onSave(null)}
+            style={{ marginRight: "auto" }}
+          />
+        ) : null}
         <Button label="Cancel" onPress={onCancel} />
-        <Button variant="primary" label="Save repeat" onPress={() => onSave(draft)} disabled={Boolean(problem) || textError} />
+        <Button
+          variant="primary"
+          label="Save repeat"
+          onPress={() => onSave(draft)}
+          disabled={Boolean(problem) || textError}
+        />
       </View>
     </View>
   );

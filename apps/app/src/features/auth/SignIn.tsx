@@ -18,14 +18,24 @@ type Mode = "sign-in" | "sign-up";
 type Step = "form" | "code";
 
 interface ClerkResult {
-  error: { message?: string; longMessage?: string; errors?: { longMessage?: string; message?: string }[] } | null;
+  error: {
+    message?: string;
+    longMessage?: string;
+    errors?: { longMessage?: string; message?: string }[];
+  } | null;
 }
 
 function message(result: ClerkResult | unknown, fallback: string): string | null {
   const error = (result as ClerkResult | undefined)?.error ?? (result instanceof Error ? result : null);
   if (!error) return null;
   const first = (error as { errors?: { longMessage?: string; message?: string }[] }).errors?.[0];
-  return first?.longMessage ?? first?.message ?? (error as { longMessage?: string }).longMessage ?? error.message ?? fallback;
+  return (
+    first?.longMessage ??
+    first?.message ??
+    (error as { longMessage?: string }).longMessage ??
+    error.message ??
+    fallback
+  );
 }
 
 export function SignIn() {
@@ -125,7 +135,8 @@ export function SignIn() {
   const google = () =>
     run(async () => {
       const result = await startSSOFlow({ strategy: "oauth_google" });
-      if (result.createdSessionId && result.setActive) await result.setActive({ session: result.createdSessionId });
+      if (result.createdSessionId && result.setActive)
+        await result.setActive({ session: result.createdSessionId });
       return null;
     });
 
@@ -145,9 +156,7 @@ export function SignIn() {
         <View style={{ gap: s.s6 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
             <Mark size={28} />
-            <Txt variant="title">
-              kriyan
-            </Txt>
+            <Txt variant="title">kriyan</Txt>
           </View>
           <View style={{ gap: s.s2 }}>
             <Txt variant="headline" heading={1}>
@@ -198,7 +207,12 @@ export function SignIn() {
               style={{ height: 44, marginTop: s.s1 }}
             />
             {mode === "sign-in" ? (
-              <Button label="Email me a code instead" onPress={sendCode} disabled={busy} style={{ height: 44 }} />
+              <Button
+                label="Email me a code instead"
+                onPress={sendCode}
+                disabled={busy}
+                style={{ height: 44 }}
+              />
             ) : null}
           </View>
         ) : (
@@ -216,7 +230,13 @@ export function SignIn() {
               autoFocus
               containerStyle={{ height: 44 }}
             />
-            <Button variant="primary" label={busy ? "One moment" : "Verify"} onPress={verify} disabled={busy} style={{ height: 44 }} />
+            <Button
+              variant="primary"
+              label={busy ? "One moment" : "Verify"}
+              onPress={verify}
+              disabled={busy}
+              style={{ height: 44 }}
+            />
             <Button
               label="Use a different email"
               onPress={() => {

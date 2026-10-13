@@ -29,7 +29,9 @@ function isoWeek(date: CivilDate): number {
   const thursday = addDays(date, 3 - weekday(date));
   const [y] = parts(thursday);
   const jan4 = `${y}-01-04`;
-  return Math.round((Date.parse(startOfWeek(thursday)) - Date.parse(startOfWeek(jan4))) / (7 * 86_400_000)) + 1;
+  return (
+    Math.round((Date.parse(startOfWeek(thursday)) - Date.parse(startOfWeek(jan4))) / (7 * 86_400_000)) + 1
+  );
 }
 
 const hoursText = (m: number) => (m < 60 ? `${m} min` : `${Math.round(m / 60)} h`);
@@ -58,7 +60,8 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
   const [addingGoal, setAddingGoal] = useState(false);
   const [addingHabit, setAddingHabit] = useState(false);
   const total = view.bySpace.reduce((sum, b) => sum + b.minutes, 0);
-  const colorOf = (spaceId: string | null) => spaceTone(spaces?.find((sp) => sp._id === spaceId)?.color ?? null).dot;
+  const colorOf = (spaceId: string | null) =>
+    spaceTone(spaces?.find((sp) => sp._id === spaceId)?.color ?? null).dot;
   return (
     <>
       <View style={{ gap: s.s4 }}>
@@ -82,14 +85,23 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
         </View>
         {total > 0 ? (
           <>
-            <View style={{ flexDirection: "row", gap: 2, height: 6, borderRadius: 3, overflow: "hidden" }} aria-label="Time by space">
+            <View
+              style={{ flexDirection: "row", gap: 2, height: 6, borderRadius: 3, overflow: "hidden" }}
+              aria-label="Time by space"
+            >
               {view.bySpace.map((b) => (
-                <View key={b.spaceId ?? "none"} style={{ flex: b.minutes, backgroundColor: spaceTone(b.color).dot }} />
+                <View
+                  key={b.spaceId ?? "none"}
+                  style={{ flex: b.minutes, backgroundColor: spaceTone(b.color).dot }}
+                />
               ))}
             </View>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s4 }}>
               {view.bySpace.map((b) => (
-                <View key={b.spaceId ?? "none"} style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+                <View
+                  key={b.spaceId ?? "none"}
+                  style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}
+                >
                   <Dot color={spaceTone(b.color).dot} />
                   <Txt variant="meta" tone="ink2" tnum>
                     {b.name} {Math.round((b.minutes / total) * 100)}%
@@ -111,7 +123,17 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
       </View>
 
       <View style={{ gap: s.s3 }}>
-        <SectionHead title="Goals" right={<Button icon={Plus} label="Add goal" onPress={() => setAddingGoal(!addingGoal)} expanded={addingGoal} />} />
+        <SectionHead
+          title="Goals"
+          right={
+            <Button
+              icon={Plus}
+              label="Add goal"
+              onPress={() => setAddingGoal(!addingGoal)}
+              expanded={addingGoal}
+            />
+          }
+        />
         {addingGoal ? <AddGoal today={today} onDone={() => setAddingGoal(false)} /> : null}
         {view.goals.length ? (
           <View style={{ gap: s.s6 }}>
@@ -121,13 +143,25 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
           </View>
         ) : addingGoal ? null : (
           <Txt variant="body" tone="ink3">
-            A goal is a target with a date: a number of tasks, kilometres or pages. Kriyan shows whether you’re on pace.
+            A goal is a target with a date: a number of tasks, kilometres or pages. Kriyan shows whether
+            you’re on pace.
           </Txt>
         )}
       </View>
 
       <View style={{ gap: s.s3 }}>
-        <SectionHead title="Habits" meta="This week" right={<Button icon={Plus} label="Add habit" onPress={() => setAddingHabit(!addingHabit)} expanded={addingHabit} />} />
+        <SectionHead
+          title="Habits"
+          meta="This week"
+          right={
+            <Button
+              icon={Plus}
+              label="Add habit"
+              onPress={() => setAddingHabit(!addingHabit)}
+              expanded={addingHabit}
+            />
+          }
+        />
         {addingHabit ? <AddHabit onDone={() => setAddingHabit(false)} /> : null}
         {view.habits.length ? (
           <View style={{ gap: s.s8 }}>
@@ -152,11 +186,22 @@ function level(value: number, max: number): number {
   return f < 0.25 ? 0.18 : f < 0.5 ? 0.36 : f < 0.8 ? 0.6 : 0.88;
 }
 
-function Heat({ days, color, label }: { days: { date: string; value: number }[]; color: string; label: string }) {
+function Heat({
+  days,
+  color,
+  label,
+}: {
+  days: { date: string; value: number }[];
+  color: string;
+  label: string;
+}) {
   const max = Math.max(...days.map((d) => d.value));
   const first = days[0]?.date;
   const lead = first ? weekday(first) : 0;
-  const cells: ({ date: string; value: number } | null)[] = [...Array.from({ length: lead }, () => null), ...days];
+  const cells: ({ date: string; value: number } | null)[] = [
+    ...Array.from({ length: lead }, () => null),
+    ...days,
+  ];
   const columns = Math.ceil(cells.length / 7);
   return (
     <View style={{ flexDirection: "row", justifyContent: "flex-end", overflow: "hidden" }}>
@@ -167,7 +212,16 @@ function Heat({ days, color, label }: { days: { date: string; value: number }[];
               d === null ? (
                 <View key={i} style={{ width: 8, height: 8 }} />
               ) : (
-                <View key={d.date} style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: d.value > 0 ? color : c.hover, opacity: d.value > 0 ? level(d.value, max) : 1 }} />
+                <View
+                  key={d.date}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 2,
+                    backgroundColor: d.value > 0 ? color : c.hover,
+                    opacity: d.value > 0 ? level(d.value, max) : 1,
+                  }}
+                />
               ),
             )}
           </View>
@@ -196,7 +250,11 @@ function YearHeat({ heat }: { heat: ProgressView["heat"] }) {
           ))}
         </View>
       )}
-      <Heat days={heat.map((d) => ({ date: d.date, value: d.minutes }))} color={c.ink} label={`Time done each day, ${hoursText(total)} in total`} />
+      <Heat
+        days={heat.map((d) => ({ date: d.date, value: d.minutes }))}
+        color={c.ink}
+        label={`Time done each day, ${hoursText(total)} in total`}
+      />
     </View>
   );
 }
@@ -215,7 +273,8 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
     weeks.set(w, (weeks.get(w) ?? 0) + (d.done ? 1 : 0));
   }
   const onTarget = [...weeks.values()].filter((n) => n >= habit.target).length;
-  const target = habit.target === 7 ? "Every day" : `${habit.target} ${habit.target === 1 ? "time" : "times"} a week`;
+  const target =
+    habit.target === 7 ? "Every day" : `${habit.target} ${habit.target === 1 ? "time" : "times"} a week`;
   const doneOn = new Set(habit.days.filter((d) => d.done).map((d) => d.date));
   return (
     <View style={{ gap: s.s3 }}>
@@ -230,18 +289,40 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
           <Txt variant="meta" tone="ink2" tnum>
             {habit.thisWeek} of {habit.target}
           </Txt>
-          <View style={{ flexDirection: "row", gap: s.s1 }} aria-label={`${habit.thisWeek} of ${habit.target} this week`}>
+          <View
+            style={{ flexDirection: "row", gap: s.s1 }}
+            aria-label={`${habit.thisWeek} of ${habit.target} this week`}
+          >
             {Array.from({ length: habit.target }, (_, k) => (
-              <View key={k} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: k < habit.thisWeek ? color : "transparent", borderWidth: k < habit.thisWeek ? 0 : 1.5, borderColor: c.lineStrong }} />
+              <View
+                key={k}
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: k < habit.thisWeek ? color : "transparent",
+                  borderWidth: k < habit.thisWeek ? 0 : 1.5,
+                  borderColor: c.lineStrong,
+                }}
+              />
             ))}
           </View>
         </View>
       </View>
-      <Heat days={habit.days.map((d) => ({ date: d.date, value: d.done ? 1 : 0 }))} color={color} label={`${habit.title}, the last 26 weeks`} />
+      <Heat
+        days={habit.days.map((d) => ({ date: d.date, value: d.done ? 1 : 0 }))}
+        color={color}
+        label={`${habit.title}, the last 26 weeks`}
+      />
       <View ref={ref} collapsable={false} style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
         <Button variant="quiet" icon={CalendarCheck} label="Fix a day" onPress={() => setFixing(true)} />
       </View>
-      <Popover open={fixing} onClose={() => setFixing(false)} anchor={ref} title={`Fix a day for ${habit.title}`}>
+      <Popover
+        open={fixing}
+        onClose={() => setFixing(false)}
+        anchor={ref}
+        title={`Fix a day for ${habit.title}`}
+      >
         <Txt variant="meta" tone="ink3">
           Pick a day to switch it between done and not done.
         </Txt>
@@ -255,7 +336,9 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
             setFixing(false);
             toggleHaptic(done);
             void check({ id: habit._id as Id<"habits">, done, date })
-              .then(() => showToast(`${habit.title}: ${done ? "done" : "not done"} on ${formatDate(date, today)}`))
+              .then(() =>
+                showToast(`${habit.title}: ${done ? "done" : "not done"} on ${formatDate(date, today)}`),
+              )
               .catch((e: unknown) => showToast(errorText(e)));
           }}
         />
@@ -278,7 +361,13 @@ function AddHabit({ onDone }: { onDone: () => void }) {
       </Txt>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
         {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-          <Chip key={n} label={n === 7 ? "Every day" : String(n)} on={target === n} onPress={() => setTarget(n)} accessibilityLabel={`${n} times a week`} />
+          <Chip
+            key={n}
+            label={n === 7 ? "Every day" : String(n)}
+            on={target === n}
+            onPress={() => setTarget(n)}
+            accessibilityLabel={`${n} times a week`}
+          />
         ))}
       </View>
       {spaces && spaces.length ? (
@@ -290,7 +379,13 @@ function AddHabit({ onDone }: { onDone: () => void }) {
             {spaces
               .filter((sp) => sp.depth === 0)
               .map((sp) => (
-                <Chip key={sp._id} label={sp.name} on={spaceId === sp._id} leading={<Dot color={spaceTone(sp.color).dot} />} onPress={() => setSpaceId(spaceId === sp._id ? null : sp._id)} />
+                <Chip
+                  key={sp._id}
+                  label={sp.name}
+                  on={spaceId === sp._id}
+                  leading={<Dot color={spaceTone(sp.color).dot} />}
+                  onPress={() => setSpaceId(spaceId === sp._id ? null : sp._id)}
+                />
               ))}
           </View>
         </>
@@ -302,7 +397,11 @@ function AddHabit({ onDone }: { onDone: () => void }) {
           label="Add habit"
           disabled={!title.trim()}
           onPress={() =>
-            void add({ title: title.trim(), target, ...(spaceId ? { spaceId: spaceId as Id<"spaces"> } : {}) })
+            void add({
+              title: title.trim(),
+              target,
+              ...(spaceId ? { spaceId: spaceId as Id<"spaces"> } : {}),
+            })
               .then(onDone)
               .catch((e: unknown) => showToast(errorText(e)))
           }

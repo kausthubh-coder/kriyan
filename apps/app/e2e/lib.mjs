@@ -5,7 +5,9 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { chromium } from "playwright-core";
 
 const root = new URL("../../../", import.meta.url);
-const ports = existsSync(new URL(".env.ports", root)) ? readFileSync(new URL(".env.ports", root), "utf8") : "";
+const ports = existsSync(new URL(".env.ports", root))
+  ? readFileSync(new URL(".env.ports", root), "utf8")
+  : "";
 export const PORT = process.env.PORT_APP ?? /PORT_APP=(\d+)/.exec(ports)?.[1] ?? "8081";
 export const BASE = `http://localhost:${PORT}`;
 export const ARTIFACTS = new URL(".artifacts/app/", root);
@@ -56,8 +58,14 @@ export async function signIn(page) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   const outcome = await Promise.race([
     page.waitForURL((u) => !u.pathname.startsWith("/sign-in"), { timeout: 15000 }).then(() => "in"),
-    page.getByRole("alert").waitFor({ timeout: 15000 }).then(() => "error"),
-    page.getByLabel("Code from the email").waitFor({ timeout: 15000 }).then(() => "code"),
+    page
+      .getByRole("alert")
+      .waitFor({ timeout: 15000 })
+      .then(() => "error"),
+    page
+      .getByLabel("Code from the email")
+      .waitFor({ timeout: 15000 })
+      .then(() => "code"),
   ]);
   if (outcome === "in") return;
   if (outcome === "code") {

@@ -4,7 +4,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Keyboard, Linking, Platform, View, type TextStyle } from "react-native";
-import { Check, Heading, Link2, List, ListOrdered, ListTodo, Quote, type LucideIcon } from "lucide-react-native";
+import {
+  Check,
+  Heading,
+  Link2,
+  List,
+  ListOrdered,
+  ListTodo,
+  Quote,
+  type LucideIcon,
+} from "lucide-react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { createStore } from "@/data/store";
 import { useIsPhone, useType } from "@/theme/layout";
@@ -15,7 +24,15 @@ import { Field } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
-import { lineToBlock, linkSegments, newId, parseNote, serializeNote, type Block, type BlockKind } from "./markdown";
+import {
+  lineToBlock,
+  linkSegments,
+  newId,
+  parseNote,
+  serializeNote,
+  type Block,
+  type BlockKind,
+} from "./markdown";
 
 interface Props {
   value: string;
@@ -81,7 +98,11 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
     const b = blocks[i];
     if (!b) return;
     const next = [...blocks];
-    next[i] = { ...b, kind: b.kind === kind && kind !== "p" ? "p" : kind, text: b.text.startsWith("/") ? "" : b.text };
+    next[i] = {
+      ...b,
+      kind: b.kind === kind && kind !== "p" ? "p" : kind,
+      text: b.text.startsWith("/") ? "" : b.text,
+    };
     commit(next);
     setFocus(i);
   };
@@ -148,8 +169,15 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
     save();
   };
 
-  const slashQuery = focus !== null && Platform.OS === "web" && blocks[focus]?.kind === "p" && blocks[focus]?.text.startsWith("/") ? (blocks[focus]?.text.slice(1).toLowerCase() ?? "") : null;
-  const matches = slashQuery === null ? [] : COMMANDS.filter((cmd) => cmd.label.toLowerCase().includes(slashQuery));
+  const slashQuery =
+    focus !== null &&
+    Platform.OS === "web" &&
+    blocks[focus]?.kind === "p" &&
+    blocks[focus]?.text.startsWith("/")
+      ? (blocks[focus]?.text.slice(1).toLowerCase() ?? "")
+      : null;
+  const matches =
+    slashQuery === null ? [] : COMMANDS.filter((cmd) => cmd.label.toLowerCase().includes(slashQuery));
 
   const runCommand = (i: number, kind: BlockKind | "link") => {
     if (kind === "link") {
@@ -191,7 +219,11 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
   useEffect(() => () => toolbar.set(null), []);
 
   const numbers: number[] = [];
-  blocks.forEach((b, i) => numbers.push(b.kind === "numbered" ? (blocks[i - 1]?.kind === "numbered" ? (numbers[i - 1] ?? 0) + 1 : 1) : 0));
+  blocks.forEach((b, i) =>
+    numbers.push(
+      b.kind === "numbered" ? (blocks[i - 1]?.kind === "numbered" ? (numbers[i - 1] ?? 0) + 1 : 1) : 0,
+    ),
+  );
   const empty = blocks.length === 1 && blocks[0]?.text === "" && blocks[0]?.kind === "p";
 
   return (
@@ -201,7 +233,15 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
         const editing = focus === i;
         const style = textStyle(b.kind);
         return (
-          <View key={b.id} style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3, marginTop: b.kind.startsWith("h") && i > 0 ? s.s2 : 0 }}>
+          <View
+            key={b.id}
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: s.s3,
+              marginTop: b.kind.startsWith("h") && i > 0 ? s.s2 : 0,
+            }}
+          >
             {b.kind === "todo" || b.kind === "done" ? (
               <Press
                 role="checkbox"
@@ -209,7 +249,13 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                 accessibilityLabel={`${b.kind === "done" ? "Uncheck" : "Check"}: ${b.text || "item"}`}
                 onPress={() => toggleDone(i)}
                 hoverBg={null}
-                style={{ width: phone ? 44 : 24, height: phone ? 44 : 24, margin: phone ? -10 : -2, alignItems: "center", justifyContent: "center" }}
+                style={{
+                  width: phone ? 44 : 24,
+                  height: phone ? 44 : 24,
+                  margin: phone ? -10 : -2,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
                 <View
                   style={{
@@ -228,7 +274,14 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
               </Press>
             ) : null}
             {b.kind === "bullet" ? (
-              <View style={{ width: 16, height: style.lineHeight, alignItems: "center", justifyContent: "center" }}>
+              <View
+                style={{
+                  width: 16,
+                  height: style.lineHeight,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: c.ink3 }} />
               </View>
             ) : null}
@@ -237,7 +290,17 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                 {number}.
               </Txt>
             ) : null}
-            {b.kind === "quote" ? <View style={{ width: 2, alignSelf: "stretch", borderRadius: 1, backgroundColor: c.lineStrong, marginRight: s.s1 }} /> : null}
+            {b.kind === "quote" ? (
+              <View
+                style={{
+                  width: 2,
+                  alignSelf: "stretch",
+                  borderRadius: 1,
+                  backgroundColor: c.lineStrong,
+                  marginRight: s.s1,
+                }}
+              />
+            ) : null}
             <View style={{ flex: 1, minWidth: 0 }}>
               {editing ? (
                 <AutoInput
@@ -246,7 +309,12 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                   padY={phone ? s.s3 : 0}
                   value={b.text}
                   accessibilityLabel={`Note, ${COMMANDS.find((x) => x.kind === b.kind)?.label ?? "text"}`}
-                  placeholder={empty ? (placeholder ?? (Platform.OS === "web" && !phone ? "Type / for blocks" : "Add a note")) : undefined}
+                  placeholder={
+                    empty
+                      ? (placeholder ??
+                        (Platform.OS === "web" && !phone ? "Type / for blocks" : "Add a note"))
+                      : undefined
+                  }
                   placeholderTextColor={hex.ink3}
                   onChangeText={(t) => onText(i, t)}
                   onBlur={() => {
@@ -259,7 +327,9 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                     if (slashQuery !== null && matches.length) {
                       if (key === "ArrowDown" || key === "ArrowUp") {
                         (e as unknown as { preventDefault: () => void }).preventDefault?.();
-                        setMenuIndex((m) => (m + (key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+                        setMenuIndex(
+                          (m) => (m + (key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length,
+                        );
                         return;
                       }
                       if (key === "Enter") {
@@ -289,7 +359,8 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                 >
                   <Txt style={[style, empty ? { color: c.ink3 } : null]}>
                     {empty
-                      ? (placeholder ?? (Platform.OS === "web" && !phone ? "Type / for blocks" : "Add a note"))
+                      ? (placeholder ??
+                        (Platform.OS === "web" && !phone ? "Type / for blocks" : "Add a note"))
                       : linkSegments(b.text).map((seg, k) =>
                           seg.url ? (
                             <Txt
@@ -311,9 +382,23 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                 <View
                   role="menu"
                   aria-label="Blocks"
-                  style={{ position: "absolute", top: (style.lineHeight ?? 20) + s.s1, left: 0, width: 248, zIndex: 7, padding: s.s1, borderRadius: r.card, backgroundColor: c.overlay, boxShadow: shadows.overlay }}
+                  style={{
+                    position: "absolute",
+                    top: (style.lineHeight ?? 20) + s.s1,
+                    left: 0,
+                    width: 248,
+                    zIndex: 7,
+                    padding: s.s1,
+                    borderRadius: r.card,
+                    backgroundColor: c.overlay,
+                    boxShadow: shadows.overlay,
+                  }}
                 >
-                  <Txt variant="caption" tone="ink3" style={{ paddingHorizontal: s.s2, paddingTop: s.s2, paddingBottom: s.s1 }}>
+                  <Txt
+                    variant="caption"
+                    tone="ink3"
+                    style={{ paddingHorizontal: s.s2, paddingTop: s.s2, paddingBottom: s.s1 }}
+                  >
                     Turn into
                   </Txt>
                   {matches.map((cmd, k) => (
@@ -323,9 +408,27 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                       aria-selected={k === menuIndex}
                       onPress={() => runCommand(i, cmd.kind)}
                       scale={false}
-                      style={{ flexDirection: "row", alignItems: "center", gap: s.s3, height: 36, paddingHorizontal: s.s2, borderRadius: r.ctl, backgroundColor: k === menuIndex ? c.select : "transparent" }}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: s.s3,
+                        height: 36,
+                        paddingHorizontal: s.s2,
+                        borderRadius: r.ctl,
+                        backgroundColor: k === menuIndex ? c.select : "transparent",
+                      }}
                     >
-                      <View style={{ width: 24, height: 24, borderRadius: r.sm, borderWidth: 1, borderColor: c.lineStrong, alignItems: "center", justifyContent: "center" }}>
+                      <View
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: r.sm,
+                          borderWidth: 1,
+                          borderColor: c.lineStrong,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
                         <Icon icon={cmd.icon} size={14} tone="ink2" />
                       </View>
                       <Txt variant="body" tone={k === menuIndex ? "ink" : "ink2"} style={{ flex: 1 }}>
@@ -377,27 +480,52 @@ export function NoteToolbarHost() {
 function Toolbar({ onPick, onDone }: { onPick: (kind: BlockKind | "link") => void; onDone: () => void }) {
   return (
     <View
-      style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: s.s2, height: 48, backgroundColor: c.overlay, boxShadow: shadows.overlay }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: s.s2,
+        height: 48,
+        backgroundColor: c.overlay,
+        boxShadow: shadows.overlay,
+      }}
     >
       {COMMANDS.map((cmd) => (
-        <Button key={cmd.kind} icon={cmd.icon} accessibilityLabel={cmd.label} onPress={() => onPick(cmd.kind)} />
+        <Button
+          key={cmd.kind}
+          icon={cmd.icon}
+          accessibilityLabel={cmd.label}
+          onPress={() => onPick(cmd.kind)}
+        />
       ))}
       <Button label="Done" onPress={onDone} style={{ marginLeft: "auto" }} />
     </View>
   );
 }
 
-function LinkForm({ onAdd, onCancel }: { onAdd: (label: string, url: string) => void; onCancel: () => void }) {
+function LinkForm({
+  onAdd,
+  onCancel,
+}: {
+  onAdd: (label: string, url: string) => void;
+  onCancel: () => void;
+}) {
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("https://");
   const valid = /^https?:\/\/\S+\.\S+/.test(url) && label.trim() !== "";
   return (
-    <View style={{ gap: s.s2, marginTop: s.s2, padding: s.s3, borderRadius: r.ctl, backgroundColor: c.sunken }}>
+    <View
+      style={{ gap: s.s2, marginTop: s.s2, padding: s.s3, borderRadius: r.ctl, backgroundColor: c.sunken }}
+    >
       <Field label="Link text" value={label} onChangeText={setLabel} placeholder="Course page" autoFocus />
       <Field label="Address" value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" />
       <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: s.s2 }}>
         <Button label="Cancel" onPress={onCancel} />
-        <Button variant="primary" label="Add link" disabled={!valid} onPress={() => onAdd(label.trim(), url.trim())} />
+        <Button
+          variant="primary"
+          label="Add link"
+          disabled={!valid}
+          onPress={() => onAdd(label.trim(), url.trim())}
+        />
       </View>
     </View>
   );

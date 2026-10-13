@@ -49,17 +49,31 @@ export const Press = forwardRef<View, Props>(function Press(
     <Pressable
       ref={ref}
       disabled={disabled}
-      android_ripple={ripple ? { color: c.select, borderless: rippleRadius !== undefined, ...(rippleRadius ? { radius: rippleRadius } : {}) } : undefined}
+      android_ripple={
+        ripple
+          ? {
+              color: c.select,
+              borderless: rippleRadius !== undefined,
+              ...(rippleRadius ? { radius: rippleRadius } : {}),
+            }
+          : undefined
+      }
       style={(state: PressableStateCallbackType) => {
         const st = state as PressableStateCallbackType & { hovered?: boolean; focused?: boolean };
-        const ps: PressState = { pressed: st.pressed, hovered: Boolean(st.hovered), focused: Boolean(st.focused) };
+        const ps: PressState = {
+          pressed: st.pressed,
+          hovered: Boolean(st.hovered),
+          focused: Boolean(st.focused),
+        };
         const own = typeof style === "function" ? style(ps) : style;
         const hover = hoverBg === null ? undefined : (hoverBg ?? c.hover);
         return [
           webTransition,
           ps.hovered && !disabled && hover ? { backgroundColor: hover } : null,
           own,
-          Platform.OS === "web" && scale && ps.pressed && !disabled ? { transform: [{ scale: m.pressScale }] } : null,
+          Platform.OS === "web" && scale && ps.pressed && !disabled
+            ? { transform: [{ scale: m.pressScale }] }
+            : null,
           disabled ? { opacity: 0.45 } : null,
           Platform.OS === "web" ? ({ cursor: disabled ? "default" : "pointer" } as ViewStyle) : null,
         ];
