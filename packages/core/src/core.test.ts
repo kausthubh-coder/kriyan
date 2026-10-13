@@ -1,0 +1,163 @@
+import { describe, expect, test } from "vitest";
+import { contrast } from "./color.ts";
+import { addDays, todayIn, weekday, zonedInstant } from "./dates.ts";
+import { describeReminder, describeRepeat, formatDay, formatDuration, repeatPhrase } from "./format.ts";
+import { parseTask } from "./parse.ts";
+import type { Repeat } from "./repeat.ts";
+import { freeMinutes, layoutDay } from "./layout.ts";
+import { reminderInstants } from "./reminders.ts";
+import { color } from "./tokens.ts";
+
+describe("dates", () => {
+  test("weekday is Monday-first", () => {
+    expect(weekday("2026-10-12")).toBe(0);
+    expect(weekday("2026-10-18")).toBe(6);
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+  });
+
+  test("today comes from the person's time zone, not UTC", () => {
+    // 03:00 UTC on 14 Oct is still the evening of 13 Oct in New York.
+    const instant = Date.UTC(2026, 9, 14, 3, 0);
+    expect(todayIn("America/New_York", instant)).toBe("2026-10-13");
+    expect(todayIn("Asia/Kolkata", instant)).toBe("2026-10-14");
+  });
+
+  test("zonedInstant handles daylight saving time", () => {
+    // 09:00 in New York is 13:00 UTC in summer time and 14:00 UTC after it ends.
+    expect(new Date(zonedInstant("2026-10-30", 540, "America/New_York")).toISOString()).toBe(
+      "2026-10-30T13:00:00.000Z",
+    );
+    expect(new Date(zonedInstant("2026-11-02", 540, "America/New_York")).toISOString()).toBe(
+      "2026-11-02T14:00:00.000Z",
+    );
+  });
+});
+
+describe("format", () => {
+  test("dates read like Tue 13 Oct or Today", () => {
+    expect(formatDay("2026-10-13", "2026-10-13")).toBe("Today");
+    expect(formatDay("2026-10-14", "2026-10-13")).toBe("Tomorrow");
+    expect(formatDay("2026-10-16", "2026-10-13")).toBe("Fri 16 Oct");
+    expect(formatDay("2027-01-04", "2026-10-13")).toBe("Mon 4 Jan 2027");
+  });
+
+  test("lengths", () => {
+    expect([15, 60, 90].map(formatDuration)).toEqual(["15 min", "1 h", "1 h 30 min"]);
+  });
+
+  test("repeat rules in words", () => {
+    expect(
+      describeRepeat(
+        { freq: "week", interval: 1, weekdays: [1, 3], end: { kind: "on", date: "2026-12-11" } },
+        "2026-10-13",
+        "2026-10-13",
+      ),
+    ).toBe("Every Tue and Thu, until Fri 11 Dec");
+    expect(describeRepeat({ freq: "week", interval: 1, weekdays: [0, 1, 2, 3, 4] }, "2026-10-13")).toBe(
+      "Every weekday",
+    );
+    expect(
+      describeRepeat(
+        { freq: "month", interval: 1, monthly: { kind: "nth", n: 2, weekday: 1 } },
+        "2026-10-13",
+      ),
+    ).toBe("Every month on the second Tuesday");
+    expect(describeRepeat({ freq: "month", interval: 1 }, "2026-10-13")).toBe("Every month on the 13th");
+    expect(describeRepeat({ freq: "year", interval: 1 }, "2026-10-16")).toBe("Every year on 16 Oct");
+    expect(describeRepeat({ freq: "day", interval: 2, fromCompletion: true }, "2026-10-13")).toBe(
+      "Every 2 days after done",
+    );
+  });
+
+  test("reminders in words", () => {
+    expect(describeReminder({ kind: "before", minutes: 10 })).toBe("10 min before");
+    expect(describeReminder({ kind: "before", minutes: 1440 })).toBe("1 day before");
+    expect(describeReminder({ kind: "day", offset: -1, time: 1200 })).toBe("Day before at 20:00");
+  });
+});
+
+describe("reminders", () => {
+  test("fire before the start, or on a day at a time, in the person's zone", () => {
+    const instants = reminderInstants(
+      { date: "2026-10-13", time: 9 * 60 },
+      [
+        { kind: "before", minutes: 10 },
+        { kind: "day", offset: -1, time: 20 * 60 },
+      ],
+      "America/New_York",
+    ).map((i) => new Date(i).toISOString());
+    expect(instants).toEqual(["2026-10-13T00:00:00.000Z", "2026-10-13T12:50:00.000Z"]);
+  });
+
+  test("a task with no time counts back from 09:00", () => {
+    expect(
+      reminderInstants({ date: "2026-10-13" }, [{ kind: "before", minutes: 60 }], "UTC").map((i) =>
+        new Date(i).toISOString(),
+      ),
+    ).toEqual(["2026-10-13T08:00:00.000Z"]);
+  });
+});
+
+describe("layout", () => {
+  test("overlapping blocks share the width in columns", () => {
+    const placed = layoutDay([
+      { id: "lunch", start: 780, length: 45 },
+      { id: "call", start: 780, length: 60 },
+      { id: "run", start: 1050, length: 60 },
+    ]);
+    expect(placed.map((p) => [p.id, p.column, p.columns])).toEqual([
+      ["call", 0, 2],
+      ["lunch", 1, 2],
+      ["run", 0, 1],
+    ]);
+  });
+
+  test("free time from now to the end of the day, overlaps counted once, no-length tasks ignored", () => {
+    const items = [
+      { id: "a", start: 660, length: 90 },
+      { id: "b", start: 780, length: 45 },
+      { id: "c", start: 780, length: 60 },
+      { id: "d", start: 900 },
+    ];
+    // From 12:20 to 22:00 is 580 min; busy: 12:20-12:30 (10) and 13:00-14:00 (60).
+    expect(freeMinutes(items, 740, 1320)).toBe(510);
+  });
+});
+
+test("every text tone keeps 4.5:1 on every surface", () => {
+  for (const text of [color.ink, color.ink2, color.ink3, color.now]) {
+    for (const surface of [color.bg, color.raised, color.overlay, color.sunken]) {
+      expect(contrast(text, surface)).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+});
+
+describe("repeatPhrase", () => {
+  const today = "2026-10-12";
+  const cases: [Repeat, string][] = [
+    [{ freq: "day", interval: 1 }, "every day"],
+    [{ freq: "day", interval: 2, fromCompletion: true }, "every 2 days after done"],
+    [
+      { freq: "week", interval: 1, weekdays: [1, 3], end: { kind: "on", date: "2026-12-11" } },
+      "every tue and thu until dec 11",
+    ],
+    [{ freq: "week", interval: 1, weekdays: [0, 1, 2, 3, 4] }, "every weekday"],
+    [{ freq: "week", interval: 2, weekdays: [0] }, "every 2 weeks on mon"],
+    [{ freq: "month", interval: 1, monthly: { kind: "day", day: 15 } }, "every 15th"],
+    [{ freq: "month", interval: 1, monthly: { kind: "last" } }, "every last day"],
+    [
+      {
+        freq: "month",
+        interval: 1,
+        monthly: { kind: "nth", n: 2, weekday: 1 },
+        end: { kind: "count", count: 10 },
+      },
+      "every second tue for 10 times",
+    ],
+    [{ freq: "year", interval: 1 }, "every year"],
+  ];
+  test.each(cases)("%o reads as %s and parses back to the same rule", (rule, phrase) => {
+    expect(repeatPhrase(rule, today)).toBe(phrase);
+    expect(parseTask(`x ${phrase}`, today).repeat).toEqual(rule);
+  });
+});

@@ -1,6 +1,0 @@
-import {spawn} from 'node:child_process';import {resolve} from 'node:path';
-async function step(name,command,args=[],cwd=process.cwd(),env={}){console.log('Starting '+name);const exit=await new Promise((done,reject)=>{const p=spawn(process.execPath,[resolve('.agents/scripts/21-command.mjs'),name,command,...args],{cwd,windowsHide:true,stdio:'inherit',env:{...process.env,...env}});p.on('error',reject);p.on('close',done)});console.log(name+': '+exit);if(exit!==0)process.exitCode=1;}
-for(const gate of ['typecheck','lint','test','build'])await step('completion-'+gate,'bun',['run',gate]);
-await step('hardening-local-after-wrapper',process.execPath,[resolve('.agents/scripts/21-local-qa.mjs'),'hardening-local-after','','playwright.hardening.config.ts']);
-await step('hardening-production-sanitized',process.execPath,[resolve('node_modules/@playwright/test/cli.js'),'test','--config','playwright.hardening.config.ts','--grep','signed account cleanup'],resolve('apps/web'),{E2E_BASE_URL:'https://app.kriyan.app',NEXT_PUBLIC_CONVEX_URL:'https://calm-salamander-183.convex.cloud',E2E_EXPECT_PRODUCTION:'1'});
-await step('local-rate-account-final',process.execPath,[resolve('.agents/scripts/21-local-services.mjs')],process.cwd(),{QA_ONLY:'read limiter',QA_SUFFIX:'-rate-final',QA_GALLERY:'1',QA_GALLERY_FILTER:'^settings account$'});

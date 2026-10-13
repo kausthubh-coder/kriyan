@@ -1,80 +1,71 @@
-import { CliError } from "./errors";
+// Command-line arguments: positionals plus a few known flags. Unknown flags are a usage error,
+// so a typo never runs a command with the wrong meaning.
 
-const commands = ["login", "logout", "add", "today", "day", "week", "list", "done", "reopen", "move", "goals", "open", "mcp", "whoami"] as const;
-export type Command = (typeof commands)[number] | "help";
-export interface Arguments {
-  command: Command;
-  positional: string[];
+export interface Args {
+  positionals: string[];
   json: boolean;
-  all: boolean;
-  area?: string;
-  project?: string;
-  due?: "today" | "week" | "overdue";
+  help: boolean;
+  version: boolean;
+  undo: boolean;
+  token: string | undefined;
+  agent: string | undefined;
+  file: string | undefined;
 }
 
-export function parseArguments(argv: readonly string[]): Arguments {
-  const result: Arguments = { command: "help", positional: [], json: false, all: false };
-  let commandSet = false;
-  let positionalOnly = false;
-  let help = false;
-  for (let index = 0; index < argv.length; index++) {
-    const token = argv[index];
-    if (token === "--" && !positionalOnly) { positionalOnly = true; continue; }
-    if (!positionalOnly && (token === "--help" || token === "-h")) { help = true; continue; }
-    if (!positionalOnly && token === "--json") { result.json = true; continue; }
-    if (!positionalOnly && token === "--all") { result.all = true; continue; }
-    if (!positionalOnly && token.startsWith("--")) {
-      const [flag, inline] = token.split(/=(.*)/s, 2);
-      if (!["--area", "--project", "--due"].includes(flag)) throw new CliError(`Unknown option ${flag}. Run kriyan --help.`);
-      const value = inline ?? argv[++index];
-      if (!value || value.startsWith("--")) throw new CliError(`Give ${flag} a value. Run kriyan --help.`);
-      if (flag === "--area") result.area = value;
-      if (flag === "--project") result.project = value;
-      if (flag === "--due") {
-        if (value !== "today" && value !== "week" && value !== "overdue") throw new CliError("Use --due today, week or overdue.");
-        result.due = value;
-      }
+export class UsageError extends Error {}
+
+const VALUE_FLAGS = ["token", "agent", "file"] as const;
+type ValueFlag = (typeof VALUE_FLAGS)[number];
+
+export function parseArgs(argv: string[]): Args {
+  const out: Args = {
+    positionals: [],
+    json: false,
+    help: false,
+    version: false,
+    undo: false,
+    token: undefined,
+    agent: undefined,
+    file: undefined,
+  };
+  let rest = false;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (rest || !arg.startsWith("-") || arg === "-" || /^-\d/.test(arg)) {
+      out.positionals.push(arg);
       continue;
     }
-    if (!positionalOnly && token.startsWith("-")) throw new CliError(`Unknown option ${token}. Run kriyan --help.`);
-    if (!commandSet) {
-      if (!(commands as readonly string[]).includes(token) && token !== "help") throw new CliError(`Unknown command ${token}. Run kriyan --help.`);
-      result.command = token as Command;
-      commandSet = true;
-    } else result.positional.push(token);
+    if (arg === "--") {
+      rest = true;
+      continue;
+    }
+    const [flag, inline] = arg.includes("=")
+      ? [arg.slice(0, arg.indexOf("=")), arg.slice(arg.indexOf("=") + 1)]
+      : [arg, undefined];
+    switch (flag) {
+      case "--json":
+        out.json = true;
+        break;
+      case "-h":
+      case "--help":
+        out.help = true;
+        break;
+      case "-v":
+      case "--version":
+        out.version = true;
+        break;
+      case "--undo":
+        out.undo = true;
+        break;
+      default: {
+        const name = flag.slice(2) as ValueFlag;
+        if (!flag.startsWith("--") || !VALUE_FLAGS.includes(name))
+          throw new UsageError(`There's no option ${flag}. Run kriyan --help to see the options.`);
+        const value = inline ?? argv[++i];
+        if (value === undefined || value === "") throw new UsageError(`${flag} needs a value.`);
+        out[name] = value;
+      }
+    }
   }
-  if (help) { result.command = "help"; return result; }
-  if ((result.area || result.project || result.due || result.all) && result.command !== "list") throw new CliError("Use --area, --project, --due and --all with kriyan list.");
-  const count = result.positional.length;
-  const minimum = result.command === "move" ? 2 : ["add", "day", "done", "reopen"].includes(result.command) ? 1 : 0;
-  const maximum = result.command === "move" ? Infinity : minimum;
-  if (count < minimum || count > maximum || result.positional.some((value) => !value.trim())) throw new CliError(`Invalid arguments for ${result.command}. Run kriyan --help.`);
-  return result;
+  return out;
 }
-
-export const helpText = `Kriyan CLI
-Organise tasks and goals in your areas. Use kriyan mcp to plan with your AI.
-
-Usage: kriyan <command> [--json]
-
-  login                              Sign in through your browser
-  logout                             Clear saved credentials
-  add "<text>"                       Add a task with quick add
-  today                              Show today's plan
-  day <YYYY-MM-DD>                    Show a day's plan
-  week                               Show this week's load and deadlines
-  list [--area <name>] [--project <name>]
-       [--due today|week|overdue] [--all]
-  done <id or text>                   Complete an active task
-  reopen <id or text>                 Reopen a completed task
-  move <id or text> <when>            Move an active task, e.g. tomorrow 3pm
-  goals                              Show goals
-  open                               Open the web app
-  mcp                                Print AI client setup snippets
-  whoami                             Show the signed-in account
-
-Use quotes around task text or a task name containing spaces.
-Every command supports --json. --help shows this help.
-KRIYAN_URL defaults to https://app.kriyan.app.
-Run kriyan login before using authenticated commands.
-`;

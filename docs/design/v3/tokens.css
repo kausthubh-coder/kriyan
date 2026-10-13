@@ -1,0 +1,93 @@
+/* Kriyan design tokens. One theme: dark, warm neutrals ("sumi" ink on night paper).
+   Components use only these names. Values come from docs/design/v3/brand.html. */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces: lighter means closer (Dark Mode). */
+  --bg: oklch(17% 0.005 70);
+  --raised: oklch(20.5% 0.006 70);
+  --overlay: oklch(24% 0.007 70);
+  --sunken: oklch(14.5% 0.005 70);
+  --hover: oklch(100% 0 0 / 0.045);
+  --select: oklch(100% 0 0 / 0.08);
+  --line: oklch(100% 0 0 / 0.07);
+  --line-strong: oklch(100% 0 0 / 0.13);
+  --scrim: oklch(10% 0.005 70 / 0.62);
+
+  /* Text: three tones (Visual Hierarchy). ink-3 stays at 4.5:1 on --overlay. */
+  --ink: oklch(93% 0.008 85);
+  --ink-2: oklch(77% 0.01 80);
+  --ink-3: oklch(68% 0.012 75);
+  --on-ink: oklch(18% 0.006 70);
+
+  /* The only interface colour: now, and late. Vermilion, like a seal. */
+  --now: oklch(71% 0.14 38);
+
+  /* Space colours, chosen by the person. Muted for calm. */
+  --space-L: 74%;
+  --space-C: 0.085;
+  --blue: oklch(var(--space-L) var(--space-C) 245);
+  --green: oklch(var(--space-L) var(--space-C) 150);
+  --orange: oklch(var(--space-L) var(--space-C) 62);
+  --purple: oklch(var(--space-L) var(--space-C) 305);
+  --red: oklch(var(--space-L) var(--space-C) 18);
+  --yellow: oklch(80% var(--space-C) 92);
+  --teal: oklch(var(--space-L) var(--space-C) 195);
+  --pink: oklch(var(--space-L) var(--space-C) 345);
+  /* Timeline block surfaces: each space's hue at surface lightness. */
+  --blue-surface: oklch(25% 0.024 245);
+  --green-surface: oklch(25% 0.024 150);
+  --orange-surface: oklch(25% 0.024 62);
+  --purple-surface: oklch(25% 0.024 305);
+  --red-surface: oklch(25% 0.024 18);
+  --yellow-surface: oklch(25% 0.024 92);
+  --teal-surface: oklch(25% 0.024 195);
+  --pink-surface: oklch(25% 0.024 345);
+
+  /* Type: Figtree, six sizes, each with a job (Type Scale). */
+  --font: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --caption: 500 12px/16px var(--font);
+  --meta: 400 12px/16px var(--font);
+  --body: 400 14px/20px var(--font);
+  --label: 500 14px/20px var(--font);
+  --subhead: 600 16px/24px var(--font);
+  --title: 600 20px/28px var(--font);
+  --headline: 600 28px/32px var(--font);
+  --display: 600 40px/44px var(--font);
+  --tight: -0.01em;
+  --tighter: -0.02em;
+  --tightest: -0.03em;
+
+  /* Space: 4px steps that grow as gaps grow (Spacing Scale). */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px; --s16: 64px;
+
+  /* Shape. Inner radius is outer minus padding (Nested Border Radius). */
+  --r-sm: 6px;
+  --r-ctl: 8px;
+  --r-card: 12px;
+  --r-sheet: 24px;
+  --ctl: 32px;
+  --row: 36px;
+  --touch: 44px;
+
+  /* Edges from light, not lines (Shadows, Not Borders, dark variant). */
+  --shadow-raised: inset 0 0 0 1px oklch(100% 0 0 / 0.05), inset 0 1px 0 oklch(100% 0 0 / 0.04), 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-overlay: inset 0 0 0 1px oklch(100% 0 0 / 0.08), inset 0 1px 0 oklch(100% 0 0 / 0.05), 0 2px 6px oklch(0% 0 0 / 0.3), 0 16px 40px oklch(0% 0 0 / 0.45);
+
+  /* Motion (Easings, Button Press). */
+  --out: cubic-bezier(0.23, 1, 0.32, 1);
+  --in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --press: 160ms;
+  --enter: 220ms;
+  --exit: 150ms;
+}
+@media (max-width: 760px) {
+  /* Phone: body grows to 16px, every target to 44px (Text Size, Hit Areas). */
+  :root {
+    --body: 400 16px/24px var(--font);
+    --label: 500 16px/24px var(--font);
+    --meta: 400 14px/20px var(--font);
+    --ctl: 44px;
+    --row: 48px;
+  }
+}

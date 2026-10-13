@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "Kriyan",
+    "slug": "kriyan",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icons/icon.png",
+    "scheme": "kriyan",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "app.kriyan",
+      "adaptiveIcon": {
+        "backgroundColor": "#110f0d",
+        "foregroundImage": "./assets/icons/adaptive-foreground.png",
+        "monochromeImage": "./assets/icons/adaptive-monochrome.png"
+      },
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": true,
+      "versionCode": 4
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/icons/favicon.png",
+      "name": "Kriyan",
+      "shortName": "Kriyan",
+      "themeColor": "#110f0d",
+      "backgroundColor": "#110f0d"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#110f0d",
+          "image": "./assets/icons/splash.png",
+          "imageWidth": 96
+        }
+      ],
+      "expo-secure-store",
+      "@clerk/expo",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#110f0d",
+          "defaultChannel": "reminders"
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "backgroundColor": "#110f0d",
+    "owner": "kausthubh",
+    "extra": {
+      "eas": {
+        "projectId": "6c332d90-6af8-4ea6-8c10-4ee8e0e93562"
+      }
+    }
+  }
+}

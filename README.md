@@ -1,47 +1,46 @@
 # Kriyan
 
-Kriyan is an open-source planner that makes organising and planning your life easy. Plan with the AI you already use to get more done.
+A calm planner for time boxing. Put everything you have to do in one place, give it a time on your day, and keep the plan quiet enough to follow. The AI you already use (Claude, ChatGPT, Cursor and others) can plan with you.
 
-![The real Kriyan Day view with sample tasks](apps/web/public/landing/day.webp)
+[Open the web app](https://app.kriyan.app) · [Get it on Android](https://github.com/kausthubh-coder/kriyan/releases/latest/download/kriyan.apk) · [Docs](https://kriyan.app/docs)
 
-[Open Kriyan](https://app.kriyan.app/app) | [Try the public demo](https://kriyan.app/demo) | [Read the docs](docs/site/index.md)
+## What it does
 
-## Get Kriyan
+- **Today**: what's next, a timeline you drag tasks onto, anytime tasks and the free time left.
+- **Tasks in one sentence**: `calculus lecture every tue and thu 9am for 1h30 #school/calculus` or `mum's birthday 16 oct every year remind day before at 20:00`.
+- **Repeats**: chosen weekdays at a time and length, first or last day of the month, the nth weekday, yearly, every N days after done, until a date or N times.
+- **Reminders**: as many as you like per task, on Android.
+- **Spaces inside spaces**, each with Markdown notes.
+- **Goals, habits** and a year-long activity heatmap.
+- **Your AI**: an MCP server at `https://kriyan.app/mcp`, an HTTP API and a `kriyan` CLI. Agents can propose a plan that you accept or discard.
 
-- [Open the web app](https://app.kriyan.app/app).
-- [Download Android 1.0.0](https://github.com/kausthubh-coder/kriyan-garden/releases/latest/download/kriyan.apk), for Android 7.0 or newer. [Install guide](https://kriyan.app/download).
-- Connect your AI to [the MCP endpoint](https://app.kriyan.app/mcp) using [the setup guide](https://kriyan.app/docs/mcp).
-- Use the CLI from this checkout with `bun run kriyan login`. [CLI guide](https://kriyan.app/docs/cli).
+## Use it
 
-All four surfaces use one Convex backend and Clerk identity. The public demo uses the real web components with an isolated in-memory store. It never writes to your account and resets on reload.
+- **Web**: [app.kriyan.app](https://app.kriyan.app).
+- **Android**: download [kriyan.apk](https://github.com/kausthubh-coder/kriyan/releases/latest/download/kriyan.apk) from the latest [release](https://github.com/kausthubh-coder/kriyan/releases) (Android 7 or newer).
+- **AI assistants**: add `https://kriyan.app/mcp` as a connector, or use a personal access token from Settings. [Setup guide](https://kriyan.app/docs/mcp).
+- **Terminal**: `bun run kriyan login`, then `bun run kriyan today` from a checkout of this repo. [CLI guide](https://kriyan.app/docs/cli).
 
-## Run locally
+## Develop
 
-Use Bun 1.3.14. Run `bun install`, configure your own projects using `apps/web/.env.example`, and run `bun run dev`. Open localhost:3000. The public landing and demo need no signed-in account. Read [self-hosting](docs/site/self-hosting.md) for Clerk, Convex, Vercel and Android build requirements.
+Bun workspaces: an Expo app (Android and the web app), a Next.js site (landing, docs, MCP), a Convex backend and Clerk for sign-in.
+
+| Where             | What                                                                                               |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| `packages/core`   | Shared logic: dates, repeats, reminders, the quick-add parser, design tokens, the agent operations |
+| `packages/convex` | The backend                                                                                        |
+| `apps/app`        | Expo Router app for Android and the web                                                            |
+| `apps/site`       | kriyan.app: landing, docs, `/mcp`                                                                  |
+| `packages/cli`    | The `kriyan` command                                                                               |
 
 ```sh
-bun run docs:quick-add
-bun run typecheck
-bun run lint
-bun run test
-bun run build
+bun install
+bun run dev      # backend, web app and site
+bun run check    # format, types, lint, tests
 ```
 
-## Repository
-
-```text
-apps/web/          Next.js web app, public landing, demo, docs and MCP
-packages/backend/  Convex schema, shared operations and owner-isolation tests
-packages/core/     Parser, dates, planning, goal logic and design tokens
-docs/site/         Public documentation source
-docs/PLAN.md       Implementation plan
-.agents/briefs/    Scoped implementation and verification briefs
-```
-
-The Android and CLI workspaces live in `apps/mobile` and `packages/cli`. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and review, [SECURITY.md](SECURITY.md) for private vulnerability reports, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
-
-The hosted version is free. Your data is yours to export or delete. The production backend region and final account deletion behavior require integration review, as described in the [privacy policy](docs/site/privacy.md).
+You need your own Convex project and Clerk application; put their values in `.env.local` files (`bun run doctor` lists what's missing). `AGENTS.md` is the guide for working in the repo, for people and coding agents alike.
 
 ## License
 
-[MIT](LICENSE). Schibsted Grotesk is distributed under its [SIL Open Font License](apps/web/public/fonts/OFL.txt).
+MIT

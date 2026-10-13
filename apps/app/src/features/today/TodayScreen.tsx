@@ -1,0 +1,391 @@
+// Today: what am I doing now, what's next, and does today fit. One calm column: the now
+// block leads, then habits, anytime tasks, one quiet row for earlier days, the schedule.
+
+import { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
+import { router } from "expo-router";
+import { useMutation } from "convex/react";
+import { ArrowRight, Check as CheckIcon, Plus } from "lucide-react-native";
+import { api } from "@kriyan/convex/api";
+import { formatClock } from "@kriyan/core/dates";
+import { formatDate, formatDuration } from "@kriyan/core/format";
+import { freeMinutes } from "@kriyan/core/layout";
+import { useClock } from "@/data/time";
+import { useTodayView, type TaskView, type TodayView } from "@/data/views";
+import { completeTask, moveTasks } from "@/features/tasks/actions";
+import { toggleHaptic } from "@/features/tasks/haptics";
+import { DayPicker } from "@/features/tasks/pickers";
+import { QuickAdd, type QuickAddHandle } from "@/features/tasks/QuickAdd";
+import { openTask, TaskRow } from "@/features/tasks/TaskRow";
+import { quickAddTarget } from "@/features/shell/context";
+import { useIsPhone } from "@/theme/layout";
+import { c, s, spaceTone } from "@/theme/tokens";
+import { Button } from "@/ui/Button";
+import { Ring, Skeleton } from "@/ui/bits";
+import { Icon } from "@/ui/Icon";
+import { Popover } from "@/ui/Popover";
+import { Press } from "@/ui/Press";
+import { Notice, PageHead, Screen, SectionHead } from "@/ui/Screen";
+import { Txt } from "@/ui/Txt";
+import { DragGhost } from "./DragGhost";
+import { DragSource } from "./DragSource";
+import { Timeline } from "./Timeline";
+
+export function TodayScreen() {
+  const view = useTodayView();
+  const { today, now } = useClock();
+  const phone = useIsPhone();
+  const quickAdd = useRef<QuickAddHandle>(null);
+
+  useEffect(() => {
+    if (phone) return;
+    quickAddTarget.set({ focus: () => quickAdd.current?.focus() });
+    return () => quickAddTarget.set(null);
+  }, [phone]);
+
+  const free = view ? freeTime(view, now) : null;
+  const freeText = free === null ? "" : free === 0 ? "No free time left" : `${formatDuration(free)} free`;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Screen
+        title="Today"
+        fab
+        actions={
+          view ? (
+            <Txt variant="meta" tone="ink3" style={{ marginRight: s.s1 }}>
+              {freeText}
+            </Txt>
+          ) : null
+        }
+      >
+        <PageHead
+          title="Today"
+          sub={formatDate(today)}
+          right={
+            view ? (
+              <Txt variant="meta" tone="ink3">
+                {freeText}
+              </Txt>
+            ) : null
+          }
+        />
+        {phone ? null : <QuickAdd ref={quickAdd} variant="inline" defaultDate={today} />}
+        {view === undefined ? (
+          <TodaySkeleton />
+        ) : (
+          <TodayBody
+            view={view}
+            today={today}
+            now={now}
+            onAdd={() => (phone ? router.push("/add") : quickAdd.current?.focus())}
+          />
+        )}
+      </Screen>
+      <DragGhost />
+    </View>
+  );
+}
+
+function freeTime(view: TodayView, now: number): number {
+  const busy = view.scheduled
+    .filter((t) => !t.done && t.length && !t.proposedBy)
+    .map((t) => ({ id: t._id, start: t.time ?? 0, length: t.length ?? undefined }));
+  return freeMinutes(busy, Math.max(now, view.profile.dayStart), view.profile.dayEnd);
+}
+
+function TodayBody({
+  view,
+  today,
+  now,
+  onAdd,
+}: {
+  view: TodayView;
+  today: string;
+  now: number;
+  onAdd: () => void;
+}) {
+  const [showEarlierHours, setShowEarlierHours] = useState(false);
+  const nothing =
+    view.scheduled.length === 0 &&
+    view.anytime.length === 0 &&
+    view.done.length === 0 &&
+    view.earlier.length === 0 &&
+    view.habits.length === 0;
+  if (nothing) {
+    return (
+      <Notice
+        title="Nothing planned for today"
+        body="Add what's on your mind, like “call the bank tomorrow 10am”. Anything without a date waits in your Inbox."
+        action={<Button icon={Plus} label="Add your first task" onPress={onAdd} />}
+      />
+    );
+  }
+
+  const live = view.scheduled.filter((t) => !t.done && !t.proposedBy);
+  const current = live.find((t) => t.time !== null && t.length && t.time <= now && now < t.time + t.length);
+  const next = live.find((t) => t.time !== null && t.time > now && t._id !== current?._id);
+  const left = view.anytime.length;
+  const cleared =
+    left === 0 &&
+    live.every((t) => (t.time ?? 0) + (t.length ?? 0) <= now) &&
+    (view.done.length > 0 || view.scheduled.some((t) => t.done));
+  const fold = !showEarlierHours && now - 60 > view.profile.dayStart ? now - 60 : null;
+  const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < now - 60).length;
+
+  return (
+    <>
+      {current || next ? <NowBlock current={current} next={next} now={now} /> : null}
+      {view.habits.length ? <Habits habits={view.habits} today={today} /> : null}
+
+      <View style={{ gap: s.s2 }}>
+        <SectionHead title="Anytime today" meta={left ? `${left} left` : undefined} />
+        {cleared && view.earlier.length === 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingVertical: s.s2 }}>
+            <Icon icon={CheckIcon} tone="ink2" />
+            <Txt variant="body" tone="ink2">
+              Nothing left today.
+            </Txt>
+          </View>
+        ) : null}
+        <View>
+          {view.anytime.map((t) => (
+            <TaskRow
+              key={`${t._id}:${t.date}`}
+              task={t}
+              today={today}
+              wrap={(row) => (
+                <DragSource taskId={t._id} title={t.title} color={spaceTone(t.color).dot} length={t.length}>
+                  {row}
+                </DragSource>
+              )}
+            />
+          ))}
+          {view.done.map((t) => (
+            <TaskRow key={`${t._id}:${t.date}:done`} task={t} today={today} />
+          ))}
+        </View>
+        {!cleared && left === 0 && view.done.length === 0 ? (
+          <Txt variant="body" tone="ink3">
+            Everything today has a time.
+          </Txt>
+        ) : null}
+        {view.earlier.length ? <Earlier tasks={view.earlier} today={today} /> : null}
+      </View>
+
+      <View style={{ gap: s.s2 }}>
+        <SectionHead
+          title="Schedule"
+          right={
+            fold !== null || showEarlierHours ? (
+              <Button
+                variant="quiet"
+                label={
+                  showEarlierHours
+                    ? "Hide earlier hours"
+                    : doneEarlier
+                      ? `Earlier today, ${doneEarlier} done`
+                      : "Earlier today"
+                }
+                onPress={() => setShowEarlierHours(!showEarlierHours)}
+              />
+            ) : null
+          }
+        />
+        <Timeline
+          date={today}
+          items={view.scheduled}
+          now={now}
+          dayStart={view.profile.dayStart}
+          dayEnd={view.profile.dayEnd}
+          foldBefore={fold}
+        />
+      </View>
+    </>
+  );
+}
+
+function NowBlock({ current, next, now }: { current?: TaskView; next?: TaskView; now: number }) {
+  const lead = current ?? next;
+  if (!lead) return null;
+  const end = current && current.time !== null && current.length ? current.time + current.length : null;
+  const progress =
+    current && end !== null && current.time !== null ? (now - current.time) / (end - current.time) : 0;
+  return (
+    <View aria-label="Now" style={{ gap: s.s3 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: current ? c.now : c.ink3 }} />
+        <Txt variant="caption" tone={current ? "now" : "ink3"} tnum>
+          {current && end !== null
+            ? `Now, until ${formatClock(end)}`
+            : `Next, at ${formatClock(lead.time ?? 0)}`}
+        </Txt>
+      </View>
+      <Press
+        role="button"
+        accessibilityLabel={`Open ${lead.title}`}
+        onPress={() => openTask(lead._id)}
+        hoverBg={null}
+        scale={false}
+        style={{ minHeight: 44, justifyContent: "center" }}
+      >
+        <Txt variant="headline" heading={2}>
+          {lead.title}
+        </Txt>
+      </Press>
+      {current && end !== null ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: s.s4 }}>
+          <View
+            style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: c.lineStrong, overflow: "hidden" }}
+          >
+            <View
+              style={{
+                width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`,
+                height: "100%",
+                backgroundColor: c.ink,
+              }}
+            />
+          </View>
+          <Txt variant="meta" tone="ink3" tnum>
+            {formatDuration(Math.max(1, end - now))} left
+          </Txt>
+          {current.event ? null : (
+            <Button icon={CheckIcon} label="Done" onPress={() => completeTask(current)} />
+          )}
+        </View>
+      ) : (
+        <Txt variant="meta" tone="ink3" tnum>
+          In {formatDuration(Math.max(1, (lead.time ?? 0) - now))}
+        </Txt>
+      )}
+      {current && next ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+          <Icon icon={ArrowRight} size={16} />
+          <Txt variant="body" tone="ink3" tnum>
+            {formatClock(next.time ?? 0)}
+          </Txt>
+          <Txt variant="label" tone="ink2" numberOfLines={1} style={{ flex: 1 }}>
+            {next.title}
+          </Txt>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function Habits({ habits, today }: { habits: TodayView["habits"]; today: string }) {
+  const check = useMutation(api.organize.checkHabit).withOptimisticUpdate((store, { id, done }) => {
+    const current = store.getQuery(api.views.today, { today });
+    if (!current) return;
+    store.setQuery(
+      api.views.today,
+      { today },
+      {
+        ...current,
+        habits: current.habits.map((h) =>
+          h._id === id ? { ...h, doneToday: done, thisWeek: h.thisWeek + (done ? 1 : -1) } : h,
+        ),
+      },
+    );
+  });
+  const phone = useIsPhone();
+  return (
+    <View aria-label="Habits today" style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s4 }}>
+      {habits.map((h) => {
+        const tone = spaceTone(h.color ?? "green");
+        return (
+          <Press
+            key={h._id}
+            role="switch"
+            aria-checked={h.doneToday}
+            accessibilityLabel={`${h.title}, ${h.thisWeek} of ${h.target} this week`}
+            onPress={() => {
+              toggleHaptic(!h.doneToday);
+              void check({ id: h._id, done: !h.doneToday, date: today });
+            }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: s.s2,
+              height: phone ? 44 : 32,
+              paddingHorizontal: s.s2,
+              marginHorizontal: -s.s2,
+              borderRadius: 8,
+            }}
+          >
+            <Ring color={tone.dot} done={h.doneToday} size={phone ? 20 : 16} />
+            <Txt variant="label" tone="ink2">
+              {h.title}
+            </Txt>
+          </Press>
+        );
+      })}
+    </View>
+  );
+}
+
+function Earlier({ tasks, today }: { tasks: TaskView[]; today: string }) {
+  const [open, setOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const pickRef = useRef<View>(null);
+  const ids = tasks.map((t) => t._id);
+  return (
+    <View style={{ gap: s.s1 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: s.s2 }}>
+        <Button
+          variant="quiet"
+          label={`${tasks.length} from earlier`}
+          expanded={open}
+          onPress={() => setOpen(!open)}
+          style={{ marginLeft: -s.s3 }}
+        />
+        <Button label="Move to today" onPress={() => void moveTasks(ids, today)} />
+        <Button ref={pickRef} label="Pick a day" onPress={() => setPicking(true)} />
+      </View>
+      {open ? (
+        <View>
+          {tasks.map((t) => (
+            <TaskRow key={t._id} task={t} today={today} showWhen />
+          ))}
+        </View>
+      ) : null}
+      <Popover
+        open={picking}
+        onClose={() => setPicking(false)}
+        anchor={pickRef}
+        title={`Move ${tasks.length} to a day`}
+      >
+        <DayPicker
+          value={null}
+          today={today}
+          allowNone={false}
+          onPick={(date) => {
+            setPicking(false);
+            if (date) void moveTasks(ids, date);
+          }}
+        />
+      </Popover>
+    </View>
+  );
+}
+
+function TodaySkeleton() {
+  return (
+    <View testID="skeleton" aria-busy style={{ gap: s.s12 }}>
+      <View style={{ gap: s.s3 }}>
+        <Skeleton width={120} height={12} />
+        <Skeleton width="70%" height={28} />
+        <Skeleton width="100%" height={2} />
+      </View>
+      <View style={{ gap: s.s4 }}>
+        <Skeleton width={140} height={16} />
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={{ flexDirection: "row", gap: s.s3, alignItems: "center" }}>
+            <Skeleton width={18} height={18} style={{ borderRadius: 9 }} />
+            <Skeleton width={`${60 - i * 8}%`} height={14} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}

@@ -1,0 +1,152 @@
+.main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--s8);
+}
+
+.hero {
+  display: grid;
+  gap: var(--s12);
+  padding: var(--s16) 0 var(--s12);
+}
+
+.heroText {
+  display: grid;
+  gap: var(--s4);
+  justify-items: start;
+}
+
+.headline {
+  font: var(--display);
+  letter-spacing: var(--tracking-display);
+  max-width: 14ch;
+}
+
+.lede {
+  font: var(--body);
+  color: var(--ink-2);
+  max-width: 52ch;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding-top: var(--s4);
+}
+
+.section {
+  display: grid;
+  gap: var(--s8);
+  padding: var(--s16) 0;
+  scroll-margin-top: var(--s8);
+}
+
+.intro {
+  display: grid;
+  gap: var(--s3);
+  max-width: 52ch;
+}
+
+.intro h2 {
+  font: var(--headline);
+  letter-spacing: var(--tracking-headline);
+}
+
+.intro p {
+  color: var(--ink-2);
+}
+
+.points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s6);
+  list-style: none;
+}
+
+.points li {
+  display: grid;
+  gap: var(--s1);
+  align-content: start;
+}
+
+.points b {
+  font: var(--subhead);
+  letter-spacing: var(--tracking-subhead);
+}
+
+.points span {
+  color: var(--ink-2);
+}
+
+.setup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s6);
+}
+
+.setupItem {
+  display: grid;
+  gap: var(--s3);
+  align-content: start;
+}
+
+.setupItem h3 {
+  font: var(--subhead);
+  letter-spacing: var(--tracking-subhead);
+}
+
+.setupItem p {
+  color: var(--ink-2);
+}
+
+.link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--ink-3);
+  text-underline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+.link:hover {
+  text-decoration-color: var(--ink);
+}
+
+.closing {
+  display: grid;
+  justify-items: start;
+  gap: var(--s4);
+  padding: var(--s16) 0;
+}
+
+.closing h2 {
+  font: var(--headline);
+  letter-spacing: var(--tracking-headline);
+}
+
+@media (max-width: 760px) {
+  .main {
+    padding: 0 var(--s4);
+  }
+  .hero {
+    padding: var(--s8) 0 var(--s8);
+    gap: var(--s8);
+  }
+  .headline {
+    font: var(--headline);
+    letter-spacing: var(--tracking-headline);
+  }
+  .actions {
+    width: 100%;
+  }
+  .actions > * {
+    flex: 1 1 auto;
+  }
+  .section {
+    padding: var(--s12) 0;
+    gap: var(--s6);
+  }
+  .points,
+  .setup {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,71 @@
+/* Base styles. Every value comes from tokens.css, generated from packages/core/src/tokens.ts. */
+@import "./tokens.css";
+
+/* next/font self-hosts Figtree and sets --font-figtree on <html>, with a size-matched fallback. */
+:root {
+  --font: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  background: var(--bg);
+}
+
+html {
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font: var(--body);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink-2);
+  outline-offset: 2px;
+  border-radius: var(--r-ctl);
+}
+
+img,
+svg {
+  display: block;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: var(--select);
+}

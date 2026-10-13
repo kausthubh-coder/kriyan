@@ -1,13 +1,5 @@
 {
-  "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023", "DOM"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "types": ["node", "bun"]
-  },
-  "include": ["src/**/*.ts", "tsdown.config.ts"]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "types": ["bun"] },
+  "include": ["src", "test", "scripts", "vitest.config.ts"]
 }
