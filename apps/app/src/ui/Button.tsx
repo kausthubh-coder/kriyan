@@ -7,11 +7,14 @@ import { Icon } from "./Icon";
 import { Press } from "./Press";
 import { Txt } from "./Txt";
 
-type Variant = "default" | "primary" | "quiet";
+/** outline: a secondary choice that must read as a button, like "Continue with Google". */
+type Variant = "default" | "primary" | "quiet" | "outline";
 
 interface Props {
   label?: string;
   icon?: LucideIcon;
+  /** A mark before the label that isn't one of our icons, like a provider's logo. */
+  leading?: ReactNode;
   /** Icon after the label (a chevron on a select). */
   trailing?: LucideIcon;
   onPress?: () => void;
@@ -31,6 +34,7 @@ export const Button = forwardRef<View, Props>(function Button(
   {
     label,
     icon,
+    leading,
     trailing,
     onPress,
     variant = "default",
@@ -47,6 +51,7 @@ export const Button = forwardRef<View, Props>(function Button(
   const { ctl } = useControl();
   const iconOnly = !label && !children;
   const primary = variant === "primary";
+  const outline = variant === "outline";
   return (
     <Press
       ref={ref}
@@ -68,7 +73,8 @@ export const Button = forwardRef<View, Props>(function Button(
           gap: s.s2,
           paddingHorizontal: iconOnly ? 0 : s.s3,
           borderRadius: r.ctl,
-          backgroundColor: primary ? c.ink : "transparent",
+          backgroundColor: primary ? c.ink : outline ? c.raised : "transparent",
+          ...(outline ? { borderWidth: 1, borderColor: c.lineStrong } : null),
           overflow: "hidden",
         },
         primary && hovered ? { opacity: 0.92 } : null,
@@ -93,10 +99,11 @@ export const Button = forwardRef<View, Props>(function Button(
               }
             />
           ) : null}
+          {leading}
           {label ? (
             <Txt
               variant="label"
-              tone={primary ? "onInk" : hovered ? "ink" : variant === "quiet" ? "ink3" : "ink2"}
+              tone={primary ? "onInk" : hovered || outline ? "ink" : variant === "quiet" ? "ink3" : "ink2"}
               numberOfLines={1}
             >
               {label}

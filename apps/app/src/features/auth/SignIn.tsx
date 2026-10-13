@@ -1,10 +1,10 @@
-// A calm sign-in: email and password, or a code by email, and Google. One column, one
-// primary button. Errors say what happened and what to do.
+// A calm sign-in: Google first (one tap for most people), then email and password, or a code
+// by email. One column, one solid button. Errors say what happened and what to do.
 
 import { useRef, useState } from "react";
 import { Platform, ScrollView, View, type TextInput } from "react-native";
 import { useSignIn, useSignUp, useSSO } from "@clerk/expo";
-import { CircleAlert, Mail } from "lucide-react-native";
+import { CircleAlert, Lock, Mail } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsPhone } from "@/theme/layout";
 import { c, s } from "@/theme/tokens";
@@ -13,6 +13,7 @@ import { Field } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Mark } from "@/ui/Mark";
 import { Txt } from "@/ui/Txt";
+import { GoogleMark } from "./GoogleMark";
 
 type Mode = "sign-in" | "sign-up";
 type Step = "form" | "code";
@@ -165,55 +166,74 @@ export function SignIn() {
             <Txt variant="body" tone="ink3">
               {step === "code"
                 ? `We sent a 6-digit code to ${email.trim()}.`
-                : "Everything you have to do, planned into your time."}
+                : "Plan the day calmly. Then do it."}
             </Txt>
           </View>
         </View>
 
         {step === "form" ? (
-          <View style={{ gap: s.s3 }}>
-            <Field
-              label="Email"
-              icon={Mail}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              containerStyle={{ height: 44 }}
-            />
-            <Field
-              ref={passwordRef}
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              secureTextEntry
-              autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-              textContentType={mode === "sign-in" ? "password" : "newPassword"}
-              returnKeyType="go"
-              onSubmitEditing={submitPassword}
-              containerStyle={{ height: 44 }}
-            />
+          <View style={{ gap: s.s6 }}>
             <Button
-              variant="primary"
-              label={busy ? "One moment" : mode === "sign-in" ? "Sign in" : "Create account"}
-              onPress={submitPassword}
+              variant="outline"
+              leading={<GoogleMark />}
+              label="Continue with Google"
+              onPress={google}
               disabled={busy}
-              style={{ height: 44, marginTop: s.s1 }}
+              style={{ height: 44 }}
             />
-            {mode === "sign-in" ? (
-              <Button
-                label="Email me a code instead"
-                onPress={sendCode}
-                disabled={busy}
-                style={{ height: 44 }}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: s.s3 }} aria-hidden>
+              <View style={{ flex: 1, height: 1, backgroundColor: c.line }} />
+              <Txt variant="meta" tone="ink3">
+                or with email
+              </Txt>
+              <View style={{ flex: 1, height: 1, backgroundColor: c.line }} />
+            </View>
+            <View style={{ gap: s.s3 }}>
+              <Field
+                label="Email"
+                icon={Mail}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                containerStyle={{ height: 44 }}
               />
-            ) : null}
+              <Field
+                ref={passwordRef}
+                label="Password"
+                icon={Lock}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                secureTextEntry
+                autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                textContentType={mode === "sign-in" ? "password" : "newPassword"}
+                returnKeyType="go"
+                onSubmitEditing={submitPassword}
+                containerStyle={{ height: 44 }}
+              />
+              <Button
+                variant="primary"
+                label={busy ? "One moment" : mode === "sign-in" ? "Sign in" : "Create account"}
+                onPress={submitPassword}
+                disabled={busy}
+                style={{ height: 44, marginTop: s.s1 }}
+              />
+              {mode === "sign-in" ? (
+                <Button
+                  variant="quiet"
+                  label="Email me a code instead"
+                  onPress={sendCode}
+                  disabled={busy}
+                  style={{ height: 44 }}
+                />
+              ) : null}
+            </View>
           </View>
         ) : (
           <View style={{ gap: s.s3 }}>
@@ -261,17 +281,17 @@ export function SignIn() {
         ) : null}
 
         {step === "form" ? (
-          <View style={{ gap: s.s3 }}>
-            <View style={{ height: 1, backgroundColor: c.line }} />
-            <Button label="Continue with Google" onPress={google} disabled={busy} style={{ height: 44 }} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <Txt variant="body" tone="ink3">
+              {mode === "sign-in" ? "New to Kriyan?" : "Have an account?"}
+            </Txt>
             <Button
-              variant="quiet"
-              label={mode === "sign-in" ? "New to Kriyan? Create an account" : "Have an account? Sign in"}
+              label={mode === "sign-in" ? "Create an account" : "Sign in"}
               onPress={() => {
                 setMode(mode === "sign-in" ? "sign-up" : "sign-in");
                 setError(null);
               }}
-              style={{ height: 44 }}
+              style={{ height: 44, paddingHorizontal: s.s2 }}
             />
           </View>
         ) : null}

@@ -85,7 +85,7 @@ export async function signIn(page) {
   }
   console.log(`sign-in said: ${await page.getByRole("alert").innerText()}`);
   // No account yet: create it, then verify with the test code.
-  await page.getByRole("button", { name: "New to Kriyan? Create an account" }).click();
+  await page.getByRole("button", { name: "Create an account" }).click();
   await page.getByRole("textbox", { name: "Email" }).fill(EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
