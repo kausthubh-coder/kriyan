@@ -1,15 +1,9 @@
 "use client";
 
 import { useId, useState, useSyncExternalStore } from "react";
-import { parseTask, type ParsedTask } from "@kriyan/core/parse";
+import { parseTask } from "@kriyan/core/parse";
 import { todayIn } from "@kriyan/core/dates";
-import {
-  describeReminder,
-  describeRepeat,
-  formatDay,
-  formatDuration,
-  formatTime,
-} from "@kriyan/core/format";
+import { describeParsed } from "@/lib/parsed";
 import css from "./QuickAddDemo.module.css";
 
 const EXAMPLES = [
@@ -32,30 +26,12 @@ function useToday(): string | null {
   );
 }
 
-interface Chip {
-  label: string;
-  value: string;
-}
-
-function chipsFor(parsed: ParsedTask, today: string): Chip[] {
-  const chips: Chip[] = [];
-  if (parsed.spaceName) chips.push({ label: "Space", value: parsed.spaceName });
-  if (parsed.date) chips.push({ label: "Date", value: formatDay(parsed.date, today) });
-  if (parsed.time !== undefined) chips.push({ label: "Time", value: formatTime(parsed.time) });
-  if (parsed.length !== undefined) chips.push({ label: "Length", value: formatDuration(parsed.length) });
-  if (parsed.repeat && parsed.date)
-    chips.push({ label: "Repeats", value: describeRepeat(parsed.repeat, parsed.date, today) });
-  for (const reminder of parsed.reminders) chips.push({ label: "Reminder", value: describeReminder(reminder) });
-  if (parsed.deadline) chips.push({ label: "Due", value: formatDay(parsed.deadline, today) });
-  return chips;
-}
-
 export function QuickAddDemo() {
   const id = useId();
   const today = useToday();
   const [text, setText] = useState(EXAMPLES[0] ?? "");
   const parsed = today ? parseTask(text, today) : null;
-  const chips = parsed && today ? chipsFor(parsed, today) : [];
+  const chips = parsed && today ? describeParsed(parsed, today) : [];
 
   return (
     <div className={css.demo}>

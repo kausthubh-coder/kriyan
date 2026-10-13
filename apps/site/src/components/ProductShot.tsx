@@ -32,7 +32,7 @@ export function ProductShot({
     <picture className={css.frame}>
       <source media="(max-width: 760px)" srcSet={phoneProps.srcSet} sizes={phoneProps.sizes} width={phone.width} height={phone.height} />
       <source media="(min-width: 761px)" srcSet={desktopSet} />
-      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+      {/* eslint-disable-next-line jsx-a11y/alt-text -- alt comes from getImageProps */}
       <img {...rest} className={css.img} />
     </picture>
   );
