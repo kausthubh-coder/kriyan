@@ -113,7 +113,7 @@ cd dist && VERCEL_ORG_ID=team_eG2BEkfqMmQSwwGiTPzlC622 VERCEL_PROJECT_ID=prj_8r2
    ```
 3. `bun publish --access public` from `packages/cli/dist`. It uses the token in `~/.npmrc`.
 
-`kriyan` was not on npm as of 2026-10-13, so the first publish claims the name. The unmerged `release-2.0` branch documents a different install, a `kriyan-cli.tgz` attached to each release. Ask me which one stays before merging it.
+The CLI ships on npm as `kriyan` (decided 2026-10-13; the name was free that day, so the first publish claims it). Install docs say `npm i -g kriyan`. The unmerged `release-2.0` branch documents an older plan, a `kriyan-cli.tgz` on each release. Change its docs to npm before merging it, or drop it.
 
 ## 7. Check production (read-only)
 
