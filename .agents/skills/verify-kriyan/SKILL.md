@@ -56,6 +56,11 @@ The test account is `kriyan.app.qa+clerk_test@example.com` on the dev Clerk inst
 
 `api.mjs` signs with the dev service secret and refuses any deployment that isn't `dev:`. Use it to arrange state; prove the feature itself through the surface a person uses.
 
+Production, read-mostly, as the test account (it removes what it adds):
+
+- `MSYS_NO_PATHCONV=1 KRIYAN_APP_URL=https://app.kriyan.app node apps/app/e2e/prod-smoke.mjs`: the web app on the production backend, a token from Settings, the API, the CLI (and its task in the app), MCP in both protocol eras, revocation.
+- `node apps/app/e2e/mcp-oauth.mjs`: the connector sign-in Claude and ChatGPT do: discovery, client registration, Clerk sign-in and consent, token exchange, MCP with that token.
+
 `node apps/app/e2e/walkthrough.mjs` runs the main desktop flows (after `seed.mjs`) and prints `ok` or `FAIL` per step with a screenshot of each failure.
 
 ## Isolation

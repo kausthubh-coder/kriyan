@@ -8,6 +8,7 @@ A person connects their AI to Kriyan with a personal access token (or OAuth on t
 - `agents-api` `GET /api/v1` lists the operations; `POST /api/v1/<op>` with `Authorization: Bearer kriyan_...`.
 - `agents-cli` the `kriyan` CLI over the same API.
 - `agents-mcp` the MCP server at `/mcp` on the site: tools, a read, a write.
+- `agents-oauth` a connector signs in through Clerk (dynamic registration, consent) and calls MCP with the OAuth token.
 - `agents-proposals` `propose_plan` puts blocks on Upcoming behind a `Claude proposed N blocks` banner with `Accept all` and `Discard`.
 
 ## How to get to it (user POV)
@@ -32,4 +33,4 @@ Preconditions: baseline seed; `bun run dev` serving the site.
 
 - Never print, log or screenshot a token; screenshots of Settings are taken before `Create token` or after `I've copied it`.
 - `api.mjs` uses the service secret, a test shortcut. A proof of `agents-api` uses a personal access token.
-- OAuth for MCP needs the production Clerk instance with dynamic client registration; locally prove MCP with a token.
+- OAuth for MCP runs on whichever Clerk instance the site's keys name (dynamic client registration is on). Prove it with `node apps/app/e2e/mcp-oauth.mjs`; Playwright routes miss the final redirect, so the script reads the callback from the request event.

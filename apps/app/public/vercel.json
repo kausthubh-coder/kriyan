@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    { "source": "/app", "destination": "/today", "permanent": false },
+    { "source": "/app/:path*", "destination": "/today", "permanent": false },
+    { "source": "/mcp", "destination": "https://kriyan.app/mcp", "statusCode": 308 }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {

@@ -8,6 +8,18 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  // Addresses from the first version of Kriyan, so old links still land somewhere useful.
+  async redirects() {
+    return [
+      {
+        source: "/download",
+        destination: "https://github.com/kausthubh-coder/kriyan/releases/latest",
+        permanent: false,
+      },
+      { source: "/demo", destination: "https://app.kriyan.app", permanent: false },
+      { source: "/app/:path*", destination: "https://app.kriyan.app/:path*", permanent: false },
+    ];
+  },
   async rewrites() {
     if (!convexSite) return [];
     return [

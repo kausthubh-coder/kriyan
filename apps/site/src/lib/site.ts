@@ -4,6 +4,8 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://kriyan.app
 export const APP_URL = "https://app.kriyan.app";
 export const GITHUB_URL = "https://github.com/kausthubh-coder/kriyan";
 export const RELEASES_URL = `${GITHUB_URL}/releases`;
+/** The APK of the latest release; every release attaches it under this name. */
+export const APK_URL = `${RELEASES_URL}/latest/download/kriyan.apk`;
 export const MCP_URL = `${SITE_URL}/mcp`;
 
 export const SITE_NAME = "Kriyan";

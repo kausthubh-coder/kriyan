@@ -5,7 +5,7 @@ import { Code } from "@/components/Code";
 import { ProductShot } from "@/components/ProductShot";
 import { QuickAddDemo } from "@/components/QuickAddDemo";
 import ui from "@/components/ui.module.css";
-import { APP_URL, DESCRIPTION, HEADLINE, MCP_URL, RELEASES_URL } from "@/lib/site";
+import { APK_URL, APP_URL, DESCRIPTION, HEADLINE, MCP_URL } from "@/lib/site";
 import todayDesktop from "@/assets/product/today-desktop.png";
 import todayPhone from "@/assets/product/today-phone.png";
 import upcomingDesktop from "@/assets/product/upcoming-desktop.png";
@@ -33,7 +33,7 @@ export default function Home() {
               <a href={APP_URL} className={`${ui.btn} ${ui.primary} ${ui.large}`}>
                 Open Kriyan
               </a>
-              <a href={RELEASES_URL} className={`${ui.btn} ${ui.secondary} ${ui.large}`}>
+              <a href={APK_URL} className={`${ui.btn} ${ui.secondary} ${ui.large}`}>
                 Get it on Android
               </a>
             </div>
@@ -171,7 +171,7 @@ export default function Home() {
             <a href={APP_URL} className={`${ui.btn} ${ui.primary} ${ui.large}`}>
               Open Kriyan
             </a>
-            <a href={RELEASES_URL} className={`${ui.btn} ${ui.secondary} ${ui.large}`}>
+            <a href={APK_URL} className={`${ui.btn} ${ui.secondary} ${ui.large}`}>
               Get it on Android
             </a>
           </div>
