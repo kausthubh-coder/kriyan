@@ -47,9 +47,9 @@ git -C C:\Users\kaust\OneDrive\Documents\dev\kriyan worktree add C:\Users\kaust\
 cd C:\Users\kaust\.t3\worktrees\kriyan\<name>; bun run setup
 ```
 
-The first setup in a new worktree takes about two minutes, mostly `bun install`.
+The first setup in a new worktree takes two to four minutes, almost all of it `bun install`.
 
 ## Cleanup
 
 - Stop only processes you started, by PID and with `/T` (see Dev).
-- Remove a worktree only when its branch is merged into `main` or I say so, and never one a live thread uses: check `t3_thread_list` for its path first. Then run `git worktree remove <path>` and `git branch -d <branch>`. The local backend's data goes with the folder.
+- Remove a worktree only when its branch is merged into `main` or I say so, and never one a live thread uses: check `t3_thread_list` for its path first. Then run `git worktree remove --force <path>` (the env files and `node_modules` are untracked) and `git branch -d <branch>`. The local backend's data goes with the folder. If git stops at "Filename too long", it has already unregistered the worktree; delete the rest in PowerShell with `Remove-Item -LiteralPath "\\?\<path>" -Recurse -Force`.
