@@ -287,23 +287,16 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           <Prop icon={Bell} label="Reminders">
             <View ref={remindersRef} collapsable={false}>
               {(task.reminders as Reminder[]).map((rem, i) => (
-                <ValueButton
-                  key={i}
-                  text={describeReminder(rem)}
-                  label={`Reminder: ${describeReminder(rem)}. Edit reminders`}
-                  onPress={() => setSub("reminders")}
-                  trailing={
-                    <Press
-                      role="button"
-                      accessibilityLabel={`Remove reminder: ${describeReminder(rem)}`}
-                      onPress={() => void save({ reminders: (task.reminders as Reminder[]).filter((_, k) => k !== i) })}
-                      hoverBg={c.select}
-                      style={{ width: 28, height: 28, borderRadius: r.sm, alignItems: "center", justifyContent: "center", marginLeft: "auto" }}
-                    >
-                      <Icon icon={X} size={14} />
-                    </Press>
-                  }
-                />
+                <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={{ flex: 1 }}>
+                    <ValueButton text={describeReminder(rem)} label={`Reminder: ${describeReminder(rem)}. Edit reminders`} onPress={() => setSub("reminders")} />
+                  </View>
+                  <Button
+                    icon={X}
+                    accessibilityLabel={`Remove reminder: ${describeReminder(rem)}`}
+                    onPress={() => void save({ reminders: (task.reminders as Reminder[]).filter((_, k) => k !== i) })}
+                  />
+                </View>
               ))}
               <ValueButton text="Add reminder" empty expanded={sub === "reminders"} onPress={() => setSub(sub === "reminders" ? null : "reminders")} />
             </View>
@@ -434,7 +427,7 @@ function GoalRow({ task, anchor, expanded, onPress }: { task: TaskDoc; anchor: R
   return (
     <Prop icon={Target} label="Goal">
       <View ref={anchor} collapsable={false}>
-        <ValueButton text={goal?.title ?? "Add to a goal"} empty={!goal} expanded={expanded} onPress={onPress} />
+        <ValueButton text={goal?.title ?? "Add to a goal"} label={`Goal: ${goal?.title ?? "Add to a goal"}`} empty={!goal} expanded={expanded} onPress={onPress} />
       </View>
     </Prop>
   );

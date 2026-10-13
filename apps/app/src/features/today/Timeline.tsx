@@ -121,33 +121,27 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                 onMove={(start) => void moveTasks([t._id], date, start)}
                 onResize={(length) => void updateTask({ id: t._id, length })}
               >
-                <Press
-                  role="button"
-                  accessibilityLabel={`Open ${t.title}, ${formatTimeRange(p.start, t.length ?? undefined)}`}
-                  onPress={() => openTask(t._id)}
-                  hoverBg={null}
-                  scale={false}
-                  style={({ hovered }) => ({
+                <View
+                  style={{
                     flex: 1,
                     flexDirection: "row",
                     alignItems: "flex-start",
                     gap: s.s2,
-                    paddingVertical: h < 28 ? 2 : s.s2,
                     paddingHorizontal: s.s3,
                     borderRadius: r.ctl,
                     overflow: "hidden",
                     backgroundColor: done ? "transparent" : tone.surface,
-                    borderWidth: done || hovered ? 1 : 0,
+                    borderWidth: done ? 1 : 0,
                     borderColor: c.lineStrong,
                     ...(t.proposedBy ? { backgroundColor: c.bg, borderWidth: 1, borderColor: tone.dot } : {}),
-                  })}
+                  }}
                 >
                   {t.event ? (
-                    <View style={{ paddingTop: 6, paddingHorizontal: s.s1 }}>
+                    <View style={{ marginTop: h < 28 ? 8 : 14, marginHorizontal: s.s1 }}>
                       <Dot color={tone.dot} />
                     </View>
                   ) : (
-                    <View style={{ paddingTop: 2 }}>
+                    <View style={{ marginTop: h < 28 ? 4 : 10 }}>
                       <Check
                         size={16}
                         color={tone.dot}
@@ -158,7 +152,14 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                       />
                     </View>
                   )}
-                  <View style={{ flex: 1, minWidth: 0 }}>
+                  <Press
+                    role="button"
+                    accessibilityLabel={`Open ${t.title}, ${formatTimeRange(p.start, t.length ?? undefined)}`}
+                    onPress={() => openTask(t._id)}
+                    hoverBg={null}
+                    scale={false}
+                    style={{ flex: 1, minWidth: 0, alignSelf: "stretch", paddingVertical: h < 28 ? s.s1 : s.s2 }}
+                  >
                     <Txt variant="label" tone={done ? "ink3" : "ink"} strike={done} numberOfLines={1}>
                       {t.title}
                     </Txt>
@@ -167,8 +168,8 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                         {t.repeatText && !t.length ? t.repeatText : formatTimeRange(p.start, t.length ?? undefined)}
                       </Txt>
                     ) : null}
-                  </View>
-                </Press>
+                  </Press>
+                </View>
               </BlockDrag>
             );
           })

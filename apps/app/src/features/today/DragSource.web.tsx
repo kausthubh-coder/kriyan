@@ -25,7 +25,7 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
     const startX = e.clientX;
     const startY = e.clientY;
     let active = false;
-    let rect: { x: number; y: number; width: number; height: number } | null = null;
+    let ended = false;
     const zone = dropZone();
 
     const move = (ev: PointerEvent) => {
@@ -33,15 +33,19 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < THRESHOLD) return;
         active = true;
         document.body.style.cursor = "grabbing";
-        void zone?.measure().then((r) => {
-          rect = r;
-        });
       }
       ev.preventDefault();
-      const over = rect && zone ? minutesAt(rect, zone, ev.clientX, ev.clientY) : null;
-      externalDrag.set({ taskId, title, color, length, x: ev.clientX, y: ev.clientY, over });
+      const x = ev.clientX;
+      const y = ev.clientY;
+      // Measure each move: the page may scroll while dragging.
+      void (zone ? zone.measure() : Promise.resolve(null)).then((rect) => {
+        if (ended) return;
+        const over = rect && zone ? minutesAt(rect, zone, x, y) : null;
+        externalDrag.set({ taskId, title, color, length, x, y, over });
+      });
     };
     const end = (commit: boolean) => {
+      ended = true;
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("keydown", key, true);
