@@ -1,11 +1,11 @@
 // Settings: your day, default reminders, agents, connecting an AI, access tokens, account.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Modal, View } from "react-native";
+import { Linking, Modal, View } from "react-native";
 import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
 import { useMutation } from "convex/react";
-import { Bot, Copy, KeyRound, LogOut, Terminal, Trash2 } from "lucide-react-native";
+import { BookOpen, Bot, Copy, KeyRound, LogOut, Terminal, Trash2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
@@ -29,6 +29,7 @@ import { Txt } from "@/ui/Txt";
 
 export const MCP_URL = "https://kriyan.app/mcp";
 export const CLI_LINE = "npx kriyan login";
+export const MCP_DOCS = "https://kriyan.app/docs/mcp";
 
 async function copy(text: string, what: string) {
   await Clipboard.setStringAsync(text);
@@ -220,6 +221,9 @@ function ConnectAI({ profile }: { profile: Profile }) {
         MCP server with this address; you’ll sign in when it connects.
       </Txt>
       <CopyLine icon={Bot} text={MCP_URL} what="the MCP address" />
+      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+        <Button icon={BookOpen} label="Read the setup guide" onPress={() => void Linking.openURL(MCP_DOCS)} />
+      </View>
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
         Or use the command line. Run this, then paste an access token from below.
       </Txt>

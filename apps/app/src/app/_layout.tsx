@@ -5,6 +5,7 @@ import { tokenCache } from "@clerk/expo/token-cache";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { DarkTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -14,6 +15,8 @@ import { useAppFonts } from "@/theme/fonts";
 import { c } from "@/theme/tokens";
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+// On the web, Google sign-in returns to this page in a popup; this hands the result back.
+WebBrowser.maybeCompleteAuthSession();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!publishableKey) throw new Error("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is missing. Run `bun run setup`.");

@@ -252,7 +252,9 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                 style={{
                   width: phone ? 44 : 24,
                   height: phone ? 44 : 24,
-                  margin: phone ? -10 : -2,
+                  // The box lines up with its row: 44px rows on phones, the text line on desktop.
+                  marginHorizontal: phone ? -10 : -2,
+                  marginVertical: phone ? 0 : -2,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -277,7 +279,7 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
               <View
                 style={{
                   width: 16,
-                  height: style.lineHeight,
+                  height: phone ? 44 : style.lineHeight,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -286,9 +288,11 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
               </View>
             ) : null}
             {b.kind === "numbered" ? (
-              <Txt variant="body" tone="ink3" tnum style={{ minWidth: 16 }}>
-                {number}.
-              </Txt>
+              <View style={{ minWidth: 16, height: phone ? 44 : style.lineHeight, justifyContent: "center" }}>
+                <Txt variant="body" tone="ink3" tnum>
+                  {number}.
+                </Txt>
+              </View>
             ) : null}
             {b.kind === "quote" ? (
               <View
