@@ -51,6 +51,7 @@
     "web": "expo start --web",
     "android": "expo run:android",
     "build:web": "expo export --platform web",
+    "export:prod": "node scripts/export-prod-web.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "test": "echo no app unit tests yet",

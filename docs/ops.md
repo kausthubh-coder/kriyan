@@ -25,12 +25,16 @@ Production environment variables: `CLERK_JWT_ISSUER_DOMAIN` (the production Cler
 
 ## Site and web app
 
-Production env on Vercel, per project: `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `KRIYAN_SERVICE_SECRET` (site); `EXPO_PUBLIC_CONVEX_URL`, `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` (app).
+Site production env lives on Vercel: `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `KRIYAN_SERVICE_SECRET`.
+
+The web app is built here and uploaded as static files, so its values are baked in at build time from `~/.kriyan/prod-env/app.env` (`EXPO_PUBLIC_CONVEX_URL`, `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`). Build it only with `export:prod`: a plain `expo export` reads `apps/app/.env.local` and ships the dev backend.
 
 ```
 bunx vercel deploy --prod --cwd apps/site
-bunx vercel deploy --prod --cwd apps/app/dist   # after `bunx expo export --platform web` in apps/app
+cd apps/app && bun run export:prod && cd dist && bunx vercel deploy --prod   # dist/.vercel links project kriyan-app
 ```
+
+Check after a deploy: the live entry bundle names the production Convex host (`brave-sheep-245`) and no dev host.
 
 ## Android
 

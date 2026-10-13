@@ -9,7 +9,8 @@ const ports = existsSync(new URL(".env.ports", root))
   ? readFileSync(new URL(".env.ports", root), "utf8")
   : "";
 export const PORT = process.env.PORT_APP ?? /PORT_APP=(\d+)/.exec(ports)?.[1] ?? "8081";
-export const BASE = `http://localhost:${PORT}`;
+// KRIYAN_APP_URL points the scripts at a deployed app, e.g. https://app.kriyan.app.
+export const BASE = process.env.KRIYAN_APP_URL ?? `http://localhost:${PORT}`;
 export const ARTIFACTS = new URL(".artifacts/app/", root);
 mkdirSync(ARTIFACTS, { recursive: true });
 export const artifact = (name) => new URL(name, ARTIFACTS).pathname.replace(/^\/([A-Z]:)/, "$1");
@@ -33,11 +34,18 @@ export async function signedInContext(browser, viewport = { width: 1440, height:
     const ctx = await browser.newContext({ viewport, storageState: STATE, reducedMotion: "reduce" });
     const page = await ctx.newPage();
     await page.goto(`${BASE}/today`);
-    const ok = await page
-      .waitForURL((u) => !u.pathname.startsWith("/sign-in"), { timeout: 8000 })
-      .then(() => page.waitForSelector("text=Sign in", { state: "detached", timeout: 8000 }))
-      .then(() => true)
-      .catch(() => false);
+    // Wait for whichever renders: the app's navigation (signed in) or the sign-in form.
+    const ok = await Promise.race([
+      page
+        .getByRole("navigation", { name: "Main" })
+        .first()
+        .waitFor({ timeout: 60000 })
+        .then(() => true),
+      page
+        .getByRole("button", { name: "Sign in", exact: true })
+        .waitFor({ timeout: 60000 })
+        .then(() => false),
+    ]).catch(() => false);
     await page.close();
     if (ok) return ctx;
     await ctx.close();
