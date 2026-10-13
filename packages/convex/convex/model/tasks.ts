@@ -245,7 +245,7 @@ export async function restoreTask(ctx: MutationCtx, ownerId: string, id: Id<"tas
   await scheduleReminders(ctx, id);
 }
 
-/** Moves tasks to a day (and optionally a time). Moving a repeating task moves the series. */
+/** Moves tasks to a day (and optionally a time). Moving a repeating task moves only this occurrence. */
 export async function moveTasks(
   ctx: MutationCtx,
   ownerId: string,

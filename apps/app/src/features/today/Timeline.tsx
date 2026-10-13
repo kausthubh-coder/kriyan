@@ -120,8 +120,10 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
             const done = t.done || Boolean(ticked[t._id]);
             const tone = spaceTone(t.color);
             const colW = laneWidth / p.columns;
-            const top = y(p.start) + 1;
-            const h = y(p.end) - y(p.start) - 2;
+            // A block that began above the "Earlier today" fold starts at the fold's edge.
+            const shown = Math.max(p.start, fromH * 60);
+            const top = y(shown) + 1;
+            const h = y(p.end) - y(shown) - 2;
             const tall = h >= 44;
             return (
               <BlockDrag

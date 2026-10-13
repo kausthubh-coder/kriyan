@@ -1,9 +1,14 @@
 // Walks the main flows on the desktop web app the way a person would and checks what lands
 // on screen: space colours, a habit, a goal, complete and undo, delete and undo, drag onto the
 // timeline, resize, the command menu, keyboard shortcuts, a note with the slash menu, tokens.
-//   node apps/app/e2e/walkthrough.mjs
+//   node apps/app/e2e/seed.mjs && node apps/app/e2e/walkthrough.mjs
 
+import { addDays, todayIn } from "@kriyan/core/dates";
+import { formatDay } from "@kriyan/core/format";
 import { BASE, artifact, launch, settle, signedInContext } from "./lib.mjs";
+
+// Starts from `node apps/app/e2e/seed.mjs`: "Run" repeats every 2 days after it's done.
+const today = todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 const browser = await launch();
 const ctx = await signedInContext(browser, { width: 1440, height: 900 });
@@ -50,12 +55,12 @@ await step(
 await step("add a habit from Progress and check it on Today", async () => {
   await page.goto(`${BASE}/progress`);
   await settle(page);
-  if (!(await page.getByText("Read 20 min", { exact: true }).count())) {
+  if (!(await page.getByText("Read 20 min", { exact: true }).filter({ visible: true }).count())) {
     await page.getByRole("button", { name: "Add habit" }).click();
     await page.getByRole("textbox", { name: "Habit" }).fill("Read 20 min");
     await page.getByRole("button", { name: "4 times a week" }).click();
     await page.getByRole("button", { name: "Add habit", exact: true }).last().click();
-    await page.getByText("Read 20 min", { exact: true }).first().waitFor();
+    await page.getByText("Read 20 min", { exact: true }).filter({ visible: true }).first().waitFor();
   }
   await page.goto(`${BASE}/today`);
   await settle(page);
@@ -103,7 +108,7 @@ await step(
     await page.getByRole("checkbox", { name: "Complete: Run" }).click();
     await page.getByRole("checkbox", { name: "Mark not done: Run" }).first().waitFor({ timeout: 1000 });
     await toast("Done: Run");
-    await toast("Next: Wed 14 Oct");
+    await toast(`Next: ${formatDay(addDays(today, 2), today)}`);
     await page.screenshot({ path: artifact("flow-complete-toast-1440.png") });
     await page.getByRole("button", { name: "Undo" }).click();
     await page.getByRole("checkbox", { name: "Complete: Run" }).waitFor();

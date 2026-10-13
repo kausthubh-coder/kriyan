@@ -180,7 +180,7 @@ export const OPS: OpSpec[] = [
     title: "Change a task",
     kind: "write",
     description:
-      "Change fields of a task. Pass null to clear a field. Changing the date of a repeating task moves the whole series.",
+      "Change fields of a task. Pass null to clear a field. Changing the date of a repeating task moves only that occurrence; later ones keep their usual days. To change the days, change `repeat`.",
     input: obj(
       {
         taskId: id("task"),

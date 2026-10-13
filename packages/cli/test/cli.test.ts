@@ -244,7 +244,8 @@ describe("changing tasks", () => {
 
   test("done by part of a title looks through today and the week", async () => {
     const r = await run("done", "call", "MUM");
-    expect(api.ops()).toEqual(["get_today", "get_week", "complete_task"]);
+    expect(api.ops().slice(0, 2).sort()).toEqual(["get_today", "get_week"]);
+    expect(api.ops()[2]).toBe("complete_task");
     expect(api.requests[2]!.body).toEqual({ taskId: f.ids.call });
     expect(r.stdout).toBe(`Done "Call mum".\n`);
   });
@@ -260,7 +261,8 @@ describe("changing tasks", () => {
 Run the command again with a number, or more of the title.
 `,
     });
-    expect(api.ops()).toEqual(["get_today", "get_week"]);
+    // Both reads go out together, so either may land first.
+    expect(api.ops().sort()).toEqual(["get_today", "get_week"]);
     await run("done", "2");
     expect(api.requests.at(-1)).toMatchObject({ op: "complete_task", body: { taskId: f.ids.essayPlan } });
   });
