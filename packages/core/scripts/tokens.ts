@@ -90,6 +90,11 @@ app.expo.plugins = app.expo.plugins.map((p: unknown) =>
 );
 write(appJsonPath, `${JSON.stringify(app, null, 2)}\n`);
 
+// The web app's page background before React draws, so there is no white flash.
+const indexPath = "apps/app/public/index.html";
+const index = readFileSync(new URL(indexPath, root), "utf8");
+write(indexPath, index.replace(/html, body \{ background: [^;]+;/, `html, body { background: ${color.bg};`));
+
 if (stale.length) {
   console.error(`Generated token files are out of date: ${stale.join(", ")}. Run \`bun run tokens\`.`);
   process.exit(1);

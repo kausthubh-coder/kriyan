@@ -109,4 +109,14 @@ describe("parseTask", () => {
       ["#school", "space"],
     ]);
   });
+  test("spans never run into a phrase taken earlier, so highlights don't overlap", () => {
+    const input = "Calculus II lecture every tue and thu 9am for 1h30 #school/calculus";
+    const { spans } = parseTask(input, today);
+    expect(spans.map((s) => [input.slice(s.start, s.end), s.kind])).toEqual([
+      ["every tue and thu", "repeat"],
+      ["9am", "time"],
+      ["for 1h30", "length"],
+      ["#school/calculus", "space"],
+    ]);
+  });
 });

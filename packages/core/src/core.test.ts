@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { contrast } from "./color.ts";
 import { addDays, todayIn, weekday, zonedInstant } from "./dates.ts";
-import { describeReminder, describeRepeat, formatDay, formatDuration } from "./format.ts";
+import { describeReminder, describeRepeat, formatDay, formatDuration, repeatPhrase } from "./format.ts";
+import { parseTask } from "./parse.ts";
+import type { Repeat } from "./repeat.ts";
 import { freeMinutes, layoutDay } from "./layout.ts";
 import { reminderInstants } from "./reminders.ts";
 import { color } from "./tokens.ts";
@@ -128,4 +130,34 @@ test("every text tone keeps 4.5:1 on every surface", () => {
       expect(contrast(text, surface)).toBeGreaterThanOrEqual(4.5);
     }
   }
+});
+
+describe("repeatPhrase", () => {
+  const today = "2026-10-12";
+  const cases: [Repeat, string][] = [
+    [{ freq: "day", interval: 1 }, "every day"],
+    [{ freq: "day", interval: 2, fromCompletion: true }, "every 2 days after done"],
+    [
+      { freq: "week", interval: 1, weekdays: [1, 3], end: { kind: "on", date: "2026-12-11" } },
+      "every tue and thu until dec 11",
+    ],
+    [{ freq: "week", interval: 1, weekdays: [0, 1, 2, 3, 4] }, "every weekday"],
+    [{ freq: "week", interval: 2, weekdays: [0] }, "every 2 weeks on mon"],
+    [{ freq: "month", interval: 1, monthly: { kind: "day", day: 15 } }, "every 15th"],
+    [{ freq: "month", interval: 1, monthly: { kind: "last" } }, "every last day"],
+    [
+      {
+        freq: "month",
+        interval: 1,
+        monthly: { kind: "nth", n: 2, weekday: 1 },
+        end: { kind: "count", count: 10 },
+      },
+      "every second tue for 10 times",
+    ],
+    [{ freq: "year", interval: 1 }, "every year"],
+  ];
+  test.each(cases)("%o reads as %s and parses back to the same rule", (rule, phrase) => {
+    expect(repeatPhrase(rule, today)).toBe(phrase);
+    expect(parseTask(`x ${phrase}`, today).repeat).toEqual(rule);
+  });
 });
