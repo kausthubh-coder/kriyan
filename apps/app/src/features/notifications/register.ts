@@ -64,8 +64,11 @@ export async function ensureNotifications(): Promise<boolean> {
   return true;
 }
 
+/** Opens the task a tapped reminder is about, once: the last response is kept across mounts. */
 function openFrom(response: Notifications.NotificationResponse | null | undefined) {
-  const taskId = response?.notification.request.content.data?.taskId;
+  if (!response) return;
+  Notifications.clearLastNotificationResponse();
+  const taskId = response.notification.request.content.data?.taskId;
   if (typeof taskId === "string") router.push(`/task/${taskId}`);
 }
 
