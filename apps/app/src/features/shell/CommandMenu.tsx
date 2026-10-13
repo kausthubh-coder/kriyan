@@ -20,6 +20,7 @@ import { Dot, Ring } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
+import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 import { closeCommand, shellState } from "./context";
 
@@ -64,6 +65,8 @@ function Menu() {
   const week = useWeekView(startOfWeek(today));
   const addText = useMutation(api.tasks.addText);
   const input = useRef<TextInput>(null);
+  const layer = useRef<View>(null);
+  useInertOutside(layer);
 
   useEffect(() => {
     const t = setTimeout(() => input.current?.focus(), 0);
@@ -155,6 +158,7 @@ function Menu() {
     <Modal transparent visible animationType="none" onRequestClose={closeCommand}>
       <Pressable accessibilityLabel="Close" onPress={closeCommand} focusable={false} style={{ position: "absolute", inset: 0, backgroundColor: c.scrim } as object} />
       <View
+        ref={layer}
         role="dialog"
         aria-modal
         aria-label="Command menu"

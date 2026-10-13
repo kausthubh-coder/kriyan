@@ -165,7 +165,7 @@ function SpaceBody({ view }: { view: SpaceView }) {
                 ) : null}
                 <Dot color={spaceTone(b.color).dot} />
                 <Link href={`/space/${b._id}`} asChild>
-                  <Press role="link" hoverBg={null} scale={false}>
+                  <Press role="link" hoverBg={null} scale={false} style={{ minHeight: phone ? 44 : 24, minWidth: phone ? 44 : undefined, justifyContent: "center" }}>
                     <Txt variant="body" tone="ink3">
                       {b.name}
                     </Txt>

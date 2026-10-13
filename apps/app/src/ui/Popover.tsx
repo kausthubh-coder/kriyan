@@ -2,12 +2,13 @@
 // outside click or Escape. Phones: a bottom sheet with a handle and a scrim. Focus stays
 // inside while it's open and the rest of the screen is inert.
 
-import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Modal, Platform, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import Animated, { FadeIn, FadeOut, SlideInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, shadows } from "@/theme/tokens";
+import { useInertOutside } from "./inert";
 import { Txt } from "./Txt";
 
 interface Props {
@@ -34,6 +35,8 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
   const win = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [box, setBox] = useState<Box | null>(null);
+  const layer = useRef<View>(null);
+  useInertOutside(layer, open);
 
   useEffect(() => {
     if (!open || phone || !anchor?.current) return;
@@ -60,6 +63,7 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: c.scrim }}>
           <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
           <Animated.View
+            ref={layer}
             entering={SlideInDown.duration(220)}
             role="dialog"
             aria-label={title}
@@ -98,6 +102,7 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
       <Pressable accessibilityLabel="Close" onPress={onClose} style={{ position: "absolute", inset: 0 } as object} focusable={false} />
       <Animated.View
+        ref={layer}
         entering={FadeIn.duration(150)}
         role="dialog"
         aria-label={title}

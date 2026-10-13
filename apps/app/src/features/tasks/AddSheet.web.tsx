@@ -1,10 +1,12 @@
 // Web: quick add as a sheet over a scrim (phones) or a dialog (desktop, when the route is
 // opened directly). The field is focused and sits above the keyboard.
 
+import { useRef } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { FadeIn, Keyframe } from "react-native-reanimated";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, shadows } from "@/theme/tokens";
+import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 import { QuickAdd } from "./QuickAdd";
 
@@ -15,8 +17,10 @@ const sheetIn = new Keyframe({
 
 export function AddSheet({ onClose }: { onClose: () => void }) {
   const phone = useIsPhone();
+  const layer = useRef<View>(null);
+  useInertOutside(layer);
   return (
-    <View style={{ flex: 1 }}>
+    <View ref={layer} style={{ flex: 1 }}>
       <Animated.View entering={FadeIn.duration(150)} style={{ position: "absolute", inset: 0, backgroundColor: c.scrim } as object}>
         <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
       </Animated.View>

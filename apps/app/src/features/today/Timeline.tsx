@@ -34,7 +34,8 @@ interface Props {
 
 export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Props) {
   const phone = useIsPhone();
-  const hourPx = phone ? 64 : 56;
+  // On touch a 30-minute block must be a 44px target, so an hour is 96px.
+  const hourPx = phone ? 96 : 56;
   const ref = useRef<View>(null);
   const [width, setWidth] = useState(0);
   const ticked = ticking.useValue((t) => t);

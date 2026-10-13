@@ -243,6 +243,7 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                 <AutoInput
                   autoFocus
                   lineHeight={style.lineHeight ?? 20}
+                  padY={phone ? s.s3 : 0}
                   value={b.text}
                   accessibilityLabel={`Note, ${COMMANDS.find((x) => x.kind === b.kind)?.label ?? "text"}`}
                   placeholder={empty ? (placeholder ?? (Platform.OS === "web" && !phone ? "Type / for blocks" : "Add a note")) : undefined}
@@ -284,7 +285,7 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
                   hoverBg={null}
                   scale={false}
                   ripple={false}
-                  style={{ minHeight: style.lineHeight, cursor: "text" } as object}
+                  style={{ minHeight: phone ? 44 : 24, justifyContent: "center", cursor: "text" } as object}
                 >
                   <Txt style={[style, empty ? { color: c.ink3 } : null]}>
                     {empty

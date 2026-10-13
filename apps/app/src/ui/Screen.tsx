@@ -7,6 +7,7 @@ import { router, usePathname } from "expo-router";
 import { ArrowLeft, Plus, Search } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { openCommand } from "@/features/shell/context";
+import { NAVBAR_HEIGHT } from "@/features/shell/navbarHeight";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, shadows, sz } from "@/theme/tokens";
 import { Button } from "./Button";
@@ -102,13 +103,12 @@ export function Screen({ title, back, actions, fab, width = "column", children, 
       {phone ? <AppBar title={title} back={back} actions={actions} /> : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        style={{ flex: 1 }}
+        // On the phone web layout the navigation bar is fixed over the bottom; the list ends above it.
+        style={{ flex: 1, ...(phone && Platform.OS === "web" ? { marginBottom: NAVBAR_HEIGHT + s.s4 } : {}) }}
         contentContainerStyle={{
           paddingTop: phone ? s.s2 : width === "wide" ? s.s8 : s.s12,
           paddingHorizontal: phone ? s.s4 : s.s8,
-          // Room for the floating add button and the navigation bar on phones.
-          paddingBottom: phone ? (Platform.OS === "web" ? 96 + s.s16 : s.s16 + 56) : s.s16,
-          ...(shift ? { paddingRight: sz.panel + s.s8 } : {}),
+          paddingBottom: s.s16,
         }}
         {...scrollProps}
       >
@@ -117,11 +117,14 @@ export function Screen({ title, back, actions, fab, width = "column", children, 
             width: "100%",
             maxWidth,
             alignSelf: shift ? "flex-start" : "center",
-            ...(shift ? { marginLeft: s.s8 } : {}),
+            // The panel covers the right 440px; the column moves left to stay clear of it.
+            ...(shift ? { marginRight: sz.panel } : {}),
             gap: phone ? s.s8 : s.s12,
           }}
         >
           {children}
+          {/* Room to scroll the last row clear of the floating add button. */}
+          {fab && phone ? <View style={{ height: 56 }} /> : null}
         </View>
       </ScrollView>
       {footer}

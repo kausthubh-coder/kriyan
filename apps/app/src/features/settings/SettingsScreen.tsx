@@ -24,6 +24,7 @@ import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { PageHead, Screen, SectionHead } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
+import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 
 export const MCP_URL = "https://kriyan.app/mcp";
@@ -166,8 +167,8 @@ function ConnectAI({ profile }: { profile: Profile }) {
             {profile.agentsEditDirectly ? "On: an agent's changes go straight into your plan." : "Off: an agent's changes wait as proposals for you to accept."}
           </Txt>
         </View>
-        <View style={{ width: 40, height: 24, borderRadius: 12, padding: 3, backgroundColor: profile.agentsEditDirectly ? c.ink : c.lineStrong, alignItems: profile.agentsEditDirectly ? "flex-end" : "flex-start" }}>
-          <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: profile.agentsEditDirectly ? c.onInk : c.ink2 }} />
+        <View style={{ width: 44, height: 24, borderRadius: 12, padding: 4, backgroundColor: profile.agentsEditDirectly ? c.ink : c.lineStrong, alignItems: profile.agentsEditDirectly ? "flex-end" : "flex-start" }}>
+          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: profile.agentsEditDirectly ? c.onInk : c.ink2 }} />
         </View>
       </Press>
     </View>
@@ -278,6 +279,8 @@ function DeleteDialog({ onClose }: { onClose: () => void }) {
   const { user } = useUser();
   const [busy, setBusy] = useState(false);
   const cancelRef = useRef<View>(null);
+  const layer = useRef<View>(null);
+  useInertOutside(layer);
   useEffect(() => {
     // Cancel has focus, so a reflexive Enter keeps everything.
     const t = setTimeout(() => (cancelRef.current as unknown as { focus?: () => void } | null)?.focus?.(), 50);
@@ -297,7 +300,7 @@ function DeleteDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: s.s4, backgroundColor: c.scrim }}>
-        <View role="alertdialog" aria-modal aria-label="Delete all your data?" style={{ width: "100%", maxWidth: 440, gap: s.s4, padding: s.s6, borderRadius: r.card, backgroundColor: c.overlay, boxShadow: shadows.overlay }}>
+        <View ref={layer} role="alertdialog" aria-modal aria-label="Delete all your data?" style={{ width: "100%", maxWidth: 440, gap: s.s4, padding: s.s6, borderRadius: r.card, backgroundColor: c.overlay, boxShadow: shadows.overlay }}>
           <Txt variant="title" heading={2}>
             Delete all your data?
           </Txt>

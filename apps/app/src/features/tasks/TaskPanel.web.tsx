@@ -1,11 +1,12 @@
 // Web: the task opens in a side panel that slides in from the right without covering the
 // column (desktop), or a bottom sheet over a scrim (below 760px).
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { FadeIn, Keyframe } from "react-native-reanimated";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, shadows, sz } from "@/theme/tokens";
+import { useInertOutside } from "@/ui/inert";
 import { panelOpenedByKeyboard } from "./panelState";
 
 const slideIn = new Keyframe({
@@ -21,9 +22,14 @@ export function TaskPanel({ children, onClose, label }: { children: ReactNode; o
   const phone = useIsPhone();
   // Opened with the keyboard: no animation (frequent and intentional).
   const animate = !panelOpenedByKeyboard.get();
+  // On phones the sheet is modal; on desktop the panel sits beside the column, which stays usable.
+  const layer = useRef<View>(null);
+  useInertOutside(layer, phone);
+  const passRef = useRef<View>(null);
+  usePassThrough(passRef, !phone);
   if (phone) {
     return (
-      <View style={{ flex: 1 }}>
+      <View ref={layer} style={{ flex: 1 }}>
         <Animated.View entering={animate ? FadeIn.duration(150) : undefined} style={{ position: "absolute", inset: 0, backgroundColor: c.scrim, zIndex: 10 } as object}>
           <Pressable accessibilityLabel="Close task" onPress={onClose} style={{ flex: 1 }} />
         </Animated.View>
@@ -54,7 +60,7 @@ export function TaskPanel({ children, onClose, label }: { children: ReactNode; o
     );
   }
   return (
-    <View pointerEvents="box-none" style={{ flex: 1 }}>
+    <View ref={passRef} pointerEvents="box-none" style={{ flex: 1 }}>
       <Animated.View
         entering={animate ? slideIn : undefined}
         role="complementary"
@@ -68,10 +74,33 @@ export function TaskPanel({ children, onClose, label }: { children: ReactNode; o
           zIndex: 5,
           backgroundColor: c.raised,
           boxShadow: shadows.overlay,
+          pointerEvents: "auto",
         }}
       >
         {children}
       </Animated.View>
     </View>
   );
+}
+
+/**
+ * The panel's route is drawn over the screen behind it. Its wrappers fill the window, so
+ * clicks and focus checks would land on them; let them pass through to the column.
+ */
+function usePassThrough(ref: RefObject<View | null>, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const changed: HTMLElement[] = [];
+    let node = (ref.current as unknown as HTMLElement | null)?.parentElement ?? null;
+    // Up to the stack, whose children are the screens.
+    while (node && node.parentElement && node.parentElement.childElementCount < 2 && node !== document.body) {
+      changed.push(node);
+      node = node.parentElement;
+    }
+    if (node && node !== document.body) changed.push(node);
+    for (const el of changed) el.style.pointerEvents = "none";
+    return () => {
+      for (const el of changed) el.style.pointerEvents = "";
+    };
+  }, [ref, active]);
 }

@@ -22,7 +22,8 @@ const TABS: { href: Href; match: (p: string) => boolean; icon: LucideIcon; label
   },
 ];
 
-export const NAVBAR_HEIGHT = 80;
+export { NAVBAR_HEIGHT } from "./navbarHeight";
+import { NAVBAR_HEIGHT } from "./navbarHeight";
 
 export function NavBar() {
   const path = usePathname();

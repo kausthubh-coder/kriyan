@@ -230,8 +230,7 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
           paddingHorizontal: s.s3,
           borderRadius: r.ctl,
           backgroundColor: c.sunken,
-          borderWidth: 1,
-          borderColor: c.line,
+          boxShadow: `inset 0 0 0 1px ${c.line}`,
         }}
       >
         {field}

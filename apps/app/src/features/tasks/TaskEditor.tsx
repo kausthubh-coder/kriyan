@@ -258,6 +258,7 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             accessibilityLabel="Title"
             placeholderTextColor={hex.ink3}
             lineHeight={roles.title.lineHeight ?? 28}
+            padY={phone ? s.s2 : 0}
             style={[roles.title, { flex: 1, color: done ? c.ink3 : c.ink }]}
           />
         </View>

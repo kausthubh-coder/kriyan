@@ -83,7 +83,7 @@ export const TaskRow = memo(function TaskRow({ task, today, showWhen = false, tr
 
   const body = (
     <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
-      <View style={{ paddingTop: phone ? 11 : 1 }}>
+      <View style={{ marginTop: phone ? 11 : 1 }}>
         {task.event ? (
           <View style={{ width: phone ? 22 : 18, height: phone ? 22 : 18, alignItems: "center", justifyContent: "center" }}>
             <Dot color={tone.dot} />
@@ -105,7 +105,7 @@ export const TaskRow = memo(function TaskRow({ task, today, showWhen = false, tr
         hoverBg={null}
         scale={false}
         unstable_pressDelay={Platform.OS === "web" ? 0 : 100}
-        style={{ flex: 1, minWidth: 0, minHeight: phone ? 44 : 20, justifyContent: "center", gap: 2 }}
+        style={{ flex: 1, minWidth: 0, minHeight: phone ? 44 : 24, justifyContent: "center", gap: 2 }}
       >
         <Txt variant="body" tone={done ? "ink3" : "ink"} strike={done}>
           {task.title}
@@ -119,7 +119,7 @@ export const TaskRow = memo(function TaskRow({ task, today, showWhen = false, tr
         ) : null}
       </Press>
       {task.length && !showWhen ? (
-        <Txt variant="meta" tone="ink3" tnum style={{ paddingTop: phone ? 12 : 2 }}>
+        <Txt variant="meta" tone="ink3" tnum style={{ marginTop: phone ? 12 : 4 }}>
           {formatDuration(task.length)}
         </Txt>
       ) : null}

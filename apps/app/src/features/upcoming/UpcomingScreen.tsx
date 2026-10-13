@@ -149,7 +149,7 @@ function LoadLine({ day }: { day: WeekView["days"][number] }) {
 function Due({ task }: { task: TaskView }) {
   const birthday = task.repeat?.freq === "year";
   return (
-    <Press role="button" accessibilityLabel={`Open ${task.title}`} onPress={() => openTask(task._id)} hoverBg={null} scale={false} style={{ flexDirection: "row", alignItems: "center", gap: s.s1 }}>
+    <Press role="button" accessibilityLabel={`Open ${task.title}`} onPress={() => openTask(task._id)} hoverBg={null} scale={false} style={{ flexDirection: "row", alignItems: "center", gap: s.s1, minHeight: 24 }}>
       <Icon icon={birthday ? Cake : Flag} size={14} />
       <Txt variant="meta" tone="ink2" numberOfLines={1} style={{ flexShrink: 1 }}>
         {birthday ? task.title : `${task.title} due`}
@@ -166,7 +166,8 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
   const y = (m: number) => ((m - from * 60) / 60) * H;
   return (
     <View>
-      <View style={{ flexDirection: "row", paddingLeft: 56 }}>
+      <View style={{ flexDirection: "row" }}>
+        <View style={{ width: 56 }} />
         {week.days.map((d, i) => {
           const over = d.plannedMinutes > d.capacity;
           const allDay = [...d.deadlines, ...d.anytime.filter((t) => t.repeat?.freq === "year")];
@@ -213,7 +214,7 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
             {d.scheduled.map((t) => {
               const tone = spaceTone(t.color);
               const top = y(t.time ?? 0) + 1;
-              const h = Math.max(18, (Math.max(t.length ?? 0, 30) / 60) * H - 2);
+              const h = Math.max(24, (Math.max(t.length ?? 0, 30) / 60) * H - 2);
               const proposed = Boolean(t.proposedBy);
               return (
                 <Press

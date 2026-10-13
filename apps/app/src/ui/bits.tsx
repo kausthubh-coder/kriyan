@@ -93,23 +93,30 @@ export function Chip({
       aria-pressed={on}
       accessibilityLabel={accessibilityLabel ?? (onRemove ? `Remove ${label}` : label)}
       onPress={onRemove ?? onPress}
-      hoverBg={on ? null : c.select}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: s.s2,
-        height: phone ? 36 : 28,
-        paddingHorizontal: s.s3,
-        borderRadius: phone ? 18 : 14,
-        backgroundColor: on ? c.ink : c.hover,
-      }}
+      hoverBg={null}
+      style={{ height: phone ? 44 : 28, minWidth: phone ? 44 : undefined, justifyContent: "center" }}
     >
-      {leading}
-      {icon ? <Icon icon={icon} size={14} tone={on ? "onInk" : "ink3"} /> : null}
-      <Txt style={[roles.label, { fontSize: 12, lineHeight: 16 }]} tone={on ? "onInk" : "ink2"} numberOfLines={1}>
-        {label}
-      </Txt>
-      {onRemove ? <Txt variant="caption" tone="ink3">×</Txt> : null}
+      {({ hovered }) => (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: s.s2,
+            height: phone ? 36 : 28,
+            paddingHorizontal: s.s3,
+            borderRadius: phone ? 18 : 14,
+            backgroundColor: on ? c.ink : hovered ? c.select : c.hover,
+          }}
+        >
+          {leading}
+          {icon ? <Icon icon={icon} size={14} tone={on ? "onInk" : "ink3"} /> : null}
+          <Txt style={[roles.label, { fontSize: 12, lineHeight: 16 }]} tone={on ? "onInk" : "ink2"} numberOfLines={1}>
+            {label}
+          </Txt>
+          {onRemove ? <Txt variant="caption" tone="ink3">×</Txt> : null}
+        </View>
+      )}
     </Press>
   );
 }
@@ -132,8 +139,8 @@ export const Field = forwardRef<
           paddingHorizontal: s.s3,
           borderRadius: r.ctl,
           backgroundColor: c.sunken,
-          borderWidth: 1,
-          borderColor: c.line,
+          // The edge is light, not a border, so the input fills the field's full height.
+          boxShadow: `inset 0 0 0 1px ${c.line}`,
         },
         containerStyle,
       ]}

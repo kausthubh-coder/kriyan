@@ -179,7 +179,7 @@ function NowBlock({ current, next, now }: { current?: TaskView; next?: TaskView;
           {current && end !== null ? `Now, until ${formatClock(end)}` : `Next, at ${formatClock(lead.time ?? 0)}`}
         </Txt>
       </View>
-      <Press role="button" accessibilityLabel={`Open ${lead.title}`} onPress={() => openTask(lead._id)} hoverBg={null} scale={false}>
+      <Press role="button" accessibilityLabel={`Open ${lead.title}`} onPress={() => openTask(lead._id)} hoverBg={null} scale={false} style={{ minHeight: 44, justifyContent: "center" }}>
         <Txt variant="headline" heading={2}>
           {lead.title}
         </Txt>

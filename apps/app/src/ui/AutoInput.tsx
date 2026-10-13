@@ -3,8 +3,8 @@
 import { forwardRef, useState } from "react";
 import { Platform, TextInput, type TextInputProps, type TextStyle } from "react-native";
 
-export const AutoInput = forwardRef<TextInput, TextInputProps & { lineHeight: number }>(function AutoInput(
-  { lineHeight, style, onContentSizeChange, ...rest },
+export const AutoInput = forwardRef<TextInput, TextInputProps & { lineHeight: number; padY?: number }>(function AutoInput(
+  { lineHeight, padY = 0, style, onContentSizeChange, ...rest },
   ref,
 ) {
   const [height, setHeight] = useState<number | null>(null);
@@ -21,7 +21,7 @@ export const AutoInput = forwardRef<TextInput, TextInputProps & { lineHeight: nu
       }}
       style={[
         style,
-        { padding: 0, height: Math.max(lineHeight, height ?? 0) } as TextStyle,
+        { padding: 0, paddingVertical: padY, height: Math.max(lineHeight + 2 * padY, height ?? 0) } as TextStyle,
         Platform.OS === "web" ? ({ outlineStyle: "none", resize: "none" } as object) : null,
       ]}
       {...rest}
