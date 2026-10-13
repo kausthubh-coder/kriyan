@@ -27,6 +27,8 @@ export const NAVBAR_HEIGHT = 80;
 export function NavBar() {
   const path = usePathname();
   const insets = useSafeAreaInsets();
+  // A sheet (a task, quick add) covers the bar; don't draw it on top of the sheet.
+  if (path.startsWith("/task/") || path === "/add") return null;
   return (
     <>
       <View

@@ -138,3 +138,47 @@ export function weekOf(date: CivilDate): CivilDate[] {
   const start = addDays(date, -weekday(date));
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
 }
+
+const WD_TYPED = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const NTH_TYPED = { 1: "first", 2: "second", 3: "third", 4: "fourth", [-1]: "last" } as const;
+
+/**
+ * The rule written in the quick-add grammar ("every tue and thu until dec 11"), so the repeat
+ * editor's text field can show the current rule and `parseTask` reads it back unchanged.
+ */
+export function repeatPhrase(rule: Repeat, first: CivilDate): string {
+  const n = rule.interval;
+  let text: string;
+  switch (rule.freq) {
+    case "day":
+      text = n === 1 ? "every day" : `every ${n} days`;
+      break;
+    case "week": {
+      const days = [...new Set(rule.weekdays ?? [weekday(first)])].sort((a, b) => a - b);
+      const list = joinAnd(days.map((d) => WD_TYPED[d]));
+      if (n === 1 && sameDays(days, [0, 1, 2, 3, 4])) text = "every weekday";
+      else if (n === 1 && sameDays(days, [5, 6])) text = "every weekend";
+      else if (n === 1) text = `every ${list}`;
+      else text = `every ${n} weeks on ${list}`;
+      break;
+    }
+    case "month": {
+      const m = rule.monthly;
+      if (n !== 1 || !m) text = n === 1 ? "every month" : `every ${n} months`;
+      else if (m.kind === "day") text = `every ${ordinal(m.day)}`;
+      else if (m.kind === "last") text = "every last day";
+      else text = `every ${NTH_TYPED[m.n]} ${WD_TYPED[m.weekday]}`;
+      break;
+    }
+    case "year":
+      text = n === 1 ? "every year" : `every ${n} years`;
+      break;
+  }
+  if (rule.fromCompletion) text += " after done";
+  if (rule.end?.kind === "on") {
+    const [, mo, d] = parts(rule.end.date);
+    text += ` until ${MONTH_SHORT[mo - 1]!.toLowerCase()} ${d}`;
+  }
+  if (rule.end?.kind === "count") text += ` for ${rule.end.count} times`;
+  return text;
+}
