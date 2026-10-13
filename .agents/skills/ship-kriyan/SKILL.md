@@ -120,7 +120,7 @@ cd dist && VERCEL_ORG_ID=team_eG2BEkfqMmQSwwGiTPzlC622 VERCEL_PROJECT_ID=prj_8r2
 - Convex: `curl -s https://brave-sheep-245.convex.site/api/v1 | head -c 200` lists the operations, including any you added.
 - Site: `curl -sI https://kriyan.app` is 200, and the changed page shows the change. `curl -s https://kriyan.app/.well-known/oauth-authorization-server` answers 200.
 - Web app: the entry bundle on https://app.kriyan.app names `brave-sheep-245` and no `wry-parrot-108` or `127.0.0.1`.
-- Android: `curl -sIL https://github.com/kausthubh-coder/kriyan/releases/latest/download/kriyan.apk` ends in 200 with the new size.
+- Android: `curl -sIL https://github.com/kausthubh-coder/kriyan/releases/latest/download/kriyan.apk | grep -i content-length | tail -1` matches the new APK's size.
 - CLI: `bun pm view kriyan version` prints the new version.
 - End to end, when I agree: `verify-kriyan` lists `prod-smoke.mjs` and `mcp-oauth.mjs`. They add a token and a task as the test account and remove them again.
 
