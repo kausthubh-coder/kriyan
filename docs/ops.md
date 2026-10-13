@@ -36,6 +36,8 @@ cd apps/app && bun run export:prod && cd dist && bunx vercel deploy --prod   # d
 
 Check after a deploy: the live entry bundle names the production Convex host (`brave-sheep-245`) and no dev host.
 
+`kriyan-app` is deliberately not connected to GitHub: a git build has no `app.env` and would publish the repo root. If Vercel reconnects it (`vercel link` can), remove the link in the project's Git settings.
+
 ## Android
 
 ```
