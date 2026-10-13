@@ -19,7 +19,7 @@ A calm planner for time boxing. Put everything you have to do in one place, give
 - **Web**: [app.kriyan.app](https://app.kriyan.app).
 - **Android**: download [kriyan.apk](https://github.com/kausthubh-coder/kriyan/releases/latest/download/kriyan.apk) from the latest [release](https://github.com/kausthubh-coder/kriyan/releases) (Android 7 or newer).
 - **AI assistants**: add `https://kriyan.app/mcp` as a connector, or use a personal access token from Settings. [Setup guide](https://kriyan.app/docs/mcp).
-- **Terminal**: `bun run kriyan login`, then `bun run kriyan today` from a checkout of this repo. [CLI guide](https://kriyan.app/docs/cli).
+- **Terminal**: `npm install -g https://github.com/kausthubh-coder/kriyan/releases/latest/download/kriyan-cli.tgz` (Node 20 or newer), then `kriyan login` and `kriyan today`. [CLI guide](https://kriyan.app/docs/cli).
 
 ## Develop
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Code } from "@/components/Code";
 import css from "@/components/Prose.module.css";
-import { GITHUB_URL } from "@/lib/site";
+import { CLI_URL, GITHUB_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "CLI",
@@ -55,8 +55,13 @@ export default function CliDocs() {
 
       <h2 id="install">Install</h2>
       <p>
-        The CLI runs on <a href="https://bun.sh">Bun</a>. Until it is published as a package, run it from the
-        source:
+        The CLI needs <a href="https://nodejs.org">Node.js</a> 20 or newer. Install it from the latest
+        release:
+      </p>
+      <Code caption="Terminal">{`npm install -g ${CLI_URL}\nkriyan --help`}</Code>
+      <p>
+        Or run it from the source with <a href="https://bun.sh">Bun</a>, using <code>bun run kriyan</code> in
+        place of <code>kriyan</code>:
       </p>
       <Code caption="Terminal">{`git clone ${GITHUB_URL}\ncd kriyan\nbun install\nbun run kriyan --help`}</Code>
 

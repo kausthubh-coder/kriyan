@@ -3,13 +3,14 @@
 Plan your days with [Kriyan](https://kriyan.app) from a terminal, and let your agents do the same.
 
 ```sh
-npx kriyan login          # paste a personal access token from Settings
-npx kriyan today
-npx kriyan add "essay fri 5pm #school every week remind 1h before"
-npx kriyan done 2
+npm install -g https://github.com/kausthubh-coder/kriyan/releases/latest/download/kriyan-cli.tgz
+kriyan login          # paste a personal access token from Settings
+kriyan today
+kriyan add "essay fri 5pm #school every week remind 1h before"
+kriyan done 2
 ```
 
-`bunx kriyan` works too. Needs Node 20 or later.
+Needs Node 20 or later.
 
 ## Commands
 
