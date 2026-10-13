@@ -1,0 +1,71 @@
+.header {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--s4) var(--s8);
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: var(--ctl);
+  font: var(--title);
+  letter-spacing: var(--tracking-headline);
+  color: var(--ink);
+  text-decoration: none;
+  margin-right: auto;
+  border-radius: var(--r-ctl);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.footer {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--s12) var(--s8) var(--s16);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s6);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.footerBrand {
+  display: grid;
+  gap: var(--s2);
+  max-width: 40ch;
+}
+.footerBrand p {
+  font: var(--meta);
+  color: var(--ink-3);
+}
+
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  list-style: none;
+  margin-left: calc(var(--s3) * -1);
+}
+
+@media (max-width: 760px) {
+  .header {
+    padding: var(--s2) var(--s4);
+    gap: var(--s2);
+  }
+  .nav .hideOnPhone {
+    display: none;
+  }
+  .footer {
+    padding: var(--s8) var(--s4) var(--s12);
+    flex-direction: column;
+  }
+}
