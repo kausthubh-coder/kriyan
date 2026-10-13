@@ -9,14 +9,14 @@ Proof means a real user path on the running app, with the action and the resulti
 
 ## Launch
 
-From the checkout root (the `rebuild` worktree or any checkout of it):
+From the root of your worktree:
 
 ```
-bun run setup                                   # once: deps, env files, ports in .env.ports
+bun run setup                                   # deps, env, ports and this checkout's own backend (worktree-kriyan skill)
 bun run dev > .artifacts/dev.log 2>&1           # run in the background; it lives until you stop it
 ```
 
-`bun run dev` starts `convex dev` (the dev deployment, shared by every checkout), the app on the web at `PORT_APP` and the site at `PORT_SITE`. Ready when `.artifacts/dev.log` holds `Waiting on http://localhost:<PORT_APP>`, `Ready` from the site and `Convex functions ready`. The first page load bundles for about 30 seconds.
+`bun run dev` starts this checkout's own local Convex backend at `PORT_CONVEX`, the app on the web at `PORT_APP` and the site at `PORT_SITE`. Ready when `.artifacts/dev.log` holds `Waiting on http://localhost:<PORT_APP>`, `Ready` from the site and `Convex functions ready`. The first page load bundles for about 30 seconds.
 
 Android, only when the feature needs it: start the emulator detached so it outlives your command, and keep its PID.
 
@@ -65,7 +65,7 @@ Production, read-mostly, as the test account (it removes what it adds):
 
 ## Isolation
 
-One dev deployment and one test account serve every checkout. Two runs at once reset each other's data: before seeding, check no other session is driving (another `bun run dev` on different ports is the sign). Port clashes are handled by `.env.ports`; the emulator is one per machine.
+Each worktree has its own backend and ports, so seeding in one never touches another. The Clerk test account is shared, but its data lives in each backend. The emulator is one per machine.
 
 ## Evidence
 
@@ -79,6 +79,6 @@ Name artifacts after the feature (`reminders-android-shade.png`) and report the 
 
 ## Cleanup
 
-- Stop what you started, by PID: the `bun run dev` background task, and the emulator from `~/.kriyan/emulator.pid` (`Stop-Process -Id (Get-Content $HOME\.kriyan\emulator.pid)`). Never stop processes by name.
+- Stop what you started, by PID: the `bun run dev` background task with its tree (`taskkill /PID <pid> /T /F`; a plain kill leaves the backend, Metro and Next running), and the emulator from `~/.kriyan/emulator.pid` (`Stop-Process -Id (Get-Content $HOME\.kriyan\emulator.pid)`). Never stop processes by name.
 - Leave the seeded data; the next run's `seed.mjs` resets it. `node apps/app/e2e/seed.mjs --reset` empties the account if you need it empty.
 - Keep `.artifacts/app/`: it holds the proof.

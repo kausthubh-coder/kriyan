@@ -1,25 +1,39 @@
-// Starts the backend watcher, the app on the web and the site, on this checkout's ports.
-// Ready when the app prints "Web is waiting on http://localhost:<PORT_APP>" and the site "Ready".
-import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+// Starts this checkout's own Convex backend (watching for changes), the app on the web and the
+// site, on the ports in .env.ports. Ready when the log shows "Convex functions ready", the app's
+// "Waiting on http://localhost:<PORT_APP>" and the site's "Ready". Ctrl+C or killing this
+// process stops all three.
+import { spawn, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { CONVEX_ENV, PORTS_FILE, PORT_KEYS, isLocal, readEnv, root, samePath } from "./checkout.mjs";
 
-const root = join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")), "..");
-const portsFile = join(root, ".env.ports");
-const ports = existsSync(portsFile)
-  ? Object.fromEntries(
-      readFileSync(portsFile, "utf8")
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((l) => l.split("=")),
-    )
-  : { PORT_APP: "8081", PORT_SITE: "3000" };
+const ports = readEnv(PORTS_FILE);
+const backend = readEnv(CONVEX_ENV);
+if (!ports || !samePath(ports.PORTS_FOR ?? "", root) || !PORT_KEYS.every((k) => ports[k])) {
+  console.error(`${PORTS_FILE} is missing or was written for another checkout: run \`bun run setup\`.`);
+  process.exit(1);
+}
+// Only a local backend is safe to push to on every save; never the shared dev or production.
+if (!isLocal(backend?.CONVEX_DEPLOYMENT)) {
+  console.error(
+    `${CONVEX_ENV} points at ${backend?.CONVEX_DEPLOYMENT ?? "nothing"}: run \`bun run setup\` to give this checkout its own backend.`,
+  );
+  process.exit(1);
+}
+console.log(
+  `kriyan dev: app http://localhost:${ports.PORT_APP}, site http://localhost:${ports.PORT_SITE}, backend ${backend.CONVEX_URL}`,
+);
 
-const run = (name, cwd, args) => {
-  const child = spawn("bun", args, {
+const convexBin = join(
+  dirname(createRequire(join(root, "packages", "convex", "package.json")).resolve("convex/package.json")),
+  "bin",
+  "main.js",
+);
+const run = (name, cwd, command, args) => {
+  const child = spawn(command, args, {
     cwd: join(root, cwd),
     stdio: "pipe",
-    shell: process.platform === "win32",
+    shell: command === "bun" && process.platform === "win32",
   });
   for (const stream of [child.stdout, child.stderr])
     stream.on("data", (d) => process.stdout.write(d.toString().replace(/^/gm, `[${name}] `)));
@@ -28,10 +42,27 @@ const run = (name, cwd, args) => {
 };
 
 const children = [
-  run("convex", "packages/convex", ["x", "convex", "dev"]),
-  run("app", "apps/app", ["x", "expo", "start", "--web", "--port", ports.PORT_APP]),
-  run("site", "apps/site", ["x", "next", "dev", "--port", ports.PORT_SITE]),
+  run("convex", "packages/convex", process.execPath, [
+    convexBin,
+    "dev",
+    "--local-cloud-port",
+    ports.PORT_CONVEX,
+    "--local-site-port",
+    ports.PORT_CONVEX_SITE,
+  ]),
+  run("app", "apps/app", "bun", ["x", "expo", "start", "--web", "--port", ports.PORT_APP]),
+  run("site", "apps/site", "bun", ["x", "next", "dev", "--port", ports.PORT_SITE]),
 ];
-const stop = () => children.forEach((c) => c.kill());
+
+// On Windows a child started through a shell leaves its own children behind; kill each tree.
+const stop = () => {
+  for (const child of children) {
+    if (child.exitCode !== null || !child.pid) continue;
+    if (process.platform === "win32")
+      spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    else child.kill();
+  }
+  process.exit(0);
+};
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);

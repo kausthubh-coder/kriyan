@@ -15,7 +15,9 @@ const SITE = envOf("packages/convex/.env.local", "CONVEX_SITE_URL");
 const SECRET = envOf("apps/site/.env.local", "KRIYAN_SERVICE_SECRET");
 const DEPLOYMENT = envOf("packages/convex/.env.local", "CONVEX_DEPLOYMENT") ?? "";
 if (!SITE || !SECRET) throw new Error("Run `bun run setup`: the dev env files are missing.");
-if (!DEPLOYMENT.startsWith("dev:")) throw new Error(`Refusing to touch ${DEPLOYMENT}: dev only.`);
+// Only this checkout's own local backend (`bun run setup` makes it); never the shared dev or prod.
+if (!/^(anonymous|local):/.test(DEPLOYMENT))
+  throw new Error(`Refusing to touch ${DEPLOYMENT}: this checkout's local backend only.`);
 
 const USER_FILE = artifact("user.json");
 export const saveUser = (userId) => writeFileSync(USER_FILE, JSON.stringify({ userId }));

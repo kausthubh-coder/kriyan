@@ -18,7 +18,7 @@ The Android app is the same Expo app as the web, with native navigation, gesture
 Preconditions: emulator booted (SKILL.md Launch), `bun run dev` serving Metro on `PORT_APP`.
 
 - **Install the dev build** when `doctor.mjs` warns it's missing or native dependencies changed: `cd apps/app && bunx expo run:android` (it generates `android/`, builds and installs `app.kriyan`; the first build takes 10 to 20 minutes).
-- **Open on this Metro.** `bash apps/app/e2e/adb.sh reverse tcp:<PORT_APP> tcp:<PORT_APP>`, then `MSYS_NO_PATHCONV=1 bash apps/app/e2e/adb.sh shell am start -a android.intent.action.VIEW -d "kriyan://expo-development-client/?url=http%3A%2F%2Flocalhost%3A<PORT_APP>" app.kriyan`. `.artifacts/dev.log` prints `Android Bundled`; allow another 30 to 60 seconds on the software-rendered emulator.
+- **Open on this Metro.** `bash apps/app/e2e/adb.sh reverse tcp:<PORT_APP> tcp:<PORT_APP>` and `reverse tcp:<PORT_CONVEX> tcp:<PORT_CONVEX>` (the app reaches this checkout's backend at `127.0.0.1:<PORT_CONVEX>`), then `MSYS_NO_PATHCONV=1 bash apps/app/e2e/adb.sh shell am start -a android.intent.action.VIEW -d "kriyan://expo-development-client/?url=http%3A%2F%2Flocalhost%3A<PORT_APP>" app.kriyan`. `.artifacts/dev.log` prints `Android Bundled`; allow another 30 to 60 seconds on the software-rendered emulator.
 - **Read the screen.** `bash apps/app/e2e/adb.sh ui` prints visible labels with bounds, e.g. `text="Today" @ [42,183][674,257]`. A first screen showing `Today`, `Anytime today`, `Schedule` and the seeded titles is signed in.
 - **Act.** Tap the centre of a label's bounds with `adb.sh tap x y`; type with `adb.sh text "..."`; Back is `adb.sh key 4`.
 - **Proof.** `adb.sh shot <feature>-<step>` before and after, plus `adb.sh ui` output saved beside it.

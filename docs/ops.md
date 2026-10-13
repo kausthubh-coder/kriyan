@@ -1,6 +1,6 @@
 # Production
 
-Every command here changes something people use. Run them only with my explicit go.
+Where each piece runs and what it needs. The ship and rollback commands are in the `ship-kriyan` skill; run them only with my explicit go.
 
 ## Where things run
 
@@ -15,11 +15,7 @@ Every command here changes something people use. Run them only with my explicit 
 
 ## Backend
 
-```
-cd packages/convex
-bunx convex env list --prod          # names only; never paste values anywhere
-bunx convex deploy                   # pushes functions and schema to production
-```
+Worktrees each run their own local backend; `wry-parrot-108` is no longer used for development. `ship-kriyan` deploys to `brave-sheep-245` with `CONVEX_DEPLOYMENT=dev:wry-parrot-108 bunx convex deploy`, which names the project; a worktree's own `.env.local` points at its local backend.
 
 Production environment variables: `CLERK_JWT_ISSUER_DOMAIN` (the production Clerk issuer once it exists; the dev issuer until then) and `KRIYAN_SERVICE_SECRET` (shared with the site; a copy lives in `~/.kriyan/prod-env/site.env`).
 
@@ -29,10 +25,7 @@ Site production env lives on Vercel: `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONV
 
 The web app is built here and uploaded as static files, so its values are baked in at build time from `~/.kriyan/prod-env/app.env` (`EXPO_PUBLIC_CONVEX_URL`, `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`). Build it only with `export:prod`: a plain `expo export` reads `apps/app/.env.local` and ships the dev backend.
 
-```
-bunx vercel deploy --prod --cwd apps/site
-cd apps/app && bun run export:prod && cd dist && bunx vercel deploy --prod   # dist/.vercel links project kriyan-app
-```
+The site builds from `main` on every push (Vercel's GitHub integration). The web app is uploaded by hand from `apps/app/dist`, with `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` naming `kriyan-app`, so a fresh worktree needs no `.vercel` link.
 
 Check after a deploy: the live entry bundle names the production Convex host (`brave-sheep-245`) and no dev host.
 
@@ -40,10 +33,11 @@ Check after a deploy: the live entry bundle names the production Convex host (`b
 
 ## Android
 
-```
-cd apps/app
-bunx eas-cli build --platform android --profile preview   # an APK to attach to a GitHub release
-```
+EAS builds an APK with the `production` profile (`apps/app/eas.json`); it goes on a GitHub release as `kriyan.apk`, which the site's download link expects.
+
+## CLI
+
+Published to npm as `kriyan` from `packages/cli/dist` (`bun run --filter @kriyan/cli build`).
 
 ## Clerk production
 

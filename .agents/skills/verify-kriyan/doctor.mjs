@@ -22,7 +22,7 @@ const report = (ok, label, fix = "") => {
 };
 
 const deployment = /^CONVEX_DEPLOYMENT=(.*)$/m.exec(read("packages/convex/.env.local"))?.[1]?.trim() ?? "";
-report(deployment.startsWith("dev:"), `Convex deployment ${deployment || "(none)"}`, "run `bun run setup`; never drive prod");
+report(/^(anonymous|local):/.test(deployment), `Convex deployment ${deployment || "(none)"}`, "run `bun run setup` for this checkout's own backend; never drive a shared or prod one");
 
 // The first request to a dev server compiles the page, so allow it a while.
 const answers = async (url) => {

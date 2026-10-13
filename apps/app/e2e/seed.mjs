@@ -2,7 +2,7 @@
 // time zone, so every e2e script starts from the same place on any day.
 //   node apps/app/e2e/seed.mjs            reset, then seed
 //   node apps/app/e2e/seed.mjs --reset    reset only (an empty account)
-// Writes go through the agent API (see api.mjs); dev deployment only.
+// Writes go through the agent API (see api.mjs); this checkout's local backend only.
 
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";

@@ -24,9 +24,11 @@ Business logic lives once, in `packages/core` or `packages/convex/convex/model`.
 
 ## Commands
 
-- Set up a fresh checkout or worktree: `bun run setup` (installs, copies dev env from `~/.kriyan/dev-env`, picks ports)
-- Doctor: `bun run doctor` (run it first when anything looks off)
-- Dev: `bun run dev` (backend, app on the web, site; ports in `.env.ports`)
+Every task in a new worktree starts with `worktree-kriyan`. Ship only with `ship-kriyan`, when I say so.
+
+- Set up a worktree: `bun run setup` (deps, dev env from `~/.kriyan/dev-env`, its own ports and local Convex backend; safe to rerun)
+- Doctor: `bun run doctor` (read-only; run it first when anything looks off)
+- Dev: `bun run dev` (this worktree's backend, the app on the web and the site, on the ports in `.env.ports`)
 - Tests for one package: `bun run --filter @kriyan/core test` (also `@kriyan/convex`, `@kriyan/cli`)
 - Full check, what CI runs: `bun run check`
 - UI check against the running app: `bun run lint:ui`
@@ -55,8 +57,8 @@ Business logic lives once, in `packages/core` or `packages/convex/convex/model`.
 
 ## Safety
 
-- Production needs my explicit go: `convex deploy`, `--prod`, Vercel production, EAS submit, Clerk production settings. Commands live in `docs/ops.md`.
-- Your worktree pushes Convex functions only to its own deployment: the shared dev deployment from the main `rebuild` checkout, or `CONVEX_AGENT_MODE=anonymous bunx convex dev --local` in other worktrees.
+- Production needs my explicit go: `convex deploy`, `--prod`, Vercel production, EAS submit, Clerk production settings. The steps are in `ship-kriyan`; `docs/ops.md` says where each piece runs.
+- Your worktree pushes Convex functions only to its own local backend, which `bun run setup` creates. Never push to the old shared dev deployment `wry-parrot-108`.
 - Secrets live in `.env.local` files (ignored) and `~/.kriyan/dev-env`. Never print, log, screenshot or commit them.
 - Stop only processes you started, by PID. Use `git stash push -u -m <tag>` and apply by SHA, never a bare `git stash`.
-- Git: branch per change, PR into `rebuild` (later `main`) with CI green.
+- Git: a branch per change in its own worktree, landed by fast-forwarding `main` with `ship-kriyan`. No PRs; this is a personal repo. Never edit the main checkout (`C:\Users\kaust\OneDrive\Documents\dev\kriyan`).
