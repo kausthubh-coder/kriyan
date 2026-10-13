@@ -1,8 +1,8 @@
-/* Long-form pages: one readable column, about 68 characters wide. */
+/* Long-form pages. Text keeps a readable measure (52ch); tables and code may use the full column. */
 .prose {
   display: grid;
   gap: var(--s4);
-  max-width: 68ch;
+  max-width: 800px;
   min-width: 0;
   padding: var(--s8) 0 var(--s16);
   align-content: start;
@@ -157,4 +157,10 @@
   display: grid;
   gap: var(--s4);
   min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
 }

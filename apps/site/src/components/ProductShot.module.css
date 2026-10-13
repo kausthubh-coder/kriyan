@@ -17,15 +17,20 @@
   pointer-events: none;
 }
 
+/* The ratio is set before the file arrives, for whichever image the breakpoint picks (Layout Shift). */
 .img {
   display: block;
   width: 100%;
   height: auto;
+  aspect-ratio: var(--desktop-ratio);
 }
 
 @media (max-width: 760px) {
   .frame {
     max-width: 390px;
     margin: 0 auto;
+  }
+  .img {
+    aspect-ratio: var(--phone-ratio);
   }
 }

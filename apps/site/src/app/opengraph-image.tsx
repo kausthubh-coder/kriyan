@@ -9,11 +9,18 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 // Generated at build time: dark page, the ensō and the headline, in Figtree.
-export default async function OpenGraphImage() {
+// Cached, so the image is rendered once at build time instead of on every request.
+async function loadFonts(): Promise<[Uint8Array, Uint8Array]> {
+  "use cache";
   const [medium, semibold] = await Promise.all([
     readFile(join(process.cwd(), "assets/figtree-latin-500.woff")),
     readFile(join(process.cwd(), "assets/figtree-latin-600.woff")),
   ]);
+  return [Uint8Array.from(medium), Uint8Array.from(semibold)];
+}
+
+export default async function OpenGraphImage() {
+  const [medium, semibold] = await loadFonts();
   return new ImageResponse(
     (
       <div
@@ -50,8 +57,8 @@ export default async function OpenGraphImage() {
     {
       ...size,
       fonts: [
-        { name: "Figtree", data: medium, weight: 500, style: "normal" },
-        { name: "Figtree", data: semibold, weight: 600, style: "normal" },
+        { name: "Figtree", data: medium.buffer as ArrayBuffer, weight: 500, style: "normal" },
+        { name: "Figtree", data: semibold.buffer as ArrayBuffer, weight: 600, style: "normal" },
       ],
     },
   );
