@@ -12,7 +12,8 @@ import { Txt } from "@/ui/Txt";
 export { RouteError as ErrorBoundary } from "@/ui/RouteError";
 
 export default function TaskRoute() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
+  const initialEdit = edit === "when" || edit === "repeat" || edit === "space" ? edit : undefined;
   const task = useTaskDoc(id as Id<"tasks">);
   const close = () => goBack("/today");
   return (
@@ -22,7 +23,7 @@ export default function TaskRoute() {
       ) : task === null ? (
         <View style={{ padding: s.s6, gap: s.s3, backgroundColor: c.raised }}>
           <Txt variant="subhead" heading={1}>
-            This task isn't here anymore
+            This task isn’t here anymore
           </Txt>
           <Txt variant="body" tone="ink3">
             It was deleted, or it belongs to another account. Your other tasks are unchanged.
@@ -30,7 +31,7 @@ export default function TaskRoute() {
           <Button variant="primary" label="Close" onPress={close} style={{ alignSelf: "flex-start" }} />
         </View>
       ) : (
-        <TaskEditor key={task._id} task={task} onClose={close} />
+        <TaskEditor key={task._id} task={task} onClose={close} initialEdit={initialEdit} />
       )}
     </TaskPanel>
   );

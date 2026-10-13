@@ -1,10 +1,4 @@
-import { Screen } from "@/ui/Screen";
-import { Txt } from "@/ui/Txt";
+import { UpcomingScreen } from "@/features/upcoming/UpcomingScreen";
 
-export default function Page() {
-  return (
-    <Screen title="upcoming" fab>
-      <Txt>upcoming</Txt>
-    </Screen>
-  );
-}
+export { RouteError as ErrorBoundary } from "@/ui/RouteError";
+export default UpcomingScreen;

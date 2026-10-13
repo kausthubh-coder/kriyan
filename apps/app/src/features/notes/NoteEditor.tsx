@@ -45,7 +45,6 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
   const lastSaved = useRef(value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef(blocks);
-  latest.current = blocks;
 
   // A change from elsewhere (an agent, another device) replaces the note when we're not editing.
   useEffect(() => {
@@ -191,13 +190,14 @@ export function NoteEditor({ value, onChange, placeholder }: Props) {
   }, [focus]);
   useEffect(() => () => toolbar.set(null), []);
 
-  let number = 0;
+  const numbers: number[] = [];
+  blocks.forEach((b, i) => numbers.push(b.kind === "numbered" ? (blocks[i - 1]?.kind === "numbered" ? (numbers[i - 1] ?? 0) + 1 : 1) : 0));
   const empty = blocks.length === 1 && blocks[0]?.text === "" && blocks[0]?.kind === "p";
 
   return (
     <View style={{ gap: s.s2 }}>
       {blocks.map((b, i) => {
-        number = b.kind === "numbered" ? (blocks[i - 1]?.kind === "numbered" ? number + 1 : 1) : 0;
+        const number = numbers[i] ?? 0;
         const editing = focus === i;
         const style = textStyle(b.kind);
         return (

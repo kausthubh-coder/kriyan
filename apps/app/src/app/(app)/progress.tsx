@@ -1,10 +1,4 @@
-import { Screen } from "@/ui/Screen";
-import { Txt } from "@/ui/Txt";
+import { ProgressScreen } from "@/features/progress/ProgressScreen";
 
-export default function Page() {
-  return (
-    <Screen title="progress" back>
-      <Txt>progress</Txt>
-    </Screen>
-  );
-}
+export { RouteError as ErrorBoundary } from "@/ui/RouteError";
+export default ProgressScreen;

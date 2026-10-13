@@ -1,13 +1,14 @@
 // One task in a list: the checkbox in its space's colour, the title, a quiet line of facts
 // (when, due, repeat, reminders, note) and its length. Tap opens it; tick completes it.
 
-import { memo, type ReactNode } from "react";
+import { memo, useEffect, type ReactNode } from "react";
 import { Platform, View } from "react-native";
 import { router } from "expo-router";
 import { Bell, Bot, Cake, Flag, NotebookText, Repeat2 } from "lucide-react-native";
 import { formatDay, formatDuration, formatTimeRange } from "@kriyan/core/format";
 import type { TaskView } from "@/data/views";
 import { selection } from "@/features/shell/context";
+import { rowRegistry } from "@/features/shell/rows";
 import { useControl, useIsPhone } from "@/theme/layout";
 import { c, r, s, spaceTone } from "@/theme/tokens";
 import { Check, Dot } from "@/ui/bits";
@@ -65,6 +66,12 @@ export const TaskRow = memo(function TaskRow({ task, today, showWhen = false, tr
   const done = task.done || isTicking;
   const tone = spaceTone(task.color);
   const info = facts(task, today, showWhen);
+  useEffect(() => {
+    rowRegistry.set(task._id, task);
+    return () => {
+      rowRegistry.delete(task._id);
+    };
+  }, [task]);
 
   const onTick = () => {
     if (task.done) {

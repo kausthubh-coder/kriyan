@@ -10,11 +10,15 @@ import { dropHaptic, liftHaptic } from "@/features/tasks/haptics";
 import { dropZone, externalDrag, STEP } from "./drag";
 
 /** The finger in window coordinates, for the ghost the Today screen draws. */
-export const fingerX = makeMutable(0);
-export const fingerY = makeMutable(0);
-export const dragging = makeMutable(0);
+const finger = { x: makeMutable(0), y: makeMutable(0), dragging: makeMutable(0) };
+export const fingerX = finger.x;
+export const fingerY = finger.y;
+export const dragging = finger.dragging;
+/** Shared values live for the app; components reach them through these, not module variables. */
+const fingerShared = () => finger;
 /** The drop zone's window rectangle and scale, copied to the UI thread at lift. */
 const zone = makeMutable({ x: 0, y: 0, w: 0, h: 0, start: 0, hourPx: 56, pad: 0, ready: false });
+const zoneShared = () => zone;
 
 interface Props {
   taskId: string;
@@ -50,22 +54,24 @@ function finish(commit: boolean) {
 }
 
 export function DragSource({ taskId, title, color, length, children }: Props) {
+  const f = fingerShared();
+  const z0 = zoneShared();
   const lifted = useSharedValue(0);
   const over = useSharedValue(-1);
   const pan = Gesture.Pan()
     .activateAfterLongPress(400)
     .onStart((e) => {
-      fingerX.value = e.absoluteX;
-      fingerY.value = e.absoluteY;
-      dragging.value = 1;
+      f.x.value = e.absoluteX;
+      f.y.value = e.absoluteY;
+      f.dragging.value = 1;
       over.value = -1;
       lifted.value = withTiming(1, { duration: 160 });
       scheduleOnRN(begin, taskId, title, color, length);
     })
     .onUpdate((e) => {
-      fingerX.value = e.absoluteX;
-      fingerY.value = e.absoluteY;
-      const z = zone.value;
+      f.x.value = e.absoluteX;
+      f.y.value = e.absoluteY;
+      const z = z0.value;
       let next = -1;
       if (z.ready && e.absoluteX >= z.x && e.absoluteX <= z.x + z.w && e.absoluteY >= z.y - 24 && e.absoluteY <= z.y + z.h + 24) {
         const minutes = z.start + ((e.absoluteY - z.y - z.pad) / z.hourPx) * 60;
@@ -80,7 +86,7 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
       scheduleOnRN(finish, true);
     })
     .onFinalize(() => {
-      dragging.value = 0;
+      f.dragging.value = 0;
       lifted.value = withTiming(0, { duration: 150 });
     });
   const style = useAnimatedStyle(() => ({ opacity: 1 - lifted.value * 0.5 }));

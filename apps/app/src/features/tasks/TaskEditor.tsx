@@ -5,7 +5,7 @@
 // Desktop: sub-editors open beside the panel. Phones: they replace the sheet's content
 // (never a sheet on a sheet), with Back to return.
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { ScrollView, View } from "react-native";
 import { useMutation } from "convex/react";
 import {
@@ -16,7 +16,6 @@ import {
   Clock,
   Ellipsis,
   Flag,
-  Hourglass,
   Layers,
   Repeat2,
   Target,
@@ -27,15 +26,14 @@ import {
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatDay, formatDuration, formatTimeRange, describeReminder, describeRepeat } from "@kriyan/core/format";
-import { parseTask } from "@kriyan/core/parse";
-import { firstOccurrence } from "@kriyan/core/parse";
+import { firstOccurrence, parseTask } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import type { Repeat } from "@kriyan/core/repeat";
 import { useClock } from "@/data/time";
 import { useProgressView, useSpaces, type TaskDoc } from "@/data/views";
 import { ensureNotifications } from "@/features/notifications/register";
 import { NoteEditor } from "@/features/notes/NoteEditor";
-import { useControl, useIsPhone, useType } from "@/theme/layout";
+import { useIsPhone, useType } from "@/theme/layout";
 import { c, hex, r, s, spaceTone } from "@/theme/tokens";
 import { AutoInput } from "@/ui/AutoInput";
 import { Button } from "@/ui/Button";
@@ -55,24 +53,38 @@ type Sub = "space" | "when" | "repeat" | "reminders" | "deadline" | "goal" | "mo
 interface Props {
   task: TaskDoc;
   onClose: () => void;
+  /** Open straight into one field (D, R and M on the keyboard). */
+  initialEdit?: "when" | "repeat" | "space";
 }
 
-export function TaskEditor({ task, onClose }: Props) {
+export function TaskEditor({ task, onClose, initialEdit }: Props) {
   const phone = useIsPhone();
   const roles = useType();
   const { today } = useClock();
   const spaces = useSpaces();
   const update = useMutation(api.tasks.update);
-  const [sub, setSub] = useState<Sub | null>(null);
-  const anchors = {
-    space: useRef<View>(null),
-    when: useRef<View>(null),
-    repeat: useRef<View>(null),
-    reminders: useRef<View>(null),
-    deadline: useRef<View>(null),
-    goal: useRef<View>(null),
-    more: useRef<View>(null),
-  };
+  const [sub, setSub] = useState<Sub | null>(initialEdit ?? null);
+  const spaceRef = useRef<View>(null);
+  const whenRef = useRef<View>(null);
+  const repeatRef = useRef<View>(null);
+  const remindersRef = useRef<View>(null);
+  const deadlineRef = useRef<View>(null);
+  const goalRef = useRef<View>(null);
+  const moreRef = useRef<View>(null);
+  const anchor =
+    sub === "space"
+      ? spaceRef
+      : sub === "when"
+        ? whenRef
+        : sub === "repeat"
+          ? repeatRef
+          : sub === "reminders"
+            ? remindersRef
+            : sub === "deadline"
+              ? deadlineRef
+              : sub === "goal"
+                ? goalRef
+                : moreRef;
   const [title, setTitle] = useState(task.title);
   const isTicking = ticking.useValue((t) => Boolean(t[task._id]));
   const done = task.doneAt !== undefined || isTicking;
@@ -206,14 +218,6 @@ export function TaskEditor({ task, onClose }: Props) {
     );
   }
 
-  const row = (which: Exclude<Sub, "more">, icon: LucideIcon, label: string, value: string | null, empty: string, extra?: ReactNode) => (
-    <Prop key={which} icon={icon} label={label}>
-      <View ref={anchors[which]} collapsable={false}>
-        <ValueButton text={value ?? empty} empty={!value} expanded={sub === which} onPress={() => setSub(sub === which ? null : which)} leading={extra} label={`${label}: ${value ?? empty}`} />
-      </View>
-    </Prop>
-  );
-
   return (
     <>
       <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1, height: phone ? 52 : 56, paddingLeft: phone ? s.s4 : s.s6, paddingRight: phone ? s.s1 : s.s3 }}>
@@ -223,7 +227,7 @@ export function TaskEditor({ task, onClose }: Props) {
             {space ? space.path.split(" / ").join(" / ") : "Inbox"}
           </Txt>
         </View>
-        <View ref={anchors.more} collapsable={false}>
+        <View ref={moreRef} collapsable={false}>
           <Button icon={Ellipsis} accessibilityLabel="More" expanded={sub === "more"} onPress={() => setSub(sub === "more" ? null : "more")} />
         </View>
         <Button icon={X} accessibilityLabel="Close" onPress={onClose} />
@@ -259,11 +263,28 @@ export function TaskEditor({ task, onClose }: Props) {
         </View>
 
         <View>
-          {row("space", Layers, "Space", space?.path ?? null, "Add to a space", space ? <Dot color={tone.dot} /> : undefined)}
-          {row("when", Clock, "When", when, "Add a date")}
-          {row("repeat", Repeat2, "Repeat", task.repeat ? describeRepeat(task.repeat as Repeat, task.repeatFirst ?? task.date ?? today, today) : null, "Add repeat")}
+          <FieldRow
+            anchor={spaceRef}
+            icon={Layers}
+            label="Space"
+            value={space?.path ?? null}
+            empty="Add to a space"
+            leading={space ? <Dot color={tone.dot} /> : undefined}
+            expanded={sub === "space"}
+            onPress={() => setSub(sub === "space" ? null : "space")}
+          />
+          <FieldRow anchor={whenRef} icon={Clock} label="When" value={when} empty="Add a date" expanded={sub === "when"} onPress={() => setSub(sub === "when" ? null : "when")} />
+          <FieldRow
+            anchor={repeatRef}
+            icon={Repeat2}
+            label="Repeat"
+            value={task.repeat ? describeRepeat(task.repeat as Repeat, task.repeatFirst ?? task.date ?? today, today) : null}
+            empty="Add repeat"
+            expanded={sub === "repeat"}
+            onPress={() => setSub(sub === "repeat" ? null : "repeat")}
+          />
           <Prop icon={Bell} label="Reminders">
-            <View ref={anchors.reminders} collapsable={false}>
+            <View ref={remindersRef} collapsable={false}>
               {(task.reminders as Reminder[]).map((rem, i) => (
                 <ValueButton
                   key={i}
@@ -286,8 +307,16 @@ export function TaskEditor({ task, onClose }: Props) {
               <ValueButton text="Add reminder" empty expanded={sub === "reminders"} onPress={() => setSub(sub === "reminders" ? null : "reminders")} />
             </View>
           </Prop>
-          {row("deadline", Flag, "Deadline", task.deadline ? `Due ${formatDay(task.deadline, today)}` : null, "Add deadline")}
-          <GoalRow task={task} anchor={anchors.goal} expanded={sub === "goal"} onPress={() => setSub(sub === "goal" ? null : "goal")} />
+          <FieldRow
+            anchor={deadlineRef}
+            icon={Flag}
+            label="Deadline"
+            value={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
+            empty="Add deadline"
+            expanded={sub === "deadline"}
+            onPress={() => setSub(sub === "deadline" ? null : "deadline")}
+          />
+          <GoalRow task={task} anchor={goalRef} expanded={sub === "goal"} onPress={() => setSub(sub === "goal" ? null : "goal")} />
         </View>
 
         <View style={{ height: 1, backgroundColor: c.line }} />
@@ -298,7 +327,7 @@ export function TaskEditor({ task, onClose }: Props) {
         <Popover
           open={Boolean(open)}
           onClose={() => setSub(null)}
-          anchor={sub ? anchors[sub] : undefined}
+          anchor={anchor}
           side={sub === "more" ? "below" : "left"}
           title={open?.title ?? ""}
           width={open?.width ?? 320}
@@ -307,6 +336,34 @@ export function TaskEditor({ task, onClose }: Props) {
         </Popover>
       ) : null}
     </>
+  );
+}
+
+function FieldRow({
+  anchor,
+  icon,
+  label,
+  value,
+  empty,
+  leading,
+  expanded,
+  onPress,
+}: {
+  anchor: RefObject<View | null>;
+  icon: LucideIcon;
+  label: string;
+  value: string | null;
+  empty: string;
+  leading?: ReactNode;
+  expanded: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Prop icon={icon} label={label}>
+      <View ref={anchor} collapsable={false}>
+        <ValueButton text={value ?? empty} empty={!value} expanded={expanded} onPress={onPress} leading={leading} label={`${label}: ${value ?? empty}`} />
+      </View>
+    </Prop>
   );
 }
 
@@ -370,7 +427,7 @@ function ValueButton({
   );
 }
 
-function GoalRow({ task, anchor, expanded, onPress }: { task: TaskDoc; anchor: React.RefObject<View | null>; expanded: boolean; onPress: () => void }) {
+function GoalRow({ task, anchor, expanded, onPress }: { task: TaskDoc; anchor: RefObject<View | null>; expanded: boolean; onPress: () => void }) {
   const progress = useProgressView();
   const goal = progress?.goals.find((g) => g._id === task.goalId);
   return (

@@ -16,7 +16,7 @@ export function RouteError({ error, retry }: ErrorBoundaryProps) {
       <View role="alert" style={{ maxWidth: 420, gap: s.s3, alignItems: "flex-start" }}>
         <Icon icon={CloudOff} size={20} tone="ink2" />
         <Txt variant="subhead" heading={1}>
-          This screen didn't load
+          This screen didn’t load
         </Txt>
         <Txt variant="body" tone="ink3">
           {detail ?? "Kriyan couldn't reach your plan. Check your connection, then try again."}

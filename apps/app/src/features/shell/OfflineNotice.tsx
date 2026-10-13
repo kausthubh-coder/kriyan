@@ -14,14 +14,14 @@ export function OfflineNotice() {
   // Brief reconnects shouldn't flash a banner.
   const [show, setShow] = useState(false);
   useEffect(() => {
-    if (!down) {
-      setShow(false);
-      return;
-    }
+    if (!down) return;
     const t = setTimeout(() => setShow(true), 2000);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      setShow(false);
+    };
   }, [down]);
-  if (!show) return null;
+  if (!show || !down) return null;
   return (
     <View
       role="status"
@@ -29,7 +29,7 @@ export function OfflineNotice() {
     >
       <Icon icon={WifiOff} size={16} />
       <Txt variant="meta" tone="ink2">
-        You're offline. Changes you make now will save when you're back.
+        You’re offline. Changes you make now will save when you’re back.
       </Txt>
     </View>
   );

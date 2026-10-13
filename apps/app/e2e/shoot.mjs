@@ -23,9 +23,15 @@ for (const { name, viewport } of widths) {
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   for (const route of routes) {
-    await page.goto(`${BASE}${route}`);
+    if (route.startsWith("/space:")) {
+      // A space by name: open it from Browse, the way a person would.
+      await page.goto(`${BASE}/browse`);
+      await settle(page);
+      await page.getByRole("link", { name: route.slice(7), exact: true }).last().click();
+      await page.waitForURL(/\/space\//);
+    } else await page.goto(`${BASE}${route}`);
     await settle(page);
-    const file = `${route.replace(/^\//, "").replace(/[/?=&]/g, "_") || "root"}-${name}.png`;
+    const file = `${route.replace(/^\//, "").replace(/[/?=&:]/g, "_") || "root"}-${name}.png`;
     await page.screenshot({ path: artifact(file), fullPage: process.env.FULL === "1" });
     console.log(`shot ${file}`);
   }

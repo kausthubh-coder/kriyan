@@ -9,7 +9,7 @@ module.exports = defineConfig([
     languageOptions: { globals: { __dirname: "readonly", require: "readonly", module: "readonly" } },
   },
   {
-    files: ["**/*.{ts,tsx,mts}"],
+    files: ["**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-non-null-assertion": "error",

@@ -1,8 +1,7 @@
 // Loads a page, waits, and prints console output and visible text. Debugging aid.
-import { BASE, launch, artifact } from "./lib.mjs";
+import { BASE, launch, artifact, signedInContext } from "./lib.mjs";
 const path = process.argv[2] ?? "sign-in";
 const browser = await launch();
-import { signedInContext } from "./lib.mjs";
 const ctx = process.env.SIGNED_OUT ? await browser.newContext({ viewport: { width: Number(process.env.W ?? 1440), height: 900 } }) : await signedInContext(browser, { width: Number(process.env.W ?? 1440), height: 900 });
 const page = await ctx.newPage();
 page.on("console", (m) => ["error","warning"].includes(m.type()) && console.log(`[${m.type()}] ${m.text().slice(0, 1500)}`));

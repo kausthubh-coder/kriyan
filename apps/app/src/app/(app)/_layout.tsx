@@ -4,6 +4,9 @@
 import { Stack } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNotifications } from "@/features/notifications/register";
+import { CommandMenu } from "@/features/shell/CommandMenu";
+import { OfflineNotice } from "@/features/shell/OfflineNotice";
 import { useSession } from "@/features/shell/session";
 import { c, r } from "@/theme/tokens";
 import { ToastHost } from "@/ui/toast";
@@ -12,9 +15,13 @@ export const unstable_settings = { anchor: "(tabs)" };
 
 export default function AppLayout() {
   useSession();
+  useNotifications();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <View style={{ paddingTop: insets.top, position: "absolute", top: 0, left: 0, right: 0, zIndex: 20 }} pointerEvents="none">
+        <OfflineNotice />
+      </View>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="index" />
@@ -43,6 +50,7 @@ export default function AppLayout() {
         />
       </Stack>
       <ToastHost bottom={insets.bottom + 80 + 16} />
+      <CommandMenu />
     </View>
   );
 }
