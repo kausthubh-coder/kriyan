@@ -30,6 +30,8 @@ interface Props {
   scrollProps?: ScrollViewProps;
   /** Below the scroll view, pinned (the proposals banner). */
   footer?: ReactNode;
+  /** The task panel covers this layout's right column instead of pushing the page left. */
+  panelCovers?: boolean;
 }
 
 export function goBack(fallback: "/today" | "/browse" = "/today") {
@@ -112,12 +114,13 @@ export function Screen({
   children,
   scrollProps,
   footer,
+  panelCovers,
 }: Props) {
   const phone = useIsPhone();
   const panelOpen = usePanelOpen();
   const maxWidth = width === "column" ? sz.column : width === "wide" ? undefined : width;
   // While the panel is open the column moves left so the panel never covers it (desktop).
-  const shift = !phone && panelOpen && width !== "wide";
+  const shift = !phone && panelOpen && width !== "wide" && !panelCovers;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       {phone ? <AppBar title={title} back={back} actions={actions} /> : null}
@@ -195,7 +198,8 @@ export function SectionHead({ title, meta, right }: { title: string; meta?: stri
           {meta}
         </Txt>
       ) : null}
-      {right}
+      {/* A quiet button's label, not its padding, lines up with the column's right edge. */}
+      {right ? <View style={{ marginRight: -s.s3 }}>{right}</View> : null}
     </View>
   );
 }

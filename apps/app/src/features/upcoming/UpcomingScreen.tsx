@@ -235,6 +235,23 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
         })}
       </View>
       <View style={{ flexDirection: "row", height: y(to * 60) }}>
+        {/* Hairlines at each hour, behind the blocks, so a time reads across the week. */}
+        {Array.from({ length: to - from }, (_, k) =>
+          k ? (
+            <View
+              key={`line-${k}`}
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                left: 56,
+                right: 0,
+                top: k * H,
+                height: 1,
+                backgroundColor: c.line,
+              }}
+            />
+          ) : null,
+        )}
         <View style={{ width: 56 }}>
           {Array.from({ length: to - from }, (_, k) =>
             k ? (
@@ -283,7 +300,9 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
                       height: h,
                       left: `${(col / cols) * 100}%`,
                       width: `${100 / cols}%`,
-                      paddingHorizontal: s.s1,
+                      // The first block's edge lines up with the day's name above it.
+                      paddingLeft: col ? 0 : s.s2,
+                      paddingRight: s.s1,
                     }}
                   >
                     <Press
@@ -350,7 +369,20 @@ function NowLine({ y }: { y: (m: number) => number }) {
     <View
       pointerEvents="none"
       style={{ position: "absolute", left: 0, right: 0, top: y(now), height: 1, backgroundColor: c.now }}
-    />
+    >
+      {/* The same mark as Today's timeline, so a 1px line in a narrow column still reads as now. */}
+      <View
+        style={{
+          position: "absolute",
+          left: -3,
+          top: -3,
+          width: 7,
+          height: 7,
+          borderRadius: 4,
+          backgroundColor: c.now,
+        }}
+      />
+    </View>
   );
 }
 

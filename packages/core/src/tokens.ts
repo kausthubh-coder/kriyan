@@ -113,7 +113,15 @@ export const size = {
   column: 680,
   sidebar: 248,
   panel: 440,
+  /**
+   * Today's schedule beside the list. With the 48 gap and the page's 32 padding it is wider
+   * than the task panel (440), so an open panel covers the schedule and never the list.
+   */
+  schedule: 400,
 } as const;
+
+/** From this window width Today puts the schedule beside the list: sidebar, a 560 list, the schedule. */
+export const SPLIT_MIN_WIDTH = 1320;
 
 export const shadow = {
   raised:

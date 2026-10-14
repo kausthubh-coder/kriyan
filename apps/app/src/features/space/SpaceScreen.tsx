@@ -220,16 +220,12 @@ function SpaceBody({ view }: { view: SpaceView }) {
               {view.space.name}
             </Txt>
           )}
+          {/* The space's name leads; adding a space lives in "Inside", where it will appear. */}
           <View style={{ flexDirection: "row", gap: s.s2, marginLeft: phone ? -s.s3 : 0 }}>
             <Button
               icon={Plus}
-              label="Add space"
-              onPress={() => setAdding(adding === "space" ? null : "space")}
-            />
-            <Button
-              variant={phone ? "default" : "primary"}
-              icon={Plus}
               label="Add task"
+              expanded={adding === "task"}
               onPress={() => setAdding(adding === "task" ? null : "task")}
             />
             <View ref={moreRef} collapsable={false}>

@@ -73,26 +73,33 @@ function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone
   const [open, setOpen] = useState<"day" | "space" | null>(null);
   const dayRef = useRef<View>(null);
   const spaceRef = useRef<View>(null);
+  // Phones show the three as words under the title (icons would push them off a 390px
+  // screen); desktop keeps them on the row, with icons for the two that open a picker.
   const actions = (
     <View
       style={{
         flexDirection: "row",
+        flexWrap: "wrap",
         alignItems: "center",
         gap: s.s1,
-        ...(phone ? { marginLeft: 34, marginTop: -s.s1 } : {}),
+        ...(phone ? { marginLeft: 34 - s.s3, marginTop: -s.s2 } : {}),
       }}
     >
-      <Button icon={Sun} label="Today" onPress={() => void moveTasks([task._id], today)} />
+      <Button
+        icon={phone ? undefined : Sun}
+        label="Today"
+        onPress={() => void moveTasks([task._id], today)}
+      />
       <Button
         ref={dayRef}
-        icon={CalendarDays}
+        icon={phone ? undefined : CalendarDays}
         label={phone ? "Pick a day" : undefined}
         accessibilityLabel="Pick a day"
         onPress={() => setOpen("day")}
       />
       <Button
         ref={spaceRef}
-        icon={Layers}
+        icon={phone ? undefined : Layers}
         label={phone ? "Move to space" : undefined}
         accessibilityLabel="Move to space"
         onPress={() => setOpen("space")}

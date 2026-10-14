@@ -1,8 +1,9 @@
-// Today: what am I doing now, what's next, and does today fit. One calm column: the now
-// block leads, then habits, anytime tasks, one quiet row for earlier days, the schedule.
+// Today: what am I doing now, what's next, and does today fit. The now block leads, then
+// habits, anytime tasks, one quiet row for earlier days, and the schedule: under the list in
+// one calm column, or beside it on a desktop wide enough for both.
 
-import { useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
 import { ArrowRight, Check as CheckIcon, Plus } from "lucide-react-native";
@@ -10,6 +11,7 @@ import { api } from "@kriyan/convex/api";
 import { formatClock } from "@kriyan/core/dates";
 import { formatDate, formatDuration } from "@kriyan/core/format";
 import { freeMinutes } from "@kriyan/core/layout";
+import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
 import { useClock } from "@/data/time";
 import { useTodayView, type TaskView, type TodayView } from "@/data/views";
 import { completeTask, moveTasks } from "@/features/tasks/actions";
@@ -19,13 +21,13 @@ import { QuickAdd, type QuickAddHandle } from "@/features/tasks/QuickAdd";
 import { openTask, TaskRow } from "@/features/tasks/TaskRow";
 import { quickAddTarget } from "@/features/shell/context";
 import { useIsPhone } from "@/theme/layout";
-import { c, s, spaceTone } from "@/theme/tokens";
+import { c, s, spaceTone, sz } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Ring, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
-import { Notice, PageHead, Screen, SectionHead } from "@/ui/Screen";
+import { Notice, PageHead, Screen, SectionHead, usePanelOpen } from "@/ui/Screen";
 import { Txt } from "@/ui/Txt";
 import { DragGhost } from "./DragGhost";
 import { DragSource } from "./DragSource";
@@ -35,7 +37,12 @@ export function TodayScreen() {
   const view = useTodayView();
   const { today, now } = useClock();
   const phone = useIsPhone();
+  const { width } = useWindowDimensions();
+  const panelOpen = usePanelOpen();
   const quickAdd = useRef<QuickAddHandle>(null);
+  // The schedule moves beside the list when both fit. An open task's panel replaces the
+  // schedule column, so the list stays exactly where it was.
+  const split = !phone && width >= SPLIT_MIN_WIDTH;
 
   useEffect(() => {
     if (phone) return;
@@ -45,39 +52,53 @@ export function TodayScreen() {
 
   const free = view ? freeTime(view, now) : null;
   const freeText = free === null ? "" : free === 0 ? "No free time left" : `${formatDuration(free)} free`;
+  const add = phone ? null : <QuickAdd ref={quickAdd} variant="inline" defaultDate={today} />;
+  const head = (
+    <PageHead
+      title="Today"
+      sub={formatDate(today)}
+      right={
+        view ? (
+          // Body size, so it shares the date's baseline across the head.
+          <Txt variant="body" tone="ink3" tnum>
+            {freeText}
+          </Txt>
+        ) : null
+      }
+    />
+  );
 
   return (
     <View style={{ flex: 1 }}>
       <Screen
         title="Today"
         fab
+        width={split ? sz.column + s.s12 + sz.schedule : "column"}
+        panelCovers={split}
         actions={
           view ? (
-            <Txt variant="meta" tone="ink3" style={{ marginRight: s.s1 }}>
+            <Txt variant="meta" tone="ink3" tnum style={{ marginRight: s.s1 }}>
               {freeText}
             </Txt>
           ) : null
         }
       >
-        <PageHead
-          title="Today"
-          sub={formatDate(today)}
-          right={
-            view ? (
-              <Txt variant="meta" tone="ink3">
-                {freeText}
-              </Txt>
-            ) : null
-          }
-        />
-        {phone ? null : <QuickAdd ref={quickAdd} variant="inline" defaultDate={today} />}
+        {split ? null : head}
         {view === undefined ? (
-          <TodaySkeleton />
+          <>
+            {split ? head : null}
+            {add}
+            <TodaySkeleton />
+          </>
         ) : (
           <TodayBody
             view={view}
             today={today}
             now={now}
+            split={split}
+            panelOpen={panelOpen}
+            head={split ? head : null}
+            add={add}
             onAdd={() => (phone ? router.push("/add") : quickAdd.current?.focus())}
           />
         )}
@@ -98,11 +119,21 @@ function TodayBody({
   view,
   today,
   now,
+  split,
+  panelOpen,
+  head,
+  add,
   onAdd,
 }: {
   view: TodayView;
   today: string;
   now: number;
+  split: boolean;
+  panelOpen: boolean;
+  /** The page head, when it heads the list column rather than the page (split). */
+  head: ReactNode;
+  /** The inline quick add (desktop), at the top of the list. */
+  add: ReactNode;
   onAdd: () => void;
 }) {
   const [showEarlierHours, setShowEarlierHours] = useState(false);
@@ -114,11 +145,15 @@ function TodayBody({
     view.habits.length === 0;
   if (nothing) {
     return (
-      <Notice
-        title="Nothing planned for today"
-        body="Add what's on your mind, like “call the bank tomorrow 10am”. Anything without a date waits in your Inbox."
-        action={<Button icon={Plus} label="Add your first task" onPress={onAdd} />}
-      />
+      <>
+        {head}
+        {add}
+        <Notice
+          title="Nothing planned for today"
+          body="Add what's on your mind, like “call the bank tomorrow 10am”. Anything without a date waits in your Inbox."
+          action={<Button icon={Plus} label="Add your first task" onPress={onAdd} />}
+        />
+      </>
     );
   }
 
@@ -133,8 +168,10 @@ function TodayBody({
   const fold = !showEarlierHours && now - 60 > view.profile.dayStart ? now - 60 : null;
   const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < now - 60).length;
 
-  return (
+  const list = (
     <>
+      {head}
+      {add}
       {current || next ? <NowBlock current={current} next={next} now={now} /> : null}
       {view.habits.length ? <Habits habits={view.habits} today={today} /> : null}
 
@@ -172,36 +209,53 @@ function TodayBody({
         ) : null}
         {view.earlier.length ? <Earlier tasks={view.earlier} today={today} /> : null}
       </View>
-
-      <View style={{ gap: s.s2 }}>
-        <SectionHead
-          title="Schedule"
-          right={
-            fold !== null || showEarlierHours ? (
-              <Button
-                variant="quiet"
-                label={
-                  showEarlierHours
-                    ? "Hide earlier hours"
-                    : doneEarlier
-                      ? `Earlier today, ${doneEarlier} done`
-                      : "Earlier today"
-                }
-                onPress={() => setShowEarlierHours(!showEarlierHours)}
-              />
-            ) : null
-          }
-        />
-        <Timeline
-          date={today}
-          items={view.scheduled}
-          now={now}
-          dayStart={view.profile.dayStart}
-          dayEnd={view.profile.dayEnd}
-          foldBefore={fold}
-        />
-      </View>
     </>
+  );
+
+  const schedule = (
+    <View style={{ gap: s.s2 }}>
+      <SectionHead
+        title="Schedule"
+        right={
+          fold !== null || showEarlierHours ? (
+            <Button
+              variant="quiet"
+              label={
+                showEarlierHours
+                  ? "Hide earlier hours"
+                  : doneEarlier
+                    ? `Earlier today, ${doneEarlier} done`
+                    : "Earlier today"
+              }
+              onPress={() => setShowEarlierHours(!showEarlierHours)}
+            />
+          ) : null
+        }
+      />
+      <Timeline
+        date={today}
+        items={view.scheduled}
+        now={now}
+        dayStart={view.profile.dayStart}
+        dayEnd={view.profile.dayEnd}
+        foldBefore={fold}
+      />
+    </View>
+  );
+
+  if (!split) {
+    return (
+      <>
+        {list}
+        {schedule}
+      </>
+    );
+  }
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s12 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: s.s12 }}>{list}</View>
+      <View style={{ width: sz.schedule }}>{panelOpen ? null : schedule}</View>
+    </View>
   );
 }
 

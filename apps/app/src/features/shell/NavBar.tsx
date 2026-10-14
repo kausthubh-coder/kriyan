@@ -30,6 +30,9 @@ export function NavBar() {
   const insets = useSafeAreaInsets();
   // A sheet (a task, quick add) covers the bar; don't draw it on top of the sheet.
   if (path.startsWith("/task/") || path === "/add") return null;
+  // Like Android, the add button is for the four tab roots; Settings, Progress and a space
+  // have their own actions, and the button would sit over their content.
+  const fab = ["/", "/today", "/upcoming", "/inbox", "/browse"].includes(path);
   return (
     <>
       <View
@@ -79,27 +82,29 @@ export function NavBar() {
           );
         })}
       </View>
-      <Press
-        role="button"
-        accessibilityLabel="Add task"
-        onPress={() => router.push("/add")}
-        hoverBg={null}
-        style={{
-          position: "absolute",
-          right: s.s4,
-          bottom: NAVBAR_HEIGHT + s.s4 + insets.bottom,
-          width: 56,
-          height: 56,
-          borderRadius: 16,
-          backgroundColor: c.ink,
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: shadows.overlay,
-          zIndex: 6,
-        }}
-      >
-        <Icon icon={Plus} size={24} tone="onInk" />
-      </Press>
+      {fab ? (
+        <Press
+          role="button"
+          accessibilityLabel="Add task"
+          onPress={() => router.push("/add")}
+          hoverBg={null}
+          style={{
+            position: "absolute",
+            right: s.s4,
+            bottom: NAVBAR_HEIGHT + s.s4 + insets.bottom,
+            width: 56,
+            height: 56,
+            borderRadius: 16,
+            backgroundColor: c.ink,
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: shadows.overlay,
+            zIndex: 6,
+          }}
+        >
+          <Icon icon={Plus} size={24} tone="onInk" />
+        </Press>
+      ) : null}
     </>
   );
 }

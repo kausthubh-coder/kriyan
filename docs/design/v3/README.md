@@ -40,7 +40,7 @@ The check cannot judge hierarchy or taste. After it passes, screenshot every cha
 - **Space colours** are muted (74% lightness, 0.085 chroma) and appear only as a dot, a checkbox ring, a chart, or a timeline surface (`--<colour>-surface`). Events show a dot; tasks show a checkbox.
 - **Type:** Figtree 400, 500, 600. Six sizes. Body 14 on desktop, 16 on phones.
 - **Mark:** an ensō, a day drawn as one stroke that opens where you are now. Built from two circles (R 9.2 centred; r 6.35 shifted 1.25 towards one o'clock), gap from 20° to 78°. Files in `logo/`.
-- **Layout:** one calm column (680px) for Today, Space and Progress; the week is the only wide view. The task panel slides in from the right without covering the column.
+- **Layout:** one calm column (680px) for Today, Space and Progress; the week is the only wide view. From a 1320px window, Today puts its schedule (400px) beside the list, and an open task's panel covers the schedule, never the list. Otherwise the task panel slides in from the right without covering the column.
 - **Android:** Material navigation bar with four destinations, a floating add button, top app bar, bottom sheets with a handle, 44px targets everywhere.
 - **Icons:** Lucide, 1.75 stroke, 18px beside 14px text.
 

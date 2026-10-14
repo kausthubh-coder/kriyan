@@ -65,24 +65,27 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
   return (
     <>
       <View style={{ gap: s.s4 }}>
-        <View style={{ flexDirection: "row", gap: s.s12 }}>
-          <View style={{ gap: s.s1 }}>
-            <Txt variant="headline" tnum>
-              {hoursText(view.weekMinutes)}
-            </Txt>
-            <Txt variant="meta" tone="ink3">
-              done this week
-            </Txt>
+        {/* Two big zeros on a new account read as a score; the line below says what comes. */}
+        {view.yearMinutes > 0 ? (
+          <View style={{ flexDirection: "row", gap: s.s12 }}>
+            <View style={{ gap: s.s1 }}>
+              <Txt variant="headline" tnum>
+                {hoursText(view.weekMinutes)}
+              </Txt>
+              <Txt variant="meta" tone="ink3">
+                done this week
+              </Txt>
+            </View>
+            <View style={{ gap: s.s1 }}>
+              <Txt variant="headline" tnum>
+                {hoursText(view.yearMinutes)}
+              </Txt>
+              <Txt variant="meta" tone="ink3">
+                in the last 12 months
+              </Txt>
+            </View>
           </View>
-          <View style={{ gap: s.s1 }}>
-            <Txt variant="headline" tnum>
-              {hoursText(view.yearMinutes)}
-            </Txt>
-            <Txt variant="meta" tone="ink3">
-              in the last 12 months
-            </Txt>
-          </View>
-        </View>
+        ) : null}
         {total > 0 ? (
           <>
             <View
@@ -186,14 +189,20 @@ function level(value: number, max: number): number {
   return f < 0.25 ? 0.18 : f < 0.5 ? 0.36 : f < 0.8 ? 0.6 : 0.88;
 }
 
+const CELL = 8;
+const PITCH = CELL + s.s1;
+
 function Heat({
   days,
   color,
   label,
+  months,
 }: {
   days: { date: string; value: number }[];
   color: string;
   label: string;
+  /** Label every other month above the column its first day falls in. */
+  months?: boolean;
 }) {
   const max = Math.max(...days.map((d) => d.value));
   const first = days[0]?.date;
@@ -203,29 +212,54 @@ function Heat({
     ...days,
   ];
   const columns = Math.ceil(cells.length / 7);
+  const monthLabels = months
+    ? cells.flatMap((d, i) => {
+        if (!d) return [];
+        const [, m, day] = parts(d.date);
+        return day === 1 && (m - 1) % 2 === 0
+          ? [{ col: Math.floor(i / 7), text: MONTH_SHORT[m - 1] ?? "" }]
+          : [];
+      })
+    : [];
   return (
     <View style={{ flexDirection: "row", justifyContent: "flex-end", overflow: "hidden" }}>
-      <View role="img" aria-label={label} style={{ flexDirection: "row", gap: s.s1 }}>
-        {Array.from({ length: columns }, (_, col) => (
-          <View key={col} style={{ gap: s.s1 }}>
-            {cells.slice(col * 7, col * 7 + 7).map((d, i) =>
-              d === null ? (
-                <View key={i} style={{ width: 8, height: 8 }} />
-              ) : (
-                <View
-                  key={d.date}
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 2,
-                    backgroundColor: d.value > 0 ? color : c.hover,
-                    opacity: d.value > 0 ? level(d.value, max) : 1,
-                  }}
-                />
-              ),
-            )}
+      <View style={{ gap: s.s2 }}>
+        {monthLabels.length ? (
+          <View style={{ height: 16 }}>
+            {monthLabels.map((m) => (
+              <Txt
+                key={m.col}
+                variant="meta"
+                tone="ink3"
+                style={{ position: "absolute", left: m.col * PITCH }}
+              >
+                {m.text}
+              </Txt>
+            ))}
           </View>
-        ))}
+        ) : null}
+        <View role="img" aria-label={label} style={{ flexDirection: "row", gap: s.s1 }}>
+          {Array.from({ length: columns }, (_, col) => (
+            <View key={col} style={{ gap: s.s1 }}>
+              {cells.slice(col * 7, col * 7 + 7).map((d, i) =>
+                d === null ? (
+                  <View key={i} style={{ width: CELL, height: CELL }} />
+                ) : (
+                  <View
+                    key={d.date}
+                    style={{
+                      width: CELL,
+                      height: CELL,
+                      borderRadius: 2,
+                      backgroundColor: d.value > 0 ? color : c.hover,
+                      opacity: d.value > 0 ? level(d.value, max) : 1,
+                    }}
+                  />
+                ),
+              )}
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -233,29 +267,14 @@ function Heat({
 
 function YearHeat({ heat }: { heat: ProgressView["heat"] }) {
   const phone = useIsPhone();
-  const months: string[] = [];
-  for (const d of heat) {
-    const [, m, day] = parts(d.date);
-    if (day === 1 && (m - 1) % 2 === 0) months.push(MONTH_SHORT[m - 1] ?? "");
-  }
   const total = heat.reduce((sum, d) => sum + d.minutes, 0);
   return (
-    <View style={{ gap: s.s2 }}>
-      {phone ? null : (
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          {months.map((m, i) => (
-            <Txt key={i} variant="meta" tone="ink3">
-              {m}
-            </Txt>
-          ))}
-        </View>
-      )}
-      <Heat
-        days={heat.map((d) => ({ date: d.date, value: d.minutes }))}
-        color={c.ink}
-        label={`Time done each day, ${hoursText(total)} in total`}
-      />
-    </View>
+    <Heat
+      days={heat.map((d) => ({ date: d.date, value: d.minutes }))}
+      color={c.ink}
+      label={`Time done each day, ${hoursText(total)} in total`}
+      months={!phone}
+    />
   );
 }
 

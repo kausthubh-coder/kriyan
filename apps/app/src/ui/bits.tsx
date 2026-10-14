@@ -120,14 +120,17 @@ export function Chip({
             height: phone ? 36 : 28,
             paddingHorizontal: s.s3,
             borderRadius: phone ? 18 : 14,
-            backgroundColor: on ? c.ink : hovered ? c.select : c.hover,
+            // Selected is a raised tone with an edge, not solid ink: a chosen setting is a
+            // state, and solid ink belongs to the one action on the screen.
+            backgroundColor: on ? c.overlay : hovered ? c.select : c.hover,
+            ...(on ? { boxShadow: `inset 0 0 0 1px ${c.lineStrong}` } : null),
           }}
         >
           {leading}
-          {icon ? <Icon icon={icon} size={14} tone={on ? "onInk" : "ink3"} /> : null}
+          {icon ? <Icon icon={icon} size={14} tone={on ? "ink" : "ink3"} /> : null}
           <Txt
             style={[roles.label, { fontSize: 12, lineHeight: 16 }]}
-            tone={on ? "onInk" : "ink2"}
+            tone={on ? "ink" : "ink2"}
             numberOfLines={1}
           >
             {label}

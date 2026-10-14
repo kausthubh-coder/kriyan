@@ -117,14 +117,16 @@ export function Sidebar() {
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: s.s2,
+          gap: s.s3,
           height: 40,
           paddingHorizontal: s.s2,
           marginBottom: s.s2,
         }}
       >
-        <Mark size={22} />
-        <Txt variant="title" style={{ letterSpacing: -0.4 }}>
+        {/* The wordmark stays quieter than the page title, so the page leads. The mark sits in
+            the nav icons' column and the word on their labels' edge. */}
+        <Mark size={18} />
+        <Txt variant="subhead" tone="ink2">
           kriyan
         </Txt>
       </View>

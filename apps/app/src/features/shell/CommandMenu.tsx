@@ -224,6 +224,9 @@ function Menu() {
         }}
       >
         <View
+          // The menu opens with the cursor in this field, so the caret shows focus; a ring
+          // here would be cut off by the menu's edge and read as a heavy line.
+          {...({ dataSet: { focus: "caret" } } as object)}
           style={{
             flexDirection: "row",
             alignItems: "center",
