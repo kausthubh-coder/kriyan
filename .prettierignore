@@ -13,3 +13,5 @@ apps/app/ios
 apps/site/src/app/tokens.css
 apps/app/app.json
 .agents/skills
+# Generated HTML reports with images inlined; formatting them only churns the diff.
+.agents/reports
