@@ -17,3 +17,5 @@ coverage/
 test-results/
 playwright-report/
 .claude/skills
+# Critly taste images; every run rewrites them.
+.critly/taste/

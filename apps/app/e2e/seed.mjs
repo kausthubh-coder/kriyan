@@ -12,11 +12,19 @@ import { BASE, launch, settle, signedInContext } from "./lib.mjs";
 const root = new URL("../../../", import.meta.url);
 // The Convex CLI run directly (no shell), so JSON arguments keep their quotes on Windows.
 const convexBin = fileURLToPath(new URL("node_modules/convex/bin/main.js", root));
-const convex = (...args) =>
-  execFileSync(process.execPath, [convexBin, ...args], {
-    cwd: new URL("packages/convex/", root),
-    encoding: "utf8",
-  }).trim();
+const convex = (...args) => {
+  try {
+    return execFileSync(process.execPath, [convexBin, ...args], {
+      cwd: new URL("packages/convex/", root),
+      encoding: "utf8",
+    }).trim();
+  } catch (e) {
+    // Node 24 on Windows can trip a libuv assertion while the CLI exits, after its work is
+    // done. The reset below is confirmed by polling, so only that crash is let through.
+    if (String(e.stderr).includes("UV_HANDLE_CLOSING")) return String(e.stdout ?? "").trim();
+    throw e;
+  }
+};
 
 const browser = await launch();
 const ctx = await signedInContext(browser);

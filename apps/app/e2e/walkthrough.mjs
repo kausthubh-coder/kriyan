@@ -90,6 +90,9 @@ await step("add a goal from Progress and link a task to it", async () => {
   }
   await page.goto(`${BASE}/today`);
   await settle(page);
+  // After 11:00 the 10:00 block sits behind the "Earlier today" fold.
+  if (await page.getByRole("button", { name: /^Earlier today/ }).count())
+    await page.getByRole("button", { name: /^Earlier today/ }).click();
   await page
     .getByRole("button", { name: /^Open Write MCP tools/ })
     .first()
@@ -123,6 +126,9 @@ await step("tick and untick before the row moves (Undo during the moment it stay
 });
 
 const dragTitle = `Pack the gym bag ${new Date().getMinutes()}${new Date().getSeconds()}`;
+// The timeline hides an hour's label within 20 minutes of now, so drop on one far from now.
+const dropAt =
+  Math.abs(new Date().getHours() * 60 + new Date().getMinutes() - 18 * 60) <= 30 ? "14:00" : "18:00";
 await step("drag an anytime task onto the timeline at a 15-minute step", async () => {
   await page.goto(`${BASE}/today`);
   await settle(page);
@@ -145,17 +151,16 @@ await step("drag an anytime task onto the timeline at a 15-minute step", async (
   await page.mouse.move(b2.x + 30, b2.y + 30, { steps: 4 });
   await timeline.scrollIntoViewIfNeeded();
   const t2 = await timeline.boundingBox();
-  // 21:00 on the timeline: find the hour label.
-  const label = page.getByLabel("Schedule").getByText("18:00", { exact: true });
+  const label = page.getByLabel("Schedule").getByText(dropAt, { exact: true });
   const lb = await label.boundingBox();
   await page.mouse.move(t2.x + 300, lb.y + 8 + 2, { steps: 8 });
   await page.screenshot({ path: artifact("flow-drag-1440.png") });
   await page.mouse.up();
-  await page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}, 18:00`) }).waitFor();
+  await page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}, ${dropAt}`) }).waitFor();
 });
 
 await step("resize a block by its bottom edge to set a length", async () => {
-  const block = page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}, 18:00`) });
+  const block = page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}, ${dropAt}`) });
   const before = await block.getAttribute("aria-label");
   const b = await block.boundingBox();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height + 1);
@@ -168,7 +173,7 @@ await step("resize a block by its bottom edge to set a length", async () => {
       [...document.querySelectorAll("[aria-label]")].some(
         (e) => (e.getAttribute("aria-label") ?? "").startsWith(prefix) && e.getAttribute("aria-label") !== b,
       ),
-    [before, `Open ${dragTitle}, 18:00–`],
+    [before, `Open ${dragTitle}, ${dropAt}–`],
   );
   console.log(`     ${before} -> ${await block.getAttribute("aria-label")}`);
 });

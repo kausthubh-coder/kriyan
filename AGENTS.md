@@ -45,7 +45,7 @@ Every task in a new worktree starts with `worktree-kriyan`. Ship only with `ship
 
 - Read `docs/design/v3/README.md` before UI work. Values come from `packages/core/src/tokens.ts` only.
 - UI work: use the `critly` skill. Read `.critly/policy.json` before choosing spacing, type or colour, use only its values, and never edit it to pass.
-- After any UI change, run `bun run lint:ui` and fix every error until it exits 0. Exit 2 means it couldn't run; say so, it is not a pass. Then screenshot each changed screen at 390 and 1440, blur it, and check one thing leads.
+- After any UI change, run `bun run lint:ui` and fix every error until it exits 0. Exit 2 means it couldn't run; say so, it is not a pass. Then run `bun run taste:ui` (signed in, at 390 and 1440), open the squint and overlay images in `.critly/taste/` for each changed screen, and fix each look or say why the screen needs it.
 - Copy: sentence case, verb plus object on buttons, dates like "Tue 13 Oct", times like "14:30", no em dashes, no guilt ("2 from earlier", never "overdue"). Never invent a task's length.
 
 ## How we write code

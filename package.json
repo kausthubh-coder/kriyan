@@ -20,7 +20,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "bun run format:check && bun run tokens --check && bun run typecheck && bun run lint && bun run test",
-    "lint:ui": "critly check http://localhost:${PORT_APP:-8081}",
+    "lint:ui": "node scripts/lint-ui.mjs",
+    "taste:ui": "node apps/app/e2e/taste-signed-in.mjs",
     "kriyan": "bun packages/cli/src/main.ts"
   },
   "devDependencies": {
