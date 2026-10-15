@@ -55,6 +55,20 @@ Every task in a new worktree starts with `worktree-kriyan`. Ship only with `ship
 - "Today" comes from the person's time zone (`todayIn`), never the server's UTC date. Queries take `today` as an argument.
 - Comments say why, never what.
 
+## Cloud sessions
+
+A cloud VM (Claude Code on the web, Codex Cloud) is Linux with a bare clone: no `~/.kriyan/dev-env`, no main checkout, no Windows. The SessionStart hook in `.claude/settings.json` runs `node scripts/cloud.mjs` (Codex: set the environment's setup script to `CLOUD=1 node scripts/cloud.mjs`). It loads Kausthubh's global skills and rules, runs setup, and makes sure a browser exists. It does nothing outside the cloud. Its last line says ready or what failed; rerun it if you're unsure.
+
+- Setup writes `apps/app/.env.local` and `apps/site/.env.local` from the cloud environment's variables, generates a `KRIYAN_SERVICE_SECRET` for this clone's backend, and creates the local Convex backend as usual. With no Clerk key it gives the backend a placeholder issuer so functions still push. The doctor names every unset variable.
+- Env vars, dev values only (setup refuses `pk_live_`, `sk_live_` and production deployments):
+  - `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`: the dev instance's `pk_test_` key. Without it the web app stops at "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is missing" and nothing signs in.
+  - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: optional, defaults to the one above.
+  - `CLERK_SECRET_KEY`: optional, the dev `sk_test_` key, for the site's MCP OAuth sign-in.
+- Works here: setup and the doctor, `bun run check`, `bun run dev`, the site and docs, the local backend through `apps/app/e2e/api.mjs` (it takes any user id in `.artifacts/app/user.json`, so it needs no Clerk), and the e2e scripts headless on the VM's Chromium (`scripts/browser.mjs` picks it; `CHROMIUM_PATH` overrides). With the Clerk key set: `seed.mjs`, the signed-in web app, `lint:ui`, `taste:ui`, and the CLI and MCP with a token from Settings. Shipping with `ship-kriyan` works for landing on `main`.
+- `bun run dev` puts each server in its own process group; stop it with `kill -TERM <pid>`. If `[convex]` exits with an `AssertionError` after "Downloading Convex dashboard", the proxy cut the download: run `bun run dev` again; it's cached after one success.
+- `gh pr` doesn't work here; `gh api` does.
+- Only on Kausthubh's machine: the Android emulator and `adb.sh`, EAS builds and the Android release, Google sign-in on a device, the main checkout (`ship-kriyan` step 9), anything that needs `~/.kriyan/prod-env` or a signed-in Vercel, Convex or npm CLI (`convex deploy`, the web app's `vercel deploy --prod`, `bun publish`). Finish the rest here and list those steps in the report.
+
 ## Safety
 
 - Production needs my explicit go: `convex deploy`, `--prod`, Vercel production, EAS submit, Clerk production settings. The steps are in `ship-kriyan`; `docs/ops.md` says where each piece runs.

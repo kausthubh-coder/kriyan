@@ -1,9 +1,9 @@
 // Renders the approved v3 screens (docs/design/v3) to the product images on the landing page.
 // Run with Node, not Bun (Playwright hangs under Bun on Windows):
 //   node apps/site/scripts/render-product.mjs
-// Set CHROMIUM to a Chromium or headless shell binary if Playwright's default isn't installed.
+// The browser comes from scripts/browser.mjs; set CHROMIUM_PATH to pick another.
 
-import { chromium } from "playwright-core";
+import { launchBrowser } from "../../../scripts/browser.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -20,7 +20,7 @@ const shots = [
   { page: "progress", name: "progress-phone", width: 390, height: 844 },
 ];
 
-const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
+const browser = await launchBrowser();
 for (const shot of shots) {
   const page = await browser.newPage({
     viewport: { width: shot.width, height: shot.height },

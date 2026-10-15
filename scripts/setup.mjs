@@ -5,18 +5,22 @@
 // Convex backend, point the app and site at it, then run the doctor.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createConnection, createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   APP_ENV,
+  CLOUD_ENV,
   CONVEX_ENV,
+  PLACEHOLDER_ISSUER,
   PORTS_FILE,
   PORT_KEYS,
   SITE_ENV,
   backendEnvNames,
+  backendEnvValue,
   convex,
+  inCloud,
   isLocal,
   mainCheckout,
   otherCheckouts,
@@ -43,8 +47,52 @@ if (!existsSync(claudeSkills)) {
 // packages/convex/.env.local is never copied: the Convex CLI writes it for this checkout's backend.
 const store = process.env.KRIYAN_ENV_DIR ?? join(homedir(), ".kriyan", "dev-env");
 const PRODUCTION = /pk_live_|sk_live_|prod:|brave-sheep-245/;
+/** Sets KEY=value lines in an env file, creating it when missing. Returns the names it changed. */
+const setEnv = (file, values) => {
+  const path = join(root, file);
+  const existed = existsSync(path);
+  let text = existed ? readFileSync(path, "utf8") : "";
+  const changed = [];
+  for (const [name, value] of Object.entries(values)) {
+    if (readEnv(file)?.[name] === value) continue;
+    const line = new RegExp(`^${name}=.*$`, "m");
+    text = line.test(text)
+      ? text.replace(line, `${name}=${value}`)
+      : `${text.replace(/\s*$/, "")}\n${name}=${value}\n`;
+    changed.push(name);
+  }
+  if (!existed || changed.length) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text.replace(/^\n/, ""));
+  }
+  return changed;
+};
 for (const file of [APP_ENV, SITE_ENV]) {
   const target = join(root, file);
+  if (inCloud && !existsSync(join(store, file))) {
+    // A cloud VM has no store and no main checkout to copy from. The cloud environment's own
+    // variables fill the file instead, on every run, so setting one later takes effect on rerun.
+    const values = Object.fromEntries(
+      CLOUD_ENV.filter((v) => v.file === file)
+        .map((v) => [
+          v.name,
+          process.env[v.name] ??
+            (v.name === "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+              ? process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
+              : undefined),
+        ])
+        .filter(([, value]) => value),
+    );
+    if (PRODUCTION.test(Object.values(values).join("\n"))) {
+      log("skipped", `${file}: the cloud environment holds production values`);
+      continue;
+    }
+    const fresh = !existsSync(target);
+    const changed = setEnv(file, values);
+    if (fresh || changed.length)
+      log("wrote", `${file} from the cloud environment (${changed.join(", ") || "no Clerk keys"})`);
+    continue;
+  }
   if (existsSync(target)) continue;
   const source = [join(store, file), join(mainCheckout(), file)].find((p) => existsSync(p) && p !== target);
   if (!source) {
@@ -59,6 +107,12 @@ for (const file of [APP_ENV, SITE_ENV]) {
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, text);
   log("copied", `${file} from ${source}`);
+}
+// The site and this checkout's backend share the service secret, and nothing else checks it, so
+// when the dev env has none a random one works as well.
+if (readEnv(SITE_ENV) && !readEnv(SITE_ENV).KRIYAN_SERVICE_SECRET) {
+  setEnv(SITE_ENV, { KRIYAN_SERVICE_SECRET: randomBytes(32).toString("hex") });
+  log("generated", `KRIYAN_SERVICE_SECRET in ${SITE_ENV}, for this checkout's backend only`);
 }
 
 // 3. Install only when node_modules is older than bun.lock; a no-op `bun install` still takes ~20s.
@@ -183,17 +237,28 @@ const issuer = clerkKey
       .toString()
       .replace(/\$$/, "")}`
   : undefined;
-const wanted = { CLERK_JWT_ISSUER_DOMAIN: issuer, KRIYAN_SERVICE_SECRET: site.KRIYAN_SERVICE_SECRET };
+// Without a Clerk key the auth config still needs an issuer before functions push; a placeholder
+// keeps the backend, the agent API and the CLI working with sign-in off. A real key replaces it.
+const wanted = {
+  CLERK_JWT_ISSUER_DOMAIN: issuer ?? PLACEHOLDER_ISSUER,
+  KRIYAN_SERVICE_SECRET: site.KRIYAN_SERVICE_SECRET,
+};
 const names = backendEnvNames();
 if (!names) stop("couldn't read the local backend's env vars (`bunx convex env list` in packages/convex)");
 for (const [name, value] of Object.entries(wanted)) {
-  if (names.has(name)) continue;
+  // Compare values, not names: a regenerated secret or a newly set Clerk key must reach the backend.
+  if (names.has(name) && (!value || backendEnvValue(name) === value)) continue;
   if (!value) {
     log("missing", `${name} for the local backend: the dev env files don't provide it`);
     continue;
   }
   if (convex(["env", "set", name, value]).status !== 0) stop(`couldn't set ${name} on the local backend`);
-  log("set", `${name} on the local backend`);
+  log(
+    "set",
+    value === PLACEHOLDER_ISSUER
+      ? `${name} on the local backend to a placeholder: no Clerk key, so sign-in is off`
+      : `${name} on the local backend`,
+  );
   push = true;
 }
 if (push) {
@@ -217,22 +282,8 @@ if (push) {
 // process env, so the files themselves must hold the local URLs.
 const backend = readEnv(CONVEX_ENV);
 const point = (file, values) => {
-  const path = join(root, file);
-  if (!existsSync(path)) return;
-  let text = readFileSync(path, "utf8");
-  const changed = [];
-  for (const [name, value] of Object.entries(values)) {
-    const line = new RegExp(`^${name}=.*$`, "m");
-    if (line.test(text)) {
-      if (readEnv(file)[name] === value) continue;
-      text = text.replace(line, `${name}=${value}`);
-    } else text = `${text.replace(/\s*$/, "")}\n${name}=${value}\n`;
-    changed.push(name);
-  }
-  if (changed.length) {
-    writeFileSync(path, text);
+  if (existsSync(join(root, file)) && setEnv(file, values).length)
     log("pointed", `${file} at ${backend.CONVEX_URL}`);
-  }
 };
 point(APP_ENV, { EXPO_PUBLIC_CONVEX_URL: backend.CONVEX_URL });
 point(SITE_ENV, {

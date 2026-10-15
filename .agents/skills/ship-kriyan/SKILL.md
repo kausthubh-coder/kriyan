@@ -5,9 +5,15 @@ description: Take verified Kriyan work to production and leave main, the main ch
 
 # Ship Kriyan
 
-Kriyan is a personal repo: work lands by fast-forwarding `main`, with no PR. Every step below changes something people use, so it needs my go in this conversation. A go for one surface does not cover another.
+Kriyan is a personal repo: work lands by fast-forwarding `main` with a direct push, with no PR. Run the commands in Bash from the worktree root.
 
-Run the commands in Bash from the worktree root. Stop at the first failure and tell me. Never force-push, skip a check, or raise a warning cap to get through.
+## Rules
+
+- Production needs my go in this conversation. "Ship" (or deploy, release, merge and deploy) is that go for every step below that the change needs, including the release when app code changed and the cleanup. Don't stop to ask between steps.
+- When a step fails because of this change (a failing check, a deploy limit, a rejected push), fix it, rerun the checks and carry on. Stop and tell me only when the cause is outside the change or the fix needs my decision.
+- Never end the turn while a build or deploy you started is queued or running: watch it to the end, then finish the steps after it. Two releases were lost to a turn that ended on a queued EAS build.
+- Never force-push, skip a check, or raise a warning cap to get through.
+- In a cloud session, steps that need my machine (see `## Cloud sessions` in AGENTS.md) are listed in the report as left for me, never skipped silently.
 
 **Dry run.** When I ask for a dry run, walk every step and run the local checks. Print each push, deploy, release and publish command instead of running it.
 
@@ -28,7 +34,7 @@ git diff --name-only origin/main...HEAD
 | `packages/cli/**` | CLI |
 | `docs/**`, `.agents/**`, `scripts/**`, tests only | Nothing beyond landing |
 
-Android and the CLI are versioned releases. Cut one when I ask for a release, or when the change fixes something Android or CLI users hit. There are no over-the-air updates, so phones only see app changes in a new APK. Otherwise list them in the report as waiting for the next release.
+Android and the CLI are versioned releases. When the change touches app code (`apps/app/**` outside `e2e/`, or `packages/core/**`), the Android release is part of the ship; when it touches `packages/cli/**` or `packages/core/**`, so is the CLI release. There are no over-the-air updates, so phones only see app changes in a new APK. Tooling, docs and test-only changes need no release.
 
 | Surface | Where | How it ships |
 | --- | --- | --- |
@@ -90,7 +96,7 @@ cd dist && VERCEL_ORG_ID=team_eG2BEkfqMmQSwwGiTPzlC622 VERCEL_PROJECT_ID=prj_8r2
 ## 5. Android release
 
 1. In `apps/app/app.json`, raise `expo.version` and `android.versionCode` above the last release (`gh release list`). Commit, then land as in step 3.
-2. Build on EAS. The free queue can take an hour, so wait at most 90 minutes:
+2. Build on EAS. The free queue can take an hour; `--wait` keeps the command attached until the build ends, and the turn must not end before it does. If 90 minutes pass, keep watching with `build:list` below rather than leaving it queued:
    ```
    cd apps/app
    bunx eas-cli@18 build --platform android --profile production --non-interactive --wait

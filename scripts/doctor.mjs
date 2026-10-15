@@ -5,13 +5,17 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   APP_ENV,
+  CLOUD_ENV,
   CONVEX_ENV,
+  PLACEHOLDER_ISSUER,
   PORTS_FILE,
   PORT_KEYS,
   SHARED_DEV,
   SITE_ENV,
   backendEnvNames,
+  backendEnvValue,
   git,
+  inCloud,
   isLocal,
   mainCheckout,
   otherCheckouts,
@@ -30,9 +34,11 @@ const fail = (msg, fix) => {
 const SETUP = "run `bun run setup`";
 
 const main = mainCheckout();
-samePath(main, root)
-  ? warn(`this is the main checkout; work in a worktree (see the worktree-kriyan skill)`)
-  : ok(`worktree; the main checkout is ${main} (never edit it)`);
+if (inCloud)
+  ok("cloud clone; there's no main checkout or dev env store here (## Cloud sessions in AGENTS.md)");
+else if (samePath(main, root))
+  warn(`this is the main checkout; work in a worktree (see the worktree-kriyan skill)`);
+else ok(`worktree; the main checkout is ${main} (never edit it)`);
 
 existsSync(join(root, ".claude", "skills"))
   ? ok(".claude/skills is linked")
@@ -72,6 +78,18 @@ for (const [file, values, vars] of [
     : ok(`${file} has its ${vars.length} variables`);
 }
 
+// The cloud has no dev env store; its environment's variables fill the env files instead.
+if (inCloud) {
+  const unset = CLOUD_ENV.filter((v) => !readEnv(v.file)?.[v.name]);
+  if (!unset.length) ok("cloud: the environment provides every Clerk dev key");
+  else {
+    warn(
+      `cloud: the environment lacks ${unset.map((v) => v.name).join(", ")}. Set them as the cloud environment's env vars (dev values only), then rerun setup:`,
+    );
+    for (const v of unset) console.log(`        ${v.name}: ${v.unlocks}`);
+  }
+}
+
 const ports = readEnv(PORTS_FILE);
 const clashes = otherCheckouts().filter((dir) => {
   const theirs = readEnv(PORTS_FILE, dir);
@@ -108,7 +126,10 @@ else {
   if (!names) warn("couldn't read the backend's env vars");
   else {
     const unset = needed.filter((n) => !names.has(n));
-    unset.length ? fail(`backend lacks ${unset.join(", ")}`, SETUP) : ok("backend has its env vars");
+    if (unset.length) fail(`backend lacks ${unset.join(", ")}`, SETUP);
+    else if (backendEnvValue("CLERK_JWT_ISSUER_DOMAIN") === PLACEHOLDER_ISSUER)
+      warn("backend has a placeholder Clerk issuer: sign-in is off; the agent API and the CLI work");
+    else ok("backend has its env vars");
   }
   try {
     const res = await fetch(`${backend.CONVEX_URL}/version`, { signal: AbortSignal.timeout(3000) });
@@ -116,6 +137,16 @@ else {
   } catch {
     ok("backend is stopped (`bun run dev` starts it)");
   }
+}
+
+try {
+  const { findBrowser } = await import("./browser.mjs");
+  const browser = findBrowser();
+  browser
+    ? ok(`browser for the e2e scripts: ${browser.name}`)
+    : warn("no browser for the e2e scripts: run `node node_modules/playwright-core/cli.js install chromium`");
+} catch {
+  warn("couldn't look for a browser (is playwright-core installed?)");
 }
 
 let behind = "unknown";

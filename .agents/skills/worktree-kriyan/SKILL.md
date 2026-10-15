@@ -31,7 +31,11 @@ kriyan: ready. app :8133, site :3333, own Convex backend :4466, 0 behind origin/
 
 ## Dev
 
-`bun run dev` starts the backend (watching `packages/convex/convex`), the web app and the site on this worktree's ports. To stop it, kill the tree: `taskkill /PID <pid> /T /F`. A plain kill of the PID leaves the backend, Metro and Next running.
+`bun run dev` starts the backend (watching `packages/convex/convex`), the web app and the site on this worktree's ports. To stop it on Windows, kill the tree: `taskkill /PID <pid> /T /F`. A plain kill of the PID leaves the backend, Metro and Next running. On Linux each server runs in its own process group, and `kill -TERM <pid>` of `node scripts/dev.mjs` stops them all.
+
+## Cloud sessions
+
+In a cloud VM, `scripts/cloud.mjs` runs setup for you, there's no main checkout or dev env store, and the env files come from the cloud environment's variables. See `## Cloud sessions` in AGENTS.md for what works there and which env vars it needs.
 
 ## The main checkout
 

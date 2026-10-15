@@ -2,7 +2,7 @@
 // account (code 424242 on the dev instance), and screenshot at phone and desktop widths.
 
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { chromium } from "playwright-core";
+import { launchBrowser } from "../../../scripts/browser.mjs";
 
 const root = new URL("../../../", import.meta.url);
 const ports = existsSync(new URL(".env.ports", root))
@@ -18,12 +18,8 @@ export const artifact = (name) => new URL(name, ARTIFACTS).pathname.replace(/^\/
 export const EMAIL = process.env.KRIYAN_TEST_EMAIL ?? "kriyan.app.qa+clerk_test@example.com";
 export const PASSWORD = process.env.KRIYAN_TEST_PASSWORD ?? "Calm-planner-2026!";
 
-export const CHROMIUM =
-  process.env.CHROMIUM_PATH ??
-  "C:/Users/kaust/AppData/Local/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-win64/chrome-headless-shell.exe";
-
 export async function launch() {
-  return chromium.launch({ executablePath: CHROMIUM });
+  return launchBrowser();
 }
 
 const STATE = artifact("auth-state.json");

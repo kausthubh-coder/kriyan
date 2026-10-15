@@ -73,3 +73,38 @@ export function backendEnvNames() {
       .map((l) => l.slice(0, l.indexOf("="))),
   );
 }
+
+/** A cloud session (Claude Code on the web, Codex Cloud): a bare Linux clone with no dev env store. */
+export const inCloud =
+  process.env.CLAUDE_CODE_REMOTE === "true" || Boolean(process.env.CODEX_CI) || process.env.CLOUD === "1";
+
+/**
+ * Env vars a cloud environment can set when there's no dev env store, by the file they go into, with
+ * what each one unlocks. All are dev values; setup refuses production ones. Names only, never values.
+ */
+export const CLOUD_ENV = [
+  {
+    name: "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    file: APP_ENV,
+    unlocks: "the web app and sign-in as the test account (dev Clerk instance, pk_test_)",
+  },
+  {
+    name: "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    file: SITE_ENV,
+    unlocks: "the site's MCP sign-in metadata; defaults to EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
+  },
+  {
+    name: "CLERK_SECRET_KEY",
+    file: SITE_ENV,
+    unlocks: "MCP OAuth sign-in on the site (dev instance, sk_test_)",
+  },
+];
+
+/** The issuer setup gives the local backend when no Clerk key is known, so functions still push. */
+export const PLACEHOLDER_ISSUER = "https://clerk.invalid";
+
+/** One variable's value on this checkout's backend, or null. Callers must never print it. */
+export function backendEnvValue(name) {
+  const got = convex(["env", "get", name]);
+  return got.status === 0 && got.stdout.trim() ? got.stdout.trim() : null;
+}

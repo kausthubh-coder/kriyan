@@ -79,6 +79,6 @@ Name artifacts after the feature (`reminders-android-shade.png`) and report the 
 
 ## Cleanup
 
-- Stop what you started, by PID: the `bun run dev` background task with its tree (`taskkill /PID <pid> /T /F`; a plain kill leaves the backend, Metro and Next running), and the emulator from `~/.kriyan/emulator.pid` (`Stop-Process -Id (Get-Content $HOME\.kriyan\emulator.pid)`). Never stop processes by name.
+- Stop what you started, by PID: the `bun run dev` background task with its tree (`taskkill /PID <pid> /T /F` on Windows, where a plain kill leaves the backend, Metro and Next running; `kill -TERM <pid>` of `node scripts/dev.mjs` on Linux, which stops each server's process group), and the emulator from `~/.kriyan/emulator.pid` (`Stop-Process -Id (Get-Content $HOME\.kriyan\emulator.pid)`). Never stop processes by name.
 - Leave the seeded data; the next run's `seed.mjs` resets it. `node apps/app/e2e/seed.mjs --reset` empties the account if you need it empty.
 - Keep `.artifacts/app/`: it holds the proof.

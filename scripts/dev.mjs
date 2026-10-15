@@ -34,6 +34,8 @@ const run = (name, cwd, command, args) => {
     cwd: join(root, cwd),
     stdio: "pipe",
     shell: command === "bun" && process.platform === "win32",
+    // Elsewhere each child leads its own process group, so stopping the group stops its children too.
+    detached: process.platform !== "win32",
   });
   for (const stream of [child.stdout, child.stderr])
     stream.on("data", (d) => process.stdout.write(d.toString().replace(/^/gm, `[${name}] `)));
@@ -54,13 +56,18 @@ const children = [
   run("site", "apps/site", "bun", ["x", "next", "dev", "--port", ports.PORT_SITE]),
 ];
 
-// On Windows a child started through a shell leaves its own children behind; kill each tree.
+// A plain kill leaves each child's own children (Metro, next-server, the backend binary) running:
+// kill each tree on Windows, each process group elsewhere.
 const stop = () => {
   for (const child of children) {
     if (child.exitCode !== null || !child.pid) continue;
     if (process.platform === "win32")
       spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-    else child.kill();
+    else {
+      try {
+        process.kill(-child.pid, "SIGTERM");
+      } catch {} // the group is already gone
+    }
   }
   process.exit(0);
 };
