@@ -2,13 +2,14 @@
 // line in vermilion. Blocks move and resize in 15-minute steps; tasks dragged from the list
 // land here.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Platform, View, type LayoutChangeEvent } from "react-native";
+import { useFocusEffect } from "expo-router";
 import { formatClock } from "@kriyan/core/dates";
 import { formatTimeRange } from "@kriyan/core/format";
 import { layoutDay } from "@kriyan/core/layout";
 import type { TaskView } from "@/data/views";
-import { completeTask, moveTasks, reopenTask, ticking, updateTask } from "@/features/tasks/actions";
+import { completeTask, placeTasks, reopenTask, ticking, updateTask } from "@/features/tasks/actions";
 import { openTask } from "@/features/tasks/TaskRow";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, spaceTone } from "@/theme/tokens";
@@ -16,7 +17,7 @@ import { Check, Dot } from "@/ui/bits";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
 import { BlockDrag } from "./BlockDrag";
-import { externalDrag, registerDropZone } from "./drag";
+import { externalDrag, registerDropZone, type Drop } from "./drag";
 
 const GUTTER = 56;
 const PAD = 8;
@@ -50,28 +51,32 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
   const height = y(toH * 60) + PAD;
 
   const onDrop = useCallback(
-    (taskId: string, minutes: number) => {
-      void moveTasks([taskId as TaskView["_id"]], date, minutes);
+    (taskId: string, drop: Drop) => {
+      if (drop.minutes !== null) void placeTasks([taskId as TaskView["_id"]], date, drop.minutes);
     },
     [date],
   );
 
-  useEffect(() => {
-    registerDropZone({
-      measure: () =>
-        new Promise((resolve) => {
-          if (!ref.current) return resolve(null);
-          ref.current.measureInWindow((x, yy, w, h) =>
-            resolve({ x: x + GUTTER, y: yy, width: w - GUTTER, height: h }),
-          );
+  // Tabs stay mounted, so the zone follows the focused screen.
+  useFocusEffect(
+    useCallback(
+      () =>
+        registerDropZone({
+          measure: () =>
+            new Promise((resolve) => {
+              if (!ref.current) return resolve(null);
+              ref.current.measureInWindow((x, yy, w, h) =>
+                resolve({ x: x + GUTTER, y: yy, width: w - GUTTER, height: h }),
+              );
+            }),
+          startMinutes: fromH * 60,
+          hourPx,
+          topPad: PAD,
+          onDrop,
         }),
-      startMinutes: fromH * 60,
-      hourPx,
-      topPad: PAD,
-      onDrop,
-    });
-    return () => registerDropZone(null);
-  }, [fromH, hourPx, onDrop]);
+      [fromH, hourPx, onDrop],
+    ),
+  );
 
   const visible = items.filter(
     (t) => t.time !== null && (t.time ?? 0) + Math.max(t.length ?? 0, 30) > fromH * 60,
@@ -119,7 +124,9 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
             if (!t) return null;
             const done = t.done || Boolean(ticked[t._id]);
             const tone = spaceTone(t.color);
-            const colW = laneWidth / p.columns;
+            // Each level a block sits on top of moves it right, so the one below keeps its title.
+            const indent = Math.min(p.depth, 3) * s.s6;
+            const colW = (laneWidth - indent) / p.columns;
             // A block that began above the "Earlier today" fold starts at the fold's edge.
             const shown = Math.max(p.start, fromH * 60);
             const top = y(shown) + 1;
@@ -130,13 +137,13 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                 key={p.id}
                 top={top}
                 height={h}
-                left={GUTTER + p.column * colW + (p.column ? 2 : 0)}
+                left={GUTTER + indent + p.column * colW + (p.column ? 2 : 0)}
                 width={colW - (p.columns > 1 ? 2 : 0)}
                 start={p.start}
                 length={t.length}
                 hourPx={hourPx}
                 disabled={t.projected}
-                onMove={(start) => void moveTasks([t._id], date, start)}
+                onMove={(start) => void placeTasks([t._id], date, start)}
                 onResize={(length) => void updateTask({ id: t._id, length })}
               >
                 <View
@@ -149,8 +156,9 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                     borderRadius: r.ctl,
                     overflow: "hidden",
                     backgroundColor: done ? "transparent" : tone.surface,
-                    borderWidth: done ? 1 : 0,
-                    borderColor: c.lineStrong,
+                    // A block on top of another gets a page-coloured edge, so the two read as two.
+                    borderWidth: done || p.depth ? 1 : 0,
+                    borderColor: done ? c.lineStrong : c.bg,
                     ...(t.proposedBy ? { backgroundColor: c.bg, borderWidth: 1, borderColor: tone.dot } : {}),
                   }}
                 >
@@ -201,14 +209,14 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
             );
           })
         : null}
-      {drag && drag.over !== null ? (
+      {drag?.over && drag.over.minutes !== null ? (
         <View
           pointerEvents="none"
           style={{
             position: "absolute",
             left: GUTTER,
             right: 0,
-            top: y(drag.over) + 1,
+            top: y(drag.over.minutes) + 1,
             height: Math.max(((drag.length ?? 30) / 60) * hourPx - 2, 20),
             borderRadius: r.ctl,
             borderWidth: 1,
@@ -228,7 +236,7 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
             }}
           >
             <Txt variant="caption" tnum>
-              {formatTimeRange(drag.over, drag.length ?? undefined)}
+              {formatTimeRange(drag.over.minutes, drag.length ?? undefined)}
             </Txt>
           </View>
         </View>

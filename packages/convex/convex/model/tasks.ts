@@ -2,7 +2,7 @@
 // lives in one place: validation, repeats, reminders, completion and undo.
 
 import { ConvexError } from "convex/values";
-import { isCivilDate, todayIn } from "@kriyan/core/dates";
+import { addDays, isCivilDate, todayIn } from "@kriyan/core/dates";
 import { firstOccurrence, parseTask } from "@kriyan/core/parse";
 import { nextAfterDone, validateRepeat, type Repeat } from "@kriyan/core/repeat";
 import { validateReminder, type Reminder } from "@kriyan/core/reminders";
@@ -258,6 +258,37 @@ export async function moveTasks(
       ...(to.time !== undefined ? { time: to.time } : {}),
     });
   }
+}
+
+/** Where a task was before a move, so the move can be undone. */
+export interface Placement {
+  _id: Id<"tasks">;
+  title: string;
+  date: string | null;
+  time: number | null;
+}
+
+/**
+ * Closes the day: what's still open today moves to tomorrow, keeping its time. Events stay
+ * (you attended them or you didn't) and so do an agent's proposals, which wait for a yes.
+ */
+export async function closeDay(ctx: MutationCtx, ownerId: string, today: string): Promise<Placement[]> {
+  if (!isCivilDate(today)) throw new ConvexError("Send today as YYYY-MM-DD.");
+  const left = (
+    await ctx.db
+      .query("tasks")
+      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).eq("date", today))
+      .take(500)
+  ).filter(
+    (t) => t.deletedAt === undefined && t.doneAt === undefined && !t.event && t.proposedBy === undefined,
+  );
+  await moveTasks(
+    ctx,
+    ownerId,
+    left.map((t) => t._id),
+    { date: addDays(today, 1) },
+  );
+  return left.map((t) => ({ _id: t._id, title: t.title, date: t.date ?? null, time: t.time ?? null }));
 }
 
 /** Accepts or discards an agent's proposed tasks. */

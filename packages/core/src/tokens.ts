@@ -113,6 +113,8 @@ export const size = {
   column: 680,
   sidebar: 248,
   panel: 440,
+  /** Upcoming's tray of tasks still to plan, beside the week. */
+  tray: 224,
   /**
    * Today's schedule beside the list. With the 48 gap and the page's 32 padding it is wider
    * than the task panel (440), so an open panel covers the schedule and never the list.

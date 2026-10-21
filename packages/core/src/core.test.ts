@@ -112,6 +112,21 @@ describe("layout", () => {
     ]);
   });
 
+  test("a block that starts later sits on top, indented, instead of halving the earlier one", () => {
+    const placed = layoutDay([
+      { id: "lecture", start: 540, length: 90 },
+      { id: "mcp", start: 600, length: 90 },
+      { id: "call", start: 610, length: 30 },
+      { id: "read", start: 1320 },
+    ]);
+    expect(placed.map((p) => [p.id, p.column, p.columns, p.depth])).toEqual([
+      ["lecture", 0, 1, 0],
+      ["mcp", 0, 2, 1],
+      ["call", 1, 2, 1],
+      ["read", 0, 1, 0],
+    ]);
+  });
+
   test("free time from now to the end of the day, overlaps counted once, no-length tasks ignored", () => {
     const items = [
       { id: "a", start: 660, length: 90 },

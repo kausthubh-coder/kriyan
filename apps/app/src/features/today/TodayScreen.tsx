@@ -6,15 +6,15 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { ArrowRight, Check as CheckIcon, Plus } from "lucide-react-native";
+import { ArrowRight, Check as CheckIcon, ListChecks, Plus } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import { formatClock } from "@kriyan/core/dates";
 import { formatDate, formatDuration } from "@kriyan/core/format";
 import { freeMinutes } from "@kriyan/core/layout";
 import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
 import { useClock } from "@/data/time";
-import { useTodayView, type TaskView, type TodayView } from "@/data/views";
-import { completeTask, moveTasks } from "@/features/tasks/actions";
+import { useInboxView, useTodayView, type TaskView, type TodayView } from "@/data/views";
+import { closeDay, completeTask, moveTasks } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { QuickAdd, type QuickAddHandle } from "@/features/tasks/QuickAdd";
@@ -31,6 +31,7 @@ import { Notice, PageHead, Screen, SectionHead, usePanelOpen } from "@/ui/Screen
 import { Txt } from "@/ui/Txt";
 import { DragGhost } from "./DragGhost";
 import { DragSource } from "./DragSource";
+import { PlanToday } from "./PlanToday";
 import { Timeline } from "./Timeline";
 
 export function TodayScreen() {
@@ -40,6 +41,9 @@ export function TodayScreen() {
   const { width } = useWindowDimensions();
   const panelOpen = usePanelOpen();
   const quickAdd = useRef<QuickAddHandle>(null);
+  const inbox = useInboxView();
+  const [planning, setPlanning] = useState(false);
+  const planRef = useRef<View>(null);
   // The schedule moves beside the list when both fit. An open task's panel replaces the
   // schedule column, so the list stays exactly where it was.
   const split = !phone && width >= SPLIT_MIN_WIDTH;
@@ -52,6 +56,17 @@ export function TodayScreen() {
 
   const free = view ? freeTime(view, now) : null;
   const freeText = free === null ? "" : free === 0 ? "No free time left" : `${formatDuration(free)} free`;
+  // Planning is offered when there's something to bring in, and never required.
+  const toPlan = view ? view.earlier.length + (inbox?.length ?? 0) : 0;
+  const planButton = toPlan ? (
+    <Button
+      ref={planRef}
+      icon={ListChecks}
+      label={phone ? "Plan" : "Plan today"}
+      accessibilityLabel="Plan today"
+      onPress={() => setPlanning(true)}
+    />
+  ) : null;
   const add = phone ? null : <QuickAdd ref={quickAdd} variant="inline" defaultDate={today} />;
   const head = (
     <PageHead
@@ -59,10 +74,13 @@ export function TodayScreen() {
       sub={formatDate(today)}
       right={
         view ? (
-          // Body size, so it shares the date's baseline across the head.
-          <Txt variant="body" tone="ink3" tnum>
-            {freeText}
-          </Txt>
+          <>
+            {planButton}
+            {/* Body size, so it shares the date's baseline across the head. */}
+            <Txt variant="body" tone="ink3" tnum>
+              {freeText}
+            </Txt>
+          </>
         ) : null
       }
     />
@@ -77,9 +95,12 @@ export function TodayScreen() {
         panelCovers={split}
         actions={
           view ? (
-            <Txt variant="meta" tone="ink3" tnum style={{ marginRight: s.s1 }}>
-              {freeText}
-            </Txt>
+            <>
+              {planButton}
+              <Txt variant="meta" tone="ink3" tnum style={{ marginRight: s.s1 }}>
+                {freeText}
+              </Txt>
+            </>
           ) : null
         }
       >
@@ -104,6 +125,17 @@ export function TodayScreen() {
         )}
       </Screen>
       <DragGhost />
+      {view ? (
+        <PlanToday
+          open={planning}
+          onClose={() => setPlanning(false)}
+          anchor={planRef}
+          today={today}
+          earlier={view.earlier}
+          inbox={inbox ?? []}
+          free={free ?? 0}
+        />
+      ) : null}
     </View>
   );
 }
@@ -165,6 +197,10 @@ function TodayBody({
     left === 0 &&
     live.every((t) => (t.time ?? 0) + (t.length ?? 0) <= now) &&
     (view.done.length > 0 || view.scheduled.some((t) => t.done));
+  // In the last four hours of the person's day, one tap moves what's left to tomorrow.
+  const stillOpen =
+    left + view.scheduled.filter((t) => !t.done && !t.event && !t.proposedBy && !t.projected).length;
+  const evening = now >= view.profile.dayEnd - 240;
   const fold = !showEarlierHours && now - 60 > view.profile.dayStart ? now - 60 : null;
   const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < now - 60).length;
 
@@ -191,6 +227,7 @@ function TodayBody({
               key={`${t._id}:${t.date}`}
               task={t}
               today={today}
+              movable
               wrap={(row) => (
                 <DragSource taskId={t._id} title={t.title} color={spaceTone(t.color).dot} length={t.length}>
                   {row}
@@ -208,6 +245,14 @@ function TodayBody({
           </Txt>
         ) : null}
         {view.earlier.length ? <Earlier tasks={view.earlier} today={today} /> : null}
+        {evening && stillOpen ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: s.s2 }}>
+            <Txt variant="body" tone="ink3">
+              {stillOpen} still open today
+            </Txt>
+            <Button label="Move to tomorrow" onPress={() => void closeDay(today)} />
+          </View>
+        ) : null}
       </View>
     </>
   );
@@ -382,7 +427,6 @@ function Earlier({ tasks, today }: { tasks: TaskView[]; today: string }) {
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const pickRef = useRef<View>(null);
-  const ids = tasks.map((t) => t._id);
   return (
     <View style={{ gap: s.s1 }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: s.s2 }}>
@@ -393,13 +437,13 @@ function Earlier({ tasks, today }: { tasks: TaskView[]; today: string }) {
           onPress={() => setOpen(!open)}
           style={{ marginLeft: -s.s3 }}
         />
-        <Button label="Move to today" onPress={() => void moveTasks(ids, today)} />
+        <Button label="Move to today" onPress={() => void moveTasks(tasks, today)} />
         <Button ref={pickRef} label="Pick a day" onPress={() => setPicking(true)} />
       </View>
       {open ? (
         <View>
           {tasks.map((t) => (
-            <TaskRow key={t._id} task={t} today={today} showWhen />
+            <TaskRow key={t._id} task={t} today={today} showWhen movable />
           ))}
         </View>
       ) : null}
@@ -415,7 +459,7 @@ function Earlier({ tasks, today }: { tasks: TaskView[]; today: string }) {
           allowNone={false}
           onPick={(date) => {
             setPicking(false);
-            if (date) void moveTasks(ids, date);
+            if (date) void moveTasks(tasks, date);
           }}
         />
       </Popover>

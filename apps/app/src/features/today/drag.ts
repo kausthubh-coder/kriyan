@@ -1,5 +1,6 @@
-// Shared state for dragging a task from a list onto the timeline. The timeline registers
-// itself as the drop zone; a drag source reports where the pointer is.
+// Shared state for dragging a task from a list onto a schedule: Today's timeline, or the
+// week on Upcoming. The screen on show registers itself as the drop zone; a drag source
+// reports where the pointer is.
 
 import { createStore } from "@/data/store";
 
@@ -8,6 +9,13 @@ export const snap = (minutes: number) => Math.round(minutes / STEP) * STEP;
 export const clampDay = (minutes: number, length = 0) =>
   Math.max(0, Math.min(1440 - Math.max(length, STEP), minutes));
 
+/** Where a drop lands: a start time, and the day when the zone spans several. */
+export interface Drop {
+  /** Minutes after midnight, or null for the day itself with no time (a week's day header). */
+  minutes: number | null;
+  date?: string;
+}
+
 export interface DropZone {
   /** Window coordinates of the timeline's top-left, and its size. */
   measure: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
@@ -15,12 +23,18 @@ export interface DropZone {
   startMinutes: number;
   hourPx: number;
   topPad: number;
-  onDrop: (taskId: string, minutes: number) => void;
+  /** A zone with more than one day (the week) says where a point lands; the timeline's is its minutes. */
+  hit?: (rect: { x: number; y: number; width: number; height: number }, x: number, y: number) => Drop | null;
+  onDrop: (taskId: string, drop: Drop) => void;
 }
 
 let zone: DropZone | null = null;
-export function registerDropZone(z: DropZone | null) {
+/** The focused screen's zone; the returned function clears it only if no other screen took over. */
+export function registerDropZone(z: DropZone): () => void {
   zone = z;
+  return () => {
+    if (zone === z) zone = null;
+  };
 }
 export function dropZone(): DropZone | null {
   return zone;
@@ -34,8 +48,8 @@ export interface ExternalDrag {
   /** Window position of the pointer. */
   x: number;
   y: number;
-  /** The snapped start over the timeline, or null when outside it. */
-  over: number | null;
+  /** Where letting go would land, or null when outside the zone. */
+  over: Drop | null;
 }
 
 export const externalDrag = createStore<ExternalDrag | null>(null);

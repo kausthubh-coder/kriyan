@@ -27,3 +27,9 @@ export function toggleHaptic(on: boolean) {
     on ? Haptics.AndroidHaptics.Toggle_On : Haptics.AndroidHaptics.Toggle_Off,
   ).catch(() => undefined);
 }
+
+/** A swipe crosses the line where letting go will act. */
+export function armHaptic() {
+  if (Platform.OS !== "android") return;
+  void Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Segment_Tick).catch(() => undefined);
+}

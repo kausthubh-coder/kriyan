@@ -237,6 +237,40 @@ describe("moving a repeating task", () => {
   });
 });
 
+describe("closing the day", () => {
+  test("moves what's open today to tomorrow at the same time; events, done tasks and proposals stay", async () => {
+    const { alice, today } = await setup();
+    const essay = await alice.mutation(api.tasks.addText, { text: "Essay today 4pm" });
+    const dentist = await alice.mutation(api.tasks.addText, { text: "Book the dentist today" });
+    const done = await alice.mutation(api.tasks.addText, { text: "Groceries today" });
+    await alice.mutation(api.tasks.complete, { id: done });
+    await alice.mutation(api.tasks.add, {
+      title: "Lecture",
+      date: today,
+      time: 540,
+      length: 90,
+      event: true,
+    });
+    const moved = await alice.mutation(api.tasks.closeDay, { today });
+    expect(moved.map((m) => [m.title, m.date, m.time])).toEqual([
+      ["Essay", "2026-10-13", 960],
+      ["Book the dentist", "2026-10-13", null],
+    ]);
+    const after = await alice.query(api.views.today, { today });
+    expect(after.scheduled.map((t) => t.title)).toEqual(["Lecture"]);
+    expect(after.anytime).toEqual([]);
+    const week = await alice.query(api.views.week, { start: "2026-10-12", today });
+    const wed = week.days.find((d) => d.date === "2026-10-14");
+    expect(wed?.scheduled.map((t) => [t.title, t.time])).toEqual([["Essay", 960]]);
+    expect(wed?.anytime.map((t) => t.title)).toEqual(["Book the dentist"]);
+    // Undo: each goes back to where it was.
+    await alice.mutation(api.tasks.move, { ids: [essay], date: today, time: 960 });
+    await alice.mutation(api.tasks.move, { ids: [dentist], date: today, time: null });
+    const back = await alice.query(api.views.today, { today });
+    expect(back.anytime.map((t) => t.title)).toEqual(["Book the dentist"]);
+  });
+});
+
 describe("deleting my data", () => {
   test("removes every row the person owns, and nobody else's", async () => {
     const { t, alice } = await setup();

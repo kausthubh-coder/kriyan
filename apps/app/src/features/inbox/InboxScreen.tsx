@@ -85,11 +85,7 @@ function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone
         ...(phone ? { marginLeft: 34 - s.s3, marginTop: -s.s2 } : {}),
       }}
     >
-      <Button
-        icon={phone ? undefined : Sun}
-        label="Today"
-        onPress={() => void moveTasks([task._id], today)}
-      />
+      <Button icon={phone ? undefined : Sun} label="Today" onPress={() => void moveTasks([task], today)} />
       <Button
         ref={dayRef}
         icon={phone ? undefined : CalendarDays}
@@ -117,7 +113,7 @@ function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone
           allowNone={false}
           onPick={(date) => {
             setOpen(null);
-            if (date) void moveTasks([task._id], date);
+            if (date) void moveTasks([task], date);
           }}
         />
       </Popover>

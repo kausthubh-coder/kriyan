@@ -20,7 +20,8 @@ One file per user-facing feature. Each lists every entry point a person uses, ho
 ## Features
 
 - [Capture](./capture.md): one sentence becomes a task, from Today's field, quick add, the command menu, the API and the CLI.
-- [Today and the timeline](./today.md): what's next, anytime tasks, the schedule, drag, resize, the "Earlier today" fold.
+- [Today and the timeline](./today.md): what's next, anytime tasks, the schedule, drag, resize, the "Earlier today" fold, moving a row (hover or swipe), Close the day, Plan today, row selection.
+- Planning the week: Upcoming's "To plan" tray (Inbox and undated tasks) drags onto a day's header (that day, no time) or into the grid (at a time). `node apps/app/e2e/plan-week.mjs` after `seed.mjs`.
 - [Complete and repeat](./complete-repeat.md): tick off, undo, a repeating task moving to its next date.
 - [Reminders](./reminders.md): a reminder ringing on Android, including for tasks added elsewhere.
 - [Agents](./agents.md): personal access tokens, the API, the CLI, the MCP server, proposals reviewed on Upcoming.

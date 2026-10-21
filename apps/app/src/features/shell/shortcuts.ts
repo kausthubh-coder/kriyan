@@ -2,7 +2,7 @@
 // I Inbox, J and K move, Enter open, X complete, D date, R repeat, M move to space,
 // Delete delete (with Undo), Escape close. Typing in a field never triggers them.
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { router, usePathname } from "expo-router";
 import { completeTask, deleteTask } from "@/features/tasks/actions";
 import { panelOpenedByKeyboard } from "@/features/tasks/panelState";
@@ -120,8 +120,11 @@ export function useShortcuts() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  // A new screen starts with nothing selected.
+  // A new screen starts with nothing selected; closing a task's panel keeps its row selected.
+  const screen = useRef(path);
   useEffect(() => {
-    if (!path.startsWith("/task/")) selection.set({ taskId: null });
+    if (path.startsWith("/task/")) return;
+    if (path !== screen.current) selection.set({ taskId: null });
+    screen.current = path;
   }, [path]);
 }

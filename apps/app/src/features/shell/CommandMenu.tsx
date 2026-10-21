@@ -8,8 +8,13 @@ import { useMutation } from "convex/react";
 import {
   Bot,
   CalendarDays,
+  Check,
+  Repeat2,
+  Sunrise,
+  Trash2,
   Inbox,
   Layers,
+  Moon,
   Plus,
   Search,
   SlidersHorizontal,
@@ -18,12 +23,12 @@ import {
   type LucideIcon,
 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
-import { startOfWeek } from "@kriyan/core/dates";
+import { addDays, startOfWeek } from "@kriyan/core/dates";
 import { formatDay } from "@kriyan/core/format";
 import { parseTask } from "@kriyan/core/parse";
 import { useClock } from "@/data/time";
 import { useInboxView, useSpaces, useTodayView, useWeekView, type TaskView } from "@/data/views";
-import { errorText } from "@/features/tasks/actions";
+import { closeDay, completeTask, deleteTask, errorText, moveTasks } from "@/features/tasks/actions";
 import { findSpace } from "@/features/tasks/QuickAdd";
 import { useIsPhone, useType } from "@/theme/layout";
 import { c, hex, r, s, shadows, spaceTone } from "@/theme/tokens";
@@ -33,11 +38,12 @@ import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
 import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
-import { closeCommand, shellState } from "./context";
+import { closeCommand, selection, shellState } from "./context";
+import { rowRegistry } from "./rows";
 
 interface Item {
   key: string;
-  group: "Add" | "Go to" | "Spaces" | "Tasks";
+  group: "Add" | "Go to" | "Selected task" | "Today" | "Spaces" | "Tasks";
   label: string;
   icon?: LucideIcon;
   leading?: ReactNode;
@@ -75,6 +81,8 @@ function Menu() {
   const todayView = useTodayView();
   const week = useWeekView(startOfWeek(today));
   const addText = useMutation(api.tasks.addText);
+  const selectedId = selection.useValue((st) => st.taskId);
+  const selected = selectedId ? rowRegistry.get(selectedId) : undefined;
   const input = useRef<TextInput>(null);
   const layer = useRef<View>(null);
   useInertOutside(layer);
@@ -154,6 +162,50 @@ function Menu() {
         run: () => router.navigate(g.href),
       });
     }
+    // The selected row's commands, each with its key. After Go to, so Enter on an empty menu
+    // never changes a task.
+    if (selected) {
+      const edit = (what: string) => () => router.push(`/task/${selected._id}?edit=${what}`);
+      const commands: Omit<Item, "group">[] = [
+        ...(selected.done
+          ? []
+          : [
+              {
+                key: "sel-done",
+                label: "Complete",
+                icon: Check,
+                kbd: "X",
+                run: () => completeTask(selected),
+              },
+            ]),
+        {
+          key: "sel-tomorrow",
+          label: "Move to tomorrow",
+          icon: Sunrise,
+          run: () => void moveTasks([selected], addDays(today, 1)),
+        },
+        { key: "sel-date", label: "Change date", icon: CalendarDays, kbd: "D", run: edit("when") },
+        { key: "sel-repeat", label: "Change repeat", icon: Repeat2, kbd: "R", run: edit("repeat") },
+        { key: "sel-space", label: "Move to space", icon: Layers, kbd: "M", run: edit("space") },
+        { key: "sel-delete", label: "Delete", icon: Trash2, kbd: "Del", run: () => deleteTask(selected) },
+      ];
+      commands
+        .filter((cmd) => !q || cmd.label.toLowerCase().includes(q))
+        .forEach((cmd, i) =>
+          out.push({ ...cmd, group: "Selected task", ...(i === 0 ? { hint: selected.title } : {}) }),
+        );
+    }
+    // After Go to, so Enter on an empty menu never closes the day.
+    if (!q || "close the day move what's left to tomorrow".includes(q)) {
+      out.push({
+        key: "close-day",
+        group: "Today",
+        label: "Close the day",
+        icon: Moon,
+        hint: q ? undefined : "move what's left to tomorrow",
+        run: () => void closeDay(today),
+      });
+    }
     if (q) {
       for (const sp of spaces ?? []) {
         if (!sp.name.toLowerCase().includes(q)) continue;
@@ -187,7 +239,7 @@ function Menu() {
       }
     }
     return out;
-  }, [parsed, q, query, spaces, today, todayView, inbox, week, addText]);
+  }, [parsed, q, query, spaces, today, todayView, inbox, week, addText, selected]);
 
   const current = Math.min(index, Math.max(0, items.length - 1));
   const run = (item: Item | undefined) => {

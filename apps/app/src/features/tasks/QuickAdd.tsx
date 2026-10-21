@@ -131,6 +131,9 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
   const input = useRef<TextInput>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  // The sheet's field wraps and grows to three lines, so a long sentence stays readable.
+  const sheet = variant !== "inline";
+  const [fieldHeight, setFieldHeight] = useState(48);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
 
   const parsed = useMemo(() => parseTask(text, today), [text, today]);
@@ -173,15 +176,39 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
       placeholderTextColor={hex.ink3}
       accessibilityLabel="Add a task"
       autoCapitalize="sentences"
+      multiline={sheet}
+      // A native multiline field grows by itself; the web's textarea reports its scroll height.
+      onContentSizeChange={
+        sheet && Platform.OS === "web"
+          ? (e) => setFieldHeight(Math.min(112, Math.max(48, e.nativeEvent.contentSize.height)))
+          : undefined
+      }
       onKeyPress={(e) => {
-        if (Platform.OS === "web" && e.nativeEvent.key === "Escape") {
+        if (Platform.OS !== "web") return;
+        const key = e.nativeEvent.key;
+        if (key === "Escape") {
           setText("");
           input.current?.blur();
+        }
+        // A multiline field on the web would add a new line; Enter adds the task, as on the phone.
+        const shift = (e.nativeEvent as unknown as { shiftKey?: boolean }).shiftKey;
+        if (sheet && key === "Enter" && !shift) {
+          e.preventDefault();
+          void submit();
         }
       }}
       style={[
         roles.body,
-        { flex: 1, minWidth: 0, color: c.ink, padding: 0, height: variant === "inline" ? "100%" : 48 },
+        sheet
+          ? {
+              flex: 1,
+              minWidth: 0,
+              color: c.ink,
+              paddingHorizontal: 0,
+              paddingVertical: s.s3,
+              ...(Platform.OS === "web" ? { height: fieldHeight } : { minHeight: 48, maxHeight: 112 }),
+            }
+          : { flex: 1, minWidth: 0, color: c.ink, padding: 0, height: "100%" },
         Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null,
       ]}
     />
@@ -256,7 +283,7 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
   // The field and its button share a row, so both stay above the keyboard (Soft Keyboard).
   return (
     <View style={{ gap: s.s3 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: s.s2 }}>
         <View
           style={{
             flex: 1,

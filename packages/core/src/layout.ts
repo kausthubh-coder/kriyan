@@ -12,40 +12,39 @@ export interface Placed {
   id: string;
   start: number;
   end: number;
-  /** 0-based column inside its overlap group. */
+  /** 0-based column among the blocks that start together. */
   column: number;
-  /** Columns in its overlap group. */
+  /** Blocks that start together, sharing the width. */
   columns: number;
+  /** How many earlier blocks this one sits on top of; each level is indented. */
+  depth: number;
 }
 
-/** Side-by-side columns for overlapping blocks, so nothing hides behind anything else. */
-export function layoutDay(items: Interval[], minLength = 30): Placed[] {
+/**
+ * Blocks that start within `share` minutes of each other sit side by side. A block that starts
+ * later sits on top of the running ones, one level deeper, so their titles stay readable
+ * instead of every overlap halving both blocks.
+ */
+export function layoutDay(items: Interval[], minLength = 30, share = 30): Placed[] {
   const sorted = items
     .map((i) => ({ id: i.id, start: i.start, end: i.start + Math.max(i.length ?? 0, minLength) }))
     .sort((a, b) => a.start - b.start || b.end - a.end);
   const placed: Placed[] = [];
-  let group: Placed[] = [];
-  let groupEnd = -1;
-  const flush = () => {
-    const columns = Math.max(1, ...group.map((g) => g.column + 1));
-    for (const g of group) g.columns = columns;
-    group = [];
-  };
+  const rows: { start: number; depth: number; members: Placed[] }[] = [];
   for (const item of sorted) {
-    if (item.start >= groupEnd) {
-      flush();
-      groupEnd = item.end;
-    } else {
-      groupEnd = Math.max(groupEnd, item.end);
+    // Every block lasts at least `minLength` >= `share`, so a row started moments ago is still running.
+    const last = rows.at(-1);
+    let row = last && item.start - last.start < share ? last : undefined;
+    if (!row) {
+      const running = placed.filter((p) => p.end > item.start);
+      row = { start: item.start, depth: Math.max(-1, ...running.map((p) => p.depth)) + 1, members: [] };
+      rows.push(row);
     }
-    const taken = new Set(group.filter((g) => g.end > item.start).map((g) => g.column));
-    let column = 0;
-    while (taken.has(column)) column++;
-    const p: Placed = { ...item, column, columns: 1 };
-    group.push(p);
+    const p: Placed = { ...item, column: row.members.length, columns: 1, depth: row.depth };
+    row.members.push(p);
     placed.push(p);
   }
-  flush();
+  for (const r of rows) for (const m of r.members) m.columns = r.members.length;
   return placed;
 }
 

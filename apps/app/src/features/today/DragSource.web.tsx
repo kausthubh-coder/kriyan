@@ -3,7 +3,8 @@
 
 import { useRef, type ReactNode } from "react";
 import { View } from "react-native";
-import { dropZone, externalDrag, minutesAt } from "./drag";
+import { useIsPhone } from "@/theme/layout";
+import { dropZone, externalDrag, minutesAt, type Drop } from "./drag";
 
 interface Props {
   taskId: string;
@@ -17,8 +18,10 @@ const THRESHOLD = 6;
 
 export function DragSource({ taskId, title, color, length, children }: Props) {
   const ref = useRef<View>(null);
+  // The phone layout swipes rows sideways; a drag there would fight the swipe.
+  const phone = useIsPhone();
   const onPointerDown = (e: PointerEvent) => {
-    if (e.button !== 0 || e.pointerType !== "mouse") return;
+    if (phone || e.button !== 0 || e.pointerType !== "mouse") return;
     const target = e.target as HTMLElement;
     // The checkbox is its own control.
     if (target.closest('[role="checkbox"]')) return;
@@ -40,7 +43,14 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
       // Measure each move: the page may scroll while dragging.
       void (zone ? zone.measure() : Promise.resolve(null)).then((rect) => {
         if (ended) return;
-        const over = rect && zone ? minutesAt(rect, zone, x, y) : null;
+        let over: Drop | null = null;
+        if (rect && zone) {
+          if (zone.hit) over = zone.hit(rect, x, y);
+          else {
+            const minutes = minutesAt(rect, zone, x, y);
+            over = minutes === null ? null : { minutes };
+          }
+        }
         externalDrag.set({ taskId, title, color, length, x, y, over });
       });
     };
@@ -55,7 +65,7 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
       if (!active) return;
       // Swallow the click that follows a drag, so the row doesn't open.
       window.addEventListener("click", (ce) => ce.stopPropagation(), { capture: true, once: true });
-      if (commit && drag?.over !== null && drag?.over !== undefined && zone) zone.onDrop(taskId, drag.over);
+      if (commit && drag?.over && zone) zone.onDrop(taskId, drag.over);
     };
     const up = () => end(true);
     const key = (ke: KeyboardEvent) => {

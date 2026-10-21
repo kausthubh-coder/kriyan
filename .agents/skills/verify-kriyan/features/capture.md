@@ -30,3 +30,4 @@ Preconditions: baseline seed.
 
 - Lowercase `#school` creates `School`; an existing space matches case-insensitively.
 - The parser lives in `packages/core/src/parse.ts` with unit tests. Prove parsing rules there; prove the UI path here.
+- The phone sheet's field wraps and grows to three lines; Enter adds (Shift+Enter is a new line on the web). `node apps/app/e2e/check-add-sheet.mjs` types a long sentence at 390, prints the field's height, presses Enter and finds the task in the week.

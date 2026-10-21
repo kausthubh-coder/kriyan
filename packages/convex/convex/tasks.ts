@@ -96,6 +96,12 @@ export const move = mutation({
     Tasks.moveTasks(ctx, await requireOwner(ctx), ids, { date, ...(time !== undefined ? { time } : {}) }),
 });
 
+/** Moves what's still open today to tomorrow; returns where each was, for Undo. */
+export const closeDay = mutation({
+  args: { today: v.string() },
+  handler: async (ctx, { today }) => Tasks.closeDay(ctx, await requireOwner(ctx), today),
+});
+
 export const settleProposals = mutation({
   args: { accept: v.boolean(), ids: v.optional(v.array(v.id("tasks"))) },
   handler: async (ctx, { accept, ids }) => Tasks.settleProposals(ctx, await requireOwner(ctx), accept, ids),

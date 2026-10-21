@@ -48,9 +48,10 @@ function begin(taskId: string, title: string, color: string, length: number | nu
   externalDrag.set({ taskId, title, color, length, x: 0, y: 0, over: null });
 }
 
-function setOver(over: number | null) {
+function setOver(minutes: number | null) {
   const drag = externalDrag.get();
-  if (drag && drag.over !== over) externalDrag.set({ ...drag, over });
+  if (drag && (drag.over?.minutes ?? null) !== minutes)
+    externalDrag.set({ ...drag, over: minutes === null ? null : { minutes } });
 }
 
 function finish(commit: boolean) {

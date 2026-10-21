@@ -14,7 +14,6 @@ import { useProgressView, useSpaces, type ProgressView } from "@/data/views";
 import { errorText } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
-import { useIsPhone } from "@/theme/layout";
 import { c, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Chip, Dot, Field, Skeleton } from "@/ui/bits";
@@ -211,19 +210,23 @@ function Heat({
     ...Array.from({ length: lead }, () => null),
     ...days,
   ];
-  const columns = Math.ceil(cells.length / 7);
+  const [width, setWidth] = useState(0);
+  const all = Math.ceil(cells.length / 7);
+  // Show the most recent weeks that fit, starting at the text's left edge.
+  const fit = width ? Math.floor((width + s.s1) / PITCH) : all;
+  const skip = Math.max(0, all - fit);
+  const columns = all - skip;
   const monthLabels = months
     ? cells.flatMap((d, i) => {
         if (!d) return [];
+        const col = Math.floor(i / 7) - skip;
         const [, m, day] = parts(d.date);
-        return day === 1 && (m - 1) % 2 === 0
-          ? [{ col: Math.floor(i / 7), text: MONTH_SHORT[m - 1] ?? "" }]
-          : [];
+        return col >= 0 && day === 1 && (m - 1) % 2 === 0 ? [{ col, text: MONTH_SHORT[m - 1] ?? "" }] : [];
       })
     : [];
   return (
-    <View style={{ flexDirection: "row", justifyContent: "flex-end", overflow: "hidden" }}>
-      <View style={{ gap: s.s2 }}>
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ flexDirection: "row" }}>
+      <View style={{ gap: s.s2, opacity: width ? 1 : 0 }}>
         {monthLabels.length ? (
           <View style={{ height: 16 }}>
             {monthLabels.map((m) => (
@@ -239,7 +242,7 @@ function Heat({
           </View>
         ) : null}
         <View role="img" aria-label={label} style={{ flexDirection: "row", gap: s.s1 }}>
-          {Array.from({ length: columns }, (_, col) => (
+          {Array.from({ length: columns }, (_, k) => k + skip).map((col) => (
             <View key={col} style={{ gap: s.s1 }}>
               {cells.slice(col * 7, col * 7 + 7).map((d, i) =>
                 d === null ? (
@@ -266,14 +269,13 @@ function Heat({
 }
 
 function YearHeat({ heat }: { heat: ProgressView["heat"] }) {
-  const phone = useIsPhone();
   const total = heat.reduce((sum, d) => sum + d.minutes, 0);
   return (
     <Heat
       days={heat.map((d) => ({ date: d.date, value: d.minutes }))}
       color={c.ink}
       label={`Time done each day, ${hoursText(total)} in total`}
-      months={!phone}
+      months
     />
   );
 }

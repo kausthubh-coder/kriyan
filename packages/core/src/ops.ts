@@ -227,6 +227,14 @@ export const OPS: OpSpec[] = [
     ),
   },
   {
+    name: "close_day",
+    title: "Close the day",
+    kind: "write",
+    description:
+      "Move everything still open today to tomorrow, keeping times. Events, done tasks and proposals stay.",
+    input: obj({}),
+  },
+  {
     name: "add_space",
     title: "Add a space",
     kind: "write",

@@ -3,7 +3,7 @@
 // Every function here takes the owner the caller was authenticated as, never one from the request body.
 
 import { ConvexError, v } from "convex/values";
-import { weekday, addDays } from "@kriyan/core/dates";
+import { weekday, addDays, todayIn } from "@kriyan/core/dates";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { getProfile } from "./model/owner";
 import * as Progress from "./model/progress";
@@ -133,6 +133,15 @@ export const move_tasks = internalMutation({
   handler: async (ctx, { ownerId, taskIds, date, time }) => {
     await Tasks.moveTasks(ctx, ownerId, taskIds, { date, ...(time !== undefined ? { time } : {}) });
     return { moved: taskIds.length };
+  },
+});
+
+export const close_day = internalMutation({
+  args: owner,
+  handler: async (ctx, { ownerId }) => {
+    const today = todayIn((await getProfile(ctx, ownerId)).timeZone);
+    const moved = await Tasks.closeDay(ctx, ownerId, today);
+    return { moved: moved.length, to: addDays(today, 1), taskIds: moved.map((t) => t._id) };
   },
 });
 

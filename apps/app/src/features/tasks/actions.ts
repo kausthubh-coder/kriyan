@@ -91,11 +91,70 @@ export function deleteTask(task: { _id: Id<"tasks">; title: string }, after?: ()
     .catch((e: unknown) => showToast(errorText(e)));
 }
 
-/** Moves tasks to a day, optionally a time. `null` sends them back to no date. */
-export function moveTasks(ids: Id<"tasks">[], date: string | null, time?: number | null) {
+/** Where a task sits now, so a move can be undone. */
+export interface Placement {
+  _id: Id<"tasks">;
+  title: string;
+  date: string | null;
+  time: number | null;
+}
+
+/** Gives tasks a time on the day they're on (a drag on the timeline). The block itself shows it. */
+export function placeTasks(ids: Id<"tasks">[], date: string | null, time?: number | null) {
   return convex
     .mutation(api.tasks.move, { ids, date, ...(time !== undefined ? { time } : {}) })
     .catch((e: unknown) => showToast(errorText(e)));
+}
+
+/** Moves tasks to another day (`null`: back to no date), and offers Undo. */
+export function moveTasks(tasks: Placement[], date: string | null, time?: number | null) {
+  if (!tasks.length) return Promise.resolve();
+  commitHaptic();
+  const where = date ? formatDay(date, todayIn(deviceTimeZone())) : "no date";
+  const [only] = tasks;
+  const text =
+    tasks.length === 1 && only ? `Moved to ${where}: ${only.title}` : `Moved ${tasks.length} to ${where}`;
+  return convex
+    .mutation(api.tasks.move, { ids: tasks.map((t) => t._id), date, ...(time !== undefined ? { time } : {}) })
+    .then(() => {
+      showToast(text, { label: "Undo", run: () => void undoMove(tasks) });
+    })
+    .catch((e: unknown) => showToast(errorText(e)));
+}
+
+/** Moves what's still open today to tomorrow, and offers Undo. */
+export function closeDay(today: string) {
+  commitHaptic();
+  return convex
+    .mutation(api.tasks.closeDay, { today })
+    .then((moved) => {
+      if (!moved.length) showToast("Nothing left to move");
+      else
+        showToast(`Moved ${moved.length} to Tomorrow`, {
+          label: "Undo",
+          run: () => void undoMove(moved),
+        });
+    })
+    .catch((e: unknown) => showToast(errorText(e)));
+}
+
+/** Puts each task back on its own day and time; tasks that shared a place move back together. */
+async function undoMove(tasks: Placement[]) {
+  const groups = new Map<string, Placement[]>();
+  for (const t of tasks) {
+    const key = `${t.date}|${t.time}`;
+    groups.set(key, [...(groups.get(key) ?? []), t]);
+  }
+  try {
+    await Promise.all(
+      [...groups.values()].map((group) => {
+        const [{ date, time }] = group as [Placement];
+        return convex.mutation(api.tasks.move, { ids: group.map((t) => t._id), date, time });
+      }),
+    );
+  } catch (e) {
+    showToast(errorText(e));
+  }
 }
 
 export function updateTask(args: FunctionArgs<typeof api.tasks.update>) {

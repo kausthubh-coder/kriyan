@@ -433,7 +433,7 @@ describe("raw operations", () => {
   test("ops lists every operation", async () => {
     const r = await run("ops");
     const lines = r.stdout.trimEnd().split("\n");
-    expect(lines).toHaveLength(19);
+    expect(lines).toHaveLength(20);
     expect(lines[0]).toBe("get_today      read   Get today");
     expect(lines.at(-1)).toBe("propose_plan   write  Propose a plan");
   });
