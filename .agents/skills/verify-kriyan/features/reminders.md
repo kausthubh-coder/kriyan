@@ -6,7 +6,7 @@ A task can have any number of reminders: minutes before its start, or a day offs
 
 - `remind-edit` add, change and remove reminders in the task panel (`Reminders`, `Custom reminder`).
 - `remind-default` a timed task gets the default reminders from Settings when none are given.
-- `remind-ring` the notification arrives with the title and `Starts at HH:MM`.
+- `remind-ring` the notification arrives with the title and when the task is, said from the day it rings: `Starts at HH:MM` on the day, `Tomorrow at HH:MM` or `Tomorrow` the day before, `Fri 16 Oct` further ahead. A repeating event rings before every occurrence.
 - `remind-elsewhere` a task added on the web, by the CLI or by an agent still rings the phone.
 - `remind-open` tapping the notification opens that task; relaunching the app later does not reopen it.
 

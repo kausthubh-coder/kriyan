@@ -1,7 +1,14 @@
 import { describe, expect, test } from "vitest";
 import { contrast } from "./color.ts";
 import { addDays, todayIn, weekday, zonedInstant } from "./dates.ts";
-import { describeReminder, describeRepeat, formatDay, formatDuration, repeatPhrase } from "./format.ts";
+import {
+  describeReminder,
+  describeRepeat,
+  formatDay,
+  formatDuration,
+  reminderBody,
+  repeatPhrase,
+} from "./format.ts";
 import { parseTask } from "./parse.ts";
 import type { Repeat } from "./repeat.ts";
 import { freeMinutes, layoutDay } from "./layout.ts";
@@ -95,6 +102,16 @@ describe("reminders", () => {
         new Date(i).toISOString(),
       ),
     ).toEqual(["2026-10-13T08:00:00.000Z"]);
+  });
+
+  test("the text says when, from the day it rings", () => {
+    // Mum's birthday on Fri 16 Oct, reminded the evening before.
+    expect(reminderBody({ date: "2026-10-16" }, "2026-10-15")).toBe("Tomorrow");
+    expect(reminderBody({ date: "2026-10-16" }, "2026-10-16")).toBe("Today");
+    expect(reminderBody({ date: "2026-10-16", time: 870 }, "2026-10-16")).toBe("Starts at 14:30");
+    expect(reminderBody({ date: "2026-10-16", time: 540 }, "2026-10-15")).toBe("Tomorrow at 09:00");
+    expect(reminderBody({ date: "2026-10-16", time: 540 }, "2026-10-13")).toBe("Fri 16 Oct at 09:00");
+    expect(reminderBody({ date: "2027-01-02" }, "2026-12-30")).toBe("Sat 2 Jan 2027");
   });
 });
 

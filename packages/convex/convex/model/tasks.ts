@@ -309,8 +309,11 @@ export async function settleProposals(
           .take(200)
       ).filter((t) => t.deletedAt === undefined);
   for (const t of rows) {
-    if (accept) await ctx.db.patch(t._id, { proposedBy: undefined });
-    else await ctx.db.patch(t._id, { deletedAt: Date.now() });
+    if (accept) {
+      await ctx.db.patch(t._id, { proposedBy: undefined });
+      // A proposal never rings; once it's part of the plan, its reminders do.
+      await scheduleReminders(ctx, t._id);
+    } else await ctx.db.patch(t._id, { deletedAt: Date.now() });
   }
   return rows.length;
 }

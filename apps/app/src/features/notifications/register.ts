@@ -12,7 +12,8 @@ import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useConvexAuth } from "convex/react";
 import { api } from "@kriyan/convex/api";
-import { addDays, formatClock, startOfWeek } from "@kriyan/core/dates";
+import { addDays, startOfWeek, todayIn } from "@kriyan/core/dates";
+import { reminderBody } from "@kriyan/core/format";
 import { reminderInstants } from "@kriyan/core/reminders";
 import { convex } from "@/data/convex";
 import { createStore } from "@/data/store";
@@ -125,7 +126,7 @@ function useLocalReminders() {
             identifier: `${LOCAL_PREFIX}${t._id}-${t.date}-${at}`,
             content: {
               title: t.title,
-              body: t.time !== null ? `Starts at ${formatClock(t.time)}` : "Today",
+              body: reminderBody({ date: t.date as string, time: t.time }, todayIn(timeZone, at)),
               data: { taskId: t._id },
             },
             trigger: {

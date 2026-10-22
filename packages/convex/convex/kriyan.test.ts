@@ -114,6 +114,104 @@ describe("reminders", () => {
     await alice.mutation(api.tasks.remove, { id });
     expect(await t.run((ctx) => ctx.db.query("reminderJobs").collect())).toEqual([]);
   });
+
+  const pending = (t: Awaited<ReturnType<typeof setup>>["t"]) =>
+    t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect())
+        .filter((f) => f.state.kind === "pending")
+        .map((f) => f.args[0] as { taskId: Id<"tasks">; fireAt: number; date: string }),
+    );
+
+  test("a repeating class rings before every lecture, not only the first", async () => {
+    const { t, alice } = await setup();
+    // Tuesday 13 Oct, 12:00: today's 09:00 lecture is over, so Thursday's rings next.
+    await alice.mutation(api.tasks.add, {
+      title: "Calculus lecture",
+      date: "2026-10-13",
+      time: 540,
+      length: 90,
+      event: true,
+      repeat: { freq: "week", interval: 1, weekdays: [1, 3] },
+    });
+    expect((await pending(t)).map((j) => [j.date, new Date(j.fireAt).toISOString()])).toEqual([
+      ["2026-10-15", "2026-10-15T08:50:00.000Z"],
+    ]);
+    // Thursday's reminder rings; the next lecture, Tuesday the 20th, gets its own.
+    vi.advanceTimersToNextTimer();
+    await t.finishInProgressScheduledFunctions();
+    expect((await pending(t)).map((j) => [j.date, new Date(j.fireAt).toISOString()])).toEqual([
+      ["2026-10-20", "2026-10-20T08:50:00.000Z"],
+    ]);
+  });
+
+  test("a daily task added after today's time still rings tomorrow morning", async () => {
+    const { t, alice } = await setup();
+    // Noon on Tuesday: today's 08:00 has passed and today's isn't ticked off.
+    await alice.mutation(api.tasks.addText, { text: "Take meds every day 8am remind 10m before" });
+    expect((await pending(t)).map((j) => [j.date, new Date(j.fireAt).toISOString()])).toEqual([
+      ["2026-10-14", "2026-10-14T07:50:00.000Z"],
+    ]);
+  });
+
+  test("a reminder the evening before says Tomorrow, not Today", async () => {
+    const { t, alice } = await setup();
+    await alice.mutation(api.tasks.addText, {
+      text: "Mum's birthday 16 oct every year remind day before at 20:00",
+    });
+    const [job] = await pending(t);
+    expect(new Date(job!.fireAt).toISOString()).toBe("2026-10-15T20:00:00.000Z");
+    expect(await t.query(internal.reminders.payload, job!)).toEqual({
+      title: "Mum's birthday",
+      body: "Tomorrow",
+      tokens: [],
+    });
+  });
+
+  test("the push goes out at high priority with the task and when it is", async () => {
+    const { t, alice } = await setup();
+    await alice.mutation(api.account.registerPush, {
+      token: "ExponentPushToken[phone]",
+      platform: "android",
+    });
+    await alice.mutation(api.tasks.addText, { text: "Dentist tomorrow 9am remind day before at 20:00" });
+    const sent: unknown[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      sent.push(...(JSON.parse(String(init.body)) as unknown[]));
+      return new Response(JSON.stringify({ data: [{ status: "ok" }] }), { status: 200 });
+    });
+    try {
+      vi.advanceTimersToNextTimer();
+      await t.finishInProgressScheduledFunctions();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(sent).toEqual([
+      {
+        to: "ExponentPushToken[phone]",
+        title: "Dentist",
+        body: "Tomorrow at 09:00",
+        sound: "default",
+        channelId: "reminders",
+        priority: "high",
+        data: { taskId: expect.any(String) },
+      },
+    ]);
+  });
+
+  test("an accepted proposal rings like any other task", async () => {
+    const { t, alice, today } = await setup();
+    await t.mutation(internal.agent.propose_plan, {
+      ownerId: ALICE.tokenIdentifier,
+      agent: "Claude",
+      blocks: [{ title: "Write launch post", date: today, time: 900, length: 60 }],
+    });
+    // While it's only a proposal, nothing rings.
+    expect(await pending(t)).toEqual([]);
+    await alice.mutation(api.tasks.settleProposals, { accept: true });
+    expect((await pending(t)).map((j) => new Date(j.fireAt).toISOString())).toEqual([
+      "2026-10-13T14:50:00.000Z",
+    ]);
+  });
 });
 
 describe("ownership", () => {
@@ -335,18 +433,18 @@ describe("months of use", () => {
     await history(t, 520, {});
     await alice.mutation(api.tasks.addText, { text: "New idea" });
     expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["New idea"]);
-    expect((await alice.query(api.views.week, { start: "2026-10-12", today })).inbox.map((x) => x.title)).toEqual(
-      ["New idea"],
-    );
+    expect(
+      (await alice.query(api.views.week, { start: "2026-10-12", today })).inbox.map((x) => x.title),
+    ).toEqual(["New idea"]);
   });
 
   test("an open task from yesterday stays in From earlier after 500 older done ones", async () => {
     const { t, alice } = await setup();
     await history(t, 520, { date: "2026-01-05" });
     await alice.mutation(api.tasks.add, { title: "Problem set 3", date: "2026-10-12" });
-    expect((await alice.query(api.views.today, { today: "2026-10-13" })).earlier.map((x) => x.title)).toEqual([
-      "Problem set 3",
-    ]);
+    expect((await alice.query(api.views.today, { today: "2026-10-13" })).earlier.map((x) => x.title)).toEqual(
+      ["Problem set 3"],
+    );
   });
 
   test("a space page shows a new task after 500 done ones in that space", async () => {

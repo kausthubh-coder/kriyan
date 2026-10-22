@@ -133,6 +133,20 @@ export function describeReminder(reminder: Reminder): string {
   return `${-reminder.offset} days before at ${at}`;
 }
 
+/**
+ * The line under a reminder's title, said from the day it rings: "Starts at 14:30" on the
+ * day, "Tomorrow at 09:00" or "Tomorrow" the evening before, "Fri 16 Oct" further ahead.
+ */
+export function reminderBody(
+  occurrence: { date: CivilDate; time?: number | null },
+  ringsOn: CivilDate,
+): string {
+  const day = formatDay(occurrence.date, ringsOn);
+  if (occurrence.time === undefined || occurrence.time === null) return day;
+  const at = formatClock(occurrence.time);
+  return occurrence.date === ringsOn ? `Starts at ${at}` : `${day} at ${at}`;
+}
+
 /** The dates of the week containing `date`, Monday first. */
 export function weekOf(date: CivilDate): CivilDate[] {
   const start = addDays(date, -weekday(date));
