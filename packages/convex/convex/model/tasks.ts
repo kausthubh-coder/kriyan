@@ -96,6 +96,8 @@ export async function createTask(
   const profile = await getProfile(ctx, ownerId);
   let date = fields.date;
   if (fields.repeat && !date) date = firstOccurrence(fields.repeat, todayIn(profile.timeZone));
+  // A time with no day would never show on a day or ring: it means today, as in quick add.
+  else if (fields.time !== undefined && !date) date = todayIn(profile.timeZone);
   const reminders = fields.reminders ?? (fields.time !== undefined ? profile.defaultReminders : []);
   const id = await ctx.db.insert("tasks", {
     ownerId,

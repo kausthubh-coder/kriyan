@@ -38,7 +38,7 @@ const SECTIONS: { id: string; title: string; intro: string; examples: string[] }
     id: "times",
     title: "Times",
     intro:
-      "Write times with am or pm, or on the 24-hour clock. “at 5” on its own means 17:00, because few things start at 5 in the morning. A range sets the start and the length.",
+      "Write times with am or pm, or on the 24-hour clock. “at 5” on its own means 17:00, because few things start at 5 in the morning. A range sets the start and the length. A time with no date puts the task on today.",
     examples: [
       "standup 9:30am",
       "gym 18:00",

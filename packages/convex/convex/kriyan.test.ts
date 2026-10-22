@@ -56,6 +56,22 @@ describe("quick add and today", () => {
     expect(day.anytime.map((t) => t.title)).toEqual(["Essay"]);
   });
 
+  test("a task with a time and no day lands on today, from quick add or an agent", async () => {
+    const { t, alice, today } = await setup();
+    await alice.mutation(api.tasks.addText, { text: "Water the plants 6pm" });
+    await t.mutation(internal.agent.add_task, {
+      ownerId: ALICE.tokenIdentifier,
+      title: "Call Mum",
+      time: 1020,
+    });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.scheduled.map((x) => [x.title, x.time])).toEqual([
+      ["Call Mum", 1020],
+      ["Water the plants", 1080],
+    ]);
+    expect(await alice.query(api.views.inbox, {})).toEqual([]);
+  });
+
   test("a task without a time is an anytime task; one without a date goes to the inbox", async () => {
     const { alice, today } = await setup();
     await alice.mutation(api.tasks.addText, { text: "Send invoice today" });

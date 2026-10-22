@@ -125,6 +125,16 @@ describe("parseTask", () => {
     expect(parse("buy eggs, milk and bread").title).toBe("buy eggs, milk and bread");
   });
 
+  test("a time on its own puts the task on today, as a reminder does", () => {
+    expect(parse("call mum 5pm")).toEqual({
+      title: "call mum",
+      date: "2026-10-13",
+      time: 17 * 60,
+      reminders: [],
+    });
+    expect(parse("call mum fri 5pm").date).toBe("2026-10-16");
+  });
+
   test("a range with am or pm only at the end starts on the same half of the day", () => {
     expect(parse("study 10-12pm")).toMatchObject({ title: "study", time: 10 * 60, length: 120 });
     expect(parse("lunch 11-1pm")).toMatchObject({ title: "lunch", time: 11 * 60, length: 120 });

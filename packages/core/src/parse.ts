@@ -286,7 +286,8 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   });
 
   if (out.repeat && !out.date) out.date = firstOccurrence(out.repeat, today);
-  if (out.reminders.length && !out.date) out.date = today;
+  // A reminder or a time needs a day to ring or show on: today, unless the sentence names one.
+  if ((out.reminders.length || out.time !== undefined) && !out.date) out.date = today;
   // Punctuation a phrase left behind goes too: "Mum's birthday ," and "call the bank .".
   out.title = masked
     .replace(/\s+/g, " ")
