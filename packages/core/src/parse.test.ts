@@ -92,6 +92,49 @@ describe("parseTask", () => {
     });
   });
 
+  test("weekdays listed with spaces, and every other weekday", () => {
+    expect(parse("yoga every mon wed fri 7am")).toEqual({
+      title: "yoga",
+      date: "2026-10-14",
+      time: 7 * 60,
+      repeat: { freq: "week", interval: 1, weekdays: [0, 2, 4] },
+      reminders: [],
+    });
+    expect(parse("team sync every other mon 10:00 for 30m")).toEqual({
+      title: "team sync",
+      date: "2026-10-19",
+      time: 10 * 60,
+      length: 30,
+      repeat: { freq: "week", interval: 2, weekdays: [0] },
+      reminders: [],
+    });
+  });
+
+  test("a phrase can end at a comma or a full stop", () => {
+    expect(parse("Mum's birthday 16 oct every year, remind day before at 20:00")).toEqual({
+      title: "Mum's birthday",
+      date: "2026-10-16",
+      repeat: { freq: "year", interval: 1 },
+      reminders: [{ kind: "day", offset: -1, time: 20 * 60 }],
+    });
+    expect(parse("call the bank tomorrow.")).toEqual({
+      title: "call the bank",
+      date: "2026-10-14",
+      reminders: [],
+    });
+    expect(parse("buy eggs, milk and bread").title).toBe("buy eggs, milk and bread");
+  });
+
+  test("a range with am or pm only at the end starts on the same half of the day", () => {
+    expect(parse("study 10-12pm")).toMatchObject({ title: "study", time: 10 * 60, length: 120 });
+    expect(parse("lunch 11-1pm")).toMatchObject({ title: "lunch", time: 11 * 60, length: 120 });
+    expect(parse("gym 6-7pm")).toMatchObject({ title: "gym", time: 18 * 60, length: 60 });
+  });
+
+  test("a date that doesn't exist stays in the title", () => {
+    expect(parse("flight 2026-02-31")).toEqual({ title: "flight 2026-02-31", reminders: [] });
+  });
+
   test("a plain sentence stays a plain title with no invented length", () => {
     expect(parse("buy oat milk")).toEqual({ title: "buy oat milk", reminders: [] });
   });
