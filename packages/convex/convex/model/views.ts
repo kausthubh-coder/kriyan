@@ -209,6 +209,19 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
       )
       .take(LIMIT)
   ).filter((t) => !t.event);
+  // Due today but planned for no day, or a later one: today's list is where they belong.
+  const due = (
+    await ctx.db
+      .query("tasks")
+      .withIndex("by_owner_and_deadline", (q) => q.eq("ownerId", ownerId).eq("deadline", today))
+      .take(LIMIT)
+  ).filter(
+    (t) =>
+      live(t) &&
+      t.doneAt === undefined &&
+      t.proposedBy === undefined &&
+      (t.date === undefined || t.date > today),
+  );
   return {
     date: today,
     profile: {
@@ -220,6 +233,7 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
     scheduled: day.filter((t) => t.time !== null),
     anytime: day.filter((t) => t.time === null && !t.done),
     done: day.filter((t) => t.time === null && t.done),
+    due: due.map((t) => view(t, map)),
     earlier: earlier.map((t) => view(t, map)),
     habits: await habitViews(ctx, ownerId, today, map),
     proposals: day.filter((t) => t.proposedBy !== null).length,

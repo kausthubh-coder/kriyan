@@ -45,6 +45,16 @@ describe("quick add and today", () => {
     expect(day.anytime).toEqual([]);
   });
 
+  test("a task due today with no day of its own shows on today, once", async () => {
+    const { alice, today } = await setup();
+    await alice.mutation(api.tasks.addText, { text: "Problem set 4 due today #school" });
+    await alice.mutation(api.tasks.addText, { text: "Essay today due today" });
+    await alice.mutation(api.tasks.addText, { text: "Lab report due tomorrow" });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.due.map((t) => [t.title, t.deadline])).toEqual([["Problem set 4", today]]);
+    expect(day.anytime.map((t) => t.title)).toEqual(["Essay"]);
+  });
+
   test("a task without a time is an anytime task; one without a date goes to the inbox", async () => {
     const { alice, today } = await setup();
     await alice.mutation(api.tasks.addText, { text: "Send invoice today" });

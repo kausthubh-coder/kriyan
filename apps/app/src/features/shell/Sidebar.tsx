@@ -105,7 +105,7 @@ export function Sidebar() {
   const inbox = useInboxView();
   const today = useTodayView();
   const todayCount = today
-    ? today.anytime.length + today.scheduled.filter((t) => !t.done && !t.event).length
+    ? today.due.length + today.anytime.length + today.scheduled.filter((t) => !t.done && !t.event).length
     : 0;
   return (
     <View

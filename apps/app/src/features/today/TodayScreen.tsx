@@ -172,6 +172,7 @@ function TodayBody({
   const nothing =
     view.scheduled.length === 0 &&
     view.anytime.length === 0 &&
+    view.due.length === 0 &&
     view.done.length === 0 &&
     view.earlier.length === 0 &&
     view.habits.length === 0;
@@ -199,7 +200,7 @@ function TodayBody({
       t._id !== current?._id &&
       (t.time > now || (t.length !== null && now < t.time + t.length)),
   );
-  const left = view.anytime.length;
+  const left = view.due.length + view.anytime.length;
   const cleared =
     left === 0 &&
     live.every((t) => (t.time ?? 0) + (t.length ?? 0) <= now) &&
@@ -235,7 +236,7 @@ function TodayBody({
           </View>
         ) : null}
         <View>
-          {view.anytime.map((t) => (
+          {[...view.due, ...view.anytime].map((t) => (
             <TaskRow
               key={`${t._id}:${t.date}`}
               task={t}

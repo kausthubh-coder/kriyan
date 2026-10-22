@@ -91,8 +91,9 @@ export const TaskRow = memo(function TaskRow({
   // the mouse itself.
   const [hovered, setHovered] = useState(false);
   const pickRef = useRef<View>(null);
-  // Something from an earlier day comes to today; anything else goes to tomorrow.
-  const target = task.date && task.date < today ? today : addDays(today, 1);
+  // Something from an earlier day, or due today with no day yet, comes to today; anything
+  // else goes to tomorrow.
+  const target = !task.date || task.date < today ? today : addDays(today, 1);
   const targetLabel = target === today ? "Today" : "Tomorrow";
   const canMove = movable && !task.done && !task.projected && !task.event;
   useEffect(() => {

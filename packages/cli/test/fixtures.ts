@@ -134,6 +134,7 @@ export function today(date = "2026-10-13"): TodayResult {
     scheduled: [gym, lecture, essay, reading, callMum],
     anytime: [stamps],
     done: [rent],
+    due: [],
     earlier: [problems],
     habits,
     proposals: 1,

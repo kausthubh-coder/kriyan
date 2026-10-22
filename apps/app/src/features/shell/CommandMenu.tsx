@@ -219,7 +219,9 @@ function Menu() {
       }
       const seen = new Set<string>();
       const pool: TaskView[] = [
-        ...(todayView ? [...todayView.anytime, ...todayView.scheduled, ...todayView.earlier] : []),
+        ...(todayView
+          ? [...todayView.due, ...todayView.anytime, ...todayView.scheduled, ...todayView.earlier]
+          : []),
         ...(inbox ?? []),
         ...(week ? week.days.flatMap((d) => [...d.scheduled, ...d.anytime, ...d.deadlines]) : []),
         ...(week ? [...week.inbox, ...week.unscheduled] : []),

@@ -125,7 +125,7 @@ export const OPS: OpSpec[] = [
     title: "Get today",
     kind: "read",
     description:
-      "Read the person's plan for a day (today by default): scheduled blocks, anytime tasks, done tasks, tasks left from earlier days, and habits. Read this before planning.",
+      "Read the person's plan for a day (today by default): scheduled blocks, anytime tasks, tasks due that day with no day of their own, done tasks, tasks left from earlier days, and habits. Read this before planning.",
     input: obj({ date }),
   },
   {
