@@ -1,7 +1,8 @@
 // Read models: the exact shapes the screens (and agents) read. Queries can't read the clock,
 // so callers pass the person's today.
 
-import { addDays, diffDays, weekday, type CivilDate } from "@kriyan/core/dates";
+import { ConvexError } from "convex/values";
+import { addDays, diffDays, isCivilDate, weekday, type CivilDate } from "@kriyan/core/dates";
 import { describeRepeat } from "@kriyan/core/format";
 import { occurrencesBetween } from "@kriyan/core/repeat";
 import type { SpaceColor } from "@kriyan/core/tokens";
@@ -192,7 +193,14 @@ async function habitViews(
     }));
 }
 
+/** Dates come from callers (an agent's "date", the app's today): refuse anything that isn't one. */
+function civil(value: string, what: string): CivilDate {
+  if (!isCivilDate(value)) throw new ConvexError(`The ${what} must look like 2026-10-13.`);
+  return value;
+}
+
 export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  civil(today, "date");
   const profile = await getProfile(ctx, ownerId);
   const { map, tree } = await spaceMap(ctx, ownerId);
   const day = (await plan(ctx, ownerId, today, today, map)).get(today) ?? [];
@@ -242,6 +250,8 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
 }
 
 export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate, today: CivilDate) {
+  civil(start, "start");
+  civil(today, "date");
   const profile = await getProfile(ctx, ownerId);
   const { map } = await spaceMap(ctx, ownerId);
   const end = addDays(start, 6);
@@ -284,6 +294,7 @@ export async function inboxView(ctx: QueryCtx, ownerId: string) {
 }
 
 export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spaces">, today: CivilDate) {
+  civil(today, "date");
   const space = owned(await ctx.db.get(spaceId), ownerId, "space");
   const { map, tree } = await spaceMap(ctx, ownerId);
   const node = map.get(spaceId);
@@ -358,6 +369,7 @@ export function goalView(g: Doc<"goals">, today: CivilDate) {
 }
 
 export async function progressView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  civil(today, "date");
   const { map } = await spaceMap(ctx, ownerId);
   const yearStart = addDays(today, -364);
   const completions = await ctx.db

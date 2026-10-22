@@ -3,7 +3,7 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
-import { cancelReminders } from "./model/reminders";
+import { cancelReminders, scheduleReminders } from "./model/reminders";
 import { DEFAULT_PROFILE, getProfile, requireOwner } from "./model/owner";
 import { checkReminders } from "./model/tasks";
 import * as Tokens from "./model/tokens";
@@ -28,9 +28,41 @@ export const ensureProfile = mutation({
       .query("profiles")
       .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
       .unique();
-    if (!row)
-      await ctx.db.insert("profiles", { ownerId, ...DEFAULT_PROFILE, timeZone, ...(name ? { name } : {}) });
-    else if (row.timeZone !== timeZone) await ctx.db.patch(row._id, { timeZone });
+    if (!row) {
+      const shown = name?.trim().slice(0, 100);
+      await ctx.db.insert("profiles", {
+        ownerId,
+        ...DEFAULT_PROFILE,
+        timeZone,
+        ...(shown ? { name: shown } : {}),
+      });
+      // Reminders on anything an agent added before the first sign-in were placed on UTC's clock.
+      if (timeZone !== DEFAULT_PROFILE.timeZone)
+        await ctx.scheduler.runAfter(0, internal.account.rescheduleReminders, { ownerId, cursor: null });
+    } else if (row.timeZone !== timeZone) {
+      await ctx.db.patch(row._id, { timeZone });
+      // A reminder rings at a clock time where the person is, so a new zone places them all again.
+      await ctx.scheduler.runAfter(0, internal.account.rescheduleReminders, { ownerId, cursor: null });
+    }
+  },
+});
+
+/** Schedules every open task's reminders again, 100 tasks at a time. */
+export const rescheduleReminders = internalMutation({
+  args: { ownerId: v.string(), cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { ownerId, cursor }) => {
+    const page = await ctx.db
+      .query("tasks")
+      .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+        q.eq("ownerId", ownerId).eq("deletedAt", undefined).eq("doneAt", undefined).gte("date", "0000"),
+      )
+      .paginate({ numItems: 100, cursor });
+    for (const task of page.page) if (task.reminders.length) await scheduleReminders(ctx, task._id);
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.account.rescheduleReminders, {
+        ownerId,
+        cursor: page.continueCursor,
+      });
   },
 });
 

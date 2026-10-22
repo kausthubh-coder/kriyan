@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { todayIn } from "@kriyan/core/dates";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { validatorMessage } from "./http";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -290,6 +291,39 @@ describe("reminders", () => {
       "2026-10-13T14:50:00.000Z",
     ]);
   });
+
+  test("moving to another time zone moves a pending reminder to the same clock time there", async () => {
+    const { t, alice } = await setup();
+    await alice.mutation(api.tasks.addText, { text: "Call Mum today 18:00 remind 10m before" });
+    expect((await pending(t)).map((j) => new Date(j.fireAt).toISOString())).toEqual([
+      "2026-10-13T17:50:00.000Z",
+    ]);
+    // Kolkata is UTC+5:30, so 17:50 there is 12:20 UTC, still ahead of now (12:00 UTC).
+    await alice.mutation(api.account.ensureProfile, { timeZone: "Asia/Kolkata" });
+    vi.advanceTimersToNextTimer();
+    await t.finishInProgressScheduledFunctions();
+    expect((await pending(t)).map((j) => new Date(j.fireAt).toISOString())).toEqual([
+      "2026-10-13T12:20:00.000Z",
+    ]);
+  });
+
+  test("a reminder an agent set before the first sign-in rings on the person's clock", async () => {
+    const t = convexTest(schema, modules);
+    // No profile yet, so the server places it on UTC's clock.
+    await t.mutation(internal.agent.add_task, {
+      ownerId: ALICE.tokenIdentifier,
+      text: "Call Mum today 18:00 remind 10m before",
+    });
+    expect((await pending(t)).map((j) => new Date(j.fireAt).toISOString())).toEqual([
+      "2026-10-13T17:50:00.000Z",
+    ]);
+    await t.withIdentity(ALICE).mutation(api.account.ensureProfile, { timeZone: "Asia/Kolkata" });
+    vi.advanceTimersToNextTimer();
+    await t.finishInProgressScheduledFunctions();
+    expect((await pending(t)).map((j) => new Date(j.fireAt).toISOString())).toEqual([
+      "2026-10-13T12:20:00.000Z",
+    ]);
+  });
 });
 
 describe("ownership", () => {
@@ -399,6 +433,59 @@ describe("agent API", () => {
     const res = await call("add_task", { title: "Run", length: 0 });
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "The length must be from 1 minute to 24 hours." });
+  });
+
+  test("a read for a day that isn't a date says how to write one", async () => {
+    const { call } = await withToken();
+    // It used to answer 200 with nothing planned and every open task "from earlier".
+    const day = await call("get_today", { date: "Friday" });
+    expect(day.status).toBe(400);
+    expect(await day.json()).toEqual({ error: "The date must look like 2026-10-13." });
+    // ...and a week of days dated 0NaN-NaN-NaN.
+    const week = await call("get_week", { start: "next monday" });
+    expect(week.status).toBe(400);
+    expect(await week.json()).toEqual({ error: "The start must look like 2026-10-13." });
+  });
+
+  test("a validator error names the field without echoing the request and its owner id", () => {
+    // What the real backend says for add_task {"title":"x","bogus":1}, owner id shortened.
+    const echoed =
+      "ArgumentValidationError: Object contains extra field `bogus` that is not in the validator.\n\n" +
+      'Object: {bogus: 1.0, ownerId: "https://example.clerk.accounts.dev|user_3Kc", title: "x"}\n' +
+      "Validator: v.object({ownerId: v.string(), title: v.optional(v.string())})";
+    expect(validatorMessage(echoed)).toBe(
+      "ArgumentValidationError: Object contains extra field `bogus` that is not in the validator.",
+    );
+    expect(
+      validatorMessage(
+        'ArgumentValidationError: Value does not match validator.\nPath: .length\nValue: "long"\nValidator: v.float64()',
+      ),
+    ).toBe('ArgumentValidationError: Value does not match validator. Path: .length Value: "long"');
+    expect(validatorMessage("TypeError: x is undefined")).toBeNull();
+  });
+
+  test("the site's service secret acts for a Clerk user id, and only an exact secret works", async () => {
+    const { t, alice } = await withToken();
+    await alice.mutation(api.tasks.addText, { text: "Book the dentist" });
+    const secret = "s".repeat(64);
+    vi.stubEnv("KRIYAN_SERVICE_SECRET", secret);
+    vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN", ALICE.issuer);
+    const inbox = (bearer: string, user: string) =>
+      t.fetch("/api/v1/get_inbox", {
+        method: "POST",
+        headers: { authorization: `Bearer ${bearer}`, "x-kriyan-user": user },
+      });
+    try {
+      const res = await inbox(secret, ALICE.subject);
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { result: { title: string }[] }).result.map((x) => x.title)).toEqual([
+        "Book the dentist",
+      ]);
+      expect((await inbox(`${secret.slice(1)}t`, ALICE.subject)).status).toBe(401);
+      expect((await inbox(secret, `${ALICE.subject}|other`)).status).toBe(401);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 
