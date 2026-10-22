@@ -548,6 +548,23 @@ describe("habits and progress", () => {
     ]);
   });
 
+  test("a habit can be renamed, retargeted and archived, and archiving can be undone", async () => {
+    const { alice, today } = await setup();
+    const id = await alice.mutation(api.organize.addHabit, { title: "Raed 20 min", target: 4 });
+    await alice.mutation(api.organize.checkHabit, { id, done: true });
+    await alice.mutation(api.organize.updateHabit, { id, title: "Read 20 min", target: 5 });
+    expect((await alice.query(api.views.today, { today })).habits.map((h) => [h.title, h.target])).toEqual([
+      ["Read 20 min", 5],
+    ]);
+    await alice.mutation(api.organize.updateHabit, { id, archived: true });
+    expect((await alice.query(api.views.today, { today })).habits).toEqual([]);
+    expect((await alice.query(api.views.progress, { today })).habits).toEqual([]);
+    // Undo brings it back with its history.
+    await alice.mutation(api.organize.updateHabit, { id, archived: false });
+    const back = await alice.query(api.views.today, { today });
+    expect(back.habits.map((h) => [h.title, h.doneToday])).toEqual([["Read 20 min", true]]);
+  });
+
   test("time done counts towards the week and its space", async () => {
     const { alice, today } = await setup();
     const id = await alice.mutation(api.tasks.addText, { text: "Deep work today 10am for 2h #work" });
