@@ -11,7 +11,7 @@ import { layoutDay } from "@kriyan/core/layout";
 import type { TaskView } from "@/data/views";
 import { completeTask, placeTasks, reopenTask, ticking, updateTask } from "@/features/tasks/actions";
 import { openTask } from "@/features/tasks/TaskRow";
-import { useIsPhone } from "@/theme/layout";
+import { useIsPhone, useType } from "@/theme/layout";
 import { c, r, s, spaceTone } from "@/theme/tokens";
 import { Check, Dot } from "@/ui/bits";
 import { Press } from "@/ui/Press";
@@ -35,8 +35,11 @@ interface Props {
 
 export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Props) {
   const phone = useIsPhone();
+  const roles = useType();
   // On touch a 30-minute block must be a 44px target, so an hour is 96px.
   const hourPx = phone ? 96 : 56;
+  // A block shows its time under the title only when both lines fit inside its padding.
+  const twoLines = Number(roles.label.lineHeight) + Number(roles.meta.lineHeight) + 2 * s.s2;
   const ref = useRef<View>(null);
   const [width, setWidth] = useState(0);
   const ticked = ticking.useValue((t) => t);
@@ -131,7 +134,7 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
             const shown = Math.max(p.start, fromH * 60);
             const top = y(shown) + 1;
             const h = y(p.end) - y(shown) - 2;
-            const tall = h >= 44;
+            const tall = h >= twoLines;
             return (
               <BlockDrag
                 key={p.id}

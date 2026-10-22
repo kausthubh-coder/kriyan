@@ -191,7 +191,14 @@ function TodayBody({
 
   const live = view.scheduled.filter((t) => !t.done && !t.proposedBy);
   const current = live.find((t) => t.time !== null && t.length && t.time <= now && now < t.time + t.length);
-  const next = live.find((t) => t.time !== null && t.time > now && t._id !== current?._id);
+  // Next is the first other block that isn't over: one still running beside the current one
+  // comes before one that starts later.
+  const next = live.find(
+    (t) =>
+      t.time !== null &&
+      t._id !== current?._id &&
+      (t.time > now || (t.length !== null && now < t.time + t.length)),
+  );
   const left = view.anytime.length;
   const cleared =
     left === 0 &&
@@ -201,8 +208,14 @@ function TodayBody({
   const stillOpen =
     left + view.scheduled.filter((t) => !t.done && !t.event && !t.proposedBy && !t.projected).length;
   const evening = now >= view.profile.dayEnd - 240;
-  const fold = !showEarlierHours && now - 60 > view.profile.dayStart ? now - 60 : null;
-  const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < now - 60).length;
+  // Hours before an hour ago fold away, but never over a block that slipped: it stays in
+  // sight until it's ticked off or moved.
+  const slipped = view.scheduled.filter(
+    (t) => !t.done && !t.event && !t.proposedBy && !t.projected && t.time !== null && t.time < now - 60,
+  );
+  const foldAt = Math.min(now - 60, ...slipped.map((t) => t.time ?? now));
+  const fold = !showEarlierHours && foldAt > view.profile.dayStart ? foldAt : null;
+  const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < (fold ?? 0)).length;
 
   const list = (
     <>
@@ -361,7 +374,9 @@ function NowBlock({ current, next, now }: { current?: TaskView; next?: TaskView;
         <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
           <Icon icon={ArrowRight} size={16} />
           <Txt variant="body" tone="ink3" tnum>
-            {formatClock(next.time ?? 0)}
+            {next.time !== null && next.time <= now && next.length !== null
+              ? `until ${formatClock(next.time + next.length)}`
+              : formatClock(next.time ?? 0)}
           </Txt>
           <Txt variant="label" tone="ink2" numberOfLines={1} style={{ flex: 1 }}>
             {next.title}
