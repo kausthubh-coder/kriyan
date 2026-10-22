@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Linking, Modal, View } from "react-native";
 import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
+import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { BookOpen, Bot, Copy, KeyRound, LogOut, Terminal, Trash2 } from "lucide-react-native";
+import { BookOpen, Bot, Copy, KeyRound, LogOut, RotateCcw, Terminal, Trash2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
@@ -56,6 +57,7 @@ export function SettingsScreen() {
           <DefaultReminders profile={profile} />
           <ConnectAI profile={profile} />
           <Tokens />
+          <Deleted />
           <Account />
         </>
       )}
@@ -379,6 +381,20 @@ function Tokens() {
           ))}
         </View>
       )}
+    </View>
+  );
+}
+
+function Deleted() {
+  return (
+    <View style={{ gap: s.s3 }}>
+      <SectionHead title="Recently deleted" />
+      <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
+        A task you delete waits 30 days before it’s gone for good, so you can bring it back.
+      </Txt>
+      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+        <Button icon={RotateCcw} label="Open recently deleted" onPress={() => router.push("/trash")} />
+      </View>
     </View>
   );
 }

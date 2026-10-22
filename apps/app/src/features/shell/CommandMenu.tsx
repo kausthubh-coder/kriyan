@@ -61,6 +61,7 @@ const GO: { label: string; href: Href; icon: LucideIcon; kbd?: string; keywords?
   { label: "Progress", href: "/progress", icon: Target, keywords: "goals habits heatmap time" },
   { label: "Settings", href: "/settings", icon: SlidersHorizontal, keywords: "tokens reminders day" },
   { label: "Connect an AI", href: "/settings", icon: Bot, keywords: "mcp, claude, chatgpt" },
+  { label: "Recently deleted", href: "/trash", icon: Trash2, keywords: "trash restore undo" },
 ];
 
 export function CommandMenu() {

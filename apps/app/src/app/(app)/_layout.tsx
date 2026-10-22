@@ -31,6 +31,7 @@ export default function AppLayout() {
         <Stack.Screen name="space/[id]" />
         <Stack.Screen name="progress" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="trash" />
         <Stack.Screen
           name="task/[id]"
           options={{

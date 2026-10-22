@@ -761,4 +761,35 @@ describe("the trash", () => {
     await alice.mutation(api.tasks.restore, { id: recent });
     expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Recent idea"]);
   });
+
+  test("recently deleted lists what's in the trash, newest first, and only the person's own", async () => {
+    const { t, alice } = await setup();
+    const essay = await alice.mutation(api.tasks.addText, { text: "Essay every fri 17:00 #school" });
+    vi.setSystemTime(new Date("2026-10-13T12:05:00Z"));
+    const idea = await alice.mutation(api.tasks.addText, { text: "Old idea" });
+    await alice.mutation(api.tasks.addText, { text: "Kept idea" });
+    await alice.mutation(api.tasks.remove, { id: essay });
+    vi.setSystemTime(new Date("2026-10-13T12:10:00Z"));
+    await alice.mutation(api.tasks.remove, { id: idea });
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    await bob.mutation(api.tasks.remove, { id: await bob.mutation(api.tasks.addText, { text: "Bob's" }) });
+
+    expect(await alice.query(api.views.trash, {})).toEqual([
+      expect.objectContaining({ title: "Old idea", date: null, repeatText: null, spacePath: null }),
+      expect.objectContaining({
+        title: "Essay",
+        date: "2026-10-16",
+        time: 1020,
+        repeatText: "Every Fri",
+        spacePath: "School",
+        deletedAt: Date.parse("2026-10-13T12:05:00Z"),
+      }),
+    ]);
+    // Restoring takes it out of the trash and puts it back on its day.
+    await alice.mutation(api.tasks.restore, { id: essay });
+    expect((await alice.query(api.views.trash, {})).map((x) => x.title)).toEqual(["Old idea"]);
+    const week = await alice.query(api.views.week, { start: "2026-10-12", today: "2026-10-13" });
+    expect(week.days.find((d) => d.date === "2026-10-16")?.scheduled.map((x) => x.title)).toEqual(["Essay"]);
+  });
 });

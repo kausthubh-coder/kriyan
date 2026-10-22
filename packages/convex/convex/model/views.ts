@@ -287,6 +287,31 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
   };
 }
 
+/** Deleted tasks, newest first. They stay until maintenance.emptyTrash removes them after 30 days. */
+export async function trashView(ctx: QueryCtx, ownerId: string) {
+  const { map } = await spaceMap(ctx, ownerId);
+  const deleted = await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+      q.eq("ownerId", ownerId).gt("deletedAt", 0),
+    )
+    .order("desc")
+    .take(LIMIT);
+  return deleted.map((t) => {
+    const space = t.spaceId ? map.get(t.spaceId) : undefined;
+    return {
+      _id: t._id,
+      title: t.title,
+      deletedAt: t.deletedAt ?? 0,
+      date: t.date ?? null,
+      time: t.time ?? null,
+      repeatText: t.repeat ? describeRepeat(t.repeat, t.repeatFirst ?? t.date ?? "1970-01-01") : null,
+      color: space?.color ?? null,
+      spacePath: space?.path ?? null,
+    };
+  });
+}
+
 export async function inboxView(ctx: QueryCtx, ownerId: string) {
   const { map } = await spaceMap(ctx, ownerId);
   const undated = (await openUndated(ctx, ownerId)).filter((t) => !t.spaceId);

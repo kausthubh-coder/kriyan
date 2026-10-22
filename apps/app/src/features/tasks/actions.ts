@@ -107,6 +107,14 @@ export function deleteTask(task: { _id: Id<"tasks">; title: string }, after?: ()
     .catch((e: unknown) => showToast(errorText(e)));
 }
 
+/** Brings a deleted task back where it was, from Recently deleted. */
+export function restoreTask(task: { _id: Id<"tasks">; title: string }) {
+  void convex
+    .mutation(api.tasks.restore, { id: task._id })
+    .then(() => showToast(`Restored: ${task.title}`))
+    .catch((e: unknown) => showToast(errorText(e)));
+}
+
 /** Where a task sits now, so a move can be undone. */
 export interface Placement {
   _id: Id<"tasks">;
