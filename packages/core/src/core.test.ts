@@ -12,6 +12,7 @@ import {
 import { parseTask } from "./parse.ts";
 import type { Repeat } from "./repeat.ts";
 import { freeMinutes, layoutDay } from "./layout.ts";
+import { OPS } from "./ops.ts";
 import { reminderInstants } from "./reminders.ts";
 import { color } from "./tokens.ts";
 
@@ -191,5 +192,19 @@ describe("repeatPhrase", () => {
   test.each(cases)("%o reads as %s and parses back to the same rule", (rule, phrase) => {
     expect(repeatPhrase(rule, today)).toBe(phrase);
     expect(parseTask(`x ${phrase}`, today).repeat).toEqual(rule);
+  });
+});
+
+describe("agent operations", () => {
+  test("only writes that create something tell MCP clients they just add", () => {
+    // Everything else edits, moves or removes, so a client may ask the person first.
+    expect(OPS.filter((op) => op.kind === "write" && !op.destructive).map((op) => op.name)).toEqual([
+      "add_task",
+      "restore_task",
+      "add_space",
+      "add_habit",
+      "add_goal",
+      "propose_plan",
+    ]);
   });
 });

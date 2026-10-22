@@ -45,7 +45,8 @@ export function buildServer(caller: Caller | undefined): McpServer {
         annotations: {
           title: op.title,
           readOnlyHint: op.kind === "read",
-          destructiveHint: op.name === "delete_task",
+          destructiveHint: op.destructive === true,
+          idempotentHint: op.kind === "read" || op.idempotent === true,
           openWorldHint: false,
         },
       },

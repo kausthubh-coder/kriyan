@@ -109,6 +109,13 @@ export interface OpSpec {
   description: string;
   /** Reads never change anything. */
   kind: "read" | "write";
+  /**
+   * A write that edits, moves or removes what's already there, rather than only adding. MCP
+   * clients read it (destructiveHint) to decide when to ask the person first.
+   */
+  destructive?: true;
+  /** Calling it again with the same input changes nothing more (MCP's idempotentHint). */
+  idempotent?: true;
   input: Schema;
 }
 
@@ -179,6 +186,8 @@ export const OPS: OpSpec[] = [
     name: "update_task",
     title: "Change a task",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description:
       "Change fields of a task. Pass null to clear a field. Changing the date of a repeating task moves only that occurrence; later ones keep their usual days. To change the days, change `repeat`.",
     input: obj(
@@ -195,6 +204,7 @@ export const OPS: OpSpec[] = [
     name: "complete_task",
     title: "Complete a task",
     kind: "write",
+    destructive: true,
     description:
       "Tick a task off. A repeating task moves to its next date. Send the date you read it on (null for a task with no date): if it has moved since, as after a retried call, the tick is refused instead of ticking the next occurrence too. The reply's completionId and date undo it with undo_complete.",
     input: obj({ taskId: id("task"), date: nullable(date) }, ["taskId"]),
@@ -203,6 +213,8 @@ export const OPS: OpSpec[] = [
     name: "undo_complete",
     title: "Undo a tick",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description:
       "Take back a tick from complete_task: the task returns to the date it was on and the tick stops counting. Send the completionId and date from complete_task's reply.",
     input: obj({ taskId: id("task"), completionId: id("completion"), date: nullable(date) }, [
@@ -215,6 +227,8 @@ export const OPS: OpSpec[] = [
     name: "reopen_task",
     title: "Reopen a task",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description:
       "Mark a finished task as not done. A repeating task isn't finished by a tick (it moves to its next date); use undo_complete for that.",
     input: obj({ taskId: id("task") }, ["taskId"]),
@@ -223,6 +237,8 @@ export const OPS: OpSpec[] = [
     name: "delete_task",
     title: "Delete a task",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description:
       "Delete a task, with all its repeats. restore_task brings it back within 30 days. Check with the person first.",
     input: obj({ taskId: id("task") }, ["taskId"]),
@@ -231,6 +247,7 @@ export const OPS: OpSpec[] = [
     name: "restore_task",
     title: "Restore a deleted task",
     kind: "write",
+    idempotent: true,
     description: "Bring back a task deleted in the last 30 days, as it was.",
     input: obj({ taskId: id("task") }, ["taskId"]),
   },
@@ -238,6 +255,8 @@ export const OPS: OpSpec[] = [
     name: "move_tasks",
     title: "Move tasks",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description: "Move tasks to a date, optionally at a time. Pass date null to unschedule.",
     input: obj(
       {
@@ -252,6 +271,8 @@ export const OPS: OpSpec[] = [
     name: "close_day",
     title: "Close the day",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description:
       "Move everything still open today to tomorrow, keeping times. Events, done tasks and proposals stay.",
     input: obj({}),
@@ -274,6 +295,8 @@ export const OPS: OpSpec[] = [
     name: "update_space",
     title: "Change a space",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description: "Rename a space, change its colour or parent, or replace its Markdown note.",
     input: obj(
       {
@@ -304,6 +327,8 @@ export const OPS: OpSpec[] = [
     name: "check_habit",
     title: "Check a habit",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description: "Mark a habit done or not done on a day (today by default).",
     input: obj({ habitId: id("habit"), done: { type: "boolean" }, date }, ["habitId", "done"]),
   },
@@ -329,6 +354,8 @@ export const OPS: OpSpec[] = [
     name: "update_goal",
     title: "Change a goal",
     kind: "write",
+    destructive: true,
+    idempotent: true,
     description: "Update a goal's progress (`current`), target, unit or due date.",
     input: obj(
       {
