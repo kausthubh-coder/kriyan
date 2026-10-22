@@ -76,9 +76,10 @@ export default function McpDocs() {
           before suggesting anything about your time.
         </li>
         <li>
-          Plans arrive as proposals. <code>propose_plan</code> puts blocks on Today and Upcoming with Accept
-          and Discard, and names the agent. Nothing moves until you accept, unless you turn on &ldquo;Let
-          agents edit directly&rdquo; in Settings.
+          Plans arrive as proposals. <code>propose_plan</code> puts blocks on Today and Upcoming, names the
+          agent, and waits for you to accept or discard them on Upcoming, unless you turn on &ldquo;Let agents
+          edit directly&rdquo; in Settings. Other changes, like <code>update_task</code>,{" "}
+          <code>move_tasks</code> and <code>delete_task</code>, apply right away.
         </li>
         <li>Agents never guess how long something takes. A length is only set when you said one.</li>
         <li>

@@ -123,7 +123,7 @@ export default function Home() {
             <h2 id="ai">Plan with your AI</h2>
             <p>
               Claude, ChatGPT, Cursor or a script can read your plan and suggest changes through MCP or the
-              command line. A plan from an agent arrives as a proposal, and nothing moves until you accept it.
+              command line. A plan from an agent arrives as a proposal for you to accept or discard.
             </p>
           </div>
           <div className={css.setup}>

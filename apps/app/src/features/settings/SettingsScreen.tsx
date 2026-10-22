@@ -29,8 +29,10 @@ import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 
 export const MCP_URL = "https://kriyan.app/mcp";
-export const CLI_LINE = "npx kriyan login";
+// The CLI isn't on npm yet, so it runs from a copy of the code; ship-kriyan step 6 says when this changes.
+export const CLI_LINE = "bun run kriyan login";
 export const MCP_DOCS = "https://kriyan.app/docs/mcp";
+export const CLI_DOCS = "https://kriyan.app/docs/cli";
 
 async function copy(text: string, what: string) {
   await Clipboard.setStringAsync(text);
@@ -226,9 +228,12 @@ function ConnectAI({ profile }: { profile: Profile }) {
         <Button icon={BookOpen} label="Read the setup guide" onPress={() => void Linking.openURL(MCP_DOCS)} />
       </View>
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
-        Or use the command line. Run this, then paste an access token from below.
+        Or use the command line. In a copy of Kriyan’s code, run this, then paste an access token from below.
       </Txt>
       <CopyLine icon={Terminal} text={CLI_LINE} what="the command" />
+      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+        <Button icon={BookOpen} label="Read the CLI guide" onPress={() => void Linking.openURL(CLI_DOCS)} />
+      </View>
       <Press
         role="switch"
         aria-checked={profile.agentsEditDirectly}
@@ -248,8 +253,8 @@ function ConnectAI({ profile }: { profile: Profile }) {
           <Txt variant="label">Let agents edit directly</Txt>
           <Txt variant="meta" tone="ink3">
             {profile.agentsEditDirectly
-              ? "On: an agent's changes go straight into your plan."
-              : "Off: an agent's changes wait as proposals for you to accept."}
+              ? "On: an agent's plans go straight onto your days."
+              : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."}
           </Txt>
         </View>
         <View

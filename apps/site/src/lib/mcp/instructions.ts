@@ -5,6 +5,8 @@ Read before you plan. Call get_today (for a day) or get_week (for seven days) be
 
 Plans go through propose_plan. When you plan time (blocks with a date and a start time), call propose_plan with your name as the agent. The blocks appear in the app as proposals the person accepts or discards. Don't create planned blocks with add_task.
 
+update_task, move_tasks, close_day and delete_task change the plan at once, with no proposal to accept. Check with the person before you change or delete something they planned.
+
 Use add_task for things the person asks you to capture. The easiest form is text, written the way they would type it: "essay fri 5pm #school every week remind 1h before".
 
 Never invent a task's length. Set length only when the person said how long something takes.
