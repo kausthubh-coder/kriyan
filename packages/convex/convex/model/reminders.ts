@@ -11,14 +11,18 @@ import type { MutationCtx } from "../_generated/server";
 import { getProfile } from "./owner";
 
 export async function cancelReminders(ctx: MutationCtx, taskId: Id<"tasks">): Promise<void> {
-  const jobs = await ctx.db
-    .query("reminderJobs")
-    .withIndex("by_taskId", (q) => q.eq("taskId", taskId))
-    .take(50);
-  for (const job of jobs) {
-    const scheduled = await ctx.db.system.get(job.jobId);
-    if (scheduled && scheduled.state.kind === "pending") await ctx.scheduler.cancel(job.jobId);
-    await ctx.db.delete(job._id);
+  // In batches until none are left: a job missed here would still ring.
+  for (;;) {
+    const jobs = await ctx.db
+      .query("reminderJobs")
+      .withIndex("by_taskId", (q) => q.eq("taskId", taskId))
+      .take(50);
+    for (const job of jobs) {
+      const scheduled = await ctx.db.system.get(job.jobId);
+      if (scheduled && scheduled.state.kind === "pending") await ctx.scheduler.cancel(job.jobId);
+      await ctx.db.delete(job._id);
+    }
+    if (jobs.length < 50) return;
   }
 }
 

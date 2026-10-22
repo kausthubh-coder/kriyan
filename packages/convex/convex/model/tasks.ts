@@ -35,6 +35,16 @@ const CLEARED: { [K in keyof TaskFields]?: TaskFields[K] } = { reminders: [], ev
 
 const MAX_REMINDERS = 10;
 
+/** A task's reminders, or the defaults a new task gets: at most 10, each one valid. */
+export function checkReminders(reminders: Reminder[]): void {
+  if (reminders.length > MAX_REMINDERS)
+    throw new ConvexError(`A task can have up to ${MAX_REMINDERS} reminders.`);
+  for (const r of reminders) {
+    const problem = validateReminder(r);
+    if (problem) throw new ConvexError(problem);
+  }
+}
+
 function check(fields: Partial<TaskFields>) {
   if (fields.title !== undefined) {
     if (!fields.title.trim()) throw new ConvexError("Give the task a title.");
@@ -61,14 +71,7 @@ function check(fields: Partial<TaskFields>) {
     const problem = validateRepeat(fields.repeat);
     if (problem) throw new ConvexError(problem);
   }
-  if (fields.reminders) {
-    if (fields.reminders.length > MAX_REMINDERS)
-      throw new ConvexError(`A task can have up to ${MAX_REMINDERS} reminders.`);
-    for (const r of fields.reminders) {
-      const problem = validateReminder(r);
-      if (problem) throw new ConvexError(problem);
-    }
-  }
+  if (fields.reminders) checkReminders(fields.reminders);
   if (fields.note !== undefined && fields.note.length > 50_000)
     throw new ConvexError("Notes can be up to 50,000 characters.");
 }

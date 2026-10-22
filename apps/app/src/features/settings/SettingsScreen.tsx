@@ -14,6 +14,7 @@ import { parseClock } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import { useClock } from "@/data/time";
 import { useAccessTokens, useProfile, type Profile } from "@/data/views";
+import { forgetDevice } from "@/features/notifications/register";
 import { errorText } from "@/features/tasks/actions";
 import { ReminderEditor } from "@/features/tasks/ReminderEditor";
 import { useControl, useIsPhone } from "@/theme/layout";
@@ -390,7 +391,11 @@ function Account() {
         </Txt>
       ) : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginLeft: -s.s3 }}>
-        <Button icon={LogOut} label="Sign out" onPress={() => void signOut()} />
+        <Button
+          icon={LogOut}
+          label="Sign out"
+          onPress={() => void forgetDevice().finally(() => void signOut())}
+        />
         <Button icon={Trash2} label="Delete my data" onPress={() => setConfirm(true)} />
       </View>
       {confirm ? <DeleteDialog onClose={() => setConfirm(false)} /> : null}
@@ -417,6 +422,7 @@ function DeleteDialog({ onClose }: { onClose: () => void }) {
   const run = async () => {
     setBusy(true);
     try {
+      await forgetDevice();
       await deleteData({});
       await user?.delete();
       await signOut();

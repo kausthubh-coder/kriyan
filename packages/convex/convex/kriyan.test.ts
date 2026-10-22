@@ -509,6 +509,68 @@ describe("closing the day", () => {
   });
 });
 
+describe("limits", () => {
+  test("default reminders get the same checks as a task's own", async () => {
+    const { alice } = await setup();
+    const eleven = Array.from({ length: 11 }, (_, i) => ({ kind: "before" as const, minutes: i }));
+    await expect(alice.mutation(api.account.updateProfile, { defaultReminders: eleven })).rejects.toThrow(
+      "A task can have up to 10 reminders.",
+    );
+    await expect(
+      alice.mutation(api.account.updateProfile, { defaultReminders: [{ kind: "before", minutes: -5 }] }),
+    ).rejects.toThrow("A reminder can be from 0 minutes to 30 days before.");
+  });
+
+  test("deleting a task cancels every reminder job it has, past the first 50", async () => {
+    const { t, alice } = await setup();
+    const id = await alice.mutation(api.tasks.add, { title: "Old data", date: "2026-10-20", time: 600 });
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 60; i++) {
+        const fireAt = Date.parse("2026-10-20T09:00:00Z") + i * 60_000;
+        const jobId = await ctx.scheduler.runAt(fireAt, internal.reminders.fire, { taskId: id, fireAt });
+        await ctx.db.insert("reminderJobs", { ownerId: ALICE.tokenIdentifier, taskId: id, fireAt, jobId });
+      }
+    });
+    await alice.mutation(api.tasks.remove, { id });
+    const left = await t.run(async (ctx) => ({
+      rows: (await ctx.db.query("reminderJobs").collect()).length,
+      pending: (await ctx.db.system.query("_scheduled_functions").collect()).filter(
+        (f) => f.state.kind === "pending",
+      ).length,
+    }));
+    expect(left).toEqual({ rows: 0, pending: 0 });
+  });
+
+  test("space notes stop at 50,000 characters, like task notes", async () => {
+    const { alice } = await setup();
+    const id = await alice.mutation(api.organize.addSpace, { name: "Work" });
+    await expect(alice.mutation(api.organize.updateSpace, { id, note: "x".repeat(50_001) })).rejects.toThrow(
+      "Notes can be up to 50,000 characters.",
+    );
+  });
+
+  test("a phone registers once per account, and signing out takes it back", async () => {
+    const { t, alice } = await setup();
+    await expect(
+      alice.mutation(api.account.registerPush, { token: "not a token", platform: "android" }),
+    ).rejects.toThrow("That isn't a push token from this app.");
+    for (let i = 0; i < 21; i++)
+      await alice.mutation(api.account.registerPush, {
+        token: `ExponentPushToken[phone${i}]`,
+        platform: "android",
+      });
+    const tokens = () =>
+      t.run(async (ctx) => (await ctx.db.query("pushTokens").collect()).map((r) => r.token));
+    expect((await tokens()).length).toBe(20);
+    expect(await tokens()).not.toContain("ExponentPushToken[phone0]");
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.unregisterPush, { token: "ExponentPushToken[phone5]" });
+    expect(await tokens()).toContain("ExponentPushToken[phone5]");
+    await alice.mutation(api.account.unregisterPush, { token: "ExponentPushToken[phone5]" });
+    expect(await tokens()).not.toContain("ExponentPushToken[phone5]");
+  });
+});
+
 describe("deleting my data", () => {
   test("removes every row the person owns, and nobody else's", async () => {
     const { t, alice } = await setup();

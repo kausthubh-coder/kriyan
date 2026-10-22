@@ -6,6 +6,12 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { getProfile, owned } from "./owner";
 
+function unit(value: string): string {
+  const u = value.trim();
+  if (u.length > 20) throw new ConvexError("Keep the unit under 20 characters, like km or pages.");
+  return u;
+}
+
 function title(value: string, what: string) {
   const t = value.trim();
   if (!t) throw new ConvexError(`Give the ${what} a title.`);
@@ -92,7 +98,7 @@ export async function createGoal(
     kind: input.kind,
     target: input.target,
     current: 0,
-    ...(input.unit ? { unit: input.unit.trim() } : {}),
+    ...(input.unit ? { unit: unit(input.unit) } : {}),
     startDate: todayIn((await getProfile(ctx, ownerId)).timeZone),
     ...(input.dueDate ? { dueDate: input.dueDate } : {}),
     ...(input.spaceId ? { spaceId: input.spaceId } : {}),
@@ -122,7 +128,7 @@ export async function updateGoal(
     ...(patch.title !== undefined ? { title: title(patch.title, "goal") } : {}),
     ...(patch.target !== undefined ? { target: patch.target } : {}),
     ...(patch.current !== undefined ? { current: patch.current } : {}),
-    ...(patch.unit !== undefined ? { unit: patch.unit ?? undefined } : {}),
+    ...(patch.unit !== undefined ? { unit: patch.unit === null ? undefined : unit(patch.unit) } : {}),
     ...(patch.dueDate !== undefined ? { dueDate: patch.dueDate ?? undefined } : {}),
     ...(patch.archived !== undefined ? { archivedAt: patch.archived ? Date.now() : undefined } : {}),
   });
