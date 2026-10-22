@@ -82,12 +82,34 @@ async function datedBetween(ctx: QueryCtx, ownerId: string, from: CivilDate, to:
 }
 
 async function repeating(ctx: QueryCtx, ownerId: string) {
-  return (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_repeatFirst", (q) => q.eq("ownerId", ownerId).gt("repeatFirst", ""))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined);
+  return await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_deletedAt_and_doneAt_and_repeatFirst", (q) =>
+      q.eq("ownerId", ownerId).eq("deletedAt", undefined).eq("doneAt", undefined).gt("repeatFirst", ""),
+    )
+    .take(LIMIT);
+}
+
+/** Open tasks with no date, oldest first: the Inbox and the week's tray. Past the limit, the newest stay. */
+async function openUndated(ctx: QueryCtx, ownerId: string) {
+  const newest = await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+      q.eq("ownerId", ownerId).eq("deletedAt", undefined).eq("doneAt", undefined).eq("date", undefined),
+    )
+    .order("desc")
+    .take(LIMIT);
+  return newest.reverse();
+}
+
+/** Open tasks in one space. */
+async function openInSpace(ctx: QueryCtx, ownerId: string, spaceId: Id<"spaces">) {
+  return await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_spaceId_and_deletedAt_and_doneAt", (q) =>
+      q.eq("ownerId", ownerId).eq("spaceId", spaceId).eq("deletedAt", undefined).eq("doneAt", undefined),
+    )
+    .take(LIMIT);
 }
 
 /** Every task falling on each day of [from, to], with repeats projected forward. */
@@ -178,9 +200,16 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
   const earlier = (
     await ctx.db
       .query("tasks")
-      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).gte("date", "0000").lt("date", today))
+      .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+        q
+          .eq("ownerId", ownerId)
+          .eq("deletedAt", undefined)
+          .eq("doneAt", undefined)
+          .gte("date", "0000")
+          .lt("date", today),
+      )
       .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined && !t.event);
+  ).filter((t) => !t.event);
   return {
     date: today,
     profile: {
@@ -225,12 +254,7 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
       capacity: profile.dailyCapacity,
     };
   });
-  const undated = (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).eq("date", undefined))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined);
+  const undated = await openUndated(ctx, ownerId);
   return {
     start,
     days,
@@ -242,12 +266,7 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
 
 export async function inboxView(ctx: QueryCtx, ownerId: string) {
   const { map } = await spaceMap(ctx, ownerId);
-  const undated = (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).eq("date", undefined))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined && !t.spaceId);
+  const undated = (await openUndated(ctx, ownerId)).filter((t) => !t.spaceId);
   return undated.sort((a, b) => b.order - a.order).map((t) => view(t, map));
 }
 
@@ -255,23 +274,10 @@ export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spa
   const space = owned(await ctx.db.get(spaceId), ownerId, "space");
   const { map, tree } = await spaceMap(ctx, ownerId);
   const node = map.get(spaceId);
-  const tasks = (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_spaceId", (q) => q.eq("ownerId", ownerId).eq("spaceId", spaceId))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined && t.proposedBy === undefined);
+  const tasks = (await openInSpace(ctx, ownerId, spaceId)).filter((t) => t.proposedBy === undefined);
   const children = tree.filter((s) => s.parentId === spaceId);
   const childCounts = await Promise.all(
-    children.map(async (c) => {
-      const open = (
-        await ctx.db
-          .query("tasks")
-          .withIndex("by_owner_and_spaceId", (q) => q.eq("ownerId", ownerId).eq("spaceId", c._id))
-          .take(LIMIT)
-      ).filter((t) => live(t) && t.doneAt === undefined).length;
-      return { ...c, open };
-    }),
+    children.map(async (c) => ({ ...c, open: (await openInSpace(ctx, ownerId, c._id)).length })),
   );
   const monthStart = `${today.slice(0, 8)}01`;
   const weekStart = addDays(today, -weekday(today));

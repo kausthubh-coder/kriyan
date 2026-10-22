@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { todayIn } from "@kriyan/core/dates";
 import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -304,6 +305,58 @@ describe("deleting my data", () => {
       return all.flat().map((row) => ("ownerId" in row ? row.ownerId : "?"));
     });
     expect([...new Set(owners)]).toEqual([BOB.tokenIdentifier]);
+  });
+});
+
+describe("months of use", () => {
+  // Done and deleted tasks pile up; lists must still find every open one.
+  async function history(
+    t: Awaited<ReturnType<typeof setup>>["t"],
+    rows: number,
+    fields: { date?: string; spaceId?: Id<"spaces"> },
+  ) {
+    await t.run(async (ctx) => {
+      for (let i = 0; i < rows; i++)
+        await ctx.db.insert("tasks", {
+          ownerId: ALICE.tokenIdentifier,
+          title: `Old ${i}`,
+          ...fields,
+          reminders: [],
+          event: false,
+          order: i,
+          source: "app",
+          ...(i % 2 ? { doneAt: 1 } : { deletedAt: Date.now() }),
+        });
+    });
+  }
+
+  test("a new capture shows in the Inbox after 500 done and deleted ones", async () => {
+    const { t, alice, today } = await setup();
+    await history(t, 520, {});
+    await alice.mutation(api.tasks.addText, { text: "New idea" });
+    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["New idea"]);
+    expect((await alice.query(api.views.week, { start: "2026-10-12", today })).inbox.map((x) => x.title)).toEqual(
+      ["New idea"],
+    );
+  });
+
+  test("an open task from yesterday stays in From earlier after 500 older done ones", async () => {
+    const { t, alice } = await setup();
+    await history(t, 520, { date: "2026-01-05" });
+    await alice.mutation(api.tasks.add, { title: "Problem set 3", date: "2026-10-12" });
+    expect((await alice.query(api.views.today, { today: "2026-10-13" })).earlier.map((x) => x.title)).toEqual([
+      "Problem set 3",
+    ]);
+  });
+
+  test("a space page shows a new task after 500 done ones in that space", async () => {
+    const { t, alice, today } = await setup();
+    const work = await alice.mutation(api.organize.addSpace, { name: "Work" });
+    await history(t, 520, { spaceId: work });
+    await alice.mutation(api.tasks.addText, { text: "Draft the launch post #work" });
+    const space = await alice.query(api.views.space, { id: work, today });
+    expect(space.later.map((x) => x.title)).toEqual(["Draft the launch post"]);
+    expect(space.stats.open).toBe(1);
   });
 });
 

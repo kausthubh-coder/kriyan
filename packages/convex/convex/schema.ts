@@ -63,9 +63,17 @@ export default defineSchema({
     proposedBy: v.optional(v.string()),
   })
     .index("by_owner_and_date", ["ownerId", "date"])
-    .index("by_owner_and_spaceId", ["ownerId", "spaceId"])
+    // Lists of open tasks read through these, so done and deleted rows, which pile up with
+    // use, can never crowd an open task out of a bounded read.
+    .index("by_owner_and_deletedAt_and_doneAt_and_date", ["ownerId", "deletedAt", "doneAt", "date"])
+    .index("by_owner_and_spaceId_and_deletedAt_and_doneAt", ["ownerId", "spaceId", "deletedAt", "doneAt"])
+    .index("by_owner_and_deletedAt_and_doneAt_and_repeatFirst", [
+      "ownerId",
+      "deletedAt",
+      "doneAt",
+      "repeatFirst",
+    ])
     .index("by_owner_and_deadline", ["ownerId", "deadline"])
-    .index("by_owner_and_repeatFirst", ["ownerId", "repeatFirst"])
     // Maintenance only (emptying the Trash), never read for a person.
     .index("by_deletedAt", ["deletedAt"])
     .index("by_owner_and_proposedBy", ["ownerId", "proposedBy"]),
