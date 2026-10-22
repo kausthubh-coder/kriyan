@@ -8,7 +8,7 @@ import { RotateCcw, Trash2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import { formatClock, todayIn } from "@kriyan/core/dates";
 import { formatDay } from "@kriyan/core/format";
-import { deviceTimeZone, useClock } from "@/data/time";
+import { useClock } from "@/data/time";
 import { useTrashView } from "@/data/views";
 import { restoreTask } from "@/features/tasks/actions";
 import { useControl } from "@/theme/layout";
@@ -23,11 +23,10 @@ type Deleted = FunctionReturnType<typeof api.views.trash>[number];
 
 export function TrashScreen() {
   const trash = useTrashView();
-  const { today } = useClock();
-  const zone = deviceTimeZone();
+  const { today, timeZone } = useClock();
   const days = new Map<string, Deleted[]>();
   for (const task of trash ?? []) {
-    const day = todayIn(zone, task.deletedAt);
+    const day = todayIn(timeZone, task.deletedAt);
     days.set(day, [...(days.get(day) ?? []), task]);
   }
   return (

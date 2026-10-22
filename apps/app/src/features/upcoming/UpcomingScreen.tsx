@@ -293,7 +293,8 @@ function Anytime({ task }: { task: TaskView }) {
         onPress={() => openTask(task._id)}
         hoverBg={null}
         scale={false}
-        style={{ flex: 1, minWidth: 0 }}
+        // The row's full 24px height, not just the line of text, is the target.
+        style={{ flex: 1, minWidth: 0, alignSelf: "stretch", justifyContent: "center" }}
       >
         <Txt
           variant="meta"
@@ -517,7 +518,7 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
                       width: `${100 / cols}%`,
                       // The first block's edge lines up with the day's name above it; a block on
                       // top of another starts further in, so the one below keeps its title.
-                      paddingLeft: (col ? 0 : s.s2) + depth * s.s3,
+                      paddingLeft: (col ? 0 : s.s2) + depth * s.s2,
                       paddingRight: s.s1,
                     }}
                   >

@@ -15,6 +15,7 @@ const screens = [
   { name: "browse", go: (p) => p.goto(`${BASE}/browse`) },
   { name: "progress", go: (p) => p.goto(`${BASE}/progress`) },
   { name: "settings", go: (p) => p.goto(`${BASE}/settings`) },
+  { name: "recently deleted", go: (p) => p.goto(`${BASE}/trash`) },
   {
     name: "space",
     go: async (p) => {

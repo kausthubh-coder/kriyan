@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import { Platform, ScrollView, View, type ScrollViewProps } from "react-native";
 import { router, usePathname } from "expo-router";
+import Head from "expo-router/head";
 import { ArrowLeft, Plus, Search } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { openCommand } from "@/features/shell/context";
@@ -123,6 +124,12 @@ export function Screen({
   const shift = !phone && panelOpen && width !== "wide" && !panelCovers;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {/* The browser's tab and history name the page, like the site's "%s | Kriyan". */}
+      {Platform.OS === "web" ? (
+        <Head>
+          <title>{`${title} | Kriyan`}</title>
+        </Head>
+      ) : null}
       {phone ? <AppBar title={title} back={back} actions={actions} /> : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
