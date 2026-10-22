@@ -387,7 +387,11 @@ describe("agent API", () => {
 
   test("a wrong token is refused and an unknown operation is named", async () => {
     const { call } = await withToken();
-    expect((await call("get_today", {}, "Bearer kriyan_wrong")).status).toBe(401);
+    const wrong = await call("get_today", {}, "Bearer kriyan_wrong");
+    expect(wrong.status).toBe(401);
+    expect(await wrong.json()).toEqual({
+      error: "That token doesn't work: it may have been revoked or mistyped. Create a new one in Settings.",
+    });
     const missing = await call("get_tomorrow", {});
     expect(missing.status).toBe(404);
     expect(await missing.json()).toEqual({

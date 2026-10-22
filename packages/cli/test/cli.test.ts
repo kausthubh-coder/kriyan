@@ -371,7 +371,8 @@ describe("errors and exit codes", () => {
     expect(r).toEqual({
       code: 1,
       stdout: "",
-      stderr: "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.\n",
+      stderr:
+        "That token doesn't work: it may have been revoked or mistyped. Create a new one in Settings.\n",
     });
   });
 
@@ -481,7 +482,7 @@ describe("signing in", () => {
     });
     expect(r.code).toBe(1);
     expect(r.stderr).toBe(
-      "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.\n",
+      "That token doesn't work: it may have been revoked or mistyped. Create a new one in Settings.\n",
     );
     expect(existsSync(join(dir, "config.json"))).toBe(false);
   });

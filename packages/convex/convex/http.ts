@@ -103,7 +103,10 @@ http.route({
     const ownerId = await authenticate(ctx, req);
     if (!ownerId)
       return json(401, {
-        error: "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.",
+        // A token that was sent and failed is most often a revoked one, not a missing one.
+        error: req.headers.get("authorization")
+          ? "That token doesn't work: it may have been revoked or mistyped. Create a new one in Settings."
+          : "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.",
       });
     let input: unknown = {};
     const text = await req.text();
