@@ -451,6 +451,32 @@ describe("agent API", () => {
     expect(await res.json()).toEqual({ error: "The length must be from 1 minute to 24 hours." });
   });
 
+  test("a write returns the task as saved, and get_task reads one back with its note", async () => {
+    const { call, t } = await withToken();
+    const added = (await (await call("add_task", { text: "Mum's birthday 16 oct every year" })).json()) as {
+      result: { taskId: string; task: { title: string; date: string; repeat: { freq: string } } };
+    };
+    expect(added.result.task).toMatchObject({
+      title: "Mum's birthday",
+      date: "2026-10-16",
+      repeat: { freq: "year" },
+    });
+    const { taskId } = added.result;
+    const updated = (await (await call("update_task", { taskId, note: "Card and flowers" })).json()) as {
+      result: { task: { note: string } };
+    };
+    expect(updated.result.task.note).toBe("Card and flowers");
+    const read = (await (await call("get_task", { taskId })).json()) as {
+      result: { title: string; note: string };
+    };
+    expect(read.result).toMatchObject({ title: "Mum's birthday", note: "Card and flowers" });
+    // Someone else's task is refused, like every other op.
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    const bobs = await bob.mutation(api.tasks.addText, { text: "Bob's plans" });
+    expect((await call("get_task", { taskId: bobs })).status).toBe(400);
+  });
+
   test("a read for a day that isn't a date says how to write one", async () => {
     const { call } = await withToken();
     // It used to answer 200 with nothing planned and every open task "from earlier".

@@ -287,6 +287,15 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
   };
 }
 
+/** One task as the lists show it, note included: what an agent reads back after a write. */
+export async function oneTask(ctx: QueryCtx, ownerId: string, id: Id<"tasks">): Promise<TaskView> {
+  const task = owned(await ctx.db.get(id), ownerId, "task");
+  if (task.deletedAt !== undefined)
+    throw new ConvexError("That task is deleted; restore_task brings it back.");
+  const { map } = await spaceMap(ctx, ownerId);
+  return view(task, map);
+}
+
 /** Deleted tasks, newest first. They stay until maintenance.emptyTrash removes them after 30 days. */
 export async function trashView(ctx: QueryCtx, ownerId: string) {
   const { map } = await spaceMap(ctx, ownerId);

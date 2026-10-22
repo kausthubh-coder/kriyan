@@ -43,6 +43,11 @@ export const get_space = internalQuery({
   handler: async (ctx, { ownerId, today, spaceId }) => Views.spaceView(ctx, ownerId, spaceId, today),
 });
 
+export const get_task = internalQuery({
+  args: { ...read, taskId: v.id("tasks") },
+  handler: async (ctx, { ownerId, taskId }) => Views.oneTask(ctx, ownerId, taskId),
+});
+
 export const list_spaces = internalQuery({
   args: read,
   handler: async (ctx, { ownerId }) => Spaces.spaceTree(await Spaces.listSpaces(ctx, ownerId)),
@@ -70,10 +75,12 @@ const taskFields = {
 export const add_task = internalMutation({
   args: { ...owner, text: v.optional(v.string()), ...taskFields },
   handler: async (ctx, { ownerId, text, title, ...fields }) => {
-    if (text)
-      return { taskId: await Tasks.addFromText(ctx, ownerId, text, { source: "agent", defaults: fields }) };
-    if (!title) throw new ConvexError("Pass either text or a title.");
-    return { taskId: await Tasks.createTask(ctx, ownerId, { ...fields, title }, { source: "agent" }) };
+    if (!text && !title) throw new ConvexError("Pass either text or a title.");
+    const taskId = text
+      ? await Tasks.addFromText(ctx, ownerId, text, { source: "agent", defaults: fields })
+      : await Tasks.createTask(ctx, ownerId, { ...fields, title: title! }, { source: "agent" });
+    // The task as saved, so the agent sees what its sentence became.
+    return { taskId, task: await Views.oneTask(ctx, ownerId, taskId) };
   },
 });
 
@@ -95,7 +102,7 @@ export const update_task = internalMutation({
   },
   handler: async (ctx, { ownerId, taskId, ...patch }) => {
     await Tasks.updateTask(ctx, ownerId, taskId, patch);
-    return { taskId };
+    return { taskId, task: await Views.oneTask(ctx, ownerId, taskId) };
   },
 });
 

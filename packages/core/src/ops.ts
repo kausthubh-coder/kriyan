@@ -158,6 +158,13 @@ export const OPS: OpSpec[] = [
     input: obj({ spaceId: id("space") }, ["spaceId"]),
   },
   {
+    name: "get_task",
+    title: "Get a task",
+    kind: "read",
+    description: "Read one task by id, with its note, repeat and reminders.",
+    input: obj({ taskId: id("task") }, ["taskId"]),
+  },
+  {
     name: "list_spaces",
     title: "List spaces",
     kind: "read",
@@ -176,7 +183,7 @@ export const OPS: OpSpec[] = [
     title: "Add a task",
     kind: "write",
     description:
-      "Add a task. Either pass `text` as one sentence the way a person types it ('essay fri 5pm #school every week remind 1h before') or pass the fields. Only the title is required. Never invent a length.",
+      "Add a task. Either pass `text` as one sentence the way a person types it ('essay fri 5pm #school every week remind 1h before') or pass the fields. Only the title is required. Never invent a length. Returns the task as saved, so check what was understood.",
     input: obj({
       text: { type: "string", description: "One sentence, parsed like the app's quick add." },
       ...taskFields,
