@@ -568,6 +568,10 @@ function GoalPicker({ value, onPick }: { value: string | null; onPick: (id: Id<"
 
 const LENGTHS = [15, 30, 45, 60, 90, 120];
 
+function withOwn(presets: number[], own: number | undefined): number[] {
+  return own === undefined || presets.includes(own) ? presets : [...presets, own].sort((a, b) => a - b);
+}
+
 function WhenEditor({
   task,
   today,
@@ -583,7 +587,10 @@ function WhenEditor({
   const [lengthText, setLengthText] = useState("");
   const typedTime = timeText.trim() ? parseTask(`x at ${timeText.trim()}`, today).time : undefined;
   const typedLength = lengthText.trim() ? parseTask(`x for ${lengthText.trim()}`, today).length : undefined;
-  const times = [9 * 60, 12 * 60, 14 * 60, 17 * 60, 19 * 60];
+  // The task's own time and length show as picked chips even when they aren't presets, so the
+  // editor always says what's set.
+  const times = withOwn([9 * 60, 12 * 60, 14 * 60, 17 * 60, 19 * 60], task.time);
+  const lengths = withOwn(LENGTHS, task.length);
   return (
     <View style={{ gap: s.s4 }}>
       <View style={{ gap: s.s2 }}>
@@ -639,7 +646,7 @@ function WhenEditor({
           Length (optional)
         </Txt>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-          {LENGTHS.map((m) => (
+          {lengths.map((m) => (
             <Chip
               key={m}
               label={formatDuration(m)}

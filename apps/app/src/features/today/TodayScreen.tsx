@@ -205,9 +205,12 @@ function TodayBody({
     left === 0 &&
     live.every((t) => (t.time ?? 0) + (t.length ?? 0) <= now) &&
     (view.done.length > 0 || view.scheduled.some((t) => t.done));
-  // In the last four hours of the person's day, one tap moves what's left to tomorrow.
-  const stillOpen =
-    left + view.scheduled.filter((t) => !t.done && !t.event && !t.proposedBy && !t.projected).length;
+  // In the last four hours of the person's day, one tap moves what's left to tomorrow. The
+  // count is what closeDay moves: not a task that's only due today, an event, a proposal or a
+  // repeat's projected copy.
+  const stillOpen = [...view.anytime, ...view.scheduled].filter(
+    (t) => !t.done && !t.event && !t.proposedBy && !t.projected,
+  ).length;
   const evening = now >= view.profile.dayEnd - 240;
   // Hours before an hour ago fold away, but never over a block that slipped: it stays in
   // sight until it's ticked off or moved.

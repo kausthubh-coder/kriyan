@@ -41,14 +41,29 @@ const webTransition = Platform.select<ViewStyle>({
   default: {},
 });
 
+/** react-native-web presses on Space only for buttons; these roles toggle on it too. */
+const SPACE_TOGGLES = new Set(["checkbox", "switch", "radio", "menuitemcheckbox", "menuitemradio"]);
+
 export const Press = forwardRef<View, Props>(function Press(
   { style, hoverBg, scale = true, ripple = true, rippleRadius, disabled, children, ...rest },
   ref,
 ) {
+  const { onPress, role } = rest;
+  const space =
+    Platform.OS === "web" && role && SPACE_TOGGLES.has(role) && onPress && !disabled
+      ? {
+          onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+            if (e.key !== " ") return;
+            e.preventDefault();
+            onPress(e as never);
+          },
+        }
+      : {};
   return (
     <Pressable
       ref={ref}
       disabled={disabled}
+      {...(space as object)}
       android_ripple={
         ripple
           ? {

@@ -56,15 +56,20 @@ export function facts(
   showWhen: boolean,
 ): { icon?: Parameters<typeof Icon>[0]["icon"]; text: string }[] {
   const out: { icon?: Parameters<typeof Icon>[0]["icon"]; text: string }[] = [];
-  if (showWhen && task.date) {
+  // A yearly task (a birthday) says its day with a cake, once, whether or not the row shows when.
+  const yearly = task.repeat?.freq === "year" && task.date !== null;
+  if ((showWhen || yearly) && task.date) {
     const day = formatDay(task.date, today);
     out.push({
-      text: task.time !== null ? `${day}, ${formatTimeRange(task.time, task.length ?? undefined)}` : day,
+      ...(yearly ? { icon: Cake } : {}),
+      text:
+        showWhen && task.time !== null
+          ? `${day}, ${formatTimeRange(task.time, task.length ?? undefined)}`
+          : day,
     });
   }
   if (task.deadline) out.push({ icon: Flag, text: `Due ${formatDay(task.deadline, today)}` });
-  if (task.repeat?.freq === "year" && task.date) out.push({ icon: Cake, text: formatDay(task.date, today) });
-  else if (task.repeatText) out.push({ icon: Repeat2, text: task.repeatText });
+  if (!yearly && task.repeatText) out.push({ icon: Repeat2, text: task.repeatText });
   if (task.reminders.length) out.push({ icon: Bell, text: String(task.reminders.length) });
   if (task.note) out.push({ icon: NotebookText, text: "Note" });
   if (task.proposedBy) out.push({ icon: Bot, text: `Proposed by ${task.proposedBy}` });
