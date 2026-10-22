@@ -100,10 +100,29 @@ export const update_task = internalMutation({
 });
 
 export const complete_task = internalMutation({
-  args: { ...owner, taskId: v.id("tasks") },
-  handler: async (ctx, { ownerId, taskId }) => {
-    const done = await Tasks.completeTask(ctx, ownerId, taskId);
-    return { taskId, finished: done.finished, next: done.next };
+  args: { ...owner, taskId: v.id("tasks"), date: nullable(v.string()) },
+  handler: async (ctx, { ownerId, taskId, date }) => {
+    const done = await Tasks.completeTask(ctx, ownerId, taskId, date);
+    return {
+      taskId,
+      finished: done.finished,
+      next: done.next,
+      completionId: done.completionId,
+      date: done.date,
+    };
+  },
+});
+
+export const undo_complete = internalMutation({
+  args: {
+    ...owner,
+    taskId: v.id("tasks"),
+    completionId: v.id("completions"),
+    date: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { ownerId, taskId, completionId, date }) => {
+    await Tasks.undoComplete(ctx, ownerId, taskId, { completionId, date });
+    return { taskId };
   },
 });
 
@@ -119,6 +138,14 @@ export const delete_task = internalMutation({
   args: { ...owner, taskId: v.id("tasks") },
   handler: async (ctx, { ownerId, taskId }) => {
     await Tasks.deleteTask(ctx, ownerId, taskId);
+    return { taskId };
+  },
+});
+
+export const restore_task = internalMutation({
+  args: { ...owner, taskId: v.id("tasks") },
+  handler: async (ctx, { ownerId, taskId }) => {
+    await Tasks.restoreTask(ctx, ownerId, taskId);
     return { taskId };
   },
 });

@@ -122,8 +122,8 @@ async function plan(
 ) {
   const byDay = new Map<CivilDate, TaskView[]>();
   const push = (d: CivilDate, t: TaskView) => byDay.set(d, [...(byDay.get(d) ?? []), t]);
-  for (const t of await datedBetween(ctx, ownerId, from, to))
-    if (!t.repeat || t.doneAt !== undefined) push(t.date!, view(t, spaces));
+  // A finished repeat's last date shows through its completion, below, like the others.
+  for (const t of await datedBetween(ctx, ownerId, from, to)) if (!t.repeat) push(t.date!, view(t, spaces));
   for (const t of await repeating(ctx, ownerId)) {
     if (!t.date || t.date > to) continue;
     // The pending date shows even when it was moved off the rule's usual days; later
@@ -134,16 +134,15 @@ async function plan(
       if (d > t.date) push(d, view(t, spaces, d));
     }
   }
-  // Repeats done earlier in the range show as done on their day.
+  // Repeats done in the range show as done on their own day, however late they were ticked.
   const done = await ctx.db
     .query("completions")
-    .withIndex("by_owner_and_doneOn", (q) =>
-      q.eq("ownerId", ownerId).gte("doneOn", addDays(from, -1)).lte("doneOn", addDays(to, 1)),
-    )
+    .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).gte("date", from).lte("date", to))
     .take(LIMIT);
+  const tasks = new Map<Id<"tasks">, Doc<"tasks"> | null>();
   for (const c of done) {
-    if (c.date < from || c.date > to) continue;
-    const task = await ctx.db.get(c.taskId);
+    if (!tasks.has(c.taskId)) tasks.set(c.taskId, await ctx.db.get(c.taskId));
+    const task = tasks.get(c.taskId);
     if (!task || !live(task) || !task.repeat) continue;
     push(c.date, view(task, spaces, c.date, true));
   }

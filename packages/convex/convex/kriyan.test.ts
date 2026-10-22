@@ -91,6 +91,74 @@ describe("completing", () => {
     expect(day.done.map((t) => t.title)).toEqual(["Book the dentist"]);
   });
 
+  test("a second tap on a repeat is refused instead of ticking off the next one too", async () => {
+    const { alice } = await setup();
+    const id = await alice.mutation(api.tasks.addText, { text: "Water plants every 3 days" });
+    await alice.mutation(api.tasks.complete, { id, date: "2026-10-13" });
+    await expect(alice.mutation(api.tasks.complete, { id, date: "2026-10-13" })).rejects.toThrow(
+      "That task is on Fri 16 Oct now, so it wasn't ticked off again.",
+    );
+    expect((await alice.query(api.views.task, { id }))?.date).toBe("2026-10-16");
+  });
+
+  test("unticking a done task takes back what the tick counted", async () => {
+    const { t, alice, today } = await setup();
+    const goal = await alice.mutation(api.organize.addGoal, {
+      title: "Ship 5 things",
+      kind: "tasks",
+      target: 5,
+    });
+    const id = await alice.mutation(api.tasks.add, {
+      title: "Ship the CLI",
+      date: today,
+      length: 60,
+      goalId: goal,
+    });
+    await alice.mutation(api.tasks.complete, { id });
+    await alice.mutation(api.tasks.reopen, { id });
+    await alice.mutation(api.tasks.complete, { id });
+    expect((await alice.query(api.views.progress, { today })).weekMinutes).toBe(60);
+    expect((await t.run((ctx) => ctx.db.get(goal)))?.current).toBe(1);
+  });
+
+  test("undo pressed twice counts once, and only puts a task back on its own date", async () => {
+    const { t, alice } = await setup();
+    const goal = await alice.mutation(api.organize.addGoal, {
+      title: "Ship 5 things",
+      kind: "tasks",
+      target: 5,
+    });
+    const id = await alice.mutation(api.tasks.add, { title: "Ship the CLI", goalId: goal });
+    const first = await alice.mutation(api.tasks.add, { title: "Earlier win", goalId: goal });
+    await alice.mutation(api.tasks.complete, { id: first });
+    const done = await alice.mutation(api.tasks.complete, { id });
+    await expect(
+      alice.mutation(api.tasks.undoComplete, { id, completion: { ...done, date: "2026-10-12<junk>" } }),
+    ).rejects.toThrow("That isn't the date this task was done on.");
+    await alice.mutation(api.tasks.undoComplete, { id, completion: done });
+    await alice.mutation(api.tasks.undoComplete, { id, completion: done });
+    expect((await t.run((ctx) => ctx.db.get(goal)))?.current).toBe(1);
+    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Ship the CLI"]);
+  });
+
+  test("a finished repeat shows once on its last day", async () => {
+    const { alice, today } = await setup();
+    const id = await alice.mutation(api.tasks.addText, { text: "Pills every day for 1 times" });
+    expect(await alice.mutation(api.tasks.complete, { id })).toMatchObject({ finished: true });
+    expect((await alice.query(api.views.today, { today })).done.map((x) => x.title)).toEqual(["Pills"]);
+  });
+
+  test("after done for 2 times finishes on the second tick", async () => {
+    const { alice } = await setup();
+    const id = await alice.mutation(api.tasks.addText, { text: "Read every! 2 days for 2 times" });
+    expect(await alice.mutation(api.tasks.complete, { id })).toMatchObject({
+      finished: false,
+      next: "2026-10-15",
+    });
+    vi.setSystemTime(new Date("2026-10-15T12:00:00Z"));
+    expect(await alice.mutation(api.tasks.complete, { id })).toMatchObject({ finished: true, next: null });
+  });
+
   test("tasks left on earlier days show as from earlier", async () => {
     const { alice } = await setup();
     await alice.mutation(api.tasks.add, { title: "Problem set 3", date: "2026-10-10" });
@@ -281,6 +349,41 @@ describe("agent API", () => {
     expect(day.scheduled.map((t) => [t.title, t.proposedBy])).toEqual([["Write launch post", null]]);
   });
 
+  test("an agent can take back a wrong tick and bring back a task it deleted", async () => {
+    const { call } = await withToken();
+    const { taskId } = (
+      (await (await call("add_task", { text: "Water plants every 3 days" })).json()) as {
+        result: { taskId: string };
+      }
+    ).result;
+    const done = (
+      (await (await call("complete_task", { taskId, date: "2026-10-13" })).json()) as {
+        result: { completionId: string; date: string; next: string };
+      }
+    ).result;
+    expect(done).toMatchObject({ date: "2026-10-13", next: "2026-10-16" });
+    // A retry of the same call is refused rather than ticking the 16th too.
+    expect((await call("complete_task", { taskId, date: "2026-10-13" })).status).toBe(400);
+    // reopen_task can't help with a repeat, and says so.
+    expect(await (await call("reopen_task", { taskId })).json()).toEqual({
+      error:
+        "That task isn't done: a repeat moves to its next date when it's ticked off. Undo the tick instead.",
+    });
+    expect(
+      (await call("undo_complete", { taskId, completionId: done.completionId, date: done.date })).status,
+    ).toBe(200);
+    const today = (await (await call("get_today", {})).json()) as {
+      result: { anytime: { title: string }[] };
+    };
+    expect(today.result.anytime.map((t) => t.title)).toEqual(["Water plants"]);
+    await call("delete_task", { taskId });
+    await call("restore_task", { taskId });
+    const again = (await (await call("get_today", {})).json()) as {
+      result: { anytime: { title: string }[] };
+    };
+    expect(again.result.anytime.map((t) => t.title)).toEqual(["Water plants"]);
+  });
+
   test("validation errors explain what to fix", async () => {
     const { call } = await withToken();
     const res = await call("add_task", { title: "Run", length: 0 });
@@ -313,6 +416,32 @@ describe("habits and progress", () => {
     const progress = await alice.query(api.views.progress, { today });
     expect(progress.weekMinutes).toBe(120);
     expect(progress.bySpace.map((s) => [s.name, s.minutes])).toEqual([["Work", 120]]);
+  });
+});
+
+describe("editing a repeat", () => {
+  test("saving the same rule again keeps the series where it was", async () => {
+    const { alice } = await setup();
+    const repeat = {
+      freq: "week" as const,
+      interval: 1,
+      weekdays: [3 as const],
+      end: { kind: "count" as const, count: 6 },
+    };
+    const id = await alice.mutation(api.tasks.add, { title: "Physio", date: "2026-10-01", repeat });
+    await alice.mutation(api.tasks.move, { ids: [id], date: "2026-10-16" });
+    await alice.mutation(api.tasks.update, { id, repeat: { ...repeat, weekdays: [3] } });
+    expect((await alice.query(api.views.task, { id }))?.repeatFirst).toBe("2026-10-01");
+    await alice.mutation(api.tasks.update, { id, repeat: { ...repeat, end: { kind: "count", count: 8 } } });
+    expect((await alice.query(api.views.task, { id }))?.repeatFirst).toBe("2026-10-16");
+  });
+
+  test("null clears reminders and the event switch, as the agent docs say", async () => {
+    const { alice } = await setup();
+    const id = await alice.mutation(api.tasks.addText, { text: "Standup today 9:30 remind 10m before" });
+    await alice.mutation(api.tasks.update, { id, event: true });
+    await alice.mutation(api.tasks.update, { id, reminders: null, event: null });
+    expect(await alice.query(api.views.task, { id })).toMatchObject({ reminders: [], event: false });
   });
 });
 

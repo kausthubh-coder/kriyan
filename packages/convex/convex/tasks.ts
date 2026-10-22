@@ -64,9 +64,10 @@ const completionV = v.object({
 });
 
 export const complete = mutation({
-  args: { id: v.id("tasks") },
+  // `date`: the date the row showed, so a second tap can't tick a repeat's next occurrence.
+  args: { id: v.id("tasks"), date: nullable(v.string()) },
   returns: completionV,
-  handler: async (ctx, { id }) => Tasks.completeTask(ctx, await requireOwner(ctx), id),
+  handler: async (ctx, { id, date }) => Tasks.completeTask(ctx, await requireOwner(ctx), id, date),
 });
 
 export const undoComplete = mutation({

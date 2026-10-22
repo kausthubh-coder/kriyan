@@ -195,21 +195,43 @@ export const OPS: OpSpec[] = [
     name: "complete_task",
     title: "Complete a task",
     kind: "write",
-    description: "Tick a task off. A repeating task moves to its next date.",
-    input: obj({ taskId: id("task") }, ["taskId"]),
+    description:
+      "Tick a task off. A repeating task moves to its next date. Send the date you read it on (null for a task with no date): if it has moved since, as after a retried call, the tick is refused instead of ticking the next occurrence too. The reply's completionId and date undo it with undo_complete.",
+    input: obj({ taskId: id("task"), date: nullable(date) }, ["taskId"]),
+  },
+  {
+    name: "undo_complete",
+    title: "Undo a tick",
+    kind: "write",
+    description:
+      "Take back a tick from complete_task: the task returns to the date it was on and the tick stops counting. Send the completionId and date from complete_task's reply.",
+    input: obj({ taskId: id("task"), completionId: id("completion"), date: nullable(date) }, [
+      "taskId",
+      "completionId",
+      "date",
+    ]),
   },
   {
     name: "reopen_task",
     title: "Reopen a task",
     kind: "write",
-    description: "Mark a finished task as not done.",
+    description:
+      "Mark a finished task as not done. A repeating task isn't finished by a tick (it moves to its next date); use undo_complete for that.",
     input: obj({ taskId: id("task") }, ["taskId"]),
   },
   {
     name: "delete_task",
     title: "Delete a task",
     kind: "write",
-    description: "Delete a task. The person can restore it from the app.",
+    description:
+      "Delete a task, with all its repeats. restore_task brings it back within 30 days. Check with the person first.",
+    input: obj({ taskId: id("task") }, ["taskId"]),
+  },
+  {
+    name: "restore_task",
+    title: "Restore a deleted task",
+    kind: "write",
+    description: "Bring back a task deleted in the last 30 days, as it was.",
     input: obj({ taskId: id("task") }, ["taskId"]),
   },
   {

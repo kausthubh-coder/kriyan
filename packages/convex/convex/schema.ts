@@ -91,6 +91,7 @@ export default defineSchema({
     minutes: v.number(),
   })
     .index("by_owner_and_doneOn", ["ownerId", "doneOn"])
+    .index("by_owner_and_date", ["ownerId", "date"])
     .index("by_taskId_and_date", ["taskId", "date"]),
 
   habits: defineTable({

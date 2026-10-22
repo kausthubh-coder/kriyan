@@ -3,8 +3,9 @@
 
 import { ConvexError } from "convex/values";
 import { addDays, isCivilDate, todayIn } from "@kriyan/core/dates";
+import { formatDay } from "@kriyan/core/format";
 import { firstOccurrence, parseTask } from "@kriyan/core/parse";
-import { nextAfterDone, validateRepeat, type Repeat } from "@kriyan/core/repeat";
+import { nextAfterDone, sameRepeat, validateRepeat, type Repeat } from "@kriyan/core/repeat";
 import { validateReminder, type Reminder } from "@kriyan/core/reminders";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -28,6 +29,9 @@ export interface TaskFields {
 
 /** A patch: `null` clears a field, `undefined` leaves it alone. */
 export type TaskPatch = { [K in keyof TaskFields]?: TaskFields[K] | null };
+
+/** What `null` clears a field to: optional fields go away, required ones go back to empty. */
+const CLEARED: { [K in keyof TaskFields]?: TaskFields[K] } = { reminders: [], event: false };
 
 const MAX_REMINDERS = 10;
 
@@ -156,15 +160,17 @@ export async function updateTask(
   const next: Partial<Doc<"tasks">> = {};
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
-    (next as Record<string, unknown>)[k] = v === null ? undefined : k === "title" ? String(v).trim() : v;
+    (next as Record<string, unknown>)[k] =
+      v === null ? CLEARED[k as keyof TaskFields] : k === "title" ? String(v).trim() : v;
   }
   const repeat = patch.repeat === null ? undefined : (patch.repeat ?? task.repeat);
   const date = patch.date === null ? undefined : (patch.date ?? task.date);
   if (repeat && !date) throw new ConvexError("A repeating task needs a date.");
-  // A new rule starts on the task's date. Moving a repeating task moves only this occurrence:
-  // the rule keeps its anchor, so the next one still lands on its usual day.
-  if (patch.repeat !== undefined || (repeat && !task.repeatFirst))
-    next.repeatFirst = repeat ? date : undefined;
+  // A new rule starts on the task's date. Moving a repeating task moves only this occurrence,
+  // and saving the same rule again changes nothing: the anchor stays, so the next one still
+  // lands on its usual day and "6 times" keeps counting from the start.
+  const newRule = patch.repeat !== undefined && !sameRepeat(patch.repeat ?? undefined, task.repeat);
+  if (newRule || (repeat && !task.repeatFirst)) next.repeatFirst = repeat ? date : undefined;
   await ctx.db.patch(id, next);
   await scheduleReminders(ctx, id);
 }
@@ -178,12 +184,27 @@ export interface Completion {
   next: string | null;
 }
 
-/** Ticks a task off. A repeating task moves to its next date; it finishes when the repeat ends. */
-export async function completeTask(ctx: MutationCtx, ownerId: string, id: Id<"tasks">): Promise<Completion> {
+/**
+ * Ticks a task off. A repeating task moves to its next date; it finishes when the repeat ends.
+ * `at` is the date the caller saw it on; when it no longer matches, the tick was a retry or a
+ * second tap, and ticking again would skip a repeat's next occurrence, so it's refused.
+ */
+export async function completeTask(
+  ctx: MutationCtx,
+  ownerId: string,
+  id: Id<"tasks">,
+  at?: string | null,
+): Promise<Completion> {
   const task = owned(await ctx.db.get(id), ownerId, "task");
   if (task.doneAt !== undefined) throw new ConvexError("That task is already done.");
   const profile = await getProfile(ctx, ownerId);
   const today = todayIn(profile.timeZone);
+  if (at !== undefined && at !== (task.date ?? null))
+    throw new ConvexError(
+      task.date
+        ? `That task is on ${formatDay(task.date, today)} now, so it wasn't ticked off again.`
+        : "That task moved to the Inbox, so it wasn't ticked off.",
+    );
   const date = task.date ?? today;
   const completionId = await ctx.db.insert("completions", {
     ownerId,
@@ -193,42 +214,71 @@ export async function completeTask(ctx: MutationCtx, ownerId: string, id: Id<"ta
     doneOn: today,
     minutes: task.length ?? 0,
   });
-  const next = task.repeat ? nextAfterDone(task.repeat, task.repeatFirst ?? date, date, today) : null;
+  // "After done for 5 times" can only tell it's finished by counting the times it was done.
+  const counted = task.repeat?.fromCompletion && task.repeat.end?.kind === "count";
+  const timesDone = counted
+    ? (
+        await ctx.db
+          .query("completions")
+          .withIndex("by_taskId_and_date", (q) => q.eq("taskId", id))
+          .take(1000)
+      ).length
+    : undefined;
+  const next = task.repeat
+    ? nextAfterDone(task.repeat, task.repeatFirst ?? date, date, today, timesDone)
+    : null;
   if (next) await ctx.db.patch(id, { date: next });
   else await ctx.db.patch(id, { doneAt: Date.now() });
-  if (task.goalId) {
-    const goal = await ctx.db.get(task.goalId);
-    if (goal && goal.kind === "tasks") await ctx.db.patch(goal._id, { current: goal.current + 1 });
-  }
+  await countTowardsGoal(ctx, task, 1);
   await scheduleReminders(ctx, id);
   return { date: task.date ?? null, completionId, finished: !next, next };
 }
 
-/** Undoes `completeTask`. */
+/** Undoes `completeTask`. Undoing twice (a double tap) changes nothing the second time. */
 export async function undoComplete(
   ctx: MutationCtx,
   ownerId: string,
   id: Id<"tasks">,
-  completion: Completion,
+  completion: Pick<Completion, "date" | "completionId">,
 ): Promise<void> {
   const task = owned(await ctx.db.get(id), ownerId, "task");
   const row = await ctx.db.get(completion.completionId);
-  if (row && row.ownerId === ownerId && row.taskId === id) await ctx.db.delete(row._id);
+  if (!row || row.ownerId !== ownerId || row.taskId !== id) return;
+  // The task goes back to the date it was done on, or to no date if it had none.
+  if (completion.date !== null && completion.date !== row.date)
+    throw new ConvexError("That isn't the date this task was done on.");
+  await ctx.db.delete(row._id);
   await ctx.db.patch(id, { doneAt: undefined, date: completion.date ?? undefined });
-  if (task.goalId) {
-    const goal = await ctx.db.get(task.goalId);
-    if (goal && goal.kind === "tasks")
-      await ctx.db.patch(goal._id, { current: Math.max(0, goal.current - 1) });
-  }
+  await countTowardsGoal(ctx, task, -1);
   await scheduleReminders(ctx, id);
 }
 
-/** Reopens a finished task (from the Done list, not as an undo). */
+/** Reopens a finished task (from the Done list, not as an undo), taking back what the tick counted. */
 export async function reopenTask(ctx: MutationCtx, ownerId: string, id: Id<"tasks">): Promise<void> {
   const task = owned(await ctx.db.get(id), ownerId, "task");
-  if (task.doneAt === undefined) return;
+  if (task.doneAt === undefined)
+    throw new ConvexError(
+      task.repeat
+        ? "That task isn't done: a repeat moves to its next date when it's ticked off. Undo the tick instead."
+        : "That task isn't done.",
+    );
+  const [last] = await ctx.db
+    .query("completions")
+    .withIndex("by_taskId_and_date", (q) => q.eq("taskId", id))
+    .order("desc")
+    .take(1);
+  if (last) await ctx.db.delete(last._id);
   await ctx.db.patch(id, { doneAt: undefined });
+  await countTowardsGoal(ctx, task, -1);
   await scheduleReminders(ctx, id);
+}
+
+/** A tick on a task linked to a "tasks" goal moves the goal by one. */
+async function countTowardsGoal(ctx: MutationCtx, task: Doc<"tasks">, by: 1 | -1) {
+  if (!task.goalId) return;
+  const goal = await ctx.db.get(task.goalId);
+  if (goal && goal.kind === "tasks")
+    await ctx.db.patch(goal._id, { current: Math.max(0, goal.current + by) });
 }
 
 /** Deletes at once; `restoreTask` brings it back (the app shows Undo). */

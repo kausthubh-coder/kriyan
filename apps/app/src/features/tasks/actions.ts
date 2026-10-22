@@ -35,18 +35,36 @@ export function errorText(error: unknown): string {
   return "That didn't save. Check your connection and try again.";
 }
 
-export function completeTask(task: { _id: Id<"tasks">; title: string }) {
+/**
+ * Ticks a task off. `date` is the date its row shows, so the server can refuse a stale tick
+ * (a projected repeat, or one that already moved on) instead of ticking the wrong occurrence.
+ * Events are attended, not ticked.
+ */
+export function completeTask(task: {
+  _id: Id<"tasks">;
+  title: string;
+  date?: string | null;
+  event?: boolean;
+}) {
   const id = task._id;
+  if (task.event || ticking.get()[id]) return;
   setTicking(id, true);
   commitHaptic();
   let completion: Completion | null = null;
-  let cancelled = false;
+  let sent = false;
+  let undoAsked = false;
+  const undo = (done: Completion) =>
+    void convex
+      .mutation(api.tasks.undoComplete, { id, completion: done })
+      .catch((e: unknown) => showToast(errorText(e)));
   const timer = setTimeout(() => {
-    if (cancelled) return;
+    sent = true;
     convex
-      .mutation(api.tasks.complete, { id })
+      .mutation(api.tasks.complete, { id, date: task.date ?? null })
       .then((result) => {
         completion = result;
+        // Undo was pressed while the tick was on its way: take it back now that it landed.
+        if (undoAsked) return undo(result);
         if (result.next)
           updateToast(
             toast,
@@ -61,15 +79,13 @@ export function completeTask(task: { _id: Id<"tasks">; title: string }) {
   const toast = showToast(`Done: ${task.title}`, {
     label: "Undo",
     run: () => {
-      if (!completion) {
-        cancelled = true;
-        clearTimeout(timer);
-        setTicking(id, false);
+      if (completion) return undo(completion);
+      if (sent) {
+        undoAsked = true;
         return;
       }
-      void convex
-        .mutation(api.tasks.undoComplete, { id, completion })
-        .catch((e: unknown) => showToast(errorText(e)));
+      clearTimeout(timer);
+      setTicking(id, false);
     },
   });
 }

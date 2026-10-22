@@ -167,7 +167,7 @@ function Menu() {
     if (selected) {
       const edit = (what: string) => () => router.push(`/task/${selected._id}?edit=${what}`);
       const commands: Omit<Item, "group">[] = [
-        ...(selected.done
+        ...(selected.done || selected.event
           ? []
           : [
               {

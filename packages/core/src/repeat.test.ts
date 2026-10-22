@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { nextAfterDone, occurrences, occurrencesBetween, validateRepeat, type Repeat } from "./repeat.ts";
+import {
+  nextAfterDone,
+  occurrences,
+  occurrencesBetween,
+  sameRepeat,
+  validateRepeat,
+  type Repeat,
+} from "./repeat.ts";
 
 const take = (rule: Repeat, first: string, n: number) => {
   const out: string[] = [];
@@ -99,6 +106,18 @@ describe("nextAfterDone", () => {
     ).toBe("2026-10-18");
   });
 
+  test("after done, early or late, counts from the day it was done", () => {
+    const rule: Repeat = { freq: "day", interval: 2, fromCompletion: true };
+    // Due Thu 15 Oct, watered early on Tue 13 Oct: next is Thu, not Sat.
+    expect(nextAfterDone(rule, "2026-10-13", "2026-10-15", "2026-10-13", 1)).toBe("2026-10-15");
+  });
+
+  test("after done for N times stops after the Nth time", () => {
+    const rule: Repeat = { freq: "day", interval: 2, fromCompletion: true, end: { kind: "count", count: 3 } };
+    expect(nextAfterDone(rule, "2026-10-13", "2026-10-17", "2026-10-17", 2)).toBe("2026-10-19");
+    expect(nextAfterDone(rule, "2026-10-13", "2026-10-19", "2026-10-19", 3)).toBeNull();
+  });
+
   test("returns null once the repeat has ended", () => {
     expect(
       nextAfterDone(
@@ -119,4 +138,23 @@ test("validateRepeat explains what is wrong", () => {
     "The interval must be a whole number from 1 to 999.",
   );
   expect(validateRepeat({ freq: "month", interval: 1, monthly: { kind: "last" } })).toBeNull();
+  expect(validateRepeat({ freq: "month", interval: 1, monthly: { kind: "day", day: 15.5 } })).toBe(
+    "The day of the month must be from 1 to 31.",
+  );
+  expect(validateRepeat({ freq: "day", interval: 1, end: { kind: "on", date: "next week" } })).toBe(
+    "The end date must be a date like 2026-12-11.",
+  );
+  expect(validateRepeat({ freq: "week", interval: 1, weekdays: [0], fromCompletion: true })).toBe(
+    "A repeat counted from when it's done can't also pick its days.",
+  );
+});
+
+test("sameRepeat tells a saved-again rule from a new one", () => {
+  const rule: Repeat = { freq: "week", interval: 1, weekdays: [3, 1], end: { kind: "count", count: 6 } };
+  expect(
+    sameRepeat(rule, { end: { count: 6, kind: "count" }, weekdays: [1, 3], interval: 1, freq: "week" }),
+  ).toBe(true);
+  expect(sameRepeat(rule, { ...rule, end: { kind: "count", count: 7 } })).toBe(false);
+  expect(sameRepeat(rule, undefined)).toBe(false);
+  expect(sameRepeat(undefined, undefined)).toBe(true);
 });
