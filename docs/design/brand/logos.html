@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Kriyan: three logo directions</title>
+    <style>
+      :root {
+        --bg: #fbfbfa;
+        --text: #1b1b1a;
+        --muted: #5d5d59;
+        --line: #e2e2de;
+        --sunken: #f0f0ee;
+        --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141413;
+          --text: #ecece8;
+          --muted: #a6a6a0;
+          --line: #343432;
+          --sunken: #232322;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        background: var(--bg);
+      }
+      body {
+        margin: 0;
+        color: var(--text);
+        font: 17px/1.5 var(--sans);
+      }
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 48px 24px 96px;
+      }
+      h1 {
+        font-size: 36px;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font-size: 24px;
+        margin: 56px 0 4px;
+      }
+      p {
+        margin: 0 0 12px;
+        max-width: 64ch;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-end;
+        margin-top: 16px;
+      }
+      .tile {
+        display: grid;
+        gap: 6px;
+        justify-items: center;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .sw {
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .light {
+        background: #fff;
+        color: #111113;
+        box-shadow: inset 0 0 0 1px #e6e6ea;
+      }
+      .dark {
+        background: #000;
+        color: #f3f3f5;
+      }
+      .icon {
+        border-radius: 22%;
+        overflow: hidden;
+        line-height: 0;
+      }
+      .home {
+        display: grid;
+        grid-template-columns: repeat(4, 60px);
+        gap: 18px 16px;
+        padding: 20px;
+        border-radius: 24px;
+        background: linear-gradient(160deg, #2b4a7a, #6a3d6e);
+      }
+      .home div {
+        width: 60px;
+        height: 60px;
+        border-radius: 14px;
+        background: rgb(255 255 255 / 0.25);
+      }
+      .home .k {
+        background: none;
+        overflow: hidden;
+      }
+      .tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 10px 10px 0 0;
+        background: #fff;
+        color: #111;
+        font-size: 14px;
+        box-shadow: inset 0 0 0 1px #e6e6ea;
+      }
+      .tab.d {
+        background: #2a2a2d;
+        color: #eee;
+        box-shadow: none;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font:
+          700 20px/1 Inter,
+          var(--sans);
+        letter-spacing: -0.02em;
+        padding: 14px 18px;
+        border-radius: 12px;
+      }
+      .pick {
+        margin-top: 8px;
+        font-weight: 600;
+      }
+      @media (max-width: 700px) {
+        main {
+          padding: 32px 16px 64px;
+        }
+        h1 {
+          font-size: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>K with the now-dot reads at every size</h1>
+      <p class="muted">
+        Three marks for the B design, each tied to the red "now" dot from the app ("Thu•"). The site uses the
+        first; switching is changing <code>CURRENT</code> in apps/site/src/lib/brand.tsx. Sources:
+        <code>node docs/design/brand/build.mjs</code>.
+      </p>
+      <div id="out"></div>
+    </main>
+    <script>
+      const RED = "#ff3b30";
+      const MARKS = {
+        "k-dot": {
+          title: "K and the now-dot",
+          why: 'Recommended: a solid K stays legible at 16px, and the dot is the same red dot as "Thu•" in the app.',
+          draw: (ink, dot) =>
+            `<path fill="${ink}" d="M3.6 3.5h3.9v6.6l6-6.6h4.7l-6.6 7 7 9.9h-4.7l-5-7.2-1.4 1.5v5.7H3.6z"/><circle cx="20.6" cy="5.4" r="2" fill="${dot}"/>`,
+        },
+        "day-line": {
+          title: "A day on a line",
+          why: "The day as a timeline with blocks and the now-dot; at 16px it reads as a generic list icon.",
+          draw: (ink, dot) =>
+            `<g fill="none" stroke="${ink}" stroke-linecap="round"><path d="M6 3v18" stroke-width="2.2"/><path d="M10 5.5h6.5M10 9.5h9M10 17.5h5" stroke-width="2.6"/><circle cx="6" cy="13.5" r="2.6" fill="${dot}" stroke="none"/></g>`,
+        },
+        "k-line": {
+          title: "K from a timeline",
+          why: "The K's stem is the day, the arms meet at now; most distinctive, but thin at favicon size.",
+          draw: (ink, dot) =>
+            `<g fill="none" stroke="${ink}" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5v17" stroke-width="3"/><path d="M18 3.5 9.6 12 18.5 20.5" stroke-width="3"/><circle cx="9.6" cy="12" r="2.9" fill="${dot}" stroke="none"/></g>`,
+        },
+      };
+      const svg = (m, size, ink = "currentColor", dot = RED) =>
+        `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${m.draw(ink, dot)}</svg>`;
+      const appIcon = (m, size) =>
+        `<div class="icon" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}" viewBox="0 0 1024 1024" aria-hidden="true"><rect width="1024" height="1024" fill="#0b0b0c"/><g transform="translate(225.3 225.3) scale(23.89)">${m.draw("#f3f3f5", RED)}</g></svg></div>`;
+      const adaptive = (m, size, shape) =>
+        `<div style="width:${size}px;height:${size}px;border-radius:${shape};overflow:hidden;background:#0b0b0c;line-height:0"><svg width="${size}" height="${size}" viewBox="18 18 72 72" aria-hidden="true"><g transform="translate(34 34) scale(1.6667)">${m.draw("#f3f3f5", RED)}</g></svg></div>`;
+      let h = "";
+      for (const [key, m] of Object.entries(MARKS)) {
+        h += `<h2>${m.title}</h2><p class="${key === "k-dot" ? "pick" : "muted"}">${m.why}</p>`;
+        h += `<div class="row">`;
+        for (const cls of ["light", "dark"])
+          for (const z of [16, 32, 64, 128])
+            h += `<div class="tile"><div class="sw ${cls}">${svg(m, z)}</div>${z}px ${cls}</div>`;
+        h += `<div class="tile"><div class="sw light">${svg(m, 64, "currentColor", "currentColor")}</div>Monochrome</div>`;
+        h += `</div><div class="row">`;
+        h += `<div class="tile">${appIcon(m, 180)}iPhone 180px</div>`;
+        h += `<div class="tile">${adaptive(m, 120, "50%")}Android, circle</div>`;
+        h += `<div class="tile">${adaptive(m, 120, "28%")}Android, squircle</div>`;
+        h += `<div class="tile"><div class="home"><div></div><div class="k">${appIcon(m, 60)}</div><div></div><div></div><div></div><div></div><div></div><div></div></div>Home Screen</div>`;
+        h += `<div class="tile"><span class="tab">${svg(m, 16)} Kriyan</span><span class="tab d">${svg(m, 16)} Kriyan</span>Browser tab</div>`;
+        h += `<div class="tile"><div class="head light">${svg(m, 22)}Kriyan</div><div class="head dark">${svg(m, 22)}Kriyan</div>Header</div>`;
+        h += `</div>`;
+      }
+      document.getElementById("out").innerHTML = h;
+    </script>
+  </body>
+</html>
