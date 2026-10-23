@@ -41,7 +41,7 @@ export function TrashScreen() {
       ) : trash.length === 0 ? (
         <View style={{ gap: s.s3, paddingVertical: s.s6, alignItems: "flex-start" }}>
           <Icon icon={Trash2} size={24} tone="ink2" />
-          <Txt variant="title" heading={2}>
+          <Txt variant="label" heading={2}>
             Nothing deleted
           </Txt>
           <Txt variant="body" tone="ink3" style={{ maxWidth: 420 }}>
