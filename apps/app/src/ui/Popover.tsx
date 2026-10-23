@@ -17,7 +17,8 @@ interface Props {
   /** The control that opened it, for placement on desktop. */
   anchor?: RefObject<View | null>;
   /** Place to the left of the anchor (the task panel's editors) instead of below it. */
-  side?: "below" | "left";
+  /** "above" grows up from the trigger, for menus at the bottom of a panel. */
+  side?: "below" | "left" | "above";
   title: string;
   width?: number;
   children: ReactNode;
@@ -108,13 +109,20 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
   const left = box
     ? side === "left"
       ? Math.max(s.s3, box.x - width - s.s3)
-      : Math.min(Math.max(s.s3, box.x), win.width - width - s.s3)
+      : side === "above"
+        ? Math.min(Math.max(s.s3, box.x + box.width - width), win.width - width - s.s3)
+        : Math.min(Math.max(s.s3, box.x), win.width - width - s.s3)
     : (win.width - width) / 2;
   const top = box
     ? side === "left"
       ? Math.max(s.s3, box.y - s.s3)
       : box.y + box.height + s.s1
     : win.height * 0.2;
+  // Above: pinned by its bottom edge just over the trigger, so it grows upward.
+  const vertical =
+    box && side === "above"
+      ? { bottom: win.height - box.y + s.s1, maxHeight: box.y - s.s6 }
+      : { top, maxHeight: win.height - top - s.s6 };
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
@@ -133,9 +141,8 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
         style={{
           position: "absolute",
           left,
-          top,
+          ...vertical,
           width,
-          maxHeight: win.height - top - s.s6,
           padding: s.s3,
           gap: s.s3,
           borderRadius: r.card,

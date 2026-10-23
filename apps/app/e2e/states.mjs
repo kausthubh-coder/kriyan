@@ -43,10 +43,13 @@ for (const [w, h] of [
     .catch(() => undefined);
   await page.goto(`${BASE}/upcoming`);
   await settle(page);
-  await page
-    .getByRole("button", { name: /^Open Calculus II lecture/ })
-    .first()
-    .click();
+  // The lecture is on Tuesdays and Thursdays from the seed day, so from Friday it's next week.
+  const lecture = page.getByRole("button", { name: /^Open Calculus II lecture/ }).first();
+  if (!(await lecture.isVisible().catch(() => false))) {
+    await page.getByRole("button", { name: "Next week" }).click();
+    await settle(page);
+  }
+  await lecture.click();
   await page.waitForTimeout(800);
   await page.getByRole("button", { name: /^Repeat:/ }).click();
   await page.waitForTimeout(500);

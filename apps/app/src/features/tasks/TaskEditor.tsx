@@ -1,16 +1,21 @@
-// One editor for every task. Order: title, space, when (date, time, optional length),
-// repeat, reminders, deadline, goal, note. Empty fields are quiet "Add" rows, so a simple
-// task stays short. Every change saves at once.
+// One editor for every task (docs/design/v4, b2.html?screen=task): the title, the note right
+// under it like Apple Notes, then one wrap of chips. A chip is filled for what's set ("Fri
+// 10:00–11:30", "3 reminders") and quiet for what isn't ("+ Repeat"); each opens its own small
+// picker. A thumb bar holds Start focus, When, Move and More. Every change saves at once.
 //
 // Desktop: sub-editors open beside the panel. Phones: they replace the sheet's content
 // (never a sheet on a sheet), with Back to return.
 
 import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { ScrollView, View } from "react-native";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "convex/react";
 import {
   ArrowLeft,
   Bell,
+  Play,
+  Plus,
   CalendarClock,
   CircleDot,
   Clock,
@@ -257,14 +262,6 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             {space ? space.path.split(" / ").join(" / ") : "Inbox"}
           </Txt>
         </View>
-        <View ref={moreRef} collapsable={false}>
-          <Button
-            icon={Ellipsis}
-            accessibilityLabel="More"
-            expanded={sub === "more"}
-            onPress={() => setSub(sub === "more" ? null : "more")}
-          />
-        </View>
         <Button icon={X} accessibilityLabel="Close" onPress={onClose} />
       </View>
       <ScrollView
@@ -309,98 +306,93 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           />
         </View>
 
-        <View>
-          <FieldRow
-            anchor={spaceRef}
-            icon={Layers}
-            label="Space"
-            value={space?.path ?? null}
-            empty="Add to a space"
-            leading={space ? <Dot color={tone.dot} /> : undefined}
-            expanded={sub === "space"}
-            onPress={() => setSub(sub === "space" ? null : "space")}
-          />
-          <FieldRow
+        <NoteEditor
+          key={task._id}
+          value={task.note ?? ""}
+          onChange={(note) => void save({ note: note || null })}
+        />
+
+        <View accessibilityLabel="Details" style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+          <PropChip
             anchor={whenRef}
             icon={Clock}
+            text={when}
+            empty="Date"
             label="When"
-            value={when}
-            empty="Add a date"
             expanded={sub === "when"}
             onPress={() => setSub(sub === "when" ? null : "when")}
           />
-          <FieldRow
+          <PropChip
             anchor={repeatRef}
             icon={Repeat2}
-            label="Repeat"
-            value={
+            text={
               task.repeat
                 ? describeRepeat(task.repeat as Repeat, task.repeatFirst ?? task.date ?? today, today)
                 : null
             }
-            empty="Add repeat"
+            empty="Repeat"
+            label="Repeat"
             expanded={sub === "repeat"}
             onPress={() => setSub(sub === "repeat" ? null : "repeat")}
           />
-          <Prop icon={Bell} label="Reminders">
-            <View ref={remindersRef} collapsable={false}>
-              {(task.reminders as Reminder[]).map((rem, i) => (
-                <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View style={{ flex: 1 }}>
-                    <ValueButton
-                      text={describeReminder(rem)}
-                      label={`Reminder: ${describeReminder(rem)}. Edit reminders`}
-                      onPress={() => setSub("reminders")}
-                    />
-                  </View>
-                  <Button
-                    icon={X}
-                    accessibilityLabel={`Remove reminder: ${describeReminder(rem)}`}
-                    onPress={() =>
-                      void save({ reminders: (task.reminders as Reminder[]).filter((_, k) => k !== i) })
-                    }
-                  />
-                </View>
-              ))}
-              <ValueButton
-                text="Add reminder"
-                empty
-                expanded={sub === "reminders"}
-                onPress={() => setSub(sub === "reminders" ? null : "reminders")}
-              />
-            </View>
-          </Prop>
-          <FieldRow
+          <PropChip
+            anchor={remindersRef}
+            icon={Bell}
+            text={
+              task.reminders.length === 0
+                ? null
+                : task.reminders.length === 1
+                  ? describeReminder((task.reminders as Reminder[])[0] as Reminder)
+                  : `${task.reminders.length} reminders`
+            }
+            empty="Reminder"
+            label="Reminders"
+            expanded={sub === "reminders"}
+            onPress={() => setSub(sub === "reminders" ? null : "reminders")}
+          />
+          <PropChip
             anchor={deadlineRef}
             icon={Flag}
+            text={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
+            empty="Deadline"
             label="Deadline"
-            value={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
-            empty="Add deadline"
             expanded={sub === "deadline"}
             onPress={() => setSub(sub === "deadline" ? null : "deadline")}
           />
-          <GoalRow
+          <PropChip
+            anchor={spaceRef}
+            icon={Layers}
+            text={space?.path ?? null}
+            empty="Space"
+            label="Space"
+            leading={space ? <Dot color={tone.dot} /> : undefined}
+            expanded={sub === "space"}
+            onPress={() => setSub(sub === "space" ? null : "space")}
+          />
+          <GoalChip
             task={task}
             anchor={goalRef}
             expanded={sub === "goal"}
             onPress={() => setSub(sub === "goal" ? null : "goal")}
           />
         </View>
-
-        <View style={{ height: 1, backgroundColor: c.line }} />
-        <NoteEditor
-          key={task._id}
-          value={task.note ?? ""}
-          onChange={(note) => void save({ note: note || null })}
-        />
       </ScrollView>
+
+      <ThumbBar
+        task={task}
+        moreRef={moreRef}
+        moreOpen={sub === "more"}
+        onWhen={() => setSub(sub === "when" ? null : "when")}
+        onMove={() => setSub(sub === "space" ? null : "space")}
+        onMore={() => setSub(sub === "more" ? null : "more")}
+      />
 
       {!phone || sub === "more" ? (
         <Popover
           open={Boolean(open)}
           onClose={() => setSub(null)}
           anchor={anchor}
-          side={sub === "more" ? "below" : "left"}
+          side={sub === "more" ? "above" : "left"}
           title={open?.title ?? ""}
           width={open?.width ?? 320}
         >
@@ -411,110 +403,65 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
   );
 }
 
-function FieldRow({
+/** A property as a chip: filled when it's set, quiet with a plus when it isn't. */
+function PropChip({
   anchor,
   icon,
-  label,
-  value,
+  text,
   empty,
+  label,
   leading,
   expanded,
   onPress,
 }: {
   anchor: RefObject<View | null>;
   icon: LucideIcon;
-  label: string;
-  value: string | null;
+  text: string | null;
   empty: string;
+  label: string;
   leading?: ReactNode;
   expanded: boolean;
   onPress: () => void;
 }) {
-  return (
-    <Prop icon={icon} label={label}>
-      <View ref={anchor} collapsable={false}>
-        <ValueButton
-          text={value ?? empty}
-          empty={!value}
-          expanded={expanded}
-          onPress={onPress}
-          leading={leading}
-          label={`${label}: ${value ?? empty}`}
-        />
-      </View>
-    </Prop>
-  );
-}
-
-function Prop({ icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
   const phone = useIsPhone();
+  const set = text !== null;
   return (
-    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-      <View
-        style={{
-          width: phone ? 112 : 120,
-          height: phone ? 48 : 36,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: s.s2,
-        }}
+    <View ref={anchor} collapsable={false}>
+      <Press
+        role="button"
+        accessibilityLabel={`${label}: ${text ?? "not set"}`}
+        aria-expanded={expanded}
+        onPress={onPress}
+        hoverBg={null}
+        style={{ minHeight: phone ? 44 : 32, justifyContent: "center" }}
       >
-        <Icon icon={icon} size={16} />
-        <Txt variant="body" tone="ink3">
-          {label}
-        </Txt>
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>{children}</View>
+        {({ hovered }) => (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              height: phone ? 36 : 30,
+              paddingHorizontal: s.s3,
+              borderRadius: r.ctl + 2,
+              borderWidth: 1,
+              borderColor: set ? "transparent" : c.line,
+              borderStyle: set ? "solid" : "dashed",
+              backgroundColor: expanded ? c.select : set ? c.sunken : hovered ? c.hover : "transparent",
+            }}
+          >
+            {set ? (leading ?? <Icon icon={icon} size={15} tone="ink2" />) : <Icon icon={Plus} size={15} />}
+            <Txt variant="label" tone={set ? "ink" : "ink3"} numberOfLines={1} tnum>
+              {text ?? empty}
+            </Txt>
+          </View>
+        )}
+      </Press>
     </View>
   );
 }
 
-function ValueButton({
-  text,
-  empty,
-  expanded,
-  onPress,
-  leading,
-  trailing,
-  label,
-}: {
-  text: string;
-  empty?: boolean;
-  expanded?: boolean;
-  onPress: () => void;
-  leading?: ReactNode;
-  trailing?: ReactNode;
-  label?: string;
-}) {
-  const phone = useIsPhone();
-  return (
-    <Press
-      role="button"
-      accessibilityLabel={label ?? text}
-      aria-expanded={expanded}
-      onPress={onPress}
-      scale={false}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: s.s2,
-        minHeight: phone ? 48 : 36,
-        paddingHorizontal: s.s2,
-        marginLeft: -s.s2,
-        borderRadius: r.ctl,
-        backgroundColor: expanded ? c.select : "transparent",
-      }}
-    >
-      {leading}
-      <Txt variant="body" tone={empty ? "ink3" : "ink"} style={{ flexShrink: 1 }}>
-        {text}
-      </Txt>
-      {trailing}
-    </Press>
-  );
-}
-
-function GoalRow({
+function GoalChip({
   task,
   anchor,
   expanded,
@@ -528,17 +475,67 @@ function GoalRow({
   const progress = useProgressView();
   const goal = progress?.goals.find((g) => g._id === task.goalId);
   return (
-    <Prop icon={Target} label="Goal">
-      <View ref={anchor} collapsable={false}>
-        <ValueButton
-          text={goal?.title ?? "Add to a goal"}
-          label={`Goal: ${goal?.title ?? "Add to a goal"}`}
-          empty={!goal}
-          expanded={expanded}
-          onPress={onPress}
+    <PropChip
+      anchor={anchor}
+      icon={Target}
+      text={goal?.title ?? null}
+      empty="Goal"
+      label="Goal"
+      expanded={expanded}
+      onPress={onPress}
+    />
+  );
+}
+
+/** Things' bottom bar, at thumb height: the actions people take on a task most. */
+function ThumbBar({
+  task,
+  moreRef,
+  moreOpen,
+  onWhen,
+  onMove,
+  onMore,
+}: {
+  task: TaskDoc;
+  /** The More menu opens from here. */
+  moreRef: RefObject<View | null>;
+  moreOpen: boolean;
+  onWhen: () => void;
+  onMove: () => void;
+  onMore: () => void;
+}) {
+  const phone = useIsPhone();
+  const insets = useSafeAreaInsets();
+  const done = task.doneAt !== undefined;
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s1,
+        paddingHorizontal: phone ? s.s3 : s.s6,
+        paddingTop: s.s2,
+        paddingBottom: (phone ? insets.bottom : 0) + s.s2,
+        borderTopWidth: 1,
+        borderTopColor: c.line,
+        backgroundColor: c.raised,
+      }}
+    >
+      {task.event || done ? null : (
+        <Button
+          variant="primary"
+          icon={Play}
+          label="Start focus"
+          onPress={() => router.push(`/focus/${task._id}`)}
         />
+      )}
+      <View style={{ flex: 1 }} />
+      <Button icon={Clock} label="When" onPress={onWhen} />
+      <Button icon={Layers} label="Move" onPress={onMove} />
+      <View ref={moreRef} collapsable={false}>
+        <Button icon={Ellipsis} accessibilityLabel="More" expanded={moreOpen} onPress={onMore} />
       </View>
-    </Prop>
+    </View>
   );
 }
 
