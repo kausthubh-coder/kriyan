@@ -44,6 +44,12 @@ export function spaceTree(spaces: Doc<"spaces">[]): SpaceNode[] {
   return out;
 }
 
+/** The same limit as a task's note. */
+function cleanNote(note: string): string {
+  if (note.length > 50_000) throw new ConvexError("Notes can be up to 50,000 characters.");
+  return note;
+}
+
 function cleanName(name: string): string {
   const trimmed = name.trim().replace(/\s+/g, " ");
   if (!trimmed) throw new ConvexError("Give the space a name.");
@@ -90,7 +96,7 @@ export async function updateSpace(
     ...(patch.name !== undefined ? { name: cleanName(patch.name) } : {}),
     ...(patch.color !== undefined ? { color: patch.color } : {}),
     ...(patch.parentId !== undefined ? { parentId: patch.parentId ?? undefined } : {}),
-    ...(patch.note !== undefined ? { note: patch.note } : {}),
+    ...(patch.note !== undefined ? { note: cleanNote(patch.note) } : {}),
   });
 }
 

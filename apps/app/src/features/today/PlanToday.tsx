@@ -6,9 +6,9 @@ import { View } from "react-native";
 import { formatDay, formatDuration } from "@kriyan/core/format";
 import type { TaskView } from "@/data/views";
 import { moveTasks } from "@/features/tasks/actions";
-import { c, r, s, spaceTone } from "@/theme/tokens";
+import { r, s } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
-import { Ring } from "@/ui/bits";
+import { PickBox } from "@/ui/bits";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
@@ -34,8 +34,11 @@ export function PlanToday({ open, onClose, anchor, today, earlier, inbox, free }
 }
 
 function Picks({ onClose, today, earlier, inbox, free }: Omit<Props, "open" | "anchor">) {
-  // What's left from earlier days is usually meant for today; Inbox ideas are a choice.
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(earlier.map((t) => t._id)));
+  // What's left from earlier days is usually meant for today; Inbox ideas are a choice. A
+  // repeat's missed day isn't picked for you: its next occurrence is already coming.
+  const [picked, setPicked] = useState<Set<string>>(
+    () => new Set(earlier.filter((t) => !t.repeat && !t.event).map((t) => t._id)),
+  );
   const toggle = (id: string) =>
     setPicked((prev) => {
       const next = new Set(prev);
@@ -100,7 +103,6 @@ function Group({
       </Txt>
       {tasks.map((t) => {
         const on = picked.has(t._id);
-        const tone = spaceTone(t.color);
         const facts = [
           ...(t.date ? [formatDay(t.date, today)] : []),
           ...(t.spacePath ? [t.spacePath] : []),
@@ -124,7 +126,7 @@ function Group({
               borderRadius: r.ctl,
             }}
           >
-            <Ring color={t.color ? tone.dot : c.ink3} done={on} size={18} />
+            <PickBox on={on} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Txt variant="body" numberOfLines={1}>
                 {t.title}

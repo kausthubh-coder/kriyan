@@ -215,6 +215,26 @@ export function Kbd({ children }: { children: string }) {
 }
 
 /** The checkbox's look without the control, for rows that are themselves the control. */
+/** Picking from a list. Square and ink, so a pick never reads as a task done (the round Ring). */
+export function PickBox({ on, size = 18 }: { on: boolean; size?: number }) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: r.sm,
+        borderWidth: on ? 0 : 1.5,
+        borderColor: c.ink3,
+        backgroundColor: on ? c.ink : "transparent",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {on ? <CheckGlyph size={size * 0.62} color={hex.onInk} strokeWidth={3} /> : null}
+    </View>
+  );
+}
+
 export function Ring({ color, done, size = 16 }: { color: string; done: boolean; size?: number }) {
   return (
     <View

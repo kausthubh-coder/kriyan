@@ -12,7 +12,8 @@ import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useConvexAuth } from "convex/react";
 import { api } from "@kriyan/convex/api";
-import { addDays, formatClock, startOfWeek } from "@kriyan/core/dates";
+import { addDays, startOfWeek, todayIn } from "@kriyan/core/dates";
+import { reminderBody } from "@kriyan/core/format";
 import { reminderInstants } from "@kriyan/core/reminders";
 import { convex } from "@/data/convex";
 import { createStore } from "@/data/store";
@@ -31,6 +32,9 @@ Notifications.setNotificationHandler({
 /** "push": the server sends reminders. "local": this device schedules them. */
 const delivery = createStore<"unknown" | "push" | "local" | "off">("unknown");
 
+/** This phone's push token once registered, so signing out can take it back. */
+let deviceToken: string | null = null;
+
 async function channel() {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync("reminders", {
@@ -45,6 +49,7 @@ async function registerToken(): Promise<boolean> {
     if (!projectId) return false;
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     await convex.mutation(api.account.registerPush, { token, platform: Platform.OS });
+    deviceToken = token;
     return true;
   } catch {
     return false;
@@ -93,12 +98,32 @@ export function useNotifications() {
 
 const LOCAL_PREFIX = "kriyan-reminder-";
 
+async function cancelLocalReminders() {
+  for (const n of await Notifications.getAllScheduledNotificationsAsync())
+    if (n.identifier.startsWith(LOCAL_PREFIX))
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+}
+
+/** Before signing out: this phone stops ringing for the account, from the server and locally. */
+export async function forgetDevice(): Promise<void> {
+  const token = deviceToken;
+  deviceToken = null;
+  delivery.set("unknown");
+  if (token) await convex.mutation(api.account.unregisterPush, { token }).catch(() => undefined);
+  await cancelLocalReminders().catch(() => undefined);
+}
+
 function useLocalReminders() {
   const mode = delivery.useValue((d) => d);
   const { today, timeZone } = useClock();
   const thisWeek = useWeekView(startOfWeek(today));
   const nextWeek = useWeekView(addDays(startOfWeek(today), 7));
   useEffect(() => {
+    // Once the server sends them, copies scheduled here earlier would ring twice.
+    if (mode === "push" || mode === "off") {
+      void cancelLocalReminders().catch(() => undefined);
+      return;
+    }
     if (mode !== "local" || !thisWeek || !nextWeek) return;
     const horizon = addDays(today, 7);
     const tasks: TaskView[] = [...thisWeek.days, ...nextWeek.days]
@@ -107,11 +132,7 @@ function useLocalReminders() {
       .filter((t) => !t.done && !t.proposedBy && t.reminders.length > 0 && t.date);
     let cancelled = false;
     void (async () => {
-      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      for (const n of scheduled) {
-        if (n.identifier.startsWith(LOCAL_PREFIX))
-          await Notifications.cancelScheduledNotificationAsync(n.identifier);
-      }
+      await cancelLocalReminders();
       const now = Date.now();
       for (const t of tasks) {
         if (cancelled) return;
@@ -125,7 +146,7 @@ function useLocalReminders() {
             identifier: `${LOCAL_PREFIX}${t._id}-${t.date}-${at}`,
             content: {
               title: t.title,
-              body: t.time !== null ? `Starts at ${formatClock(t.time)}` : "Today",
+              body: reminderBody({ date: t.date as string, time: t.time }, todayIn(timeZone, at)),
               data: { taskId: t._id },
             },
             trigger: {

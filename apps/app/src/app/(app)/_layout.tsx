@@ -36,6 +36,7 @@ export default function AppLayout() {
           name="focus/[id]"
           options={{ presentation: "fullScreenModal", animation: "fade_from_bottom" }}
         />
+        <Stack.Screen name="trash" />
         <Stack.Screen
           name="task/[id]"
           options={{

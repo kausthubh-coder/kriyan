@@ -34,6 +34,10 @@ export function useInboxView() {
   return useQuery(api.views.inbox, useAuthed() ? {} : "skip");
 }
 
+export function useTrashView() {
+  return useQuery(api.views.trash, useAuthed() ? {} : "skip");
+}
+
 export function useSpaceView(id: Id<"spaces">) {
   const { today } = useClock();
   return useQuery(api.views.space, useAuthed() ? { id, today } : "skip");

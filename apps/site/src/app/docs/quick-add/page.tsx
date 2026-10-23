@@ -38,7 +38,7 @@ const SECTIONS: { id: string; title: string; intro: string; examples: string[] }
     id: "times",
     title: "Times",
     intro:
-      "Write times with am or pm, or on the 24-hour clock. “at 5” on its own means 17:00, because few things start at 5 in the morning. A range sets the start and the length.",
+      "Write times with am or pm, or on the 24-hour clock. “at 5” on its own means 17:00, because few things start at 5 in the morning. A range sets the start and the length. A time with no date puts the task on today.",
     examples: [
       "standup 9:30am",
       "gym 18:00",
@@ -69,7 +69,9 @@ const SECTIONS: { id: string; title: string; intro: string; examples: string[] }
       "water plants daily",
       "review inbox every weekday",
       "Calculus II lecture every tue and thu 9am for 1h30 until dec 11",
+      "yoga every mon wed fri 7am",
       "team sync every 2 weeks on mon",
+      "1:1 every other thu 15:00",
       "clean the flat every other week",
       "rent every month on the 1st",
       "pay card every 15th",

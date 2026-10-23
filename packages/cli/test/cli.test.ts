@@ -371,7 +371,8 @@ describe("errors and exit codes", () => {
     expect(r).toEqual({
       code: 1,
       stdout: "",
-      stderr: "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.\n",
+      stderr:
+        "That token doesn't work: it may have been revoked or mistyped. Create a new one in Settings.\n",
     });
   });
 
@@ -433,7 +434,7 @@ describe("raw operations", () => {
   test("ops lists every operation", async () => {
     const r = await run("ops");
     const lines = r.stdout.trimEnd().split("\n");
-    expect(lines).toHaveLength(20);
+    expect(lines).toHaveLength(23);
     expect(lines[0]).toBe("get_today      read   Get today");
     expect(lines.at(-1)).toBe("propose_plan   write  Propose a plan");
   });
@@ -481,7 +482,7 @@ describe("signing in", () => {
     });
     expect(r.code).toBe(1);
     expect(r.stderr).toBe(
-      "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.\n",
+      "That token doesn't work: it may have been revoked or mistyped. Create a new one in Settings.\n",
     );
     expect(existsSync(join(dir, "config.json"))).toBe(false);
   });

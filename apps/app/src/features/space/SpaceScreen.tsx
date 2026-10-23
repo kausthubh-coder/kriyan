@@ -76,6 +76,7 @@ function SpaceBody({ view }: { view: SpaceView }) {
       {adding === "task" ? (
         <QuickAdd
           variant={phone ? "sheet" : "inline"}
+          defaultSpaceId={view.space._id}
           placeholder={`Add to ${view.space.name}, like “read 7.4 thu”`}
           autoFocus
           onAdded={() => setAdding(null)}

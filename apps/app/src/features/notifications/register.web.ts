@@ -5,3 +5,5 @@ export async function ensureNotifications(): Promise<boolean> {
 }
 
 export function useNotifications() {}
+
+export async function forgetDevice(): Promise<void> {}

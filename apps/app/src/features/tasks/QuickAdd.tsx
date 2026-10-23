@@ -7,6 +7,7 @@ import { Platform, TextInput, View } from "react-native";
 import { useMutation } from "convex/react";
 import { AlarmClock, Bell, CalendarDays, Flag, Hourglass, Plus, Repeat2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
+import type { Id } from "@kriyan/convex/dataModel";
 import { formatDay, formatDuration, describeReminder, describeRepeat } from "@kriyan/core/format";
 import { formatClock } from "@kriyan/core/dates";
 import { parseTask, type ParsedTask, type SpanKind } from "@kriyan/core/parse";
@@ -31,6 +32,8 @@ interface Props {
   variant: "inline" | "sheet";
   /** Tasks without a date land here (Today's field adds to today). */
   defaultDate?: string;
+  /** Tasks without a #space land here (a space's own page adds to that space). */
+  defaultSpaceId?: Id<"spaces">;
   autoFocus?: boolean;
   onAdded?: () => void;
   placeholder?: string;
@@ -120,7 +123,14 @@ function without(text: string, parsed: ParsedTask, kinds: SpanKind[]): string {
 }
 
 export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
-  { variant, defaultDate, autoFocus, onAdded, placeholder = "Add a task, like “essay fri 5pm every week”" },
+  {
+    variant,
+    defaultDate,
+    defaultSpaceId,
+    autoFocus,
+    onAdded,
+    placeholder = "Add a task, like “essay fri 5pm every week”",
+  },
   ref,
 ) {
   const { today } = useClock();
@@ -144,14 +154,20 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
     if (!value || busy) return;
     setBusy(true);
     try {
-      await addText({ text: value, ...(defaultDate && !parsed.date ? { date: defaultDate } : {}) });
+      await addText({
+        text: value,
+        ...(defaultDate && !parsed.date ? { date: defaultDate } : {}),
+        ...(defaultSpaceId && !parsed.spaceName ? { spaceId: defaultSpaceId } : {}),
+      });
       const where = parsed.date
         ? formatDay(parsed.date, today)
         : defaultDate
           ? formatDay(defaultDate, today)
           : parsed.spaceName
             ? (findSpace(spaces, parsed.spaceName)?.name ?? parsed.spaceName)
-            : "Inbox";
+            : defaultSpaceId
+              ? (spaces?.find((sp) => sp._id === defaultSpaceId)?.name ?? "this space")
+              : "Inbox";
       showToast(`Added to ${where}: ${parsed.title || value}`);
       if (parsed.reminders.length || parsed.time !== undefined) void ensureNotifications();
       setText("");

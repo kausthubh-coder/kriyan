@@ -8,6 +8,7 @@ import {
   daysInMonth,
   diffDays,
   fromParts,
+  isCivilDate,
   parts,
   startOfWeek,
   weekday,
@@ -48,13 +49,39 @@ export function validateRepeat(rule: Repeat): string | null {
   if (rule.weekdays && rule.freq !== "week") return "Weekdays only apply to weekly repeats.";
   if (rule.weekdays && rule.weekdays.length === 0) return "Pick at least one day of the week.";
   if (rule.monthly && rule.freq !== "month") return "A day of the month only applies to monthly repeats.";
-  if (rule.monthly?.kind === "day" && (rule.monthly.day < 1 || rule.monthly.day > 31)) {
+  // "After done" counts the interval from the tick, so it can't also land on chosen days.
+  if (rule.fromCompletion && (rule.weekdays || rule.monthly))
+    return "A repeat counted from when it's done can't also pick its days.";
+  if (
+    rule.monthly?.kind === "day" &&
+    (!Number.isInteger(rule.monthly.day) || rule.monthly.day < 1 || rule.monthly.day > 31)
+  ) {
     return "The day of the month must be from 1 to 31.";
   }
   if (rule.end?.kind === "count" && (!Number.isInteger(rule.end.count) || rule.end.count < 1)) {
     return "The number of times must be at least 1.";
   }
+  if (rule.end?.kind === "on" && !isCivilDate(rule.end.date)) {
+    return "The end date must be a date like 2026-12-11.";
+  }
   return null;
+}
+
+/** True when two rules are the same rule, so saving one again changes nothing. */
+export function sameRepeat(a: Repeat | undefined, b: Repeat | undefined): boolean {
+  if (!a || !b) return a === b;
+  const days = (r: Repeat) => [...new Set(r.weekdays ?? [])].sort((x, y) => x - y).join(",");
+  const monthly = (m: MonthlyRule | undefined) =>
+    !m ? "" : m.kind === "day" ? `day ${m.day}` : m.kind === "last" ? "last" : `nth ${m.n} ${m.weekday}`;
+  const end = (e: RepeatEnd | undefined) => (!e ? "" : e.kind === "on" ? `on ${e.date}` : `count ${e.count}`);
+  return (
+    a.freq === b.freq &&
+    a.interval === b.interval &&
+    days(a) === days(b) &&
+    monthly(a.monthly) === monthly(b.monthly) &&
+    end(a.end) === end(b.end) &&
+    Boolean(a.fromCompletion) === Boolean(b.fromCompletion)
+  );
 }
 
 /** Every occurrence of `rule` started on `first`, in order, from `first` itself. */
@@ -90,16 +117,20 @@ export function occurrencesBetween(
 /**
  * The next date a repeating task is due after it was done.
  * `current` is the occurrence that was done; `doneOn` is the person's today when they did it.
- * Returns null when the repeat has ended.
+ * `timesDone` counts every time it has been done, this one included; "after done" repeats
+ * need it to know when "N times" is up. Returns null when the repeat has ended.
  */
 export function nextAfterDone(
   rule: Repeat,
   first: CivilDate,
   current: CivilDate,
   doneOn: CivilDate,
+  timesDone?: number,
 ): CivilDate | null {
   if (rule.fromCompletion) {
-    const next = advance(rule, doneOn > current ? doneOn : current);
+    if (rule.end?.kind === "count" && timesDone !== undefined && timesDone >= rule.end.count) return null;
+    // From the day it was done, early or late.
+    const next = advance(rule, doneOn);
     if (rule.end?.kind === "on" && next > rule.end.date) return null;
     return next;
   }

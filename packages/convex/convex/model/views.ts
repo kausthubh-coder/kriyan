@@ -1,7 +1,8 @@
 // Read models: the exact shapes the screens (and agents) read. Queries can't read the clock,
 // so callers pass the person's today.
 
-import { addDays, diffDays, weekday, type CivilDate } from "@kriyan/core/dates";
+import { ConvexError } from "convex/values";
+import { addDays, diffDays, isCivilDate, weekday, type CivilDate } from "@kriyan/core/dates";
 import { describeRepeat } from "@kriyan/core/format";
 import { occurrencesBetween } from "@kriyan/core/repeat";
 import type { SpaceColor } from "@kriyan/core/tokens";
@@ -82,12 +83,34 @@ async function datedBetween(ctx: QueryCtx, ownerId: string, from: CivilDate, to:
 }
 
 async function repeating(ctx: QueryCtx, ownerId: string) {
-  return (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_repeatFirst", (q) => q.eq("ownerId", ownerId).gt("repeatFirst", ""))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined);
+  return await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_deletedAt_and_doneAt_and_repeatFirst", (q) =>
+      q.eq("ownerId", ownerId).eq("deletedAt", undefined).eq("doneAt", undefined).gt("repeatFirst", ""),
+    )
+    .take(LIMIT);
+}
+
+/** Open tasks with no date, oldest first: the Inbox and the week's tray. Past the limit, the newest stay. */
+async function openUndated(ctx: QueryCtx, ownerId: string) {
+  const newest = await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+      q.eq("ownerId", ownerId).eq("deletedAt", undefined).eq("doneAt", undefined).eq("date", undefined),
+    )
+    .order("desc")
+    .take(LIMIT);
+  return newest.reverse();
+}
+
+/** Open tasks in one space. */
+async function openInSpace(ctx: QueryCtx, ownerId: string, spaceId: Id<"spaces">) {
+  return await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_spaceId_and_deletedAt_and_doneAt", (q) =>
+      q.eq("ownerId", ownerId).eq("spaceId", spaceId).eq("deletedAt", undefined).eq("doneAt", undefined),
+    )
+    .take(LIMIT);
 }
 
 /** Every task falling on each day of [from, to], with repeats projected forward. */
@@ -100,8 +123,8 @@ async function plan(
 ) {
   const byDay = new Map<CivilDate, TaskView[]>();
   const push = (d: CivilDate, t: TaskView) => byDay.set(d, [...(byDay.get(d) ?? []), t]);
-  for (const t of await datedBetween(ctx, ownerId, from, to))
-    if (!t.repeat || t.doneAt !== undefined) push(t.date!, view(t, spaces));
+  // A finished repeat's last date shows through its completion, below, like the others.
+  for (const t of await datedBetween(ctx, ownerId, from, to)) if (!t.repeat) push(t.date!, view(t, spaces));
   for (const t of await repeating(ctx, ownerId)) {
     if (!t.date || t.date > to) continue;
     // The pending date shows even when it was moved off the rule's usual days; later
@@ -112,16 +135,15 @@ async function plan(
       if (d > t.date) push(d, view(t, spaces, d));
     }
   }
-  // Repeats done earlier in the range show as done on their day.
+  // Repeats done in the range show as done on their own day, however late they were ticked.
   const done = await ctx.db
     .query("completions")
-    .withIndex("by_owner_and_doneOn", (q) =>
-      q.eq("ownerId", ownerId).gte("doneOn", addDays(from, -1)).lte("doneOn", addDays(to, 1)),
-    )
+    .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).gte("date", from).lte("date", to))
     .take(LIMIT);
+  const tasks = new Map<Id<"tasks">, Doc<"tasks"> | null>();
   for (const c of done) {
-    if (c.date < from || c.date > to) continue;
-    const task = await ctx.db.get(c.taskId);
+    if (!tasks.has(c.taskId)) tasks.set(c.taskId, await ctx.db.get(c.taskId));
+    const task = tasks.get(c.taskId);
     if (!task || !live(task) || !task.repeat) continue;
     push(c.date, view(task, spaces, c.date, true));
   }
@@ -171,16 +193,43 @@ async function habitViews(
     }));
 }
 
+/** Dates come from callers (an agent's "date", the app's today): refuse anything that isn't one. */
+function civil(value: string, what: string): CivilDate {
+  if (!isCivilDate(value)) throw new ConvexError(`The ${what} must look like 2026-10-13.`);
+  return value;
+}
+
 export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  civil(today, "date");
   const profile = await getProfile(ctx, ownerId);
   const { map, tree } = await spaceMap(ctx, ownerId);
   const day = (await plan(ctx, ownerId, today, today, map)).get(today) ?? [];
   const earlier = (
     await ctx.db
       .query("tasks")
-      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).gte("date", "0000").lt("date", today))
+      .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+        q
+          .eq("ownerId", ownerId)
+          .eq("deletedAt", undefined)
+          .eq("doneAt", undefined)
+          .gte("date", "0000")
+          .lt("date", today),
+      )
       .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined && !t.event);
+  ).filter((t) => !t.event);
+  // Due today but planned for no day, or a later one: today's list is where they belong.
+  const due = (
+    await ctx.db
+      .query("tasks")
+      .withIndex("by_owner_and_deadline", (q) => q.eq("ownerId", ownerId).eq("deadline", today))
+      .take(LIMIT)
+  ).filter(
+    (t) =>
+      live(t) &&
+      t.doneAt === undefined &&
+      t.proposedBy === undefined &&
+      (t.date === undefined || t.date > today),
+  );
   return {
     date: today,
     profile: {
@@ -192,6 +241,7 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
     scheduled: day.filter((t) => t.time !== null),
     anytime: day.filter((t) => t.time === null && !t.done),
     done: day.filter((t) => t.time === null && t.done),
+    due: due.map((t) => view(t, map)),
     earlier: earlier.map((t) => view(t, map)),
     habits: await habitViews(ctx, ownerId, today, map),
     proposals: day.filter((t) => t.proposedBy !== null).length,
@@ -200,6 +250,8 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
 }
 
 export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate, today: CivilDate) {
+  civil(start, "start");
+  civil(today, "date");
   const profile = await getProfile(ctx, ownerId);
   const { map } = await spaceMap(ctx, ownerId);
   const end = addDays(start, 6);
@@ -225,12 +277,7 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
       capacity: profile.dailyCapacity,
     };
   });
-  const undated = (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).eq("date", undefined))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined);
+  const undated = await openUndated(ctx, ownerId);
   return {
     start,
     days,
@@ -240,38 +287,55 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
   };
 }
 
+/** One task as the lists show it, note included: what an agent reads back after a write. */
+export async function oneTask(ctx: QueryCtx, ownerId: string, id: Id<"tasks">): Promise<TaskView> {
+  const task = owned(await ctx.db.get(id), ownerId, "task");
+  if (task.deletedAt !== undefined)
+    throw new ConvexError("That task is deleted; restore_task brings it back.");
+  const { map } = await spaceMap(ctx, ownerId);
+  return view(task, map);
+}
+
+/** Deleted tasks, newest first. They stay until maintenance.emptyTrash removes them after 30 days. */
+export async function trashView(ctx: QueryCtx, ownerId: string) {
+  const { map } = await spaceMap(ctx, ownerId);
+  const deleted = await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+      q.eq("ownerId", ownerId).gt("deletedAt", 0),
+    )
+    .order("desc")
+    .take(LIMIT);
+  return deleted.map((t) => {
+    const space = t.spaceId ? map.get(t.spaceId) : undefined;
+    return {
+      _id: t._id,
+      title: t.title,
+      deletedAt: t.deletedAt ?? 0,
+      date: t.date ?? null,
+      time: t.time ?? null,
+      repeatText: t.repeat ? describeRepeat(t.repeat, t.repeatFirst ?? t.date ?? "1970-01-01") : null,
+      color: space?.color ?? null,
+      spacePath: space?.path ?? null,
+    };
+  });
+}
+
 export async function inboxView(ctx: QueryCtx, ownerId: string) {
   const { map } = await spaceMap(ctx, ownerId);
-  const undated = (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId).eq("date", undefined))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined && !t.spaceId);
+  const undated = (await openUndated(ctx, ownerId)).filter((t) => !t.spaceId);
   return undated.sort((a, b) => b.order - a.order).map((t) => view(t, map));
 }
 
 export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spaces">, today: CivilDate) {
+  civil(today, "date");
   const space = owned(await ctx.db.get(spaceId), ownerId, "space");
   const { map, tree } = await spaceMap(ctx, ownerId);
   const node = map.get(spaceId);
-  const tasks = (
-    await ctx.db
-      .query("tasks")
-      .withIndex("by_owner_and_spaceId", (q) => q.eq("ownerId", ownerId).eq("spaceId", spaceId))
-      .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined && t.proposedBy === undefined);
+  const tasks = (await openInSpace(ctx, ownerId, spaceId)).filter((t) => t.proposedBy === undefined);
   const children = tree.filter((s) => s.parentId === spaceId);
   const childCounts = await Promise.all(
-    children.map(async (c) => {
-      const open = (
-        await ctx.db
-          .query("tasks")
-          .withIndex("by_owner_and_spaceId", (q) => q.eq("ownerId", ownerId).eq("spaceId", c._id))
-          .take(LIMIT)
-      ).filter((t) => live(t) && t.doneAt === undefined).length;
-      return { ...c, open };
-    }),
+    children.map(async (c) => ({ ...c, open: (await openInSpace(ctx, ownerId, c._id)).length })),
   );
   const monthStart = `${today.slice(0, 8)}01`;
   const weekStart = addDays(today, -weekday(today));
@@ -339,6 +403,7 @@ export function goalView(g: Doc<"goals">, today: CivilDate) {
 }
 
 export async function progressView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  civil(today, "date");
   const { map } = await spaceMap(ctx, ownerId);
   const yearStart = addDays(today, -364);
   const completions = await ctx.db

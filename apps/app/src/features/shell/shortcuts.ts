@@ -1,11 +1,13 @@
 // Keyboard shortcuts on the web: N new task, Ctrl K command menu, T Today, U Upcoming,
 // I Inbox, J and K move, Enter open, X complete, D date, R repeat, M move to space,
-// Delete delete (with Undo), Escape close. Typing in a field never triggers them.
+// Delete delete (with Undo), Ctrl Z the newest Undo, Escape close. Typing in a field never
+// triggers them.
 
 import { useEffect, useRef } from "react";
 import { router, usePathname } from "expo-router";
 import { completeTask, deleteTask } from "@/features/tasks/actions";
 import { panelOpenedByKeyboard } from "@/features/tasks/panelState";
+import { runNewestAction } from "@/ui/toast";
 import { closeCommand, openCommand, quickAddTarget, selection, shellState } from "./context";
 import { rowRegistry } from "./rows";
 
@@ -37,6 +39,11 @@ export function useShortcuts() {
         e.preventDefault();
         if (shellState.get().commandOpen) closeCommand();
         else openCommand();
+        return;
+      }
+      // Undo lives in a toast at the end of the page; this reaches it without a pointer.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !typing(e.target)) {
+        if (runNewestAction()) e.preventDefault();
         return;
       }
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || shellState.get().commandOpen) return;

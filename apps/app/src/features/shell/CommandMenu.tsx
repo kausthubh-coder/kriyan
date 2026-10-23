@@ -61,6 +61,7 @@ const GO: { label: string; href: Href; icon: LucideIcon; kbd?: string; keywords?
   { label: "Progress", href: "/progress", icon: Target, keywords: "goals habits heatmap time" },
   { label: "Settings", href: "/settings", icon: SlidersHorizontal, keywords: "tokens reminders day" },
   { label: "Connect an AI", href: "/settings", icon: Bot, keywords: "mcp, claude, chatgpt" },
+  { label: "Recently deleted", href: "/trash", icon: Trash2, keywords: "trash restore undo" },
 ];
 
 export function CommandMenu() {
@@ -167,7 +168,7 @@ function Menu() {
     if (selected) {
       const edit = (what: string) => () => router.push(`/task/${selected._id}?edit=${what}`);
       const commands: Omit<Item, "group">[] = [
-        ...(selected.done
+        ...(selected.done || selected.event
           ? []
           : [
               {
@@ -219,7 +220,9 @@ function Menu() {
       }
       const seen = new Set<string>();
       const pool: TaskView[] = [
-        ...(todayView ? [...todayView.anytime, ...todayView.scheduled, ...todayView.earlier] : []),
+        ...(todayView
+          ? [...todayView.due, ...todayView.anytime, ...todayView.scheduled, ...todayView.earlier]
+          : []),
         ...(inbox ?? []),
         ...(week ? week.days.flatMap((d) => [...d.scheduled, ...d.anytime, ...d.deadlines]) : []),
         ...(week ? [...week.inbox, ...week.unscheduled] : []),

@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Linking, Modal, View } from "react-native";
 import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
+import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { BookOpen, Bot, Copy, KeyRound, LogOut, Terminal, Trash2 } from "lucide-react-native";
+import { BookOpen, Bot, Copy, KeyRound, LogOut, RotateCcw, Terminal, Trash2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
@@ -14,6 +15,7 @@ import { parseClock } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import { useClock } from "@/data/time";
 import { useAccessTokens, useProfile, type Profile } from "@/data/views";
+import { forgetDevice } from "@/features/notifications/register";
 import { errorText } from "@/features/tasks/actions";
 import { ReminderEditor } from "@/features/tasks/ReminderEditor";
 import { useControl, useIsPhone } from "@/theme/layout";
@@ -28,8 +30,10 @@ import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 
 export const MCP_URL = "https://kriyan.app/mcp";
-export const CLI_LINE = "npx kriyan login";
+// The CLI isn't on npm yet, so it runs from a copy of the code; ship-kriyan step 6 says when this changes.
+export const CLI_LINE = "bun run kriyan login";
 export const MCP_DOCS = "https://kriyan.app/docs/mcp";
+export const CLI_DOCS = "https://kriyan.app/docs/cli";
 
 async function copy(text: string, what: string) {
   await Clipboard.setStringAsync(text);
@@ -53,6 +57,7 @@ export function SettingsScreen() {
           <DefaultReminders profile={profile} />
           <ConnectAI profile={profile} />
           <Tokens />
+          <Deleted />
           <Account />
         </>
       )}
@@ -225,9 +230,12 @@ function ConnectAI({ profile }: { profile: Profile }) {
         <Button icon={BookOpen} label="Read the setup guide" onPress={() => void Linking.openURL(MCP_DOCS)} />
       </View>
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
-        Or use the command line. Run this, then paste an access token from below.
+        Or use the command line. In a copy of Kriyan’s code, run this, then paste an access token from below.
       </Txt>
       <CopyLine icon={Terminal} text={CLI_LINE} what="the command" />
+      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+        <Button icon={BookOpen} label="Read the CLI guide" onPress={() => void Linking.openURL(CLI_DOCS)} />
+      </View>
       <Press
         role="switch"
         aria-checked={profile.agentsEditDirectly}
@@ -247,8 +255,8 @@ function ConnectAI({ profile }: { profile: Profile }) {
           <Txt variant="label">Let agents edit directly</Txt>
           <Txt variant="meta" tone="ink3">
             {profile.agentsEditDirectly
-              ? "On: an agent's changes go straight into your plan."
-              : "Off: an agent's changes wait as proposals for you to accept."}
+              ? "On: an agent's plans go straight onto your days."
+              : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."}
           </Txt>
         </View>
         <View
@@ -377,6 +385,20 @@ function Tokens() {
   );
 }
 
+function Deleted() {
+  return (
+    <View style={{ gap: s.s3 }}>
+      <SectionHead title="Recently deleted" />
+      <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
+        A task you delete waits 30 days before it’s gone for good, so you can bring it back.
+      </Txt>
+      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+        <Button icon={RotateCcw} label="Open recently deleted" onPress={() => router.push("/trash")} />
+      </View>
+    </View>
+  );
+}
+
 function Account() {
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -390,7 +412,11 @@ function Account() {
         </Txt>
       ) : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginLeft: -s.s3 }}>
-        <Button icon={LogOut} label="Sign out" onPress={() => void signOut()} />
+        <Button
+          icon={LogOut}
+          label="Sign out"
+          onPress={() => void forgetDevice().finally(() => void signOut())}
+        />
         <Button icon={Trash2} label="Delete my data" onPress={() => setConfirm(true)} />
       </View>
       {confirm ? <DeleteDialog onClose={() => setConfirm(false)} /> : null}
@@ -417,6 +443,7 @@ function DeleteDialog({ onClose }: { onClose: () => void }) {
   const run = async () => {
     setBusy(true);
     try {
+      await forgetDevice();
       await deleteData({});
       await user?.delete();
       await signOut();

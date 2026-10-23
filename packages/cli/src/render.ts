@@ -138,12 +138,14 @@ export function renderToday(day: TodayResult, view: View, refs: RefBook): string
     for (const t of tasks) lines.push(taskRow(t, whenOf(t), refs, view, showDone));
   };
   section("Schedule", day.scheduled, when);
+  section(isToday ? "Due today" : "Due that day", day.due, () => "");
   section("Anytime", day.anytime, () => "");
   section("From earlier", day.earlier, (t) => (t.date ? formatDate(t.date, today) : ""));
   section("Done", day.done, () => "", false);
   if (lines.length) out.push("", table(lines, TASKS));
 
-  const left = day.scheduled.filter((t) => !t.done).length + day.anytime.length + day.earlier.length;
+  const left =
+    day.scheduled.filter((t) => !t.done).length + day.due.length + day.anytime.length + day.earlier.length;
   if (left === 0)
     out.push(
       "",

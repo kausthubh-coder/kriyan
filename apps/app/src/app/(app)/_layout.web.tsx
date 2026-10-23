@@ -43,6 +43,7 @@ export default function AppLayout() {
           <Stack.Screen name="settings" />
           <Stack.Screen name="review" />
           <Stack.Screen name="focus/[id]" />
+          <Stack.Screen name="trash" />
           <Stack.Screen name="task/[id]" options={overlay} />
           <Stack.Screen name="add" options={overlay} />
         </Stack>

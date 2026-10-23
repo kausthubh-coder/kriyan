@@ -4,5 +4,5 @@ import type { TaskView } from "@/data/views";
 
 export const rowRegistry = new Map<
   string,
-  Pick<TaskView, "_id" | "title" | "done" | "repeat" | "date" | "time">
+  Pick<TaskView, "_id" | "title" | "done" | "repeat" | "date" | "time" | "event">
 >();

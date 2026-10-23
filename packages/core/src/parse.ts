@@ -11,6 +11,7 @@ import {
   addDays,
   daysInMonth,
   fromParts,
+  isCivilDate,
   parts,
   startOfWeek,
   weekday,
@@ -51,6 +52,10 @@ const TIME = "\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)|\\d{1,2}:\\d{2}|noon|midnight";
 const UNIT_MIN = "m|min|mins|minutes?";
 const UNIT_H = "h|hr|hrs|hours?";
 const UNIT_D = "d|days?";
+/** Where a phrase may end: a space, the end, or punctuation ("every year, remind ..."). */
+const END = "(?![^\\s,.;:!?])";
+/** Weekdays listed with commas, "and", "&" or just spaces: "mon, wed and fri", "mon wed fri". */
+const WD_LIST = `(?:${WD})(?:(?:\\s*(?:,|and|&)\\s*|\\s+)(?:${WD}))*`;
 
 function weekdayOf(word: string): Weekday {
   const key = word.slice(0, 3).toLowerCase();
@@ -81,7 +86,11 @@ export function parseDate(text: string, today: CivilDate): CivilDate | null {
   m = /^in (\d+) (days?|weeks?)$/.exec(t);
   if (m) return addDays(today, Number(m[1]) * (m[2]!.startsWith("week") ? 7 : 1));
   m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
-  if (m) return fromParts(Number(m[1]), Number(m[2]), Number(m[3]));
+  if (m) {
+    // 2026-02-31 doesn't exist, so it isn't a date.
+    const date = fromParts(Number(m[1]), Number(m[2]), Number(m[3]));
+    return isCivilDate(date) ? date : null;
+  }
   m =
     new RegExp(`^(\\d{1,2})(?:st|nd|rd|th)? (${MONTHS})$`).exec(t) ??
     swap(new RegExp(`^(${MONTHS}) (\\d{1,2})(?:st|nd|rd|th)?$`).exec(t));
@@ -169,22 +178,22 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   const REPEAT_SPEC =
     `every!?\\s+(?:month\\s+on\\s+)?(?:the\\s+)?(?:last\\s+day|(?:first|second|third|fourth|last|1st|2nd|3rd|4th)\\s+(?:${WD})|${DAYORD})` +
     `|every!?\\s+(?:weekdays?|weekend)` +
-    `|every!?\\s+(?:${WD})(?:\\s*(?:,|and|&)\\s*(?:${WD}))*` +
-    `|every!?\\s+(?:other\\s+|\\d+\\s+)?(?:days?|weeks?|months?|years?)(?:\\s+on)?(?:\\s+(?:${WD})(?:\\s*(?:,|and|&)\\s*(?:${WD}))*)?` +
+    `|every!?\\s+(?:other\\s+)?${WD_LIST}` +
+    `|every!?\\s+(?:other\\s+|\\d+\\s+)?(?:days?|weeks?|months?|years?)(?:\\s+on)?(?:\\s+${WD_LIST})?` +
     `|daily|weekly|monthly|yearly|annually`;
-  take(new RegExp(`(?<!\\S)(${REPEAT_SPEC})(\\s+after\\s+done)?(?!\\S)`, "i"), "repeat", (m) => {
+  take(new RegExp(`(?<!\\S)(${REPEAT_SPEC})(\\s+after\\s+done)?${END}`, "i"), "repeat", (m) => {
     const rule = repeatFrom(m[1]!.toLowerCase().replace(/\s+/g, " "));
     if (!rule) return false;
     if (m[2] || m[1]!.startsWith("every!")) rule.fromCompletion = true;
     out.repeat = rule;
   });
   // "until dec 11" and "10 times" end a repeat wherever they appear in the sentence.
-  take(new RegExp(`(?<!\\S)(?:until|till)\\s+(${DATE})(?!\\S)`, "i"), "repeat", (m) => {
+  take(new RegExp(`(?<!\\S)(?:until|till)\\s+(${DATE})${END}`, "i"), "repeat", (m) => {
     const until = out.repeat ? parseDate(m[1]!, today) : null;
     if (!until || !out.repeat) return false;
     out.repeat.end = { kind: "on", date: until };
   });
-  take(/(?<!\S)(?:for\s+)?(\d+)\s+times(?!\S)/i, "repeat", (m) => {
+  take(new RegExp(`(?<!\\S)(?:for\\s+)?(\\d+)\\s+times${END}`, "i"), "repeat", (m) => {
     if (!out.repeat) return false;
     out.repeat.end = { kind: "count", count: Number(m[1]) };
   });
@@ -192,7 +201,7 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   // remind 10m before / remind 1 day before / remind at 8am / remind day before at 20:00 (chainable with "and")
   const ONE_REMINDER = `(?:(\\d+(?:\\.\\d+)?)\\s*(${UNIT_MIN}|${UNIT_H}|${UNIT_D})\\s+before|(?:the\\s+)?(day\\s+before|on\\s+the\\s+day)\\s+at\\s+(${TIME})|at\\s+(${TIME}))`;
   take(
-    new RegExp(`(?<!\\S)remind(?:\\s+me)?\\s+${ONE_REMINDER}(?:\\s+and\\s+${ONE_REMINDER})*(?!\\S)`, "gi"),
+    new RegExp(`(?<!\\S)remind(?:\\s+me)?\\s+${ONE_REMINDER}(?:\\s+and\\s+${ONE_REMINDER})*${END}`, "gi"),
     "reminder",
     (m) => {
       const each = new RegExp(ONE_REMINDER, "gi");
@@ -213,7 +222,7 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   );
 
   // due fri / by 13 oct
-  take(new RegExp(`(?<!\\S)(?:due|by)\\s+(${DATE})(?!\\S)`, "i"), "deadline", (m) => {
+  take(new RegExp(`(?<!\\S)(?:due|by)\\s+(${DATE})${END}`, "i"), "deadline", (m) => {
     const date = parseDate(m[1]!, today);
     if (!date) return false;
     out.deadline = date;
@@ -222,7 +231,7 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   // for 1h / for 30 min / for 1h30
   take(
     new RegExp(
-      `(?<!\\S)for\\s+(\\d+(?:\\.\\d+)?)\\s*(${UNIT_H}|${UNIT_MIN})(?:\\s*(\\d+)\\s*(?:${UNIT_MIN})?)?(?!\\S)`,
+      `(?<!\\S)for\\s+(\\d+(?:\\.\\d+)?)\\s*(${UNIT_H}|${UNIT_MIN})(?:\\s*(\\d+)\\s*(?:${UNIT_MIN})?)?${END}`,
       "i",
     ),
     "length",
@@ -237,7 +246,7 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   // 9-10:30am, 14:00-15:30
   take(
     new RegExp(
-      `(?<!\\S)(?:at\\s+)?(\\d{1,2}(?::\\d{2})?)\\s*(am|pm)?\\s*(?:-|–|to)\\s*(\\d{1,2}(?::\\d{2})?)\\s*(am|pm)?(?!\\S)`,
+      `(?<!\\S)(?:at\\s+)?(\\d{1,2}(?::\\d{2})?)\\s*(am|pm)?\\s*(?:-|–|to)\\s*(\\d{1,2}(?::\\d{2})?)\\s*(am|pm)?${END}`,
       "i",
     ),
     "time",
@@ -245,8 +254,12 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
       const endMer = m[4]?.toLowerCase();
       const startMer = m[2]?.toLowerCase() ?? endMer;
       if (!startMer && !(m[1]!.includes(":") && m[3]!.includes(":"))) return false;
-      const start = parseClock(m[1]! + (startMer ?? ""));
+      let start = parseClock(m[1]! + (startMer ?? ""));
       const end = parseClock(m[3]! + (endMer ?? ""));
+      // "10-12pm" is 10:00 to 12:00: a start that borrowed "pm" and landed after the end
+      // takes the other half of the day.
+      if (!m[2] && endMer && start !== null && end !== null && start >= end)
+        start = parseClock(m[1]! + (endMer === "pm" ? "am" : "pm"));
       if (start === null || end === null || end <= start) return false;
       out.time = start;
       out.length ??= end - start;
@@ -254,7 +267,7 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   );
 
   // 5pm / at 17:00 / at 5 / noon
-  take(new RegExp(`(?<!\\S)(at\\s+)?(${TIME}|\\d{1,2})(?!\\S)`, "i"), "time", (m) => {
+  take(new RegExp(`(?<!\\S)(at\\s+)?(${TIME}|\\d{1,2})${END}`, "i"), "time", (m) => {
     if (out.time !== undefined) return false;
     const viaAt = Boolean(m[1]);
     if (!viaAt && /^\d{1,2}$/.test(m[2]!)) return false;
@@ -264,7 +277,7 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   });
 
   // today / fri / next fri / 13 oct / in 3 days (optionally "on")
-  take(new RegExp(`(?<!\\S)(?:on\\s+)?(${DATE})(?!\\S)`, "i"), "date", (m) => {
+  take(new RegExp(`(?<!\\S)(?:on\\s+)?(${DATE})${END}`, "i"), "date", (m) => {
     if (out.date) return false;
     const date = parseDate(m[1]!, today);
     if (!date) return false;
@@ -273,8 +286,14 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
   });
 
   if (out.repeat && !out.date) out.date = firstOccurrence(out.repeat, today);
-  if (out.reminders.length && !out.date) out.date = today;
-  out.title = masked.replace(/\s+/g, " ").trim();
+  // A reminder or a time needs a day to ring or show on: today, unless the sentence names one.
+  if ((out.reminders.length || out.time !== undefined) && !out.date) out.date = today;
+  // Punctuation a phrase left behind goes too: "Mum's birthday ," and "call the bank .".
+  out.title = masked
+    .replace(/\s+/g, " ")
+    .replace(/(^|\s)[,.;:!?]+(?=\s|$)/g, "$1")
+    .replace(/[\s,;:]+$/, "")
+    .trim();
   out.spans.sort((a, b) => a.start - b.start);
   return out;
 }
@@ -293,9 +312,9 @@ function repeatFrom(spec: string): Repeat | null {
   };
   if (simple[s]) return { ...simple[s] };
 
-  let m = new RegExp(
-    `^every (other |\\d+ )?(days?|weeks?|months?|years?)(?: on)?((?: (?:${WD})(?:\\s*(?:,|and|&)\\s*(?:${WD}))*)?)$`,
-  ).exec(s);
+  let m = new RegExp(`^every (other |\\d+ )?(days?|weeks?|months?|years?)(?: on)?((?: ${WD_LIST})?)$`).exec(
+    s,
+  );
   if (m) {
     const interval = m[1]?.trim() === "other" ? 2 : m[1] ? Number(m[1]) : 1;
     const freq = m[2]!.replace(/s$/, "") as Repeat["freq"];
@@ -307,8 +326,8 @@ function repeatFrom(spec: string): Repeat | null {
     }
     return rule;
   }
-  m = new RegExp(`^every ((?:${WD})(?:\\s*(?:,|and|&)\\s*(?:${WD}))*)$`).exec(s);
-  if (m) return { freq: "week", interval: 1, weekdays: weekdaysIn(m[1]!) };
+  m = new RegExp(`^every (other )?(${WD_LIST})$`).exec(s);
+  if (m) return { freq: "week", interval: m[1] ? 2 : 1, weekdays: weekdaysIn(m[2]!) };
 
   m = new RegExp(
     `^every (?:month on )?(?:the )?(last day|(first|second|third|fourth|last|1st|2nd|3rd|4th) (${WD})|(${DAYNUM}))$`,

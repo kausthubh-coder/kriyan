@@ -4,7 +4,7 @@
 import { useRef, useState } from "react";
 import { View } from "react-native";
 import { useMutation } from "convex/react";
-import { CalendarCheck, Plus } from "lucide-react-native";
+import { CalendarCheck, Pencil, Plus } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { addDays, parts, startOfWeek, weekday, type CivilDate } from "@kriyan/core/dates";
@@ -283,7 +283,9 @@ function YearHeat({ heat }: { heat: ProgressView["heat"] }) {
 function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; today: string }) {
   const check = useMutation(api.organize.checkHabit);
   const [fixing, setFixing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const ref = useRef<View>(null);
+  const editRef = useRef<View>(null);
   const color = spaceTone(habit.color ?? "green").dot;
   // Weeks on target among the finished weeks shown (the current week is still going).
   const weekStart = startOfWeek(today);
@@ -335,9 +337,23 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
         color={color}
         label={`${habit.title}, the last 26 weeks`}
       />
-      <View ref={ref} collapsable={false} style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
-        <Button variant="quiet" icon={CalendarCheck} label="Fix a day" onPress={() => setFixing(true)} />
+      <View style={{ flexDirection: "row", flexWrap: "wrap", marginLeft: -s.s3 }}>
+        <View ref={ref} collapsable={false}>
+          <Button variant="quiet" icon={CalendarCheck} label="Fix a day" onPress={() => setFixing(true)} />
+        </View>
+        <View ref={editRef} collapsable={false}>
+          <Button variant="quiet" icon={Pencil} label="Edit habit" onPress={() => setEditing(true)} />
+        </View>
       </View>
+      <Popover
+        open={editing}
+        onClose={() => setEditing(false)}
+        anchor={editRef}
+        title="Edit habit"
+        width={320}
+      >
+        <EditHabit habit={habit} onDone={() => setEditing(false)} />
+      </Popover>
       <Popover
         open={fixing}
         onClose={() => setFixing(false)}
@@ -364,6 +380,61 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
           }}
         />
       </Popover>
+    </View>
+  );
+}
+
+/** Rename, retarget or archive a habit. Archiving takes it off Today's check-ins, with Undo. */
+function EditHabit({ habit, onDone }: { habit: ProgressView["habits"][number]; onDone: () => void }) {
+  const update = useMutation(api.organize.updateHabit);
+  const [title, setTitle] = useState(habit.title);
+  const [target, setTarget] = useState(habit.target);
+  const id = habit._id as Id<"habits">;
+  const changed = title.trim() !== habit.title || target !== habit.target;
+  return (
+    <View style={{ gap: s.s3 }}>
+      <Field label="Habit" value={title} onChangeText={setTitle} autoFocus />
+      <Txt variant="caption" tone="ink3">
+        Times a week
+      </Txt>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+          <Chip
+            key={n}
+            label={n === 7 ? "Every day" : String(n)}
+            on={target === n}
+            onPress={() => setTarget(n)}
+            accessibilityLabel={`${n} times a week`}
+          />
+        ))}
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: s.s2 }}>
+        <Button
+          variant="quiet"
+          label="Archive habit"
+          onPress={() => {
+            onDone();
+            void update({ id, archived: true })
+              .then(() =>
+                showToast(`Archived: ${habit.title}`, {
+                  label: "Undo",
+                  run: () =>
+                    void update({ id, archived: false }).catch((e: unknown) => showToast(errorText(e))),
+                }),
+              )
+              .catch((e: unknown) => showToast(errorText(e)));
+          }}
+        />
+        <Button
+          variant="primary"
+          label="Save habit"
+          disabled={!title.trim() || !changed}
+          onPress={() => {
+            onDone();
+            void update({ id, title: title.trim(), target }).catch((e: unknown) => showToast(errorText(e)));
+          }}
+        />
+      </View>
     </View>
   );
 }

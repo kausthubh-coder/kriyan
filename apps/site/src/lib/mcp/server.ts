@@ -7,12 +7,39 @@ import {
   McpServer,
   type CallToolResult,
 } from "@modelcontextprotocol/server";
+import { AjvJsonSchemaValidator } from "@modelcontextprotocol/server/validators/ajv";
 import { OPS } from "@kriyan/core/ops";
 import { callOp } from "@/lib/agent-api";
 import type { Caller } from "./auth";
 import { INSTRUCTIONS } from "./instructions";
 
 type JsonSchema = Parameters<typeof fromJsonSchema>[0];
+type Validator = NonNullable<Parameters<typeof fromJsonSchema>[1]>;
+
+const ajv = new AjvJsonSchemaValidator();
+
+/**
+ * Ajv says "data must NOT have additional properties" without naming them, so an agent that
+ * sends `due` instead of `deadline` can't tell what to fix. This names the fields it doesn't take.
+ */
+const namingValidator: Validator = {
+  getValidator<T>(schema: JsonSchema) {
+    const check = ajv.getValidator<T>(schema);
+    const known = Object.keys((schema as { properties?: object }).properties ?? {});
+    return (input: unknown) => {
+      const result = check(input);
+      if (result.valid || !input || typeof input !== "object") return result;
+      const extra = Object.keys(input).filter((key) => !known.includes(key));
+      if (!extra.length) return result;
+      const names = extra.map((key) => `"${key}"`).join(", ");
+      const takes = known.length ? ` It takes: ${known.join(", ")}.` : " It takes no input.";
+      return {
+        ...result,
+        errorMessage: `Unknown ${extra.length === 1 ? "field" : "fields"} ${names}.${takes}`,
+      };
+    };
+  },
+};
 
 function toolResult(reply: Awaited<ReturnType<typeof callOp>>): CallToolResult {
   if (!reply.ok) {
@@ -41,11 +68,12 @@ export function buildServer(caller: Caller | undefined): McpServer {
       {
         title: op.title,
         description: op.description,
-        inputSchema: fromJsonSchema<Record<string, unknown>>(op.input as JsonSchema),
+        inputSchema: fromJsonSchema<Record<string, unknown>>(op.input as JsonSchema, namingValidator),
         annotations: {
           title: op.title,
           readOnlyHint: op.kind === "read",
-          destructiveHint: op.name === "delete_task",
+          destructiveHint: op.destructive === true,
+          idempotentHint: op.kind === "read" || op.idempotent === true,
           openWorldHint: false,
         },
       },

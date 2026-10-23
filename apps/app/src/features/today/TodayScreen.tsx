@@ -165,6 +165,7 @@ function TodayBody({
   const nothing =
     view.scheduled.length === 0 &&
     view.anytime.length === 0 &&
+    view.due.length === 0 &&
     view.done.length === 0 &&
     view.earlier.length === 0 &&
     view.habits.length === 0;
@@ -185,23 +186,39 @@ function TodayBody({
 
   const live = view.scheduled.filter((t) => !t.done && !t.proposedBy);
   const current = live.find((t) => t.time !== null && t.length && t.time <= now && now < t.time + t.length);
-  const next = live.find((t) => t.time !== null && t.time > now && t._id !== current?._id);
-  const left = view.anytime.length;
+  // Next is the first other block that isn't over: one still running beside the current one
+  // comes before one that starts later.
+  const next = live.find(
+    (t) =>
+      t.time !== null &&
+      t._id !== current?._id &&
+      (t.time > now || (t.length !== null && now < t.time + t.length)),
+  );
+  const left = view.due.length + view.anytime.length;
   const cleared =
     left === 0 &&
     live.every((t) => (t.time ?? 0) + (t.length ?? 0) <= now) &&
     (view.done.length > 0 || view.scheduled.some((t) => t.done));
-  const stillOpen =
-    left + view.scheduled.filter((t) => !t.done && !t.event && !t.proposedBy && !t.projected).length;
+  // The count is what closeDay moves: not a task that's only due today, an event, a proposal or
+  // a repeat's projected copy.
+  const stillOpen = [...view.anytime, ...view.scheduled].filter(
+    (t) => !t.done && !t.event && !t.proposedBy && !t.projected,
+  ).length;
   const reviewTime = view.profile.dayEnd - REVIEW_BEFORE_END;
-  const fold = !showEarlierHours && now - 60 > view.profile.dayStart ? now - 60 : null;
-  const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < now - 60).length;
+  // Hours before an hour ago fold away, but never over a block that slipped: it stays in
+  // sight until it's ticked off or moved.
+  const slipped = view.scheduled.filter(
+    (t) => !t.done && !t.event && !t.proposedBy && !t.projected && t.time !== null && t.time < now - 60,
+  );
+  const foldAt = Math.min(now - 60, ...slipped.map((t) => t.time ?? now));
+  const fold = !showEarlierHours && foldAt > view.profile.dayStart ? foldAt : null;
+  const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < (fold ?? 0)).length;
   // Beside the timeline (split) the list is always the list; otherwise the person picks.
   const showList = split || mode === "list";
 
   const anytimeRows = (
     <View>
-      {view.anytime.map((t) => (
+      {[...view.due, ...view.anytime].map((t) => (
         <TaskRow
           key={`${t._id}:${t.date}`}
           task={t}
@@ -421,6 +438,14 @@ function UpNext({ current, next, now }: { current?: TaskView; next?: TaskView; n
             ? `${formatClock(lead.time)} → ${formatClock(end)}  ${formatDuration(lead.length ?? 0)}`
             : formatClock(lead.time)}
         </Txt>
+        {/* With blocks overlapping, the next one may already be running: say until when. */}
+        {current && next && next.time !== null ? (
+          <Txt variant="meta" tone="ink3" numberOfLines={1} tnum>
+            {next.time <= now && next.length !== null
+              ? `Then ${next.title}, until ${formatClock(next.time + next.length)}`
+              : `Then ${next.title} at ${formatClock(next.time)}`}
+          </Txt>
+        ) : null}
       </View>
       {lead.event ? null : (
         <Button

@@ -40,7 +40,9 @@ export class FakeApi {
           return reply(404, { error: `There's no operation called "${op}". GET /api/v1 lists them.` });
         if (req.headers.authorization !== `Bearer ${TOKEN}`)
           return reply(401, {
-            error: "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.",
+            error: req.headers.authorization
+              ? "That token doesn't work: it may have been revoked or mistyped. Create a new one in Settings."
+              : "Send a personal access token: Authorization: Bearer kriyan_... Create one in Settings.",
           });
         const out = handler(body);
         if (out.error) return reply(out.status ?? 400, { error: out.error });

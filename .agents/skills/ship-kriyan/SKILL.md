@@ -118,6 +118,7 @@ cd dist && VERCEL_ORG_ID=team_eG2BEkfqMmQSwwGiTPzlC622 VERCEL_PROJECT_ID=prj_8r2
    cd packages/cli/dist && node kriyan.js --version && bun publish --dry-run
    ```
 3. `bun publish --access public` from `packages/cli/dist`. It uses the token in `~/.npmrc`.
+4. After the first publish, switch the lines that say to run from a copy of the code to the npm form (`npx kriyan login`, `npm i -g kriyan`): `CLI_LINE` in `apps/app/src/features/settings/SettingsScreen.tsx`, the Install, Sign in and Examples steps of `apps/site/src/app/docs/cli/page.tsx`, and the Terminal line in `README.md`. `packages/cli/README.md` is the npm page and already uses `npx`.
 
 The CLI ships on npm as `kriyan` (decided 2026-10-13; the name was free that day, so the first publish claims it). Install docs say `npm i -g kriyan`. The unmerged `release-2.0` branch documents an older plan, a `kriyan-cli.tgz` on each release. Change its docs to npm before merging it, or drop it.
 

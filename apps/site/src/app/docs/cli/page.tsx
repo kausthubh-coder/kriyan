@@ -55,8 +55,8 @@ export default function CliDocs() {
 
       <h2 id="install">Install</h2>
       <p>
-        The CLI runs on <a href="https://bun.sh">Bun</a>. Until it is published as a package, run it from the
-        source:
+        The CLI runs on <a href="https://bun.sh">Bun</a>. Until it is published as a package, run it from a
+        copy of the code. Every command on this page runs from that folder.
       </p>
       <Code caption="Terminal">{`git clone ${GITHUB_URL}\ncd kriyan\nbun install\nbun run kriyan --help`}</Code>
 
@@ -64,21 +64,21 @@ export default function CliDocs() {
       <p>
         In Kriyan, open Settings and create a personal access token named after this computer. Then save it:
       </p>
-      <Code caption="Terminal">{`kriyan login\n# or\nkriyan login --token kriyan_...`}</Code>
+      <Code caption="Terminal">{`bun run kriyan login\n# or\nbun run kriyan login --token kriyan_...`}</Code>
       <p>
-        The token is checked before it is saved, and kept only on this computer. <code>kriyan logout</code>{" "}
-        removes it; revoke it in Settings to stop it working everywhere.
+        The token is checked before it is saved, and kept only on this computer.{" "}
+        <code>bun run kriyan logout</code> removes it; revoke it in Settings to stop it working everywhere.
       </p>
 
       <h2 id="examples">Examples</h2>
       <Code caption="Terminal">
-        {`kriyan today
-kriyan week
-kriyan add "essay fri 5pm #school every week remind 1h before"
-kriyan add "calculus lecture every tue and thu 10:00-11:30 #school"
-kriyan done 2
-kriyan move 3 5 tomorrow 9am
-kriyan today --json`}
+        {`bun run kriyan today
+bun run kriyan week
+bun run kriyan add "essay fri 5pm #school every week remind 1h before"
+bun run kriyan add "calculus lecture every tue and thu 10:00-11:30 #school"
+bun run kriyan done 2
+bun run kriyan move 3 5 tomorrow 9am
+bun run kriyan today --json`}
       </Code>
       <p>
         A task is the number shown next to it in your last listing, part of its title, or its id.{" "}
@@ -106,7 +106,7 @@ kriyan today --json`}
         </section>
       ))}
       <p>
-        <code>kriyan &lt;command&gt; --help</code> shows the options and examples for each command.
+        <code>bun run kriyan &lt;command&gt; --help</code> shows the options and examples for each command.
       </p>
 
       <h2 id="environment">Environment</h2>

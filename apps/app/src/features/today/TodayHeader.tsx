@@ -34,7 +34,12 @@ export function TodayHeader({
     name: user?.firstName,
     now,
     dayEnd: view.profile.dayEnd,
-    items: [...view.scheduled.filter((t) => !t.proposedBy), ...view.anytime],
+    // A task due today counts, but any time it has is on its own (later) day, not today's.
+    items: [
+      ...view.scheduled.filter((t) => !t.proposedBy),
+      ...view.anytime,
+      ...view.due.map((t) => ({ ...t, time: null })),
+    ],
     habitsDue: view.habits.filter((h) => !h.doneToday).length,
   });
   const planned = view.scheduled

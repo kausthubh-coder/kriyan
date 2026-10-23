@@ -21,6 +21,11 @@ export const inbox = query({
   handler: async (ctx) => Views.inboxView(ctx, await requireOwner(ctx)),
 });
 
+export const trash = query({
+  args: {},
+  handler: async (ctx) => Views.trashView(ctx, await requireOwner(ctx)),
+});
+
 export const space = query({
   args: { id: v.id("spaces"), today: v.string() },
   handler: async (ctx, { id, today }) => Views.spaceView(ctx, await requireOwner(ctx), id, today),

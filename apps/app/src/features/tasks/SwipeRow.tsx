@@ -40,15 +40,21 @@ function markOpen(id: string, on: boolean) {
 }
 
 /** On the web, letting go after a swipe still clicks the row; that click shouldn't open the task. */
+function stopClick(e: Event) {
+  e.stopPropagation();
+  e.preventDefault();
+}
+
+/** From the start of a swipe, however long it's held, until just after it's let go. */
 function swallowClick() {
   if (Platform.OS !== "web") return;
-  const stop = (e: Event) => {
-    e.stopPropagation();
-    e.preventDefault();
-  };
-  window.addEventListener("click", stop, { capture: true, once: true });
-  // Long enough for the release; short enough that the next real tap still works.
-  setTimeout(() => window.removeEventListener("click", stop, { capture: true }), 600);
+  window.addEventListener("click", stopClick, { capture: true, once: true });
+}
+
+function stopSwallowingSoon() {
+  if (Platform.OS !== "web") return;
+  // Long enough for the release's own click; short enough that the next real tap still works.
+  setTimeout(() => window.removeEventListener("click", stopClick, { capture: true }), 300);
 }
 
 const ACTION = 88;
@@ -131,6 +137,9 @@ export function SwipeRow({ children, color, onComplete, moveLabel, onMove, onPic
         x.value = withSpring(0, { ...SPRING, velocity: e.velocityX });
         scheduleOnRN(setOpen, false);
       }
+    })
+    .onFinalize(() => {
+      scheduleOnRN(stopSwallowingSoon);
     });
 
   useAnimatedReaction(
@@ -183,6 +192,7 @@ export function SwipeRow({ children, color, onComplete, moveLabel, onMove, onPic
       >
         <Press
           role="button"
+          focusable={isOpen}
           accessibilityLabel={moveLabel}
           onPress={slideOutAndMove}
           hoverBg={null}
@@ -196,6 +206,7 @@ export function SwipeRow({ children, color, onComplete, moveLabel, onMove, onPic
         </Press>
         <Press
           role="button"
+          focusable={isOpen}
           accessibilityLabel="Pick a day"
           onPress={() => {
             setOpen(false);

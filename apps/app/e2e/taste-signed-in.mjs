@@ -12,7 +12,7 @@ process.chdir(new URL("../../../", import.meta.url).pathname.replace(/^\/([A-Z]:
 const TASTE = readFileSync("node_modules/@kausthubh/critly/src/taste.js", "utf8");
 const routes = process.argv.slice(2).length
   ? process.argv.slice(2).map((p) => (p.startsWith("/") ? p : `/${p}`))
-  : ["/today", "/upcoming", "/inbox", "/browse", "/progress", "/settings", "/space:Kriyan"];
+  : ["/today", "/upcoming", "/inbox", "/browse", "/progress", "/settings", "/trash", "/space:Kriyan"];
 const out = ".critly/taste";
 mkdirSync(out, { recursive: true });
 

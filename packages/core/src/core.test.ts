@@ -1,10 +1,18 @@
 import { describe, expect, test } from "vitest";
 import { contrast } from "./color.ts";
 import { addDays, todayIn, weekday, zonedInstant } from "./dates.ts";
-import { describeReminder, describeRepeat, formatDay, formatDuration, repeatPhrase } from "./format.ts";
+import {
+  describeReminder,
+  describeRepeat,
+  formatDay,
+  formatDuration,
+  reminderBody,
+  repeatPhrase,
+} from "./format.ts";
 import { parseTask } from "./parse.ts";
 import type { Repeat } from "./repeat.ts";
 import { freeMinutes, layoutDay } from "./layout.ts";
+import { OPS } from "./ops.ts";
 import { reminderInstants } from "./reminders.ts";
 import { color } from "./tokens.ts";
 
@@ -96,6 +104,16 @@ describe("reminders", () => {
       ),
     ).toEqual(["2026-10-13T08:00:00.000Z"]);
   });
+
+  test("the text says when, from the day it rings", () => {
+    // Mum's birthday on Fri 16 Oct, reminded the evening before.
+    expect(reminderBody({ date: "2026-10-16" }, "2026-10-15")).toBe("Tomorrow");
+    expect(reminderBody({ date: "2026-10-16" }, "2026-10-16")).toBe("Today");
+    expect(reminderBody({ date: "2026-10-16", time: 870 }, "2026-10-16")).toBe("Starts at 14:30");
+    expect(reminderBody({ date: "2026-10-16", time: 540 }, "2026-10-15")).toBe("Tomorrow at 09:00");
+    expect(reminderBody({ date: "2026-10-16", time: 540 }, "2026-10-13")).toBe("Fri 16 Oct at 09:00");
+    expect(reminderBody({ date: "2027-01-02" }, "2026-12-30")).toBe("Sat 2 Jan 2027");
+  });
 });
 
 describe("layout", () => {
@@ -174,5 +192,19 @@ describe("repeatPhrase", () => {
   test.each(cases)("%o reads as %s and parses back to the same rule", (rule, phrase) => {
     expect(repeatPhrase(rule, today)).toBe(phrase);
     expect(parseTask(`x ${phrase}`, today).repeat).toEqual(rule);
+  });
+});
+
+describe("agent operations", () => {
+  test("only writes that create something tell MCP clients they just add", () => {
+    // Everything else edits, moves or removes, so a client may ask the person first.
+    expect(OPS.filter((op) => op.kind === "write" && !op.destructive).map((op) => op.name)).toEqual([
+      "add_task",
+      "restore_task",
+      "add_space",
+      "add_habit",
+      "add_goal",
+      "propose_plan",
+    ]);
   });
 });
