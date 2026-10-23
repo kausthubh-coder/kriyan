@@ -1,4 +1,4 @@
-/* Long-form pages. Text keeps a readable measure (52ch); tables and code may use the full column. */
+/* Long-form pages. Text keeps a readable measure (46ch, about 70 characters); tables and code may use the full column. */
 .prose {
   display: grid;
   gap: var(--s4);
@@ -34,7 +34,7 @@
 .prose p,
 .prose li {
   color: var(--ink-2);
-  max-width: 52ch;
+  max-width: 46ch;
 }
 
 .prose strong {
@@ -63,6 +63,7 @@
 .lede {
   font: var(--body);
   color: var(--ink-2);
+  max-width: 46ch;
 }
 
 /* Inline code: same typeface, a quiet tint so it reads as something you type. */

@@ -1,152 +1,350 @@
-.main {
-  max-width: 1120px;
+/* The landing page's own B2 values, light and dark. Kept here (not in tokens.css) so the page
+   doesn't depend on the shared site tokens while those move to B2. Names start with --k-. */
+:global(html):has(.root) {
+  --k-bg: #ffffff;
+  --k-ink: #111113;
+  --k-ink-2: #3c3c41;
+  --k-muted: #6a6a6f;
+  --k-dim: #76767b;
+  --k-line: #e6e6ea;
+  --k-fill: #f2f2f4;
+  --k-card: #f4f4f6;
+  --k-on-ink: #ffffff;
+  --k-focus: #0a68d6;
+  --k-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 18px 48px rgb(0 0 0 / 0.1);
+  color-scheme: light;
+  background: var(--k-bg);
+}
+@media (prefers-color-scheme: dark) {
+  :global(html):has(.root) {
+    --k-bg: #000000;
+    --k-ink: #f3f3f5;
+    --k-ink-2: #d0d0d5;
+    --k-muted: #a1a1a7;
+    --k-dim: #8e8e94;
+    --k-line: #2e2e32;
+    --k-fill: #1e1e21;
+    --k-card: #151517;
+    --k-on-ink: #000000;
+    --k-focus: #5aa8ff;
+    --k-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 18px 48px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+:global(body):has(.root) {
+  background: var(--k-bg);
+}
+
+.root {
+  /* The shared components on this page (Code, QuickAddDemo, ProductShot) read the site's names;
+     map those names to the landing values inside this page only. */
+  --font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --caption: 500 12px/16px var(--font);
+  --meta: 400 12px/16px var(--font);
+  --body: 400 16px/24px var(--font);
+  --label: 500 16px/24px var(--font);
+  --subhead: 600 16px/24px var(--font);
+  --bg: var(--k-bg);
+  --raised: var(--k-card);
+  --overlay: var(--k-fill);
+  --sunken: var(--k-fill);
+  --ink: var(--k-ink);
+  --ink-2: var(--k-ink-2);
+  --ink-3: var(--k-muted);
+  --on-ink: var(--k-on-ink);
+  --hover: color-mix(in oklab, var(--k-ink) 6%, transparent);
+  --select: color-mix(in oklab, var(--k-ink) 10%, transparent);
+  --line: var(--k-line);
+  --line-strong: var(--k-line);
+  --shadow-raised: none;
+  --shadow-overlay: var(--k-shadow);
+  --r-card: 16px;
+
+  min-height: 100%;
+  background: var(--k-bg);
+  color: var(--k-ink);
+  font: 400 16px/24px var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.root :focus-visible {
+  outline: 2px solid var(--k-focus);
+  outline-offset: 2px;
+}
+
+/* Header */
+.header {
+  max-width: 1184px;
   margin: 0 auto;
-  padding: 0 var(--s8);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font: 600 20px/28px var(--font);
+  letter-spacing: -0.02em;
+  color: var(--k-ink);
+  text-decoration: none;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font: 600 16px/24px var(--font);
+  color: var(--k-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    transform 120ms ease-out,
+    background-color 120ms ease-out;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.quiet {
+  font-weight: 500;
+}
+.quiet:hover {
+  background: var(--k-fill);
+}
+.primary {
+  background: var(--k-ink);
+  color: var(--k-on-ink);
+}
+.secondary {
+  background: var(--k-fill);
+}
+.secondary:hover {
+  background: color-mix(in oklab, var(--k-fill) 88%, var(--k-ink));
+}
+.large {
+  min-height: 48px;
+  padding: 0 24px;
+}
+
+/* Page */
+.main {
+  max-width: 1184px;
+  margin: 0 auto;
+  padding: 0 32px;
 }
 
 .hero {
-  display: grid;
-  gap: var(--s12);
-  padding: var(--s16) 0 var(--s12);
+  padding: 64px 0 48px;
 }
-
-.heroText {
-  display: grid;
-  gap: var(--s4);
-  justify-items: start;
-}
-
 .headline {
-  font: var(--display);
-  letter-spacing: var(--tracking-display);
-  max-width: 14ch;
+  font: 700 56px/60px var(--font);
+  letter-spacing: -0.035em;
+  max-width: 15ch;
+  text-wrap: balance;
 }
-
+.dim {
+  color: var(--k-dim);
+}
 .lede {
-  font: var(--body);
-  color: var(--ink-2);
-  max-width: 52ch;
+  margin-top: 24px;
+  font: 400 20px/28px var(--font);
+  color: var(--k-muted);
+  max-width: 46ch;
+  text-wrap: pretty;
 }
-
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--s3);
-  padding-top: var(--s4);
+  gap: 12px;
+  margin-top: 32px;
+}
+.note {
+  margin-top: 16px;
+  font: 400 14px/20px var(--font);
+  color: var(--k-muted);
+}
+.shot {
+  margin-top: 48px;
 }
 
 .section {
   display: grid;
-  gap: var(--s8);
-  padding: var(--s16) 0;
-  scroll-margin-top: var(--s8);
+  gap: 32px;
+  padding: 96px 0 0;
 }
-
 .intro {
   display: grid;
-  gap: var(--s3);
-  max-width: 52ch;
+  gap: 12px;
+  max-width: 640px;
 }
-
-.intro h2 {
-  font: var(--headline);
-  letter-spacing: var(--tracking-headline);
+.intro h2,
+.closing h2 {
+  font: 700 40px/48px var(--font);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
 }
-
 .intro p {
-  color: var(--ink-2);
+  font: 400 20px/28px var(--font);
+  color: var(--k-muted);
+  text-wrap: pretty;
+}
+.link {
+  color: var(--k-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--k-dim);
+  text-underline-offset: 4px;
+}
+.link:hover {
+  text-decoration-color: currentColor;
 }
 
+/* Three short points, set as columns on wide screens. */
 .points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--s6);
-  list-style: none;
+  gap: 32px;
 }
-
 .points li {
   display: grid;
-  gap: var(--s1);
-  align-content: start;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--k-line);
 }
-
 .points b {
-  font: var(--subhead);
-  letter-spacing: var(--tracking-subhead);
+  font: 500 16px/24px var(--font);
+}
+.points span {
+  color: var(--k-muted);
 }
 
-.points span {
-  color: var(--ink-2);
+.demo {
+  max-width: 720px;
 }
 
 .setup {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s6);
+  gap: 32px;
 }
-
-.setupItem {
+.setup > div {
   display: grid;
-  gap: var(--s3);
+  gap: 12px;
   align-content: start;
 }
-
-.setupItem h3 {
-  font: var(--subhead);
-  letter-spacing: var(--tracking-subhead);
+.setup h3 {
+  font: 600 20px/28px var(--font);
+  letter-spacing: -0.01em;
 }
-
-.setupItem p {
-  color: var(--ink-2);
-}
-
-.link {
-  color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: var(--ink-3);
-  text-underline-offset: 3px;
-  border-radius: var(--r-sm);
-}
-.link:hover {
-  text-decoration-color: var(--ink);
+.setup p {
+  color: var(--k-muted);
 }
 
 .closing {
+  padding: 96px 0;
   display: grid;
+  gap: 8px;
   justify-items: start;
-  gap: var(--s4);
-  padding: var(--s16) 0;
 }
 
-.closing h2 {
-  font: var(--headline);
-  letter-spacing: var(--tracking-headline);
+/* Footer */
+.footer {
+  max-width: 1184px;
+  margin: 0 auto;
+  padding: 32px;
+  border-top: 1px solid var(--k-line);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+}
+.footer p {
+  margin-top: 8px;
+  font: 400 14px/20px var(--font);
+  color: var(--k-muted);
+}
+.footerLinks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 @media (max-width: 760px) {
+  .header,
   .main {
-    padding: 0 var(--s4);
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hideOnPhone {
+    display: none;
   }
   .hero {
-    padding: var(--s8) 0 var(--s8);
-    gap: var(--s8);
+    padding: 32px 0 32px;
   }
   .headline {
-    font: var(--headline);
-    letter-spacing: var(--tracking-headline);
+    font: 700 40px/48px var(--font);
+    letter-spacing: -0.03em;
+  }
+  .lede {
+    font: 400 16px/24px var(--font);
   }
   .actions {
+    display: grid;
     width: 100%;
   }
-  .actions > * {
-    flex: 1 1 auto;
-  }
   .section {
-    padding: var(--s12) 0;
-    gap: var(--s6);
+    padding-top: 64px;
+    gap: 24px;
+  }
+  .intro h2,
+  .closing h2 {
+    font: 700 28px/32px var(--font);
+    letter-spacing: -0.02em;
+  }
+  .intro p {
+    font: 400 16px/24px var(--font);
   }
   .points,
   .setup {
     grid-template-columns: 1fr;
+    gap: 24px;
   }
+  .closing {
+    padding: 64px 0;
+  }
+  .closing .actions {
+    margin-top: 24px;
+  }
+  .footer {
+    padding: 24px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+}
+
+/* The header's link to the app stays quieter than the hero's buttons. */
+.nav .secondary {
+  font-weight: 500;
 }

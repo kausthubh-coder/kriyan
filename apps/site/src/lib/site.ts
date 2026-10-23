@@ -9,6 +9,6 @@ export const APK_URL = `${RELEASES_URL}/latest/download/kriyan.apk`;
 export const MCP_URL = `${SITE_URL}/mcp`;
 
 export const SITE_NAME = "Kriyan";
-export const HEADLINE = "Plan the day calmly. Then do it.";
+export const HEADLINE = "Your whole day, in one calm plan.";
 export const DESCRIPTION =
-  "Kriyan turns everything you have to do into a plan for your time, and keeps that plan quiet enough to follow. Your AI can plan with you.";
+  "Tasks, events, habits and goals on one timeline. Kriyan tells you what's next and how much time is free, and your AI plans with you.";
