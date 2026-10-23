@@ -42,7 +42,7 @@ await toast.waitFor();
 check((await habits()).length === 0, "1440: archived, it's gone from Today's check-ins");
 await page.screenshot({ path: artifact("habit-archived-1440.png") });
 await toast.getByRole("button", { name: "Undo" }).click();
-await page.getByText("Read 20 min").first().waitFor();
+await page.getByText("Read 20 min", { exact: true }).filter({ visible: true }).first().waitFor();
 const back = (await op("get_today")).habits;
 check(
   back.length === 1 && back[0].title === "Read 20 min" && back[0].doneToday,

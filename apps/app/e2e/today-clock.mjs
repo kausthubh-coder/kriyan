@@ -42,16 +42,26 @@ async function open(viewport, hhmm) {
 }
 
 {
+  // The seeded lecture repeats only on Tue and Thu; on other days give today the same overlap.
+  const plan = await op("get_today");
+  if (!JSON.stringify(plan).includes("Calculus II lecture")) {
+    await op("add_task", { text: "Calculus II lecture today 9am for 1h30 #school/calculus" });
+  }
   const { ctx, page } = await open({ width: 1440, height: 900 }, "10:15");
   const now = (await page.getByLabel("Now", { exact: true }).first().innerText()).replace(/\s+/g, " ");
   check(/→ 10:30/.test(now) && /Calculus II lecture/.test(now), `10:15: Now is the lecture (${now})`);
-  check(/Then Write MCP tools, until 11:30/.test(now), "10:15: Next is the block already running, until 11:30");
+  check(
+    /Then Write MCP tools, until 11:30/.test(now),
+    "10:15: Next is the block already running, until 11:30",
+  );
   await page.screenshot({ path: artifact("today-clock-1015-1440.png") });
   await ctx.close();
 }
 
 {
   const { ctx, page } = await open({ width: 390, height: 844 }, "20:30");
+  // The phone opens Today as a list; the block lives on the timeline.
+  await page.getByText("Timeline", { exact: true }).click();
   const block = page.getByRole("button", { name: /^Open Read chapter 7\.4, 22:00/ });
   await block.scrollIntoViewIfNeeded();
   const text = (await block.innerText()).trim();
