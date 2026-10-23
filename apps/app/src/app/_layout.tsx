@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { DarkTheme, Stack, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
@@ -12,7 +12,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { convex } from "@/data/convex";
 import { useAppFonts } from "@/theme/fonts";
-import { c } from "@/theme/tokens";
+import { c, scheme } from "@/theme/tokens";
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 // On the web, Google sign-in returns to this page in a popup; this hands the result back.
@@ -21,9 +21,10 @@ WebBrowser.maybeCompleteAuthSession();
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!publishableKey) throw new Error("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is missing. Run `bun run setup`.");
 
+const base = scheme === "dark" ? DarkTheme : DefaultTheme;
 const navTheme = {
-  ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: c.bg, card: c.bg, text: c.ink, border: c.line, primary: c.ink },
+  ...base,
+  colors: { ...base.colors, background: c.bg, card: c.bg, text: c.ink, border: c.line, primary: c.ink },
 };
 
 export default function RootLayout() {
@@ -34,7 +35,7 @@ export default function RootLayout() {
           <ClerkProvider publishableKey={publishableKey as string} tokenCache={tokenCache}>
             <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
               <ThemeProvider value={navTheme}>
-                <StatusBar style="light" />
+                <StatusBar style="auto" />
                 <Gate />
               </ThemeProvider>
             </ConvexProviderWithClerk>

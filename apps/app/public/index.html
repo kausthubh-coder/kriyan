@@ -18,12 +18,8 @@
         height: 100%;
         flex: 1;
       }
-      /* The page background before the app draws, so there is no white flash. Written by `bun run tokens`. */
-      html,
-      body {
-        background: #110f0d;
-        color-scheme: dark;
-      }
+      /* The page background before the app draws, so there is no flash. Written by `bun run tokens`. */
+      /* FIRST-PAINT */ html, body { background: #ffffff; color-scheme: light; } @media (prefers-color-scheme: dark) { html, body { background: #070709; color-scheme: dark; } } /* /FIRST-PAINT */
     </style>
   </head>
   <body>

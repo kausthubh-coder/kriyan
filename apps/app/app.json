@@ -6,11 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icons/icon.png",
     "scheme": "kriyan",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "android": {
       "package": "app.kriyan",
       "adaptiveIcon": {
-        "backgroundColor": "#110f0d",
+        "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/icons/adaptive-foreground.png",
         "monochromeImage": "./assets/icons/adaptive-monochrome.png"
       },
@@ -23,17 +23,20 @@
       "favicon": "./assets/icons/favicon.png",
       "name": "Kriyan",
       "shortName": "Kriyan",
-      "themeColor": "#110f0d",
-      "backgroundColor": "#110f0d"
+      "themeColor": "#ffffff",
+      "backgroundColor": "#ffffff"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#110f0d",
+          "backgroundColor": "#ffffff",
           "image": "./assets/icons/splash.png",
-          "imageWidth": 96
+          "imageWidth": 96,
+          "dark": {
+            "backgroundColor": "#070709"
+          }
         }
       ],
       "expo-secure-store",
@@ -42,7 +45,7 @@
       [
         "expo-notifications",
         {
-          "color": "#110f0d",
+          "color": "#d42f25",
           "defaultChannel": "reminders"
         }
       ],
@@ -52,7 +55,7 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "backgroundColor": "#110f0d",
+    "backgroundColor": "#ffffff",
     "owner": "kausthubh",
     "extra": {
       "eas": {

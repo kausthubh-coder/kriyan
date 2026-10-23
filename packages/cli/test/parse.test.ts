@@ -1,7 +1,9 @@
 // How the command line is read: task references, "when" phrases, options, the add echo and colour.
 
 import { parseTask } from "@kriyan/core/parse";
-import { spaceColor } from "@kriyan/core/tokens";
+import { schemes } from "@kriyan/core/tokens";
+
+const spaceColor = schemes.dark.space;
 import { describe, expect, test } from "vitest";
 import { parseArgs, UsageError } from "../src/args.ts";
 import { classifyRef, matchTitle, parseWhen, splitMove } from "../src/refs.ts";

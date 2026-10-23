@@ -1,15 +1,15 @@
 // Writes the generated token files. `--check` fails when any of them is out of date (CI runs it).
 import { readFileSync, writeFileSync } from "node:fs";
 import {
-  css,
-  color,
+  font,
   phoneType,
   radius,
-  shadow,
+  schemes,
+  shadows,
   size,
   space,
-  spaceColor,
   SPACE_COLORS,
+  type Scheme,
   type,
   motion,
 } from "../src/tokens.ts";
@@ -33,13 +33,19 @@ const kebab = (s: string) => s.replace(/[A-Z0-9]+/g, (m) => `-${m.toLowerCase()}
 const role = (r: (typeof type)["body"]) => `${r.weight} ${r.size}px/${r.line}px var(--font)`;
 const em = (n: number) => (n === 0 ? "0" : `${n}em`);
 
-const vars = [
-  ...Object.entries(css).map(([k, v]) => `--${kebab(k)}: ${v};`),
+/** The colour variables of one scheme; everything else is the same in both. */
+const schemeVars = (scheme: Scheme) => [
+  ...Object.entries(schemes[scheme].css).map(([k, v]) => `--${kebab(k)}: ${v};`),
   ...SPACE_COLORS.flatMap((c) => [
-    `--${c}: ${spaceColor[c].css};`,
-    `--${c}-surface: ${spaceColor[c].cssSurface};`,
+    `--${c}: ${schemes[scheme].space[c].css};`,
+    `--${c}-surface: ${schemes[scheme].space[c].cssSurface};`,
   ]),
-  `--font: "Figtree", ui-sans-serif, system-ui, sans-serif;`,
+  `--shadow-raised: ${shadows[scheme].raised};`,
+  `--shadow-overlay: ${shadows[scheme].overlay};`,
+];
+
+const vars = [
+  `--font: "${font.family}", ui-sans-serif, system-ui, sans-serif;`,
   ...Object.entries(type).map(([k, r]) => `--${k}: ${role(r)};`),
   ...Object.entries(type).map(([k, r]) => `--tracking-${k}: ${em(r.tracking)};`),
   ...Object.entries(space).map(([k, v]) => `--${k}: ${v}px;`),
@@ -47,8 +53,6 @@ const vars = [
   `--ctl: ${size.ctl}px;`,
   `--row: ${size.row}px;`,
   `--touch: ${size.touch}px;`,
-  `--shadow-raised: ${shadow.raised};`,
-  `--shadow-overlay: ${shadow.overlay};`,
   `--out: cubic-bezier(${motion.easeOut.join(", ")});`,
   `--in-out: cubic-bezier(${motion.easeInOut.join(", ")});`,
   `--press: ${motion.press}ms;`,
@@ -67,8 +71,19 @@ write(
   "apps/site/src/app/tokens.css",
   `/* Generated from packages/core/src/tokens.ts by \`bun run tokens\`. Do not edit. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  ${schemeVars("light").join("\n  ")}
   ${vars.join("\n  ")}
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    ${schemeVars("dark").join("\n    ")}
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  ${schemeVars("dark").join("\n  ")}
 }
 @media (max-width: 760px) {
   :root {
@@ -81,11 +96,17 @@ write(
 // Native startup draws before React, so the splash and window colours live in app.json.
 const appJsonPath = "apps/app/app.json";
 const app = JSON.parse(readFileSync(new URL(appJsonPath, root), "utf8"));
-app.expo.backgroundColor = color.bg;
-app.expo.android.adaptiveIcon.backgroundColor = color.bg;
+const light = schemes.light.color;
+const dark = schemes.dark.color;
+app.expo.userInterfaceStyle = "automatic";
+app.expo.backgroundColor = light.bg;
+app.expo.android.adaptiveIcon.backgroundColor = light.bg;
 app.expo.plugins = app.expo.plugins.map((p: unknown) =>
   Array.isArray(p) && p[0] === "expo-splash-screen"
-    ? ["expo-splash-screen", { ...p[1], backgroundColor: color.bg }]
+    ? [
+        "expo-splash-screen",
+        { ...p[1], backgroundColor: light.bg, dark: { ...p[1].dark, backgroundColor: dark.bg } },
+      ]
     : p,
 );
 write(appJsonPath, `${JSON.stringify(app, null, 2)}\n`);
@@ -93,7 +114,8 @@ write(appJsonPath, `${JSON.stringify(app, null, 2)}\n`);
 // The web app's page background before React draws, so there is no white flash.
 const indexPath = "apps/app/public/index.html";
 const index = readFileSync(new URL(indexPath, root), "utf8");
-write(indexPath, index.replace(/html, body \{ background: [^;]+;/, `html, body { background: ${color.bg};`));
+const firstPaint = `/* FIRST-PAINT */ html, body { background: ${light.bg}; color-scheme: light; } @media (prefers-color-scheme: dark) { html, body { background: ${dark.bg}; color-scheme: dark; } } /* /FIRST-PAINT */`;
+write(indexPath, index.replace(/\/\* FIRST-PAINT \*\/[\s\S]*?\/\* \/FIRST-PAINT \*\//, firstPaint));
 
 if (stale.length) {
   console.error(`Generated token files are out of date: ${stale.join(", ")}. Run \`bun run tokens\`.`);

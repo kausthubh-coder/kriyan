@@ -24,10 +24,22 @@ export async function launch() {
 
 const STATE = artifact("auth-state.json");
 
-/** A context that is signed in: reuses the saved session, or signs in (or up) through the UI. */
-export async function signedInContext(browser, viewport = { width: 1440, height: 900 }) {
+/**
+ * A context that is signed in: reuses the saved session, or signs in (or up) through the UI.
+ * `colorScheme` is "light" (default) or "dark"; SCHEME=dark sets it for every script.
+ */
+export async function signedInContext(
+  browser,
+  viewport = { width: 1440, height: 900 },
+  colorScheme = process.env.SCHEME ?? "light",
+) {
   if (existsSync(STATE)) {
-    const ctx = await browser.newContext({ viewport, storageState: STATE, reducedMotion: "reduce" });
+    const ctx = await browser.newContext({
+      viewport,
+      storageState: STATE,
+      reducedMotion: "reduce",
+      colorScheme,
+    });
     const page = await ctx.newPage();
     await page.goto(`${BASE}/today`);
     // Wait for whichever renders: the app's navigation (signed in) or the sign-in form.
@@ -46,7 +58,7 @@ export async function signedInContext(browser, viewport = { width: 1440, height:
     if (ok) return ctx;
     await ctx.close();
   }
-  const ctx = await browser.newContext({ viewport, reducedMotion: "reduce" });
+  const ctx = await browser.newContext({ viewport, reducedMotion: "reduce", colorScheme });
   const page = await ctx.newPage();
   await signIn(page);
   await ctx.storageState({ path: STATE });

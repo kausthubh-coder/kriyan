@@ -1,9 +1,14 @@
 {
   "$schema": "../node_modules/@kausthubh/critly/policy.schema.json",
-  "fonts": ["Figtree"],
+  "fonts": ["Inter"],
   "typeScale": [12, 14, 16, 20, 28, 40],
   "spacing": [4, 8, 12, 16, 24, 32, 48, 64],
-  "schemes": { "dark": {} },
+  "schemes": {
+    "light": {},
+    "dark": {
+      "media": true
+    }
+  },
   "pages": ["/sign-in", "/today", "/upcoming", "/inbox", "/browse", "/progress", "/settings"],
   "bannedPhrases": ["overdue", "garden", "Oops", "lorem"],
   "rules": {
@@ -12,5 +17,5 @@
     "off-token-color": "error",
     "focus-ring": "error"
   },
-  "note": "Tokens live in packages/core/src/tokens.ts; see docs/design/v3/README.md."
+  "note": "Tokens live in packages/core/src/tokens.ts; the look is docs/design/v4 (B2): light and dark, Inter."
 }

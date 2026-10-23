@@ -18,7 +18,7 @@ A planner that turns everything a person has to do into a plan for their time, a
 | `apps/app`                             | Expo Router app for Android and the web app, one feature per folder in `src/features`                                                                                 |
 | `apps/site`                            | Next.js: landing page, docs, `/mcp` server                                                                                                                            |
 | `packages/cli`                         | The `kriyan` command                                                                                                                                                  |
-| `docs/design/ux.md`, `docs/design/v3/` | How the app works, and how it looks (open `brand.html`)                                                                                                               |
+| `docs/design/ux.md`, `docs/design/v4/` | How the app works, and how it looks (open `b2.html` and `onboarding.html`)                                                                                            |
 
 Business logic lives once, in `packages/core` or `packages/convex/convex/model`. Apps, MCP and the CLI call it.
 
@@ -43,7 +43,7 @@ Every task in a new worktree starts with `worktree-kriyan`. Ship only with `ship
 
 ## Design
 
-- Read `docs/design/v3/README.md` before UI work. Values come from `packages/core/src/tokens.ts` only.
+- Read `docs/design/v4/README.md` before UI work. Values come from `packages/core/src/tokens.ts` only.
 - UI work: use the `critly` skill. Read `.critly/policy.json` before choosing spacing, type or colour, use only its values, and never edit it to pass.
 - After any UI change, run `bun run lint:ui` and fix every error until it exits 0. Exit 2 means it couldn't run; say so, it is not a pass. Then run `bun run taste:ui` (signed in, at 390 and 1440), open the squint and overlay images in `.critly/taste/` for each changed screen, and fix each look or say why the screen needs it.
 - Copy: sentence case, verb plus object on buttons, dates like "Tue 13 Oct", times like "14:30", no em dashes, no guilt ("2 from earlier", never "overdue"). Never invent a task's length.

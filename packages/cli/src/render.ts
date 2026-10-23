@@ -4,7 +4,10 @@
 import { todayIn, zonedParts, type CivilDate } from "@kriyan/core/dates";
 import { formatDate, formatDay, formatDuration, formatTime, formatTimeRange } from "@kriyan/core/format";
 import { freeMinutes } from "@kriyan/core/layout";
-import { spaceColor, type SpaceColor } from "@kriyan/core/tokens";
+import { schemes, type SpaceColor } from "@kriyan/core/tokens";
+
+// Terminals are usually dark, so the dots use the dark scheme's colours.
+const spaceColor = schemes.dark.space;
 import type { Listed } from "./config.ts";
 import type {
   GoalView,

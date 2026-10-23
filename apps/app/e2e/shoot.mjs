@@ -34,7 +34,8 @@ for (const { name, viewport } of widths) {
       await page.waitForURL(/\/space\//);
     } else await page.goto(`${BASE}${route}`);
     await settle(page);
-    const file = `${route.replace(/^\//, "").replace(/[/?=&:]/g, "_") || "root"}-${name}.png`;
+    const suffix = process.env.SCHEME ? `-${process.env.SCHEME}` : "";
+    const file = `${route.replace(/^\//, "").replace(/[/?=&:]/g, "_") || "root"}-${name}${suffix}.png`;
     await page.screenshot({ path: artifact(file), fullPage: process.env.FULL === "1" });
     console.log(`shot ${file}`);
   }

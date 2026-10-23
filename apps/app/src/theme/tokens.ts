@@ -1,36 +1,49 @@
 // The app's theme, built only from @kriyan/core/tokens. On the web every colour is the CSS
-// custom property the site uses (so the browser and the Critly check see real tokens); on
-// Android it is the hex value core computes from the same oklch source.
+// custom property the site uses (so the browser and the Critly check see real tokens), and the
+// stylesheet switches light and dark itself; on Android it is the hex value core computes from
+// the same oklch source, for the scheme the phone was in when the app started.
 
-import { Platform } from "react-native";
+import { Appearance, Platform } from "react-native";
 import { oklchStringToHex } from "@kriyan/core/color";
 import {
-  color as hexColor,
-  css as cssValues,
   font,
   motion,
   radius,
-  shadow,
+  schemes,
+  shadows as schemeShadows,
   size,
   space,
-  spaceColor,
   SPACE_COLORS,
+  type Scheme,
   type SpaceColor,
 } from "@kriyan/core/tokens";
 
 export const isWeb = Platform.OS === "web";
 
-type ColorName = keyof typeof hexColor;
+/** The scheme this run of the app draws in. A change of system scheme applies on next launch. */
+export const scheme: Scheme = startScheme();
+
+function startScheme(): Scheme {
+  if (isWeb && typeof window !== "undefined") {
+    const forced = document.documentElement.dataset.theme;
+    if (forced === "light" || forced === "dark") return forced;
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return Appearance.getColorScheme() === "dark" ? "dark" : "light";
+}
+
+const tokens = schemes[scheme];
+type ColorName = keyof typeof tokens.color;
 
 const kebab = (s: string) => s.replace(/[A-Z0-9]+/g, (m) => `-${m.toLowerCase()}`);
 
 /** Colours for styles: `var(--ink)` on the web, hex on Android. */
 export const c = Object.fromEntries(
-  (Object.keys(hexColor) as ColorName[]).map((k) => [k, isWeb ? `var(--${kebab(k)})` : hexColor[k]]),
+  (Object.keys(tokens.color) as ColorName[]).map((k) => [k, isWeb ? `var(--${kebab(k)})` : tokens.color[k]]),
 ) as Record<ColorName, string>;
 
 /** Hex colours, for SVG strokes and fills (SVG attributes can't read CSS variables). */
-export const hex = hexColor;
+export const hex = tokens.color;
 
 export interface SpaceTone {
   /** The dot, ring, bar and chart colour. */
@@ -42,11 +55,11 @@ export interface SpaceTone {
 }
 
 export function spaceTone(name: SpaceColor | null | undefined): SpaceTone {
-  if (!name) return { dot: c.ink3, surface: c.raised, dotHex: hexColor.ink3 };
+  if (!name) return { dot: c.ink3, surface: c.sunken, dotHex: tokens.color.ink3 };
   return {
-    dot: isWeb ? `var(--${name})` : spaceColor[name].dot,
-    surface: isWeb ? `var(--${name}-surface)` : spaceColor[name].surface,
-    dotHex: spaceColor[name].dot,
+    dot: isWeb ? `var(--${name})` : tokens.space[name].dot,
+    surface: isWeb ? `var(--${name}-surface)` : tokens.space[name].surface,
+    dotHex: tokens.space[name].dot,
   };
 }
 
@@ -60,13 +73,13 @@ export const easeOut = `cubic-bezier(${motion.easeOut.join(", ")})`;
 
 const toNativeShadow = (value: string) => value.replace(/oklch\([^)]*\)/g, (x) => oklchStringToHex(x));
 
-/** Edges from light, not lines. Web reads the oklch shadow; Android gets hex. */
+/** Edges from light, not lines. Web reads the scheme's shadow variable; Android gets hex. */
 export const shadows = {
-  raised: isWeb ? shadow.raised : toNativeShadow(shadow.raised),
-  overlay: isWeb ? shadow.overlay : toNativeShadow(shadow.overlay),
+  raised: isWeb ? "var(--shadow-raised)" : toNativeShadow(schemeShadows[scheme].raised),
+  overlay: isWeb ? "var(--shadow-overlay)" : toNativeShadow(schemeShadows[scheme].overlay),
 } as const;
 
-/** Font family per weight. The web registers one "Figtree" family with three weights. */
+/** Font family per weight. The web registers one "Inter" family with three weights. */
 export function family(weight: "400" | "500" | "600"): {
   fontFamily: string;
   fontWeight?: "400" | "500" | "600";
@@ -74,22 +87,26 @@ export function family(weight: "400" | "500" | "600"): {
   if (isWeb)
     return { fontFamily: `${font.family}, ui-sans-serif, system-ui, sans-serif`, fontWeight: weight };
   return {
-    fontFamily: { "400": "Figtree_400Regular", "500": "Figtree_500Medium", "600": "Figtree_600SemiBold" }[
-      weight
-    ],
+    fontFamily: { "400": "Inter_400Regular", "500": "Inter_500Medium", "600": "Inter_600SemiBold" }[weight],
   };
 }
 
-/** The web stylesheet: tokens as custom properties, the page background, focus rings. */
-export function webCss(): string {
-  const vars = [
-    ...(Object.keys(hexColor) as ColorName[]).map((k) => `--${kebab(k)}: ${cssColor(k)};`),
-    ...SPACE_COLORS.flatMap((name) => [
-      `--${name}: ${spaceColor[name].css};`,
-      `--${name}-surface: ${spaceColor[name].cssSurface};`,
+const schemeVars = (name: Scheme) =>
+  [
+    ...(Object.keys(schemes[name].css) as ColorName[]).map((k) => `--${kebab(k)}: ${schemes[name].css[k]};`),
+    ...SPACE_COLORS.flatMap((sc) => [
+      `--${sc}: ${schemes[name].space[sc].css};`,
+      `--${sc}-surface: ${schemes[name].space[sc].cssSurface};`,
     ]),
-  ];
-  return `:root { color-scheme: dark; ${vars.join(" ")} }
+    `--shadow-raised: ${schemeShadows[name].raised};`,
+    `--shadow-overlay: ${schemeShadows[name].overlay};`,
+  ].join(" ");
+
+/** The web stylesheet: tokens as custom properties for both schemes, the page, focus rings. */
+export function webCss(): string {
+  return `:root { color-scheme: light; ${schemeVars("light")} }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; ${schemeVars("dark")} } }
+:root[data-theme="dark"] { color-scheme: dark; ${schemeVars("dark")} }
 html, body { background: var(--bg); margin: 0; height: 100%; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 #root { display: flex; min-height: 100%; }
 :focus { outline: none; }
@@ -100,8 +117,4 @@ input:focus-visible, textarea:focus-visible { outline: none !important; }
 input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
 ::selection { background: var(--line-strong); }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0ms !important; animation-duration: 0ms !important; } }`;
-}
-
-function cssColor(name: ColorName): string {
-  return cssValues[name];
 }
