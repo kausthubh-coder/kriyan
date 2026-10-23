@@ -1,5 +1,5 @@
-// The week under Today's header, Joi's way: today outlined with its weekday in red, past days
-// quiet. Another day opens the week, where that day's plan lives.
+// The week under Today's header and on the phone's Week, Joi's way: the selected day outlined,
+// today's weekday in red, past days quiet. On Today another day opens the Week on that day.
 
 import { View } from "react-native";
 import { router } from "expo-router";
@@ -10,11 +10,32 @@ import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
 import { weekOf } from "./TodayHeader";
 
-export function WeekStrip({ today }: { today: CivilDate }) {
+export function WeekStrip({
+  today,
+  selected = today,
+  onSelect,
+}: {
+  today: CivilDate;
+  /** The outlined day, and the week shown. Defaults to today. */
+  selected?: CivilDate;
+  /** Without it, picking another day opens the Week on that day. */
+  onSelect?: (date: CivilDate) => void;
+}) {
   return (
-    <View accessibilityLabel="This week" style={{ flexDirection: "row", gap: s.s1 }}>
-      {weekOf(today).map((date) => {
+    <View
+      accessibilityLabel={selected === today ? "This week" : "Week"}
+      style={{
+        flexDirection: "row",
+        gap: s.s1,
+        paddingBottom: s.s2,
+        borderBottomWidth: 1,
+        borderStyle: "dotted",
+        borderColor: c.lineStrong,
+      }}
+    >
+      {weekOf(selected).map((date) => {
         const isToday = date === today;
+        const isSelected = date === selected;
         const past = date < today;
         return (
           <Press
@@ -22,7 +43,14 @@ export function WeekStrip({ today }: { today: CivilDate }) {
             role="button"
             accessibilityLabel={formatDate(date)}
             aria-current={isToday ? "date" : undefined}
-            onPress={() => (isToday ? undefined : router.push("/upcoming"))}
+            aria-pressed={onSelect ? isSelected : undefined}
+            onPress={() =>
+              onSelect
+                ? onSelect(date)
+                : isToday
+                  ? undefined
+                  : router.push({ pathname: "/upcoming", params: { day: date } })
+            }
             style={{
               flex: 1,
               minHeight: 56,
@@ -31,10 +59,10 @@ export function WeekStrip({ today }: { today: CivilDate }) {
               gap: 2,
               borderRadius: r.card,
               borderWidth: 1,
-              borderColor: isToday ? c.lineStrong : "transparent",
+              borderColor: isSelected ? c.lineStrong : "transparent",
             }}
           >
-            <Txt variant="subhead" tone={isToday ? "ink" : past ? "ink3" : "ink2"} tnum>
+            <Txt variant="subhead" tone={isSelected ? "ink" : past ? "ink3" : "ink2"} tnum>
               {String(Number(date.slice(8)))}
             </Txt>
             <Txt

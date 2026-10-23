@@ -175,10 +175,10 @@ describe("colour", () => {
 
   test("only the space dot is coloured, with the token's colour", () => {
     const text = renderToday(f.today(), { color: true, now }, new RefBook());
-    expect(spaceColor.blue.dot).toBe("#7db1dd");
-    expect(spaceColor.green.dot).toBe("#84ba8f");
-    const blue = "\x1b[38;2;125;177;221m●\x1b[39m";
-    const green = "\x1b[38;2;132;186;143m●\x1b[39m";
+    expect(spaceColor.blue.dot).toBe("#0093eb");
+    expect(spaceColor.green.dot).toBe("#17a750");
+    const blue = "\x1b[38;2;0;147;235m●\x1b[39m";
+    const green = "\x1b[38;2;23;167;80m●\x1b[39m";
     expect(text).toContain(`\n  3  14:00–15:30  ${blue} Essay draft       School\n`);
     // A habit with no space keeps its place in the column.
     expect(text).toContain(

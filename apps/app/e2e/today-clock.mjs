@@ -2,7 +2,8 @@
 // - 14:00: a block that slipped (10:00 "Write MCP tools", not done) stays on the schedule
 //   instead of folding away under "Earlier today".
 // - 10:15: two blocks overlap; Now shows the running one and Next the other running one.
-// - 20:30 at 390: the 30-minute 22:00 block shows its title alone, not two clipped lines.
+// - 20:30 at 390: on the phone's spine the 22:00 block (no length) reads its time, "no length"
+//   (never an invented one) and its whole title, each on its own line.
 // - On "Problem set 4"'s due day: a task due that day with no day of its own is on the list.
 // Run after seed.mjs. Prints ok or FAIL per step; screenshots go to .artifacts/app/.
 //   node apps/app/e2e/today-clock.mjs
@@ -64,8 +65,20 @@ async function open(viewport, hhmm) {
   await page.getByText("Timeline", { exact: true }).click();
   const block = page.getByRole("button", { name: /^Open Read chapter 7\.4, 22:00/ });
   await block.scrollIntoViewIfNeeded();
-  const text = (await block.innerText()).trim();
-  check(text === "Read chapter 7.4", `20:30 at 390: the short block shows its title alone ("${text}")`);
+  // The phone's timeline is the spine (b2.html `.tl`), not the hour grid: each item has room
+  // for its times and title, so the check is that all three lines are there and whole.
+  const lines = (await block.innerText())
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  check(
+    JSON.stringify(lines) === JSON.stringify(["22:00", "22:00 · no length", "Read chapter 7.4"]),
+    `20:30 at 390: the 22:00 item shows its time, no length and its title (${JSON.stringify(lines)})`,
+  );
+  const clipped = await block
+    .getByText("Read chapter 7.4", { exact: true })
+    .evaluate((el) => el.scrollWidth > el.clientWidth);
+  check(!clipped, "20:30 at 390: the title is not cut off");
   await block.screenshot({ path: artifact("today-clock-2030-390-block.png") });
   await page.screenshot({ path: artifact("today-clock-2030-390.png") });
   await ctx.close();

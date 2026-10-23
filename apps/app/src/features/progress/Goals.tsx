@@ -1,14 +1,15 @@
-// Goals against pace: where you are, where a steady pace would put you today, and in words.
+// Goals against pace: how much is left, when it is due, and where a steady pace would put you.
 
 import { useRef, useState } from "react";
 import { View } from "react-native";
 import { useMutation } from "convex/react";
 import { api } from "@kriyan/convex/api";
+import { diffDays } from "@kriyan/core/dates";
 import { formatDate } from "@kriyan/core/format";
 import type { ProgressView } from "@/data/views";
 import { errorText } from "@/features/tasks/actions";
 import { DayPicker } from "@/features/tasks/pickers";
-import { c, r, s, spaceTone } from "@/theme/tokens";
+import { c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Chip, Field } from "@/ui/bits";
 import { Popover } from "@/ui/Popover";
@@ -25,75 +26,123 @@ function amount(goal: Goal, n: number) {
     : `${v}${goal.unit ? ` ${goal.unit}` : ""}`;
 }
 
-export function paceText(goal: Goal, today: string): string {
-  const due = goal.dueDate ? formatDate(goal.dueDate, today) : null;
-  if (goal.current >= goal.target) return "Done";
-  if (goal.pace === null) return "No due date";
-  const expected = goal.pace * goal.target;
-  const diff = goal.current - expected;
-  if (Math.abs(diff) < goal.target * 0.04) return due ? `On pace, due ${due}` : "On pace";
-  if (diff > 0) return `${amount(goal, diff)} ahead of pace`;
-  return `${amount(goal, -diff)} behind pace${due ? `, due ${due}` : ""}`;
+/** Where the goal stands against a steady pace, in words; null when done or without a due date. */
+function paceText(goal: Goal): string | null {
+  if (goal.current >= goal.target || goal.pace === null) return null;
+  const diff = goal.current - goal.pace * goal.target;
+  if (Math.abs(diff) < goal.target * 0.04) return "On pace";
+  return diff > 0 ? `${amount(goal, diff)} ahead of pace` : `${amount(goal, -diff)} behind pace`;
 }
 
+/** "Due Fri 20 Nov · 30 days left". A date that has passed only says when it was due. */
+function dueText(goal: Goal, today: string): string | null {
+  if (!goal.dueDate) return null;
+  const left = diffDays(goal.dueDate, today);
+  if (left === 0) return "Due today";
+  const due = `Due ${formatDate(goal.dueDate, today)}`;
+  if (left < 0) return due;
+  return `${due} · ${left} ${left === 1 ? "day" : "days"} left`;
+}
+
+function daysLeftText(goal: Goal, today: string): string | null {
+  if (!goal.dueDate) return null;
+  const left = diffDays(goal.dueDate, today);
+  if (left <= 0) return dueText(goal, today);
+  return `${left} ${left === 1 ? "day" : "days"} left`;
+}
+
+/** Up to this many steps, a count goal draws one segment per step, like the prototype. */
+const MAX_SEGMENTS = 12;
+
+/**
+ * One goal as the prototype draws it (b2.html `.goal`): the title, a segmented bar (or a plain one
+ * for big numbers), what's left beside the due date, and where a steady pace would put you.
+ */
 export function GoalView({ goal, color, today }: { goal: Goal; color: string; today: string }) {
   const update = useMutation(api.organize.updateGoal);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(String(goal.current));
   const ref = useRef<View>(null);
-  const meta =
-    goal.kind === "tasks"
-      ? `${goal.current} of ${goal.target} tasks`
-      : `${goal.current} of ${goal.target}${goal.unit ? ` ${goal.unit}` : ""}`;
+  const unit = goal.kind === "tasks" ? (goal.target === 1 ? "task" : "tasks") : (goal.unit ?? "");
+  const of = `${goal.current} of ${goal.target}${unit ? ` ${unit}` : ""}`;
+  const left = Math.max(0, Math.round((goal.target - goal.current) * 10) / 10);
+  const segments =
+    goal.kind === "tasks" && Number.isInteger(goal.target) && goal.target > 1 && goal.target <= MAX_SEGMENTS
+      ? goal.target
+      : null;
+  // Beside a plain bar the prototype keeps the right side short: just the days left.
+  const due = segments ? dueText(goal, today) : daysLeftText(goal, today);
+  const pace = paceText(goal);
   return (
-    <View style={{ gap: s.s2 }}>
+    <View style={{ borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong }}>
       <Press
         ref={ref}
         role="button"
-        accessibilityLabel={`${goal.title}, ${meta}. Update progress`}
+        accessibilityLabel={`${goal.title}, ${of}. Update progress`}
         onPress={() => setOpen(true)}
         hoverBg={null}
         scale={false}
-        style={{ gap: s.s2 }}
+        style={{ gap: s.s2, paddingVertical: s.s4 }}
       >
-        <View style={{ flexDirection: "row", alignItems: "baseline", gap: s.s3 }}>
-          <Txt variant="label" style={{ flex: 1 }}>
-            {goal.title}
-          </Txt>
-          <Txt variant="meta" tone="ink3" tnum>
-            {meta}
-          </Txt>
-        </View>
-        <View style={{ height: 4, borderRadius: 2, backgroundColor: c.lineStrong }}>
+        <Txt variant="subhead">{goal.title}</Txt>
+        {segments ? (
+          <View style={{ flexDirection: "row", gap: s.s1 }} aria-hidden>
+            {Array.from({ length: segments }, (_, k) => (
+              <View
+                key={k}
+                style={{
+                  flex: 1,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: k < goal.current ? color : c.line,
+                }}
+              />
+            ))}
+          </View>
+        ) : (
           <View
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: `${Math.round(goal.progress * 100)}%`,
-              borderRadius: 2,
-              backgroundColor: color,
-            }}
-          />
-          {goal.pace !== null ? (
+            style={{ height: 6, borderRadius: 3, backgroundColor: c.line, overflow: "hidden" }}
+            aria-hidden
+          >
             <View
-              accessibilityLabel="Where a steady pace would be today"
               style={{
-                position: "absolute",
-                top: -4,
-                bottom: -4,
-                left: `${Math.round(goal.pace * 100)}%`,
-                width: 2,
-                borderRadius: 1,
-                backgroundColor: c.ink2,
+                width: `${Math.round(goal.progress * 100)}%`,
+                height: "100%",
+                borderRadius: 3,
+                backgroundColor: color,
               }}
             />
+          </View>
+        )}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: s.s3 }}>
+          <Txt variant="meta" tone="ink3" tnum style={{ flex: 1 }}>
+            {left > 0 ? (
+              <>
+                <Txt variant="meta" tnum style={family("600")}>
+                  {left} to go
+                </Txt>
+                {segments ? ` of ${goal.target} ${unit}` : ` · ${of}`}
+              </>
+            ) : (
+              <>
+                <Txt variant="meta" tnum style={family("600")}>
+                  Done
+                </Txt>
+                {` · ${of}`}
+              </>
+            )}
+          </Txt>
+          {due ? (
+            <Txt variant="meta" tone="ink3" tnum>
+              {due}
+            </Txt>
           ) : null}
         </View>
-        <Txt variant="meta" tone="ink3">
-          {paceText(goal, today)}
-        </Txt>
+        {pace ? (
+          <Txt variant="meta" tone="ink2">
+            {pace}
+          </Txt>
+        ) : null}
       </Press>
       <Popover open={open} onClose={() => setOpen(false)} anchor={ref} title={goal.title} width={300}>
         {goal.kind === "number" ? (

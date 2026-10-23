@@ -6,6 +6,7 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNotifications } from "@/features/notifications/register";
 import { CommandMenu } from "@/features/shell/CommandMenu";
+import { DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { TASK_SHEET_DETENTS } from "@/features/tasks/TaskPanel";
 import { OfflineNotice } from "@/features/shell/OfflineNotice";
 import { useSession } from "@/features/shell/session";
@@ -30,7 +31,7 @@ export default function AppLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="index" />
         <Stack.Screen name="space/[id]" />
-        <Stack.Screen name="progress" />
+        <Stack.Screen name="inbox" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="review" />
         <Stack.Screen
@@ -59,8 +60,8 @@ export default function AppLayout() {
           }}
         />
       </Stack>
-      {/* Above the navigation bar and the floating add button. */}
-      <ToastHost bottom={insets.bottom + 80 + 16 + 56 + 8} />
+      {/* Above the floating dock. */}
+      <ToastHost bottom={insets.bottom + DOCK_CLEARANCE} />
       <CommandMenu />
     </View>
   );

@@ -1,37 +1,37 @@
-// Progress: time done this week and this year split by space, a year heatmap, goals against
-// pace, and habits by the week ("weeks on target", never a streak that resets).
+// Goals and habits (b2.html?screen=goals): the time left in the year and free this week, goals
+// with what's left and when they're due, habits by the week ("weeks on target", never a streak
+// that resets), then the last 12 months of time done, split by space.
 
-import { useRef, useState } from "react";
-import { View } from "react-native";
+import { useRef, useState, type ReactNode } from "react";
+import { useWindowDimensions, View } from "react-native";
+import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { CalendarCheck, Pencil, Plus } from "lucide-react-native";
+import { CalendarCheck, Circle, CircleCheck, Pencil, Plus } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
-import { addDays, parts, startOfWeek, weekday, type CivilDate } from "@kriyan/core/dates";
-import { formatDate, MONTH_SHORT } from "@kriyan/core/format";
+import { addDays, diffDays, parts, startOfWeek, weekday, type CivilDate } from "@kriyan/core/dates";
+import { formatDate, MONTH_SHORT, WEEKDAY_SHORT } from "@kriyan/core/format";
+import { freeMinutes } from "@kriyan/core/layout";
 import { useClock } from "@/data/time";
-import { useProgressView, useSpaces, type ProgressView } from "@/data/views";
+import { useProfile, useProgressView, useSpaces, useWeekView, type ProgressView } from "@/data/views";
 import { errorText } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
+import { useIsPhone } from "@/theme/layout";
 import { c, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Chip, Dot, Field, Skeleton } from "@/ui/bits";
+import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
-import { PageHead, Screen, SectionHead } from "@/ui/Screen";
+import { Press } from "@/ui/Press";
+import { PageHead, Screen } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 import { AddGoal, GoalView } from "./Goals";
+import { SectionLabel } from "./SectionLabel";
 
-function isoWeek(date: CivilDate): number {
-  // The Thursday of this week decides the year; weeks start on Monday.
-  const thursday = addDays(date, 3 - weekday(date));
-  const [y] = parts(thursday);
-  const jan4 = `${y}-01-04`;
-  return (
-    Math.round((Date.parse(startOfWeek(thursday)) - Date.parse(startOfWeek(jan4))) / (7 * 86_400_000)) + 1
-  );
-}
+const TITLE = "Goals and habits";
+const SUB = "What you're working towards, and the time you still have.";
 
 const hoursText = (m: number) => (m < 60 ? `${m} min` : `${Math.round(m / 60)} h`);
 
@@ -39,12 +39,12 @@ export function ProgressScreen() {
   const view = useProgressView();
   const { today } = useClock();
   return (
-    <Screen title="Progress" back>
-      <PageHead big title="Progress" sub={`Week ${isoWeek(today)}`} />
+    <Screen title={TITLE} sub={SUB}>
+      <PageHead big title={TITLE} sub={SUB} />
       {view === undefined ? (
         <View testID="skeleton" style={{ gap: s.s6 }}>
-          <Skeleton width={160} height={28} />
-          <Skeleton width="100%" height={6} />
+          <Skeleton width="100%" height={120} />
+          <Skeleton width={160} height={16} />
           <Skeleton width="100%" height={84} />
         </View>
       ) : (
@@ -55,20 +55,81 @@ export function ProgressScreen() {
 }
 
 function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
-  const spaces = useSpaces();
   const [addingGoal, setAddingGoal] = useState(false);
   const [addingHabit, setAddingHabit] = useState(false);
   const total = view.bySpace.reduce((sum, b) => sum + b.minutes, 0);
-  const colorOf = (spaceId: string | null) =>
-    spaceTone(spaces?.find((sp) => sp._id === spaceId)?.color ?? null).dot;
+  const doneToday = view.habits.filter((h) => h.days.some((d) => d.date === today && d.done)).length;
   return (
     <>
-      <View style={{ gap: s.s4 }}>
+      <TimeLeft today={today} />
+
+      <View>
+        <SectionLabel
+          title="Goals"
+          count={view.goals.length ? String(view.goals.length) : undefined}
+          right={
+            <Button
+              variant="quiet"
+              icon={Plus}
+              label="Add goal"
+              onPress={() => setAddingGoal(!addingGoal)}
+              expanded={addingGoal}
+            />
+          }
+        />
+        {addingGoal ? <AddGoal today={today} onDone={() => setAddingGoal(false)} /> : null}
+        {view.goals.length ? (
+          <View>
+            {view.goals.map((g) => (
+              <GoalView key={g._id} goal={g} color={c.ink} today={today} />
+            ))}
+          </View>
+        ) : addingGoal ? null : (
+          <Txt variant="body" tone="ink3">
+            A goal is a target with a date: a number of tasks, kilometres or pages. Kriyan shows whether
+            you’re on pace.
+          </Txt>
+        )}
+      </View>
+
+      <View>
+        <SectionLabel
+          title="Habits today"
+          count={view.habits.length ? `${doneToday} of ${view.habits.length}` : undefined}
+          right={
+            <Button
+              variant="quiet"
+              icon={Plus}
+              label="Add habit"
+              onPress={() => setAddingHabit(!addingHabit)}
+              expanded={addingHabit}
+            />
+          }
+        />
+        {addingHabit ? <AddHabit onDone={() => setAddingHabit(false)} /> : null}
+        {view.habits.length ? (
+          <>
+            {view.habits.map((h) => (
+              <HabitRow key={h._id} habit={h} today={today} />
+            ))}
+            <Txt variant="meta" tone="ink3" style={{ marginTop: s.s3 }}>
+              Missed days stay quiet. One miss never resets anything.
+            </Txt>
+          </>
+        ) : addingHabit ? null : (
+          <Txt variant="body" tone="ink3">
+            A habit has a weekly target, like reading 4 times a week. Missing a day never resets anything.
+          </Txt>
+        )}
+      </View>
+
+      <View style={{ gap: s.s3 }}>
+        <SectionLabel title="The last 12 months" />
         {/* Two big zeros on a new account read as a score; the line below says what comes. */}
         {view.yearMinutes > 0 ? (
           <View style={{ flexDirection: "row", gap: s.s12 }}>
             <View style={{ gap: s.s1 }}>
-              <Txt variant="headline" tnum>
+              <Txt variant="title" tnum>
                 {hoursText(view.weekMinutes)}
               </Txt>
               <Txt variant="meta" tone="ink3">
@@ -76,7 +137,7 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
               </Txt>
             </View>
             <View style={{ gap: s.s1 }}>
-              <Txt variant="headline" tnum>
+              <Txt variant="title" tnum>
                 {hoursText(view.yearMinutes)}
               </Txt>
               <Txt variant="meta" tone="ink3">
@@ -117,68 +178,113 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
             Tick tasks off and the time they take shows up here, split by space.
           </Txt>
         )}
-      </View>
-
-      <View style={{ gap: s.s3 }}>
-        <SectionHead title="The last 12 months" />
         <YearHeat heat={view.heat} />
-      </View>
-
-      <View style={{ gap: s.s3 }}>
-        <SectionHead
-          title="Goals"
-          right={
-            <Button
-              icon={Plus}
-              label="Add goal"
-              onPress={() => setAddingGoal(!addingGoal)}
-              expanded={addingGoal}
-            />
-          }
-        />
-        {addingGoal ? <AddGoal today={today} onDone={() => setAddingGoal(false)} /> : null}
-        {view.goals.length ? (
-          <View style={{ gap: s.s6 }}>
-            {view.goals.map((g) => (
-              <GoalView key={g._id} goal={g} color={colorOf(g.spaceId)} today={today} />
-            ))}
-          </View>
-        ) : addingGoal ? null : (
-          <Txt variant="body" tone="ink3">
-            A goal is a target with a date: a number of tasks, kilometres or pages. Kriyan shows whether
-            you’re on pace.
-          </Txt>
-        )}
-      </View>
-
-      <View style={{ gap: s.s3 }}>
-        <SectionHead
-          title="Habits"
-          meta="This week"
-          right={
-            <Button
-              icon={Plus}
-              label="Add habit"
-              onPress={() => setAddingHabit(!addingHabit)}
-              expanded={addingHabit}
-            />
-          }
-        />
-        {addingHabit ? <AddHabit onDone={() => setAddingHabit(false)} /> : null}
-        {view.habits.length ? (
-          <View style={{ gap: s.s8 }}>
-            {view.habits.map((h) => (
-              <HabitRow key={h._id} habit={h} today={today} />
-            ))}
-          </View>
-        ) : addingHabit ? null : (
-          <Txt variant="body" tone="ink3">
-            A habit has a weekly target, like reading 4 times a week. Missing a day never resets anything.
-          </Txt>
-        )}
       </View>
     </>
   );
+}
+
+/** One square per week of the year (b2.html `.weeks`): weeks gone are grey, this one is red. */
+function WeekDots({ count, current }: { count: number; current: number }) {
+  return (
+    <View aria-hidden style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s1, marginTop: s.s3 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <View
+          key={i}
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: 3,
+            backgroundColor: i < current ? c.ink3 : i === current ? c.now : c.line,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+function Card({ children, flex }: { children: ReactNode; flex?: number }) {
+  return (
+    <View
+      style={{ flex, minWidth: 0, gap: 2, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/**
+ * The time you still have (b2.html `.tlc`): days left in the year, and the free time left this
+ * week. The prototype's semester card waits for the app to know about semesters.
+ */
+function TimeLeft({ today }: { today: CivilDate }) {
+  const phone = useIsPhone();
+  const [year] = parts(today);
+  const daysLeft = diffDays(`${year}-12-31`, today) + 1;
+  const week = Math.min(51, Math.floor(diffDays(today, `${year}-01-01`) / 7));
+  const free = useFreeThisWeek(today);
+  return (
+    <View style={{ flexDirection: phone ? "column" : "row", gap: s.s3 }}>
+      <Card flex={phone ? undefined : 1.6}>
+        <Txt variant="headline" tnum>
+          {daysLeft}
+        </Txt>
+        <Txt variant="meta" tone="ink3">
+          {daysLeft === 1 ? "day" : "days"} left in {year}
+        </Txt>
+        <WeekDots count={52} current={week} />
+      </Card>
+      <Card flex={phone ? undefined : 1}>
+        <View
+          style={{
+            flex: 1,
+            flexDirection: phone ? "row" : "column",
+            alignItems: phone ? "center" : "flex-start",
+            gap: s.s3,
+          }}
+        >
+          <View style={{ flex: phone ? 1 : undefined, gap: 2 }}>
+            <Txt variant="headline" tnum>
+              {free === null ? "–" : `${Math.round(free.minutes / 6) / 10} h`}
+            </Txt>
+            <Txt variant="meta" tone="ink3">
+              {free === null ? "free this week" : `free this week, ${free.range}`}
+            </Txt>
+          </View>
+          {phone ? null : <View style={{ flex: 1 }} />}
+          <Button
+            label="Plan it"
+            onPress={() => router.push("/upcoming")}
+            style={{ borderRadius: r.pill, backgroundColor: c.hover }}
+          />
+        </View>
+      </Card>
+    </View>
+  );
+}
+
+/**
+ * Free minutes from now to the end of this week, between each day's start and end, less what's
+ * planned with a length: Today's count of free time, over the days left in the week.
+ */
+function useFreeThisWeek(today: CivilDate): { minutes: number; range: string } | null {
+  const { now } = useClock();
+  const profile = useProfile();
+  const week = useWeekView(startOfWeek(today));
+  if (!profile || !week) return null;
+  let minutes = 0;
+  for (const day of week.days) {
+    if (day.date < today) continue;
+    const busy = day.scheduled
+      .filter((t) => !t.done && t.length && !t.proposedBy)
+      .map((t) => ({ id: t._id, start: t.time ?? 0, length: t.length ?? undefined }));
+    const from = day.date === today ? Math.max(now, profile.dayStart) : profile.dayStart;
+    minutes += freeMinutes(busy, from, profile.dayEnd);
+  }
+  const end = addDays(startOfWeek(today), 6);
+  const range =
+    today === end ? "today" : `${WEEKDAY_SHORT[weekday(today)]} to ${WEEKDAY_SHORT[weekday(end)]}`;
+  return { minutes, range };
 }
 
 /** Four steps of opacity, from a little to a lot. */
@@ -280,13 +386,31 @@ function YearHeat({ heat }: { heat: ProgressView["heat"] }) {
   );
 }
 
+/** The last four weeks, one dot a day (b2.html `.dots`). */
+const RECENT_DAYS = 28;
+const ICON = 24;
+/** The tick's hit area reaches past its icon without moving the title. */
+const TICK = ICON + 2 * s.s3;
+/** The dots and actions line up with the title, past the tick. */
+const INDENT = ICON + s.s3;
+
 function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; today: string }) {
   const check = useMutation(api.organize.checkHabit);
   const [fixing, setFixing] = useState(false);
   const [editing, setEditing] = useState(false);
   const ref = useRef<View>(null);
   const editRef = useRef<View>(null);
-  const color = spaceTone(habit.color ?? "green").dot;
+  const win = useWindowDimensions();
+  const [side, setSide] = useState<"below" | "above">("below");
+  // Habits sit low on the page; a popover opened in the bottom half grows upward so it stays on screen.
+  const openFrom = (anchor: typeof ref, open: () => void) => {
+    const node = anchor.current;
+    if (!node) return open();
+    node.measureInWindow((_x, y) => {
+      setSide(y > win.height / 2 ? "above" : "below");
+      open();
+    });
+  };
   // Weeks on target among the finished weeks shown (the current week is still going).
   const weekStart = startOfWeek(today);
   const weeks = new Map<string, number>();
@@ -299,56 +423,94 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
   const target =
     habit.target === 7 ? "Every day" : `${habit.target} ${habit.target === 1 ? "time" : "times"} a week`;
   const doneOn = new Set(habit.days.filter((d) => d.done).map((d) => d.date));
+  const doneToday = doneOn.has(today);
+  const recent = habit.days.slice(-RECENT_DAYS);
+  const recentDone = recent.filter((d) => d.done).length;
   return (
-    <View style={{ gap: s.s3 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s6 }}>
-        <View style={{ flex: 1, gap: 2 }}>
+    <View
+      style={{
+        paddingVertical: s.s3,
+        borderBottomWidth: 1,
+        borderStyle: "dotted",
+        borderColor: c.lineStrong,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s3 }}>
+        <Press
+          role="checkbox"
+          aria-checked={doneToday}
+          accessibilityLabel={`${habit.title} today`}
+          onPress={() => {
+            toggleHaptic(!doneToday);
+            void check({ id: habit._id as Id<"habits">, done: !doneToday, date: today }).catch((e: unknown) =>
+              showToast(errorText(e)),
+            );
+          }}
+          hoverBg={null}
+          style={{ width: TICK, height: TICK, alignItems: "center", justifyContent: "center", margin: -s.s3 }}
+        >
+          <Icon icon={doneToday ? CircleCheck : Circle} size={ICON} tone={doneToday ? "ink3" : "ink2"} />
+        </Press>
+        <View style={{ flex: 1 }}>
           <Txt variant="label">{habit.title}</Txt>
           <Txt variant="meta" tone="ink3">
             {target}, {onTarget} {onTarget === 1 ? "week" : "weeks"} on target
           </Txt>
         </View>
-        <View style={{ alignItems: "flex-end", gap: s.s1 }}>
-          <Txt variant="meta" tone="ink2" tnum>
+        <View style={{ alignItems: "flex-end" }}>
+          <Txt variant="meta" tone="ink3" tnum>
             {habit.thisWeek} of {habit.target}
           </Txt>
-          <View
-            style={{ flexDirection: "row", gap: s.s1 }}
-            aria-label={`${habit.thisWeek} of ${habit.target} this week`}
-          >
-            {Array.from({ length: habit.target }, (_, k) => (
-              <View
-                key={k}
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: k < habit.thisWeek ? color : "transparent",
-                  borderWidth: k < habit.thisWeek ? 0 : 1.5,
-                  borderColor: c.lineStrong,
-                }}
-              />
-            ))}
-          </View>
+          <Txt variant="caption" tone="ink3">
+            this week
+          </Txt>
         </View>
       </View>
-      <Heat
-        days={habit.days.map((d) => ({ date: d.date, value: d.done ? 1 : 0 }))}
-        color={color}
-        label={`${habit.title}, the last 26 weeks`}
-      />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", marginLeft: -s.s3 }}>
+      <View style={{ flexDirection: "row", gap: s.s3, marginTop: s.s3 }}>
+        <View style={{ width: ICON }} />
+        <View
+          role="img"
+          aria-label={`${recentDone} of the last ${recent.length} days done`}
+          style={{ flex: 1, flexDirection: "row", gap: s.s1 }}
+        >
+          {recent.map((d) => (
+            <View
+              key={d.date}
+              style={{
+                flex: 1,
+                // Wide desktop columns would otherwise blow the dots up to coins.
+                maxWidth: 16,
+                aspectRatio: 1,
+                borderRadius: r.pill,
+                backgroundColor: d.done ? c.ink2 : c.line,
+              }}
+            />
+          ))}
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", marginLeft: INDENT - s.s3, marginTop: s.s1 }}>
         <View ref={ref} collapsable={false}>
-          <Button variant="quiet" icon={CalendarCheck} label="Fix a day" onPress={() => setFixing(true)} />
+          <Button
+            variant="quiet"
+            icon={CalendarCheck}
+            label="Fix a day"
+            onPress={() => openFrom(ref, () => setFixing(true))}
+          />
         </View>
         <View ref={editRef} collapsable={false}>
-          <Button variant="quiet" icon={Pencil} label="Edit habit" onPress={() => setEditing(true)} />
+          <Button
+            variant="quiet"
+            icon={Pencil}
+            label="Edit habit"
+            onPress={() => openFrom(editRef, () => setEditing(true))}
+          />
         </View>
       </View>
       <Popover
         open={editing}
         onClose={() => setEditing(false)}
         anchor={editRef}
+        side={side}
         title="Edit habit"
         width={320}
       >
@@ -358,6 +520,7 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
         open={fixing}
         onClose={() => setFixing(false)}
         anchor={ref}
+        side={side}
         title={`Fix a day for ${habit.title}`}
       >
         <Txt variant="meta" tone="ink3">

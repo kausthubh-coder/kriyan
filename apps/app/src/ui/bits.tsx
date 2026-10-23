@@ -17,6 +17,7 @@ export function Check({
   label,
   size,
   disabled,
+  round,
 }: {
   color: string;
   done: boolean;
@@ -24,9 +25,15 @@ export function Check({
   label: string;
   size?: number;
   disabled?: boolean;
+  /**
+   * A space-coloured ring, for blocks on the timeline. Without it the check is the prototype's
+   * rounded square in ink, faint with a tick once done (b2.html `.tick`).
+   */
+  round?: boolean;
 }) {
   const phone = useIsPhone();
   const d = size ?? (phone ? 22 : 18);
+  const ring = round ? color : done ? c.ink3 : c.ink2;
   // The visible ring stays small; the target grows to 44 on touch (Hit Areas).
   const target = phone ? 44 : 32;
   const inset = (target - d) / 2;
@@ -52,22 +59,24 @@ export function Check({
           style={{
             width: d,
             height: d,
-            borderRadius: d / 2,
-            borderWidth: done ? 0 : 1.5,
-            borderColor: color,
-            backgroundColor: done ? color : "transparent",
+            borderRadius: round ? d / 2 : d * 0.28,
+            borderWidth: round && done ? 0 : 1.75,
+            borderColor: ring,
+            backgroundColor: round && done ? color : "transparent",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          {done ? <CheckGlyph size={d * 0.62} color={hex.bg} strokeWidth={3} /> : null}
+          {done ? (
+            <CheckGlyph size={d * 0.62} color={round ? hex.bg : hex.ink3} strokeWidth={round ? 3 : 2.25} />
+          ) : null}
           {!done && hovered ? (
             <View
               style={{
                 position: "absolute",
                 inset: 0,
-                borderRadius: d / 2,
-                backgroundColor: color,
+                borderRadius: round ? d / 2 : d * 0.28,
+                backgroundColor: ring,
                 opacity: 0.14,
               }}
             />

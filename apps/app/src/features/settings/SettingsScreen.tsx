@@ -1,12 +1,13 @@
-// Settings: your day, default reminders, agents, connecting an AI, access tokens, account.
+// Settings (b2.html?screen=settings): who's signed in, then your day, default reminders, agents
+// and the command line, access tokens, recently deleted, and deleting your data.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Linking, Modal, View } from "react-native";
+import { Linking, Modal, Platform, View } from "react-native";
 import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { BookOpen, Bot, Copy, KeyRound, LogOut, RotateCcw, Terminal, Trash2 } from "lucide-react-native";
+import { BookOpen, KeyRound, Link, RotateCcw, Terminal, Trash2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
@@ -16,15 +17,16 @@ import type { Reminder } from "@kriyan/core/reminders";
 import { useClock } from "@/data/time";
 import { useAccessTokens, useProfile, type Profile } from "@/data/views";
 import { forgetDevice } from "@/features/notifications/register";
+import { SectionLabel } from "@/features/progress/SectionLabel";
 import { errorText } from "@/features/tasks/actions";
 import { ReminderEditor } from "@/features/tasks/ReminderEditor";
-import { useControl, useIsPhone } from "@/theme/layout";
-import { c, r, s, shadows } from "@/theme/tokens";
+import { useIsPhone } from "@/theme/layout";
+import { c, family, r, s, shadows } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Chip, Field, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
-import { PageHead, Screen, SectionHead } from "@/ui/Screen";
+import { PageHead, Screen } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
 import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
@@ -34,6 +36,13 @@ export const MCP_URL = "https://kriyan.app/mcp";
 export const CLI_LINE = "bun run kriyan login";
 export const MCP_DOCS = "https://kriyan.app/docs/mcp";
 export const CLI_DOCS = "https://kriyan.app/docs/cli";
+
+const MONO = Platform.OS === "web" ? "ui-monospace, Menlo, Consolas, monospace" : "monospace";
+
+/** The prototype's small round button on a card (b2.html `.btn-sm`). */
+const small = { borderRadius: r.pill, backgroundColor: c.hover } as const;
+/** The prototype's dotted rule between rows. */
+const rule = { borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong } as const;
 
 async function copy(text: string, what: string) {
   await Clipboard.setStringAsync(text);
@@ -47,18 +56,20 @@ export function SettingsScreen() {
       <PageHead big title="Settings" />
       {profile === undefined ? (
         <View testID="skeleton" style={{ gap: s.s4 }}>
+          <Skeleton width="100%" height={72} />
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} width={`${70 - i * 10}%`} />
           ))}
         </View>
       ) : (
         <>
+          <AccountCard profile={profile} />
           <YourDay profile={profile} />
           <DefaultReminders profile={profile} />
           <ConnectAI profile={profile} />
           <Tokens />
           <Deleted />
-          <Account />
+          <DeleteData />
         </>
       )}
     </Screen>
@@ -71,18 +82,97 @@ function useUpdateProfile() {
     update(patch).catch((e: unknown) => showToast(errorText(e)));
 }
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  const phone = useIsPhone();
+/** A section: the quiet uppercase label, then its rows. */
+function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
+  return (
+    <View nativeID={id} style={{ gap: s.s2 }}>
+      <SectionLabel title={title} />
+      {children}
+    </View>
+  );
+}
+
+/** Who's signed in (b2.html `.acct`), with Sign out beside them. */
+function AccountCard({ profile }: { profile: Profile }) {
+  const { signOut } = useClerk();
+  const { user } = useUser();
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
+  const name = profile.name?.trim() || user?.firstName || email || "You";
+  const google = user?.externalAccounts.some((a) => a.provider.includes("google"));
+  const how = name === email ? (google ? "Signed in with Google" : "Signed in") : (email ?? "Signed in");
   return (
     <View
       style={{
-        flexDirection: phone ? "column" : "row",
-        alignItems: phone ? "flex-start" : "center",
-        gap: phone ? s.s2 : s.s6,
-        paddingVertical: s.s2,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s3,
+        padding: s.s3,
+        paddingLeft: s.s4,
+        borderRadius: r.sheet,
+        backgroundColor: c.sunken,
       }}
     >
-      <View style={{ width: phone ? undefined : 200, gap: 2 }}>
+      <View
+        aria-hidden
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: r.pill,
+          backgroundColor: c.ink,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Txt variant="subhead" tone="onInk">
+          {name.charAt(0).toUpperCase()}
+        </Txt>
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt variant="subhead" numberOfLines={1}>
+          {name}
+        </Txt>
+        <Txt variant="meta" tone="ink3" numberOfLines={1}>
+          {how}
+        </Txt>
+      </View>
+      <Button
+        label="Sign out"
+        onPress={() => void forgetDevice().finally(() => void signOut())}
+        style={small}
+      />
+    </View>
+  );
+}
+
+/**
+ * One setting (b2.html `.togrow`): its name and a hint on the left, the control on the right,
+ * over a dotted rule. Controls too wide for the right side go under the name instead.
+ */
+function Row({
+  label,
+  hint,
+  children,
+  below,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+  below?: boolean;
+}) {
+  const phone = useIsPhone();
+  const stack = below && phone;
+  return (
+    <View
+      style={{
+        flexDirection: stack ? "column" : "row",
+        alignItems: stack ? "flex-start" : "center",
+        gap: stack ? s.s2 : s.s4,
+        minHeight: 48,
+        paddingVertical: s.s2,
+        ...rule,
+      }}
+    >
+      <View style={{ flex: stack ? undefined : 1 }}>
         <Txt variant="label">{label}</Txt>
         {hint ? (
           <Txt variant="meta" tone="ink3">
@@ -90,15 +180,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
           </Txt>
         ) : null}
       </View>
-      <View
-        style={{
-          flex: phone ? undefined : 1,
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: s.s2,
-          alignItems: "center",
-        }}
-      >
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, alignItems: "center" }}>
         {children}
       </View>
     </View>
@@ -130,7 +212,7 @@ function TimeField({
       onChangeText={setText}
       onBlur={commit}
       onSubmitEditing={commit}
-      containerStyle={{ width: 120 }}
+      containerStyle={{ width: 96 }}
     />
   );
 }
@@ -139,43 +221,43 @@ function YourDay({ profile }: { profile: Profile }) {
   const update = useUpdateProfile();
   const hours = profile.dailyCapacity / 60;
   return (
-    <View style={{ gap: s.s2 }}>
-      <SectionHead title="Your day" />
-      <Row label="Day starts" hint="The schedule starts here">
-        <TimeField
-          key={profile.dayStart}
-          label="Day starts"
-          value={profile.dayStart}
-          onSave={(dayStart) => void update({ dayStart })}
-        />
-      </Row>
-      <Row label="Day ends" hint="Free time is counted until here">
-        <TimeField
-          key={profile.dayEnd}
-          label="Day ends"
-          value={profile.dayEnd}
-          onSave={(dayEnd) => void update({ dayEnd })}
-        />
-      </Row>
-      <Row label="Daily capacity" hint="Planned work a day can hold, for the load lines">
-        {[4, 5, 6, 7, 8].map((h) => (
-          <Chip
-            key={h}
-            label={`${h} h`}
-            on={hours === h}
-            onPress={() => void update({ dailyCapacity: h * 60 })}
+    <Section title="Your day">
+      <View>
+        <Row label="Day starts" hint="The schedule starts here">
+          <TimeField
+            key={profile.dayStart}
+            label="Day starts"
+            value={profile.dayStart}
+            onSave={(dayStart) => void update({ dayStart })}
           />
-        ))}
-      </Row>
-    </View>
+        </Row>
+        <Row label="Day ends" hint="Free time is counted until here">
+          <TimeField
+            key={profile.dayEnd}
+            label="Day ends"
+            value={profile.dayEnd}
+            onSave={(dayEnd) => void update({ dayEnd })}
+          />
+        </Row>
+        <Row label="Daily capacity" hint="Planned work a day can hold, for the load lines" below>
+          {[4, 5, 6, 7, 8].map((h) => (
+            <Chip
+              key={h}
+              label={`${h} h`}
+              on={hours === h}
+              onPress={() => void update({ dailyCapacity: h * 60 })}
+            />
+          ))}
+        </Row>
+      </View>
+    </Section>
   );
 }
 
 function DefaultReminders({ profile }: { profile: Profile }) {
   const update = useUpdateProfile();
   return (
-    <View style={{ gap: s.s2 }}>
-      <SectionHead title="Default reminders" />
+    <Section title="Default reminders">
       <Txt variant="body" tone="ink3">
         Added to new tasks that have a time. You can change them on any task.
       </Txt>
@@ -184,34 +266,67 @@ function DefaultReminders({ profile }: { profile: Profile }) {
         timed
         onChange={(defaultReminders) => void update({ defaultReminders })}
       />
+    </Section>
+  );
+}
+
+/** A value to copy, in monospace, with its Copy button (b2.html `.conn-r code`). */
+function CopyLine({ text, what, label = "Copy" }: { text: string; what: string; label?: string }) {
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: s.s2 }}>
+      <View
+        style={{
+          flexShrink: 1,
+          paddingHorizontal: s.s3,
+          paddingVertical: s.s2,
+          borderRadius: r.ctl,
+          backgroundColor: c.hover,
+        }}
+      >
+        <Txt variant="body" selectable numberOfLines={1} style={{ fontFamily: MONO }}>
+          {text}
+        </Txt>
+      </View>
+      <Button
+        label={label}
+        accessibilityLabel={`Copy ${what}`}
+        onPress={() => void copy(text, what)}
+        style={small}
+      />
     </View>
   );
 }
 
-function CopyLine({ icon, text, what }: { icon: typeof Bot; text: string; what: string }) {
-  const { ctl } = useControl();
+/** One way to connect (b2.html `.conn-r`): an icon, what it is, and what to do. */
+function ConnRow({
+  icon,
+  title,
+  meta,
+  children,
+  last,
+}: {
+  icon: typeof Link;
+  title: string;
+  meta: string;
+  children?: ReactNode;
+  last?: boolean;
+}) {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: s.s3,
-        minHeight: ctl,
-        paddingLeft: s.s3,
-        borderRadius: r.ctl,
-        backgroundColor: c.sunken,
-      }}
-    >
-      <Icon icon={icon} size={16} />
-      <Txt variant="body" style={{ flex: 1 }} selectable numberOfLines={1}>
-        {text}
-      </Txt>
-      <Button
-        icon={Copy}
-        label="Copy"
-        accessibilityLabel={`Copy ${what}`}
-        onPress={() => void copy(text, what)}
-      />
+    <View style={{ gap: s.s3, paddingVertical: s.s3, ...(last ? null : rule) }}>
+      <View style={{ flexDirection: "row", gap: s.s3 }}>
+        <View style={{ paddingTop: 2 }}>
+          <Icon icon={icon} size={20} tone="ink2" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Txt variant="label" style={family("600")}>
+            {title}
+          </Txt>
+          <Txt variant="meta" tone="ink3">
+            {meta}
+          </Txt>
+        </View>
+      </View>
+      {children ? <View style={{ gap: s.s2 }}>{children}</View> : null}
     </View>
   );
 }
@@ -219,39 +334,62 @@ function CopyLine({ icon, text, what }: { icon: typeof Bot; text: string; what: 
 function ConnectAI({ profile }: { profile: Profile }) {
   const update = useUpdateProfile();
   return (
-    <View style={{ gap: s.s3 }} nativeID="connect-ai">
-      <SectionHead title="Connect an AI" />
-      <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
-        Claude, ChatGPT, Cursor and other assistants can read your plan and plan with you. Add Kriyan as an
-        MCP server with this address; you’ll sign in when it connects.
-      </Txt>
-      <CopyLine icon={Bot} text={MCP_URL} what="the MCP address" />
-      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
-        <Button icon={BookOpen} label="Read the setup guide" onPress={() => void Linking.openURL(MCP_DOCS)} />
-      </View>
-      <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
-        Or use the command line. In a copy of Kriyan’s code, run this, then paste an access token from below.
-      </Txt>
-      <CopyLine icon={Terminal} text={CLI_LINE} what="the command" />
-      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
-        <Button icon={BookOpen} label="Read the CLI guide" onPress={() => void Linking.openURL(CLI_DOCS)} />
+    <Section title="Agents and automations" id="connect-ai">
+      <View
+        style={{
+          paddingHorizontal: s.s4,
+          paddingVertical: s.s1,
+          borderRadius: r.sheet,
+          backgroundColor: c.sunken,
+        }}
+      >
+        <ConnRow
+          icon={Link}
+          title="MCP server"
+          meta="For Claude, ChatGPT, Cursor and other assistants. Add Kriyan as an MCP server with this address; you’ll sign in when it connects."
+        >
+          <CopyLine text={MCP_URL} what="the MCP address" label="Copy URL" />
+          <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+            <Button
+              icon={BookOpen}
+              label="Read the setup guide"
+              onPress={() => void Linking.openURL(MCP_DOCS)}
+            />
+          </View>
+        </ConnRow>
+        <ConnRow
+          icon={Terminal}
+          title="Command line"
+          meta="For scripts and scheduled runs. In a copy of Kriyan’s code, run this, then paste an access token from below."
+          last
+        >
+          <CopyLine text={CLI_LINE} what="the command" />
+          <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+            <Button
+              icon={BookOpen}
+              label="Read the CLI guide"
+              onPress={() => void Linking.openURL(CLI_DOCS)}
+            />
+          </View>
+        </ConnRow>
       </View>
       <Press
         role="switch"
         aria-checked={profile.agentsEditDirectly}
+        accessibilityLabel="Let agents edit directly"
         onPress={() => void update({ agentsEditDirectly: !profile.agentsEditDirectly })}
         scale={false}
+        hoverBg={null}
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: s.s3,
+          gap: s.s4,
+          minHeight: 48,
           paddingVertical: s.s2,
-          paddingHorizontal: s.s2,
-          marginHorizontal: -s.s2,
-          borderRadius: r.ctl,
+          ...rule,
         }}
       >
-        <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flex: 1 }}>
           <Txt variant="label">Let agents edit directly</Txt>
           <Txt variant="meta" tone="ink3">
             {profile.agentsEditDirectly
@@ -259,26 +397,35 @@ function ConnectAI({ profile }: { profile: Profile }) {
               : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."}
           </Txt>
         </View>
-        <View
-          style={{
-            width: 44,
-            height: 24,
-            borderRadius: 12,
-            padding: 4,
-            backgroundColor: profile.agentsEditDirectly ? c.ink : c.lineStrong,
-            alignItems: profile.agentsEditDirectly ? "flex-end" : "flex-start",
-          }}
-        >
-          <View
-            style={{
-              width: 16,
-              height: 16,
-              borderRadius: 8,
-              backgroundColor: profile.agentsEditDirectly ? c.onInk : c.ink2,
-            }}
-          />
-        </View>
+        <Switch on={profile.agentsEditDirectly} />
       </Press>
+    </Section>
+  );
+}
+
+/** The prototype's switch (b2.html `.switch`): green when on, a white knob that slides. */
+function Switch({ on }: { on: boolean }) {
+  return (
+    <View
+      aria-hidden
+      style={{
+        width: 48,
+        height: 28,
+        borderRadius: r.pill,
+        padding: s.s1,
+        backgroundColor: on ? c.done : c.lineStrong,
+        alignItems: on ? "flex-end" : "flex-start",
+      }}
+    >
+      <View
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: r.pill,
+          backgroundColor: c.headInk,
+          boxShadow: shadows.raised,
+        }}
+      />
     </View>
   );
 }
@@ -306,8 +453,7 @@ function Tokens() {
   };
   const day = (ms: number) => formatDate(new Date(ms).toISOString().slice(0, 10), today);
   return (
-    <View style={{ gap: s.s3 }}>
-      <SectionHead title="Access tokens" />
+    <Section title="Access tokens">
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
         For the command line and scripts. Each token can read and change your plan, so give it a name you’ll
         recognise and revoke it when you stop using it.
@@ -317,17 +463,16 @@ function Tokens() {
           role="alert"
           style={{
             gap: s.s2,
-            padding: s.s3,
-            borderRadius: r.card,
-            backgroundColor: c.raised,
-            boxShadow: shadows.raised,
+            padding: s.s4,
+            borderRadius: r.sheet,
+            backgroundColor: c.sunken,
           }}
         >
           <Txt variant="label">Copy your new token now</Txt>
           <Txt variant="meta" tone="ink3">
             You won’t see it again. Paste it when kriyan login asks.
           </Txt>
-          <CopyLine icon={KeyRound} text={fresh} what="the token" />
+          <CopyLine text={fresh} what="the token" />
           <Button label="I've copied it" onPress={() => setFresh(null)} style={{ alignSelf: "flex-end" }} />
         </View>
       ) : null}
@@ -358,10 +503,17 @@ function Tokens() {
           {tokens.map((t) => (
             <View
               key={t._id}
-              style={{ flexDirection: "row", alignItems: "center", gap: s.s3, paddingVertical: s.s2 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: s.s3,
+                minHeight: 48,
+                paddingVertical: s.s2,
+                ...rule,
+              }}
             >
               <Icon icon={KeyRound} size={16} />
-              <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flex: 1 }}>
                 <Txt variant="label">{t.name}</Txt>
                 <Txt variant="meta" tone="ink3">
                   {t.hint}… made {day(t.createdAt)}
@@ -371,6 +523,7 @@ function Tokens() {
               <Button
                 label="Revoke"
                 accessibilityLabel={`Revoke ${t.name}`}
+                style={small}
                 onPress={() =>
                   void revoke({ id: t._id as Id<"accessTokens"> })
                     .then(() => showToast(`Revoked ${t.name}. Anything using it is signed out.`))
@@ -381,46 +534,36 @@ function Tokens() {
           ))}
         </View>
       )}
-    </View>
+    </Section>
   );
 }
 
 function Deleted() {
   return (
-    <View style={{ gap: s.s3 }}>
-      <SectionHead title="Recently deleted" />
+    <Section title="Recently deleted">
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
         A task you delete waits 30 days before it’s gone for good, so you can bring it back.
       </Txt>
       <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
         <Button icon={RotateCcw} label="Open recently deleted" onPress={() => router.push("/trash")} />
       </View>
-    </View>
+    </Section>
   );
 }
 
-function Account() {
-  const { signOut } = useClerk();
-  const { user } = useUser();
+/** Sign out sits in the account card at the top; this is the one way to leave for good. */
+function DeleteData() {
   const [confirm, setConfirm] = useState(false);
   return (
-    <View style={{ gap: s.s3 }}>
-      <SectionHead title="Account" />
-      {user ? (
-        <Txt variant="body" tone="ink3">
-          Signed in as {user.primaryEmailAddress?.emailAddress ?? "you"}
-        </Txt>
-      ) : null}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginLeft: -s.s3 }}>
-        <Button
-          icon={LogOut}
-          label="Sign out"
-          onPress={() => void forgetDevice().finally(() => void signOut())}
-        />
+    <Section title="Account">
+      <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
+        Deleting your data removes everything you’ve made in Kriyan, and your account.
+      </Txt>
+      <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
         <Button icon={Trash2} label="Delete my data" onPress={() => setConfirm(true)} />
       </View>
       {confirm ? <DeleteDialog onClose={() => setConfirm(false)} /> : null}
-    </View>
+    </Section>
   );
 }
 

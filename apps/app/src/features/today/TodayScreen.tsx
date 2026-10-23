@@ -33,6 +33,7 @@ import { Txt } from "@/ui/Txt";
 import { DragGhost } from "./DragGhost";
 import { DragSource } from "./DragSource";
 import { PlanToday } from "./PlanToday";
+import { Spine } from "./Spine";
 import { Timeline } from "./Timeline";
 import { TodayHeader } from "./TodayHeader";
 import { WeekStrip } from "./WeekStrip";
@@ -80,7 +81,6 @@ export function TodayScreen() {
       <Screen
         title="Today"
         hero={header}
-        fab
         width={split ? sz.column + s.s12 + sz.schedule : "column"}
         panelCovers={split}
       >
@@ -221,20 +221,23 @@ function TodayBody({
   const anytimeRows = (
     <View>
       {[...view.due, ...view.anytime].map((t) => (
-        <TaskRow
-          key={`${t._id}:${t.date}`}
-          task={t}
-          today={today}
-          movable
-          wrap={(row) => (
-            <DragSource taskId={t._id} title={t.title} color={spaceTone(t.color).dot} length={t.length}>
-              {row}
-            </DragSource>
-          )}
-        />
+        <Dotted key={`${t._id}:${t.date}`}>
+          <TaskRow
+            task={t}
+            today={today}
+            movable
+            wrap={(row) => (
+              <DragSource taskId={t._id} title={t.title} color={spaceTone(t.color).dot} length={t.length}>
+                {row}
+              </DragSource>
+            )}
+          />
+        </Dotted>
       ))}
       {view.done.map((t) => (
-        <TaskRow key={`${t._id}:${t.date}:done`} task={t} today={today} />
+        <Dotted key={`${t._id}:${t.date}:done`}>
+          <TaskRow task={t} today={today} />
+        </Dotted>
       ))}
     </View>
   );
@@ -271,7 +274,9 @@ function TodayBody({
                 <SectionHead title={part.title} meta={`${items.length}`} />
                 <View>
                   {items.map((t) => (
-                    <TaskRow key={`${t._id}:${t.date}`} task={t} today={today} movable clock />
+                    <Dotted key={`${t._id}:${t.date}`}>
+                      <TaskRow task={t} today={today} movable clock />
+                    </Dotted>
                   ))}
                 </View>
               </View>
@@ -280,7 +285,10 @@ function TodayBody({
     </View>
   );
 
-  const schedule = (
+  // Phones get the spine (b2.html `.tl`); the hour grid, with dragging, stays on desktop.
+  const schedule = phone ? (
+    <Spine date={today} items={view.scheduled} now={now} />
+  ) : (
     <View style={{ gap: s.s2 }}>
       <SectionHead
         title="Schedule"
@@ -358,6 +366,13 @@ function TodayBody({
       <View style={{ flex: 1, minWidth: 0, gap: s.s8 }}>{list}</View>
       <View style={{ width: sz.schedule }}>{panelOpen ? null : schedule}</View>
     </View>
+  );
+}
+
+/** The prototype's dotted rule under each row of the day's list (b2.html `.row`). */
+function Dotted({ children }: { children: ReactNode }) {
+  return (
+    <View style={{ borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong }}>{children}</View>
   );
 }
 
@@ -455,6 +470,7 @@ function UpNext({ current, next, now }: { current?: TaskView; next?: TaskView; n
           icon={Play}
           label={current ? "Focus" : "Start focus"}
           onPress={() => router.push(`/focus/${lead._id}`)}
+          style={{ borderRadius: r.pill, paddingHorizontal: s.s4 }}
         />
       )}
     </View>

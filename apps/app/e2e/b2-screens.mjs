@@ -54,11 +54,11 @@ for (const [name, viewport] of [
   await page.goto(`${BASE}/review`);
   await settle(page);
   await shot("review-done");
-  const give = page.getByRole("button", { name: /Give \d+ a place|Look at tomorrow/ });
+  const give = page.getByRole("button", { name: /^Next: (\d+ things? still open|tomorrow)$/ });
   check(`${name}: review opens on what got done`, (await give.count()) > 0);
   const label = (await give.textContent()) ?? "";
   await give.click();
-  if (label.startsWith("Give")) {
+  if (/still open/.test(label)) {
     await settle(page);
     await shot("review-decide");
     const before = await page.getByText(/^\d+ of \d+\./).textContent();

@@ -5,7 +5,7 @@
 import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
 import { CommandMenu } from "@/features/shell/CommandMenu";
-import { NavBar, NAVBAR_HEIGHT } from "@/features/shell/NavBar";
+import { Dock, DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { useSession } from "@/features/shell/session";
 import { useShortcuts } from "@/features/shell/shortcuts";
 import { Sidebar } from "@/features/shell/Sidebar";
@@ -26,8 +26,11 @@ export default function AppLayout() {
   useSession();
   useShortcuts();
   const phone = useIsPhone();
+  const path = usePathname();
   // Focus takes the whole window: no sidebar, no navigation bar, one task.
-  const immersive = usePathname().startsWith("/focus/");
+  const immersive = path.startsWith("/focus/");
+  // Like the prototype, the dock leaves for a sheet (a task, quick add) and the evening review.
+  const dock = phone && !immersive && !path.startsWith("/task/") && path !== "/add" && path !== "/review";
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg, height: "100%" }}>
       {phone || immersive ? null : <Sidebar />}
@@ -39,7 +42,7 @@ export default function AppLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="index" />
           <Stack.Screen name="space/[id]" />
-          <Stack.Screen name="progress" />
+          <Stack.Screen name="inbox" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="review" />
           <Stack.Screen name="focus/[id]" />
@@ -48,8 +51,8 @@ export default function AppLayout() {
           <Stack.Screen name="add" options={overlay} />
         </Stack>
       </View>
-      {phone && !immersive ? <NavBar /> : null}
-      <ToastHost bottom={phone ? NAVBAR_HEIGHT + 56 + s.s8 : s.s6} />
+      {dock ? <Dock /> : null}
+      <ToastHost bottom={phone ? DOCK_CLEARANCE : s.s6} />
       <CommandMenu />
     </View>
   );

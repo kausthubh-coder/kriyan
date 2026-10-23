@@ -8,7 +8,7 @@ const page = await ctx.newPage();
 page.setDefaultTimeout(60000);
 await page.goto(`${BASE}/today`);
 await settle(page);
-await page.getByRole("button", { name: "Add task" }).click();
+await page.getByRole("button", { name: "Add a task" }).click();
 const title = `Essay draft ${Date.now() % 10000}`;
 const field = page.getByRole("textbox", { name: "Add a task" });
 await field.pressSequentially(`${title} fri 5pm #school every week remind 1h before`, { delay: 5 });

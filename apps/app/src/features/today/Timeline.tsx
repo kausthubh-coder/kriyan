@@ -172,6 +172,7 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                   ) : (
                     <View style={{ marginTop: h < 28 ? 4 : 10 }}>
                       <Check
+                        round
                         size={16}
                         color={tone.dot}
                         done={done}

@@ -1,0 +1,133 @@
+// The phone's navigation on Android and the web (docs/design/v4, b2.html `.dock`): a pill of
+// four tabs floating 14 above the bottom edge, at most 528 wide, with the round add button
+// beside it. The same component on both, so the app looks like the prototype rather than a
+// Material navigation bar.
+
+import { View } from "react-native";
+import { router, usePathname, type Href } from "expo-router";
+import { Layers, Plus, Sun, Target, Table2, type LucideIcon } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { c, s, shadows } from "@/theme/tokens";
+import { Icon } from "@/ui/Icon";
+import { Press } from "@/ui/Press";
+import { Txt } from "@/ui/Txt";
+
+/** The pill's height, its gap above the bottom edge, and the room content leaves under it. */
+export const DOCK_HEIGHT = 60;
+export const DOCK_GAP = 14;
+export const DOCK_CLEARANCE = DOCK_HEIGHT + DOCK_GAP + s.s4;
+
+const FAB = 58;
+const MAX_WIDTH = 528;
+
+// The prototype's fourth tab is Ask, which isn't built yet; Browse holds the Inbox, spaces,
+// search and Settings until it is.
+const TABS: { href: Href; match: (p: string) => boolean; icon: LucideIcon; label: string }[] = [
+  { href: "/today", match: (p) => p === "/today" || p === "/", icon: Sun, label: "Today" },
+  { href: "/upcoming", match: (p) => p === "/upcoming", icon: Table2, label: "Week" },
+  { href: "/progress", match: (p) => p === "/progress", icon: Target, label: "Goals" },
+  {
+    href: "/browse",
+    match: (p) =>
+      p === "/browse" || p === "/inbox" || p.startsWith("/space/") || p === "/settings" || p === "/trash",
+    icon: Layers,
+    label: "Browse",
+  },
+];
+
+export function Dock() {
+  const path = usePathname();
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: DOCK_GAP + insets.bottom,
+        alignItems: "center",
+        zIndex: 6,
+      }}
+    >
+      <View
+        pointerEvents="box-none"
+        style={{
+          width: "100%",
+          maxWidth: MAX_WIDTH + 2 * DOCK_GAP,
+          paddingHorizontal: DOCK_GAP,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <View
+          role="navigation"
+          aria-label="Main"
+          style={{
+            flex: 1,
+            height: DOCK_HEIGHT,
+            flexDirection: "row",
+            justifyContent: "space-around",
+            alignItems: "center",
+            padding: 5,
+            borderRadius: DOCK_HEIGHT / 2,
+            borderWidth: 1,
+            borderColor: c.line,
+            backgroundColor: c.raised,
+            boxShadow: shadows.overlay,
+          }}
+        >
+          {TABS.map((tab) => {
+            const active = tab.match(path);
+            return (
+              <Press
+                key={tab.label}
+                role="link"
+                aria-current={active ? "page" : undefined}
+                accessibilityLabel={tab.label}
+                onPress={() => {
+                  if (!active) router.navigate(tab.href);
+                }}
+                hoverBg={null}
+                scale={false}
+                ripple={false}
+                style={{
+                  minWidth: 58,
+                  height: 48,
+                  paddingHorizontal: 10,
+                  borderRadius: 24,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: active ? c.sunken : "transparent",
+                }}
+              >
+                <Icon icon={tab.icon} size={20} tone={active ? "ink" : "ink3"} />
+                <Txt variant="caption" tone={active ? "ink" : "ink3"} style={{ fontWeight: "600" }}>
+                  {tab.label}
+                </Txt>
+              </Press>
+            );
+          })}
+        </View>
+        <Press
+          role="button"
+          accessibilityLabel="Add a task"
+          onPress={() => router.push("/add")}
+          hoverBg={null}
+          style={{
+            width: FAB,
+            height: FAB,
+            borderRadius: FAB / 2,
+            backgroundColor: c.ink,
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: shadows.overlay,
+          }}
+        >
+          <Icon icon={Plus} size={24} tone="onInk" />
+        </Press>
+      </View>
+    </View>
+  );
+}

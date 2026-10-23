@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { Link, router, type Href } from "expo-router";
-import { ChevronRight, Plus, Search, SlidersHorizontal, Target } from "lucide-react-native";
+import { ChevronRight, Inbox, Plus, Search, SlidersHorizontal } from "lucide-react-native";
 import { useSpaces } from "@/data/views";
 import { openCommand } from "@/features/shell/context";
 import { useControl } from "@/theme/layout";
@@ -66,7 +66,7 @@ export function BrowseScreen() {
   const spaces = useSpaces();
   const [adding, setAdding] = useState(false);
   return (
-    <Screen title="Browse" fab>
+    <Screen title="Browse">
       <PageHead title="Browse" />
       <View style={{ gap: s.s2 }}>
         <NavRow
@@ -118,11 +118,7 @@ export function BrowseScreen() {
       <View style={{ gap: s.s2 }}>
         <SectionHead title="More" />
         <View>
-          <NavRow
-            href="/progress"
-            label="Progress: goals, habits, time"
-            leading={<Icon icon={Target} size={16} />}
-          />
+          <NavRow href="/inbox" label="Inbox" leading={<Icon icon={Inbox} size={16} />} />
           <NavRow href="/settings" label="Settings" leading={<Icon icon={SlidersHorizontal} size={16} />} />
         </View>
       </View>

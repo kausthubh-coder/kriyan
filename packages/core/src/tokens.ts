@@ -103,10 +103,11 @@ const spaceHue: Record<SpaceColor, number> = {
   pink: 345,
 };
 // Dots carry meaning only next to a name, so they need 3:1, not 4.5:1, against their ground.
+// B2's spaces are vivid in both schemes (the timeline's pills carry a white icon), not pastel.
 const spaceOklch = (scheme: Scheme, c: SpaceColor) =>
   scheme === "light"
-    ? `oklch(${c === "yellow" ? 70 : 58}% 0.14 ${spaceHue[c]})`
-    : `oklch(${c === "yellow" ? 80 : 74}% 0.085 ${spaceHue[c]})`;
+    ? `oklch(${c === "yellow" ? 70 : 58}% 0.17 ${spaceHue[c]})`
+    : `oklch(${c === "yellow" ? 76 : 64}% 0.17 ${spaceHue[c]})`;
 const surfaceOklch = (scheme: Scheme, c: SpaceColor) =>
   scheme === "light" ? `oklch(95.5% 0.03 ${spaceHue[c]})` : `oklch(25% 0.03 ${spaceHue[c]})`;
 
@@ -197,7 +198,7 @@ export const TYPE_SCALE = [12, 14, 16, 20, 28, 40] as const;
 export const space = { s1: 4, s2: 8, s3: 12, s4: 16, s6: 24, s8: 32, s12: 48, s16: 64 } as const;
 export const SPACE_SCALE = Object.values(space);
 
-export const radius = { sm: 6, ctl: 8, card: 12, sheet: 24 } as const;
+export const radius = { sm: 6, ctl: 8, card: 12, sheet: 24, pill: 999 } as const;
 
 export const size = {
   ctl: 32,

@@ -67,25 +67,24 @@ const tomorrow = addDays(today, 1);
   });
 
   await step("close the day: everything open today goes to tomorrow, Undo puts it back", async () => {
+    // B2 replaced Today's "N still open today" row with the evening review; the one-step move
+    // lives in the command menu's Close the day.
     await page.mouse.move(0, 0);
-    const row = page.getByText(/still open today$/);
-    await row.waitFor();
-    const count = Number((await row.innerText()).split(" ")[0]);
     await page.screenshot({ path: artifact("fix-close-day-before-1440.png") });
-    await page.getByRole("button", { name: "Move to tomorrow" }).click();
-    await status.filter({ hasText: `Moved ${count} to Tomorrow` }).waitFor();
-    await row.waitFor({ state: "detached" });
+    await page.keyboard.press("Control+k");
+    await page.keyboard.type("close the day");
+    await page.getByRole("dialog", { name: "Command menu" }).getByText("Close the day").click();
+    const moved = status.filter({ hasText: /^Moved \d+ to Tomorrow/ });
+    await moved.waitFor();
     await page.screenshot({ path: artifact("fix-close-day-after-1440.png") });
     const week = await op("get_week", { start: today });
     const next = week.days.find((d) => d.date === tomorrow);
     const there = [...next.anytime, ...next.scheduled].map((t) => t.title);
     for (const title of ["Book the dentist", "Run", "Read chapter 7.4"])
       if (!there.includes(title)) throw new Error(`${title} is not on ${tomorrow}: ${there.join(", ")}`);
-    await status
-      .filter({ hasText: `Moved ${count} to Tomorrow` })
-      .getByRole("button", { name: "Undo" })
-      .click();
-    await row.waitFor();
+    expectEq(await anytimeTitles(), [], "anytime after closing the day");
+    await moved.getByRole("button", { name: "Undo" }).click();
+    await page.getByRole("button", { name: "Open Run" }).waitFor();
     expectEq(await anytimeTitles(), ["Book the dentist", "Run"], "anytime after Undo");
   });
 

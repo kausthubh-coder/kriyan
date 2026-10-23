@@ -13,12 +13,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "convex/react";
 import {
   ArrowLeft,
+  ArrowRight,
   Bell,
+  Calendar,
   Play,
   Plus,
   CalendarClock,
   CircleDot,
-  Clock,
   Ellipsis,
   Flag,
   Layers,
@@ -44,8 +45,9 @@ import { useClock } from "@/data/time";
 import { useGoals, useSpaces, type TaskDoc } from "@/data/views";
 import { ensureNotifications } from "@/features/notifications/register";
 import { NoteEditor } from "@/features/notes/NoteEditor";
-import { useIsPhone, useType } from "@/theme/layout";
-import { c, hex, r, s, spaceTone } from "@/theme/tokens";
+import { type } from "@kriyan/core/tokens";
+import { roleStyle, useIsPhone, useType } from "@/theme/layout";
+import { c, family, hex, r, s, shadows, spaceTone } from "@/theme/tokens";
 import { AutoInput } from "@/ui/AutoInput";
 import { Button } from "@/ui/Button";
 import { Check, Chip, Dot, Field } from "@/ui/bits";
@@ -246,20 +248,21 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
 
   return (
     <>
+      {/* A small label over the title, like the prototype's "Task": here the space it lives in. */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: s.s1,
-          height: phone ? 52 : 56,
+          minHeight: phone ? 48 : 56,
           paddingLeft: phone ? s.s4 : s.s6,
-          paddingRight: phone ? s.s1 : s.s3,
+          paddingRight: phone ? s.s2 : s.s3,
         }}
       >
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: s.s2, minWidth: 0 }}>
           {space ? <Dot color={tone.dot} /> : null}
-          <Txt variant="meta" tone="ink3" numberOfLines={1}>
-            {space ? space.path.split(" / ").join(" / ") : "Inbox"}
+          <Txt variant="caption" tone="ink3" numberOfLines={1} style={family("600")}>
+            {space ? space.path : "Inbox"}
           </Txt>
         </View>
         <Button icon={X} accessibilityLabel="Close" onPress={onClose} />
@@ -269,20 +272,21 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: phone ? s.s4 : s.s6,
-          paddingTop: s.s2,
-          paddingBottom: s.s16,
-          gap: s.s6,
+          paddingTop: s.s1,
+          // Room under the last chip for the floating thumb bar.
+          paddingBottom: BAR_ROOM,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
-          <View style={{ paddingTop: phone ? s.s3 : s.s1 }}>
+          {/* Centres the box on the first line of the title. */}
+          <View style={{ paddingTop: (roles.headline.lineHeight ?? 32) / 2 - TICK / 2 }}>
             {task.event ? (
-              <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center" }}>
+              <View style={{ width: TICK, height: TICK, alignItems: "center", justifyContent: "center" }}>
                 <Dot color={tone.dot} size={10} />
               </View>
             ) : (
               <Check
-                size={20}
+                size={TICK}
                 color={space ? tone.dot : c.ink3}
                 done={done}
                 label={`${done ? "Mark not done" : "Complete"}: ${task.title}`}
@@ -300,27 +304,41 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             submitBehavior="blurAndSubmit"
             accessibilityLabel="Title"
             placeholderTextColor={hex.ink3}
-            lineHeight={roles.title.lineHeight ?? 28}
-            padY={phone ? s.s2 : 0}
-            style={[roles.title, { flex: 1, color: done ? c.ink3 : c.ink }]}
+            lineHeight={roles.headline.lineHeight ?? 32}
+            style={[roles.headline, { flex: 1, color: done ? c.ink3 : c.ink }]}
           />
         </View>
 
-        <NoteEditor
-          key={task._id}
-          value={task.note ?? ""}
-          onChange={(note) => void save({ note: note || null })}
-        />
+        {/* The note sits right under the title as plain text, like Apple Notes. */}
+        <View style={{ marginTop: s.s1 }}>
+          <NoteEditor
+            key={task._id}
+            value={task.note ?? ""}
+            onChange={(note) => void save({ note: note || null })}
+          />
+        </View>
 
-        <View accessibilityLabel="Details" style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+        <View
+          accessibilityLabel="Details"
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: phone ? s.s4 : s.s3 }}
+        >
           <PropChip
             anchor={whenRef}
-            icon={Clock}
+            icon={Calendar}
             text={when}
             empty="Date"
             label="When"
             expanded={sub === "when"}
             onPress={() => setSub(sub === "when" ? null : "when")}
+          />
+          <PropChip
+            anchor={deadlineRef}
+            icon={Flag}
+            text={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
+            empty="Deadline"
+            label="Deadline"
+            expanded={sub === "deadline"}
+            onPress={() => setSub(sub === "deadline" ? null : "deadline")}
           />
           <PropChip
             anchor={repeatRef}
@@ -349,15 +367,6 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             label="Reminders"
             expanded={sub === "reminders"}
             onPress={() => setSub(sub === "reminders" ? null : "reminders")}
-          />
-          <PropChip
-            anchor={deadlineRef}
-            icon={Flag}
-            text={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
-            empty="Deadline"
-            label="Deadline"
-            expanded={sub === "deadline"}
-            onPress={() => setSub(sub === "deadline" ? null : "deadline")}
           />
           <PropChip
             anchor={spaceRef}
@@ -433,7 +442,13 @@ function PropChip({
         aria-expanded={expanded}
         onPress={onPress}
         hoverBg={null}
-        style={{ minHeight: phone ? 44 : 32, justifyContent: "center" }}
+        // The chips wrap 8 apart like the prototype's; the target still reaches 44 on touch.
+        style={{
+          minHeight: phone ? 44 : 32,
+          marginVertical: phone ? -s.s1 : 0,
+          justifyContent: "center",
+          maxWidth: "100%",
+        }}
       >
         {({ hovered }) => (
           <View
@@ -441,17 +456,24 @@ function PropChip({
               flexDirection: "row",
               alignItems: "center",
               gap: 6,
-              height: phone ? 36 : 30,
+              height: phone ? 36 : 32,
               paddingHorizontal: s.s3,
-              borderRadius: r.ctl + 2,
+              borderRadius: r.card,
+              // Set chips are filled; an unset one is only an outline, so the set ones read first.
               borderWidth: 1,
-              borderColor: set ? "transparent" : c.line,
-              borderStyle: set ? "solid" : "dashed",
+              borderColor: set ? "transparent" : c.lineStrong,
               backgroundColor: expanded ? c.select : set ? c.sunken : hovered ? c.hover : "transparent",
             }}
           >
-            {set ? (leading ?? <Icon icon={icon} size={15} tone="ink2" />) : <Icon icon={Plus} size={15} />}
-            <Txt variant="label" tone={set ? "ink" : "ink3"} numberOfLines={1} tnum>
+            {set ? (
+              <>
+                <Icon icon={icon} size={16} tone="ink2" />
+                {leading}
+              </>
+            ) : (
+              <Icon icon={Plus} size={16} tone="ink3" />
+            )}
+            <Txt tone={set ? "ink" : "ink3"} numberOfLines={1} tnum style={chipText}>
               {text ?? empty}
             </Txt>
           </View>
@@ -488,7 +510,18 @@ function GoalChip({
   );
 }
 
-/** Things' bottom bar, at thumb height: the actions people take on a task most. */
+/** Size of the box beside the title. */
+const TICK = 24;
+/** The thumb bar's pill: 44 buttons in 4 padding and a 1 border. */
+const BAR_HEIGHT = 44 + 2 * s.s1 + 2;
+/** Its gap above the sheet's bottom edge and the sides, like the dock's. */
+const BAR_GAP = 14;
+const BAR_ROOM = BAR_HEIGHT + BAR_GAP + s.s8;
+
+/**
+ * Things' bottom bar, at thumb height: the actions people take on a task most. A pill that
+ * floats over the sheet's content (b2.html `.tsh-bar`), the same shape as the dock.
+ */
 function ThumbBar({
   task,
   moreRef,
@@ -510,35 +543,106 @@ function ThumbBar({
   const done = task.doneAt !== undefined;
   return (
     <View
+      pointerEvents="box-none"
       style={{
-        flexDirection: "row",
+        position: "absolute",
+        left: BAR_GAP,
+        right: BAR_GAP,
+        bottom: BAR_GAP + (phone ? insets.bottom : 0),
         alignItems: "center",
-        gap: s.s1,
-        paddingHorizontal: phone ? s.s3 : s.s6,
-        paddingTop: s.s2,
-        paddingBottom: (phone ? insets.bottom : 0) + s.s2,
-        borderTopWidth: 1,
-        borderTopColor: c.line,
-        backgroundColor: c.raised,
       }}
     >
-      {task.event || done ? null : (
-        <Button
-          variant="primary"
-          icon={Play}
-          label="Start focus"
-          onPress={() => router.push(`/focus/${task._id}`)}
-        />
-      )}
-      <View style={{ flex: 1 }} />
-      <Button icon={Clock} label="When" onPress={onWhen} />
-      <Button icon={Layers} label="Move" onPress={onMove} />
-      <View ref={moreRef} collapsable={false}>
-        <Button icon={Ellipsis} accessibilityLabel="More" expanded={moreOpen} onPress={onMore} />
+      <View
+        style={{
+          width: "100%",
+          maxWidth: 528,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: s.s1,
+          padding: s.s1,
+          borderRadius: r.pill,
+          borderWidth: 1,
+          borderColor: c.line,
+          backgroundColor: c.raised,
+          boxShadow: shadows.overlay,
+        }}
+      >
+        {task.event || done ? null : (
+          <BarButton
+            primary
+            icon={Play}
+            label="Start focus"
+            onPress={() => router.push(`/focus/${task._id}`)}
+          />
+        )}
+        <BarButton icon={Calendar} label="When" onPress={onWhen} />
+        <BarButton icon={ArrowRight} label="Move" onPress={onMove} />
+        <View ref={moreRef} collapsable={false}>
+          <BarButton icon={Ellipsis} accessibilityLabel="More" expanded={moreOpen} onPress={onMore} />
+        </View>
       </View>
     </View>
   );
 }
+
+function BarButton({
+  icon,
+  label,
+  accessibilityLabel,
+  primary,
+  expanded,
+  onPress,
+}: {
+  icon: LucideIcon;
+  label?: string;
+  accessibilityLabel?: string;
+  primary?: boolean;
+  expanded?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Press
+      role="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      aria-expanded={expanded}
+      onPress={onPress}
+      hoverBg={primary ? null : c.hover}
+      rippleRadius={label ? undefined : 22}
+      style={({ hovered }) => [
+        {
+          height: 44,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          borderRadius: r.pill,
+          overflow: "hidden",
+        },
+        // The prototype's flex 1.5 / 1 / 48: Start focus widest, More just its icon.
+        label ? { flexGrow: primary ? 3 : 2, flexBasis: 0, paddingHorizontal: s.s2 } : { width: 48 },
+        primary ? { backgroundColor: c.ink } : null,
+        primary && hovered ? { opacity: 0.92 } : null,
+        expanded ? { backgroundColor: c.select } : null,
+      ]}
+    >
+      {primary ? (
+        // Filled, like the prototype's play mark.
+        <Play size={16} color={hex.onInk} fill={hex.onInk} aria-hidden focusable={false} />
+      ) : (
+        <Icon icon={icon} size={16} tone="ink2" />
+      )}
+      {label ? (
+        <Txt variant="label" tone={primary ? "onInk" : "ink2"} numberOfLines={1} style={barLabel}>
+          {label}
+        </Txt>
+      ) : null}
+    </Press>
+  );
+}
+
+/** 14 on both layouts, like the prototype's chips and bar; the phone's label role is 16. */
+const chipText = roleStyle(type.label);
+const barLabel = { ...chipText, ...family("600") };
 
 function GoalPicker({ value, onPick }: { value: string | null; onPick: (id: Id<"goals"> | null) => void }) {
   const loaded = useGoals();

@@ -9,7 +9,7 @@ import { addDays, diffDays, weekday, type CivilDate } from "@kriyan/core/dates";
 import { formatDuration, MONTH_LONG, WEEKDAY_SHORT } from "@kriyan/core/format";
 import { daySummary, summaryText, type SummaryPart } from "@kriyan/core/summary";
 import { useIsPhone } from "@/theme/layout";
-import { c, family, r, s } from "@/theme/tokens";
+import { c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Txt } from "@/ui/Txt";
 import type { TodayView } from "@/data/views";
@@ -97,9 +97,12 @@ export function TodayHeader({
       </Txt>
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: s.s4, rowGap: s.s1 }}>
-        <Stat icon={Timer} text={`${formatDuration(planned)} planned`} />
-        {free !== null ? <Stat icon={Sun} text={`${formatDuration(free)} free`} /> : null}
-        <Stat icon={Hourglass} text={`${daysLeft} days left in ${year}`} />
+        {/* The prototype colours each stat's icon: planned blue, free green, the year purple. */}
+        <Stat icon={Timer} color={spaceTone("blue").dot} text={`${formatDuration(planned)} planned`} />
+        {free !== null ? (
+          <Stat icon={Sun} color={spaceTone("green").dot} text={`${formatDuration(free)} free`} />
+        ) : null}
+        <Stat icon={Hourglass} color={spaceTone("purple").dot} text={`${daysLeft} days left in ${year}`} />
       </View>
     </View>
   );
@@ -118,10 +121,18 @@ function SentencePart({ part }: { part: SummaryPart }) {
   return <Text style={style}>{part.text}</Text>;
 }
 
-function Stat({ icon, text }: { icon: Parameters<typeof Icon>[0]["icon"]; text: string }) {
+function Stat({
+  icon,
+  color,
+  text,
+}: {
+  icon: Parameters<typeof Icon>[0]["icon"];
+  color: string;
+  text: string;
+}) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-      <Icon icon={icon} size={14} tone="headDim" strokeWidth={2} />
+      <Icon icon={icon} size={14} color={color} strokeWidth={2} />
       <Txt variant="caption" tone="headInk" tnum>
         {text}
       </Txt>

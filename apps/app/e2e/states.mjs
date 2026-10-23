@@ -64,7 +64,7 @@ for (const [w, h] of [
     await shot("command-search");
     await page.keyboard.press("Escape");
   } else {
-    await page.getByRole("button", { name: "Add task" }).click();
+    await page.getByRole("button", { name: "Add a task" }).click();
     await page
       .getByRole("textbox", { name: "Add a task" })
       .fill("Essay fri 5pm #school every week remind 1h before");

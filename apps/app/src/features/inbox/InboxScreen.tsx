@@ -26,7 +26,7 @@ export function InboxScreen() {
   const { today } = useClock();
   const phone = useIsPhone();
   return (
-    <Screen title="Inbox" fab>
+    <Screen title="Inbox" back>
       <PageHead
         title="Inbox"
         sub={

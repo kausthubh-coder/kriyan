@@ -1,30 +1,29 @@
-// The frame every screen sits in. Phones get a 64dp top app bar (with back on pushed
-// screens); desktop gets the calm 680px column, shifted left while a task panel is open.
+// The frame every screen sits in. Phones get the prototype's large title (with "Back" on pushed
+// screens) and room for the floating dock; desktop gets the calm 680px column, shifted left
+// while a task panel is open.
 
 import type { ReactNode } from "react";
 import { Platform, ScrollView, View, type ScrollViewProps } from "react-native";
 import { router, usePathname } from "expo-router";
 import Head from "expo-router/head";
-import { ArrowLeft, Plus, Search } from "lucide-react-native";
+import { ChevronLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { openCommand } from "@/features/shell/context";
-import { NAVBAR_HEIGHT } from "@/features/shell/navbarHeight";
+import { DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { useIsPhone } from "@/theme/layout";
-import { c, r, s, shadows, sz } from "@/theme/tokens";
-import { Button } from "./Button";
+import { c, r, s, sz } from "@/theme/tokens";
 import { Icon } from "./Icon";
 import { Press } from "./Press";
 import { Txt } from "./Txt";
 
 interface Props {
-  /** The phone app bar's title. */
+  /** The phone's large title (and the browser tab's name). */
   title: string;
+  /** A quiet line under the phone title. */
+  sub?: string;
   /** Pushed screens show a back arrow on phones. */
   back?: boolean;
   /** Extra controls in the phone app bar, before search. */
   actions?: ReactNode;
-  /** Tab roots on Android show the floating add button. */
-  fab?: boolean;
   /** "wide" is for the week; everything else is the 680px column. */
   width?: "column" | "wide" | number;
   children: ReactNode;
@@ -45,64 +44,57 @@ export function goBack(fallback: "/today" | "/browse" = "/today") {
   else router.replace(fallback);
 }
 
-export function AppBar({ title, back, actions }: { title: string; back?: boolean; actions?: ReactNode }) {
-  const insets = useSafeAreaInsets();
+/**
+ * The phone's page head (b2.html `.pg-head`): "Back" above a large title on pushed screens,
+ * the title alone on tabs. It scrolls with the page; there is no app bar.
+ */
+export function PhoneHead({
+  title,
+  sub,
+  back,
+  actions,
+}: {
+  title: string;
+  sub?: string;
+  back?: boolean;
+  actions?: ReactNode;
+}) {
   return (
-    <View
-      style={{
-        paddingTop: insets.top,
-        backgroundColor: c.bg,
-        zIndex: 4,
-        ...(Platform.OS === "web" ? ({ position: "sticky", top: 0 } as object) : {}),
-      }}
-    >
-      <View
-        style={{
-          height: 64,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: s.s1,
-          paddingLeft: back ? s.s1 : s.s4,
-          paddingRight: s.s1,
-        }}
-      >
-        {back ? (
-          <Button icon={ArrowLeft} accessibilityLabel="Back" onPress={() => goBack("/browse")} />
-        ) : null}
-        <Txt variant="title" heading={1} numberOfLines={1} style={{ flex: 1 }}>
+    <View style={{ gap: s.s1 }}>
+      {back ? (
+        <Press
+          role="button"
+          accessibilityLabel="Back"
+          onPress={() => goBack("/browse")}
+          hoverBg={null}
+          scale={false}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            minHeight: sz.touch,
+            marginLeft: -s.s1,
+            paddingRight: s.s2,
+          }}
+        >
+          <Icon icon={ChevronLeft} size={20} tone="ink2" />
+          <Txt variant="label" tone="ink2">
+            Back
+          </Txt>
+        </Press>
+      ) : null}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+        <Txt variant="headline" heading={1} style={{ flex: 1 }}>
           {title}
         </Txt>
         {actions}
-        <Button icon={Search} accessibilityLabel="Search" onPress={() => openCommand()} />
       </View>
+      {sub ? (
+        <Txt variant="body" tone="ink3">
+          {sub}
+        </Txt>
+      ) : null}
     </View>
-  );
-}
-
-export function Fab() {
-  return (
-    <Press
-      role="button"
-      accessibilityLabel="Add task"
-      onPress={() => router.push("/add")}
-      hoverBg={null}
-      style={{
-        position: "absolute",
-        right: s.s4,
-        bottom: s.s4,
-        width: 56,
-        height: 56,
-        borderRadius: 16,
-        backgroundColor: c.ink,
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: shadows.overlay,
-        overflow: "hidden",
-        zIndex: 6,
-      }}
-    >
-      <Icon icon={Plus} size={24} tone="onInk" />
-    </Press>
   );
 }
 
@@ -113,9 +105,9 @@ export function usePanelOpen(): boolean {
 
 export function Screen({
   title,
+  sub,
   back,
   actions,
-  fab,
   width = "column",
   children,
   scrollProps,
@@ -138,16 +130,14 @@ export function Screen({
           <title>{`${title} | Kriyan`}</title>
         </Head>
       ) : null}
-      {phone && !heroed ? <AppBar title={title} back={back} actions={actions} /> : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        // On the phone web layout the navigation bar is fixed over the bottom; the list ends above it.
-        style={{ flex: 1, ...(phone && Platform.OS === "web" ? { marginBottom: NAVBAR_HEIGHT + s.s4 } : {}) }}
+        style={{ flex: 1 }}
         contentContainerStyle={
           heroed
             ? { paddingBottom: s.s16 }
             : {
-                paddingTop: phone ? s.s2 : width === "wide" ? s.s8 : s.s12,
+                paddingTop: phone ? insets.top + s.s4 : width === "wide" ? s.s8 : s.s12,
                 paddingHorizontal: phone ? s.s4 : s.s8,
                 paddingBottom: s.s16,
               }
@@ -179,14 +169,14 @@ export function Screen({
               gap: phone ? s.s8 : s.s12,
             }}
           >
+            {phone && !heroed ? <PhoneHead title={title} sub={sub} back={back} actions={actions} /> : null}
             {children}
-            {/* Room to scroll the last row clear of the floating add button. */}
-            {fab && phone ? <View style={{ height: 56 }} /> : null}
+            {/* Room to scroll the last row clear of the floating dock. */}
+            {phone ? <View style={{ height: DOCK_CLEARANCE + insets.bottom }} /> : null}
           </View>
         </View>
       </ScrollView>
       {footer}
-      {fab && phone && Platform.OS !== "web" ? <Fab /> : null}
     </View>
   );
 }
