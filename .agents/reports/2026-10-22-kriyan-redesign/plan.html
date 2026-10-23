@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Kriyan: plan to ship the B design</title>
+<style>
+  :root { --bg:#fbfbfa; --text:#1b1b1a; --muted:#5d5d59; --line:#e2e2de; --sunken:#f2f2f0; --accent:#d42f25; --good:#2f7d4a; --mixed:#8a5a00;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141413; --text:#ecece8; --muted:#a6a6a0; --line:#343432; --sunken:#232322; --accent:#ff6b5c; --good:#6cc48a; --mixed:#e0a943; } }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; color: var(--text); font: 17px/1.5 var(--sans); }
+  main { max-width: 860px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 36px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 12px; text-wrap: balance; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 56px 0 12px; }
+  p, li { max-width: 62ch; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 19px; color: var(--muted); }
+  a { color: inherit; text-underline-offset: 3px; }
+  ol.asks { padding-left: 24px; } ol.asks li { margin: 6px 0; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 8px 0; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  .good { color: var(--good); } .mixed { color: var(--mixed); }
+  code { font-family: var(--mono); font-size: .9em; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
+  details { border-top: 1px solid var(--line); padding: 8px 0; }
+  details:last-of-type { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+  summary::before { content: "+"; width: 1.2em; color: var(--muted); }
+  details[open] > summary::before { content: "−"; }
+  details > *:not(summary) { margin-top: 8px; }
+  @media (max-width: 700px) { main { padding: 32px 16px 64px; } h1 { font-size: 28px; } td:first-child { white-space: normal; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ship B in 6 steps, on today's app</h1>
+  <p class="lede">The repo already has Expo for Android and web, Convex, Clerk, haptics, gestures and the kriyan.app domain. What's new: the B design, an assistant that acts straight away, and installing as a PWA on iPhone.</p>
+
+  <ol class="asks" aria-label="What I need from you">
+    <li>Say yes to the assistant model: everything you, your automations and agents ask for applies straight away, with Undo and a log, and the proposal queue for planned blocks goes.</li>
+    <li>Pick who pays for the in-app assistant: Kriyan's own Claude API key, or each person adds their own.</li>
+    <li>When I reach step 6, run the Android build on your laptop (EAS needs your login); everything else I can do and test here.</li>
+  </ol>
+
+  <h2>The steps, in order</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Step</th><th>What changes</th><th>Done when</th></tr></thead>
+    <tbody>
+      <tr><td>1. Look</td><td>B's tokens in <code>packages/core/src/tokens.ts</code>: Inter, monochrome, the red dot, light and dark (the app is dark-only today).</td><td><code>bun run lint:ui</code> exits 0 on every screen</td></tr>
+      <tr><td>2. Screens</td><td>Today, the task sheet, quick add, Week, Goals and habits, Review, rebuilt to the B2 prototype.</td><td>The <code>verify-kriyan</code> walkthrough passes on web at 390 and 1440</td></tr>
+      <tr><td>3. Feel</td><td>Swipe, long press, double-tap and pull-to-add on rows; spring sheets; haptics; soft sounds, off by default.</td><td>Every gesture has a visible twin; haptics fire on Android</td></tr>
+      <tr><td>4. Assistant</td><td>An ask bar backed by the existing agent operations in <code>ops.ts</code>; an activity log with Undo; automations listed with what each run did; the coach card.</td><td>"Move the lab report to after lunch" changes the task, and Undo restores it</td></tr>
+      <tr><td>5. iPhone PWA</td><td>Web manifest, icons, service worker, Web Push for reminders, and the install step in onboarding.</td><td>Added to the Home Screen, opens full screen, and a reminder arrives</td></tr>
+      <tr><td>6. Android APK</td><td>Version bump and an EAS build with the new screens.</td><td>Installed APK passes the walkthrough on your phone</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Onboarding with Clerk sign-in lands with step 2. Clerk's production instance on kriyan.app is still pending in <code>docs/ops.md</code>; it needs your Clerk and Vercel logins, so it's yours to do when we ship.</p>
+
+  <h2>The assistant acts, then shows Undo</h2>
+  <p>Today agents can already add tasks directly, but time blocks they plan (<code>propose_blocks</code>) wait as proposals until you accept them. In the new model, everything happens immediately and lands in an activity log with Undo:</p>
+  <details>
+  <summary>How you, automations, agents and the coach use it</summary>
+  <ul>
+    <li><b>You, in the app:</b> type or say "plan my afternoon"; the change appears as a card with Undo.</li>
+    <li><b>Automations:</b> Codex reads Moodle and Gmail at 07:00 through the CLI and adds tasks marked "from Moodle". Each run lists what it added, with Undo on each item.</li>
+    <li><b>Agents over MCP:</b> Claude plans your week with the same operations and the same log.</li>
+    <li><b>Coach:</b> one insight at a time, from your own history ("lab reports take you 1h 50m, not 1h 30m").</li>
+  </ul>
+  </details>
+  <details>
+    <summary>What this changes in the backend</summary>
+    <p>Proposals become an activity log: every operation records who did it (you, an automation by name, or an agent), what it changed, and the data to undo it. Agent operations already go through one registry, <code>packages/core/src/ops.ts</code>, so the log and Undo live in one place. The in-app ask bar sends your words plus today's plan to a Claude model with those operations as tools, through a Convex action. That needs an API key, which is ask 2 above.</p>
+    <p>AGENTS.md defines "proposal" as a task that waits for a yes; that definition changes with this step.</p>
+  </details>
+
+  <h2>iPhone as a PWA: what works</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Feature</th><th>On iPhone</th></tr></thead>
+    <tbody>
+      <tr><td>Full-screen app</td><td class="good">Yes. Since iOS 26, anything added to the Home Screen opens as a web app by default.</td></tr>
+      <tr><td>Reminders</td><td class="good">Yes, through Web Push, once it's on the Home Screen and the person taps Allow (iOS 16.4 and later).</td></tr>
+      <tr><td>Haptics</td><td class="mixed">Unreliable. Safari has no vibration API; a hidden-switch trick worked on iOS 18, and a May 2026 report says a WebKit change may have broken it. Untested by me.</td></tr>
+      <tr><td>Sounds</td><td class="good">Yes, through Web Audio after the first tap.</td></tr>
+      <tr><td>Gestures</td><td class="good">Yes. Swipe, long press and double-tap work in the browser; edge-swipe back is the system's.</td></tr>
+      <tr><td>Install prompt</td><td class="mixed">No automatic prompt on iPhone, so onboarding shows the Share, then "Add to Home Screen" steps.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <details>
+    <summary>Sources: 4 pages on iOS web apps</summary>
+    <ul>
+      <li><a href="https://firt.dev/notes/pwa-ios/">firt.dev: iOS PWA compatibility</a></li>
+      <li><a href="https://mjtsai.com/blog/2025/10/03/web-apps-in-ios-26/">Michael Tsai: Web apps in iOS 26</a></li>
+      <li><a href="https://documentation.onesignal.com/docs/en/web-push-for-ios">OneSignal: iOS web push setup</a></li>
+      <li><a href="https://github.com/alexianjjohnston-ai/WIIUemu/pull/27">WIIUemu PR #27: the haptics trick and the possible WebKit change (unverified)</a></li>
+    </ul>
+  </details>
+
+  <h2>No domain to buy</h2>
+  <p>You already own kriyan.app, with DNS on Vercel: the site is kriyan.app and the web app is app.kriyan.app. The iPhone PWA installs from app.kriyan.app.</p>
+
+  <details>
+    <summary>Not checked: 3 gaps</summary>
+    <ul>
+      <li>The iPhone haptics trick on a real iPhone running iOS 26.</li>
+      <li>Web Push delivery from Convex; it needs the step 5 build to test.</li>
+      <li>Cost of the in-app assistant per person; it depends on ask 2.</li>
+    </ul>
+  </details>
+</main>
+<script>addEventListener("beforeprint",()=>document.querySelectorAll("details").forEach(d=>d.open=true));</script>
+</body>
+</html>

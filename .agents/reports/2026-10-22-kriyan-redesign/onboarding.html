@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kriyan onboarding, in variant B's look</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens copied from variant-b.html so onboarding and the app are one look. */
+:root{
+  --bg:#fff;--sheet:#fff;--side:#fafafa;--head:#0b0b0c;--head-ink:#fff;--head-dim:#8e8e93;
+  --ink:#111113;--ink2:#3c3c41;--muted:#6a6a6f;--faint:#76767b;--line:#d4d4d9;--line2:#ececef;
+  --fill:#f2f2f4;--fill2:#e6e6ea;--card:#f4f4f6;
+  --red:#d42f25;--dot:#ff3b30;--badge-ink:#fff;--blue:#0a68d6;--blue-bg:rgba(10,104,214,.1);
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 10px 30px rgba(0,0,0,.10);
+  --bar:#ffffff;--scrim:rgba(0,0,0,.32);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#000;--sheet:#151517;--side:#0c0c0d;--head:#000;--head-ink:#fff;--head-dim:#8e8e93;
+  --ink:#f3f3f5;--ink2:#d0d0d5;--muted:#a1a1a7;--faint:#8e8e94;--line:#38383d;--line2:#232326;
+  --fill:#232326;--fill2:#2e2e32;--card:#1d1d20;
+  --red:#ff5a50;--dot:#ff453a;--badge-ink:#000;--blue:#5aa8ff;--blue-bg:rgba(90,168,255,.16);
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.5);
+  --bar:#1e1e21;--scrim:rgba(0,0,0,.55);
+  color-scheme:dark;
+}}
+:root[data-theme=dark]{
+  --bg:#000;--sheet:#151517;--side:#0c0c0d;--head:#000;--head-ink:#fff;--head-dim:#8e8e93;
+  --ink:#f3f3f5;--ink2:#d0d0d5;--muted:#a1a1a7;--faint:#8e8e94;--line:#38383d;--line2:#232326;
+  --fill:#232326;--fill2:#2e2e32;--card:#1d1d20;
+  --red:#ff5a50;--dot:#ff453a;--badge-ink:#000;--blue:#5aa8ff;--blue-bg:rgba(90,168,255,.16);
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.5);
+  --bar:#1e1e21;--scrim:rgba(0,0,0,.55);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
+button:disabled{cursor:default}
+input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:8px}
+.tnum{font-variant-numeric:tabular-nums}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---------- B components reused ---------- */
+.btn-full{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border-radius:15px;background:var(--ink);color:var(--bg);font-size:16px;font-weight:600;text-align:center;transition:transform .1s}
+.btn-full:active{transform:scale(.97)}
+.btn-full:disabled{background:var(--fill);color:var(--muted)}
+.btn-full.inv{background:var(--head-ink);color:var(--head)}
+.btn-out{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;border-radius:15px;border:1px solid var(--line);font-size:16px;font-weight:600;text-align:center}
+.btn-out:active{transform:scale(.98)}
+.link{display:inline-flex;align-items:center;justify-content:center;color:var(--ink2);font-size:15px;font-weight:500;padding:0 6px;min-height:44px;min-width:44px}
+.link.u{text-decoration:underline;text-underline-offset:3px}
+.iconbtn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--ink2)}
+.iconbtn:hover{background:var(--fill)}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 11px;border-radius:10px;background:var(--fill);font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;position:relative}
+.chip svg.i{width:15px;height:15px}
+.chip.ghost{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted)}
+.chip.set{background:var(--blue-bg);color:var(--blue)}
+button.chip::after{content:"";position:absolute;inset:-6px -4px}
+.tok{color:var(--blue)}
+.switch{width:51px;height:31px;border-radius:16px;background:var(--fill2);position:relative;flex:none;transition:background .15s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s cubic-bezier(.2,.8,.2,1)}
+.switch::before{content:"";position:absolute;inset:-7px -2px}
+.switch[aria-checked=true]{background:#2a9d4b}
+.switch[aria-checked=true]::after{transform:translateX(20px)}
+
+/* Joi rows */
+.row{display:flex;align-items:center;gap:12px;min-height:52px;padding:9px 0;border-bottom:1px dotted var(--line)}
+.row .body{flex:1;min-width:0}
+.row .t{font-size:16px;font-weight:500;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .m{font-size:13px;color:var(--muted);margin-top:1px}
+.row .tm{font-size:14px;color:var(--muted);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ico{width:24px;height:24px;flex:none;display:grid;place-items:center;color:var(--ink2)}
+.ico.red{color:var(--dot)}
+.gapline{display:flex;align-items:center;gap:10px;min-height:40px;font-size:13px;color:var(--muted);border-bottom:1px dotted var(--line);padding-left:36px}
+
+/* Joi head */
+.dayname{font-size:36px;font-weight:700;letter-spacing:-.035em;line-height:1}
+.dayname i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dot);margin-left:4px;position:relative;top:-5px}
+.greet{font-size:22px;font-weight:600;line-height:1.34;letter-spacing:-.018em;text-wrap:pretty}
+.greet .d{color:var(--head-dim)}
+.greet svg.i{width:19px;height:19px;stroke-width:1.9;vertical-align:-3px;margin-right:2px}
+.greet .nw{white-space:nowrap}
+.row.ghost .t{color:var(--muted)}
+.row.ghost .ico{color:var(--blue)}
+.row.ghost .tm{color:var(--blue)}
+.row.ghost{border-bottom-style:dashed}
+
+/* ---------- onboarding shell ---------- */
+.ob{min-height:100dvh;max-width:560px;margin:0 auto;display:flex;flex-direction:column;background:var(--sheet);padding:calc(env(safe-area-inset-top) + 8px) 22px calc(env(safe-area-inset-bottom) + 20px)}
+.ob.dark{background:var(--head);color:var(--head-ink)}
+.topbar{display:flex;align-items:center;gap:8px;min-height:48px}
+.topbar .sp{flex:1;display:flex;justify-content:center}
+.prog{display:flex;gap:4px;width:100%;max-width:200px}
+.prog i{flex:1;height:4px;border-radius:2px;background:var(--fill2)}
+.prog i.on{background:var(--ink)}
+.stepnum{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
+.q{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.12;margin-top:18px;text-wrap:balance}
+.q .d{color:var(--muted)}
+.lead{font-size:16px;color:var(--muted);margin-top:10px;line-height:1.45;max-width:40ch}
+.grow{flex:1}
+.foot{padding-top:16px;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.foot .link{align-self:center}
+.legal{font-size:13px;color:var(--muted);text-align:center;line-height:1.45;margin-top:6px}
+.legal a{color:var(--ink2)}
+
+/* step 1 welcome */
+.brand{display:flex;align-items:center;gap:6px;font-size:17px;font-weight:700;letter-spacing:-.02em;min-height:48px}
+.brand i{width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.welcome .dayrow{display:flex;justify-content:space-between;align-items:flex-start;margin-top:40px}
+.welcome .datebox{color:var(--head-dim);font-size:14px;text-align:right;line-height:1.25;font-weight:500}
+.welcome .greet{margin-top:24px;font-size:26px}
+.welcome .greet span{opacity:1}
+.anim .greet span{animation:wordin .32s cubic-bezier(.2,.8,.2,1) both}
+@keyframes wordin{from{opacity:0;transform:translateY(4px)}}
+.welcome h1{font-size:40px;font-weight:700;letter-spacing:-.035em;line-height:1.05;margin-top:auto;padding-top:40px}
+.welcome h1 .d{color:var(--head-dim)}
+.welcome .lead{color:var(--head-dim);font-size:17px}
+.welcome .link{color:var(--head-ink)}
+
+/* step 2 helps */
+.opts{display:flex;flex-direction:column;gap:10px;margin-top:24px}
+.opt{display:flex;align-items:center;gap:14px;min-height:60px;padding:10px 14px;border-radius:16px;background:var(--card);text-align:left;border:1.5px solid transparent;transition:border-color .12s,background .12s}
+.opt .ic{width:36px;height:36px;border-radius:11px;background:var(--sheet);display:grid;place-items:center;flex:none;color:var(--ink2)}
+.opt .tx{flex:1;min-width:0}
+.opt .tx b{display:block;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.opt .tx span{display:block;font-size:13px;color:var(--muted);margin-top:1px}
+.opt .ck{width:24px;height:24px;border-radius:50%;border:1.6px solid var(--line);display:grid;place-items:center;flex:none;color:var(--bg)}
+.opt[aria-pressed=true]{border-color:var(--ink);background:var(--sheet)}
+.opt[aria-pressed=true] .ck{background:var(--ink);border-color:var(--ink)}
+.opt .ck svg.i{width:14px;height:14px;stroke-width:2.6}
+
+/* step 3 wheels */
+.wheels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:26px}
+.wh{background:var(--card);border-radius:18px;padding:12px 10px 10px}
+.wh-l{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink2);padding:0 6px}
+.wh-l svg.i{width:16px;height:16px}
+.wheel{position:relative;height:220px;overflow-y:auto;scroll-snap-type:y mandatory;margin-top:6px;scrollbar-width:none;-webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
+.wheel::-webkit-scrollbar{display:none}
+.wheel .pad{height:88px}
+.wheel button{display:block;width:100%;height:44px;scroll-snap-align:center;text-align:center;font-size:20px;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums;border-radius:12px}
+.wheel button[aria-selected=true]{color:var(--ink);font-weight:700;font-size:24px}
+.wh .band{position:relative}
+.wh .band::before{content:"";position:absolute;left:4px;right:4px;top:94px;height:44px;border-radius:12px;background:var(--sheet);pointer-events:none}
+.stepper{display:flex;align-items:center;gap:12px;margin-top:14px;background:var(--card);border-radius:18px;padding:10px 10px 10px 16px}
+.stepper .tx{flex:1}
+.stepper .tx b{display:block;font-size:15px;font-weight:600}
+.stepper .tx span{display:block;font-size:13px;color:var(--muted)}
+.stepper .v{font-size:20px;font-weight:700;min-width:44px;text-align:center;font-variant-numeric:tabular-nums}
+.stepper .iconbtn{background:var(--sheet)}
+
+/* step 4 math */
+.big{font-size:84px;font-weight:700;letter-spacing:-.05em;line-height:1;margin-top:26px;font-variant-numeric:tabular-nums}
+.big small{font-size:24px;letter-spacing:-.02em;font-weight:600;margin-left:6px}
+.bars{margin-top:26px;display:flex;flex-direction:column;gap:12px}
+.bar{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:14px}
+.bar span{color:var(--ink2)}
+.bar b{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.bar .trk{grid-column:1/3;height:10px;border-radius:5px;background:var(--fill);overflow:hidden}
+.bar .trk i{display:block;height:100%;border-radius:5px;background:var(--fill2);transform-origin:left;animation:grow .7s cubic-bezier(.2,.8,.2,1) both}
+.bar.free .trk i{background:var(--ink)}
+@keyframes grow{from{transform:scaleX(0)}}
+.yr{display:flex;align-items:center;gap:10px;margin-top:22px;padding:14px 16px;border-radius:16px;background:var(--card);font-size:15px;color:var(--ink2)}
+.yr svg.i{color:var(--ink)}
+
+/* step 5 first plan */
+.qa{position:relative;margin-top:22px;padding:14px 16px;border-radius:18px;background:var(--card)}
+.qa .hl,.qa textarea{font:600 22px/1.36 Inter,system-ui,sans-serif;letter-spacing:-.018em;white-space:pre-wrap;overflow-wrap:break-word;width:100%;min-height:60px;padding:0;border:0}
+.qa .hl{position:relative;color:var(--ink);pointer-events:none}
+.qa textarea{position:absolute;inset:14px 16px;width:calc(100% - 32px);height:calc(100% - 28px);display:block;overflow:hidden;background:transparent;outline:0;color:transparent;caret-color:var(--ink);resize:none}
+.qa textarea::placeholder{color:var(--muted)}
+.qa:focus-within{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.sugg{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.sugg button{min-height:40px;padding:0 13px;border-radius:999px;border:1px solid var(--line);font-size:14px;font-weight:500;color:var(--ink2);position:relative}
+.sugg button::after{content:"";position:absolute;inset:-3px 0}
+.mini{margin-top:18px}
+.mini .lbl{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.row.new{animation:land .45s cubic-bezier(.2,.8,.2,1) both}
+@keyframes land{from{transform:translateY(-10px);opacity:.35}}
+.okline{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:15px;font-weight:600}
+.okline svg.i{width:18px;height:18px;color:#2a9d4b;stroke-width:2.4}
+
+/* step 6 sign in */
+.savecard{margin-top:22px;border-radius:20px;background:var(--head);color:var(--head-ink);padding:18px 18px 16px}
+.savecard .greet{font-size:18px}
+.auth{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.g{width:20px;height:20px;flex:none}
+.field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:15px;padding:0 6px 0 16px;min-height:52px}
+.field:focus-within{border-color:var(--ink)}
+.field input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:16px;min-height:50px}
+.field input::placeholder{color:var(--muted)}
+.field .go{width:44px;height:44px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;flex:none}
+.field .go:disabled{background:var(--fill);color:var(--muted)}
+.or{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);margin:4px 0}
+.or::before,.or::after{content:"";flex:1;border-top:1px solid var(--line2)}
+.code{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:24px}
+.code input{width:100%;min-height:58px;text-align:center;font-size:24px;font-weight:600;border:1px solid var(--line);border-radius:14px;background:var(--sheet);outline:0;font-variant-numeric:tabular-nums}
+.code input:focus{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.err{color:var(--red);font-size:14px;margin-top:10px;min-height:20px}
+
+/* step 7 install + notifications */
+.steps7{display:flex;flex-direction:column;gap:10px;margin-top:22px;counter-reset:s}
+.st{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:var(--card)}
+.st .n{width:28px;height:28px;border-radius:50%;background:var(--sheet);display:grid;place-items:center;font-size:14px;font-weight:700;flex:none}
+.st .tx{flex:1;font-size:15px;line-height:1.4}
+.st .tx b{font-weight:600}
+.st .glyph{width:40px;height:40px;border-radius:11px;background:var(--sheet);display:grid;place-items:center;color:var(--blue);flex:none}
+.why7{margin-top:16px;font-size:14px;color:var(--muted);line-height:1.5}
+.preview{margin-top:24px;border-radius:22px;background:var(--fill);padding:16px}
+.notif{display:flex;gap:12px;align-items:flex-start;background:var(--sheet);border-radius:18px;padding:12px 14px;box-shadow:var(--shadow)}
+.notif .app{width:38px;height:38px;border-radius:10px;background:#0b0b0c;color:#fff;display:grid;place-items:center;flex:none;font-weight:700;font-size:17px;position:relative}
+.notif .app i{position:absolute;top:8px;right:8px;width:5px;height:5px;border-radius:50%;background:#ff3b30}
+.notif .nb{flex:1;min-width:0}
+.notif .nh{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.notif .nt{font-size:15px;font-weight:600;margin-top:1px}
+.notif .nm{font-size:14px;color:var(--ink2)}
+.notif + .notif{margin-top:8px;transform:scale(.96);opacity:.85}
+.sw{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px dotted var(--line);min-height:64px}
+.sw .tx{flex:1}
+.sw .tx b{display:block;font-size:16px;font-weight:600}
+.sw .tx span{display:block;font-size:13px;color:var(--muted);margin-top:1px}
+.sysdlg{position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:60;animation:fade .15s}
+.sysdlg .box{width:270px;border-radius:14px;background:var(--sheet);text-align:center;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.sysdlg .bt{padding:18px 16px 14px;font-size:16px;font-weight:600;line-height:1.3}
+.sysdlg .bt span{display:block;font-size:13px;font-weight:400;color:var(--ink2);margin-top:4px}
+.sysdlg .acts{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line2)}
+.sysdlg .acts button{min-height:46px;color:var(--blue);font-size:16px;text-align:center}
+.sysdlg .acts button + button{border-left:1px solid var(--line2);font-weight:600}
+@keyframes fade{from{opacity:0}}
+
+/* step 8 connect */
+.cn{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px dotted var(--line);min-height:68px}
+.cn .lg{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;flex:none;font-weight:700;font-size:15px;color:#fff}
+.cn .tx{flex:1;min-width:0}
+.cn .tx b{display:block;font-size:16px;font-weight:600}
+.cn .tx span{display:block;font-size:13px;color:var(--muted);margin-top:1px;line-height:1.4}
+.btn-sm{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--fill);border-radius:999px;padding:0 14px;font-size:14px;font-weight:600;min-height:44px;white-space:nowrap}
+.btn-sm.done{background:transparent;color:#2a9d4b;padding:0 6px}
+.btn-sm.done svg.i{width:16px;height:16px;stroke-width:2.4}
+.sec{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:26px 0 2px}
+.mcp{margin:4px 0 6px 54px;padding:12px 14px;border-radius:14px;background:var(--card);font-size:14px;color:var(--ink2);line-height:1.5}
+.mcp code{display:block;margin-top:6px;font:500 13px ui-monospace,Menlo,monospace;color:var(--ink);word-break:break-all}
+
+/* step 9 done */
+.done-head{background:var(--head);color:var(--head-ink);margin:0 -22px;padding:calc(env(safe-area-inset-top) + 18px) 22px 30px;border-radius:0 0 0 0}
+.done-head .dayrow{display:flex;justify-content:space-between;align-items:flex-start}
+.done-head .datebox{color:var(--head-dim);font-size:14px;text-align:right;line-height:1.25;font-weight:500}
+.done-head .greet{margin-top:20px}
+.done-body{background:var(--sheet);margin:-18px -22px 0;border-radius:24px 24px 0 0;padding:20px 22px 0;flex:1;display:flex;flex-direction:column}
+.gs-h{display:flex;justify-content:space-between;align-items:baseline}
+.gs-h h2{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.gs-h span{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cards{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin:12px -22px 0;padding:0 22px 6px;scrollbar-width:none}
+.cards::-webkit-scrollbar{display:none}
+.gc{flex:0 0 72%;scroll-snap-align:start;border-radius:18px;background:var(--card);padding:16px;display:flex;flex-direction:column;gap:6px;min-height:150px;text-align:left}
+.gc .gi{width:36px;height:36px;border-radius:11px;background:var(--sheet);display:grid;place-items:center}
+.gc b{font-size:16px;font-weight:600;letter-spacing:-.01em;margin-top:6px}
+.gc span{font-size:13px;color:var(--muted);line-height:1.4}
+.gc .tm{margin-top:auto;font-size:13px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:4px}
+.gc.ok{background:transparent;box-shadow:inset 0 0 0 1px var(--line2)}
+.gc.ok b{text-decoration:line-through;color:var(--muted)}
+
+/* dev toolbar (outside the product) */
+.dev{position:fixed;top:12px;right:12px;z-index:70;display:flex;gap:4px;align-items:center;background:var(--sheet);border:1px solid var(--line2);border-radius:999px;padding:3px;box-shadow:var(--shadow);font-size:13px}
+.dev span{padding:0 8px;color:var(--muted)}
+.dev button{min-height:36px;padding:0 12px;border-radius:999px;font-weight:600;color:var(--muted)}
+.dev button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+
+/* ---------- desktop: step left, live day right ---------- */
+@media (min-width:900px){
+  body{background:var(--side)}
+  html{background:var(--side)}
+  .stage{min-height:100vh;display:grid;grid-template-columns:minmax(0,480px) minmax(0,460px);gap:72px;justify-content:center;align-items:center;padding:56px 40px}
+  .ob{min-height:auto;height:min(800px,calc(100vh - 80px));overflow-y:auto;max-width:none;border-radius:28px;padding:20px 32px 28px;box-shadow:var(--shadow)}
+  .ob.dark{box-shadow:none}
+  .done-head{margin:0 -32px;padding:24px 32px 30px;border-radius:28px 28px 0 0;margin-top:-20px}
+  .done-body{margin:-18px -32px 0;padding:20px 32px 0}
+  .cards{margin:12px -32px 0;padding:0 32px 6px}
+  .live{display:block}
+  .wheel{height:220px}
+}
+@media (min-width:900px){ .stage.solo{grid-template-columns:minmax(0,480px)} }
+@media (max-width:899px){ .live{display:none} .stage{display:block} }
+.live .cap{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.live .cap i{width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.lv{border-radius:26px;overflow:hidden;background:var(--sheet);box-shadow:var(--shadow)}
+.lv-h{background:var(--head);color:var(--head-ink);padding:24px 26px 26px}
+.lv-h .dayrow{display:flex;justify-content:space-between}
+.lv-h .datebox{color:var(--head-dim);font-size:14px;text-align:right;line-height:1.25;font-weight:500}
+.lv-h .greet{margin-top:18px;font-size:20px}
+.lv-b{padding:6px 26px 16px}
+.lv-b .row{min-height:48px}
+.live .note{font-size:14px;color:var(--muted);margin-top:14px;line-height:1.5;max-width:46ch}
+
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01s !important;animation-delay:0s !important;transition-duration:.01s !important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="shared/kriyan-data.js"></script>
+<script src="shared/why.js"></script>
+<script>
+(function () {
+  const K = window.KRIYAN;
+  const P = new URLSearchParams(location.search);
+  const theme = P.get("theme");
+  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const NOW = K.NOW;
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const toMin = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+  const fromMin = (m) => `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
+
+  const I = {
+    cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h.01M12 14h.01M16 14h.01" stroke-width="2.4"/>',
+    box: '<rect x="4" y="4" width="16" height="16" rx="4.5"/>',
+    habit: '<circle cx="12" cy="12" r="8" stroke-dasharray="2.6 2.9"/>',
+    loop: '<path d="M7 8.5h8.5a3.5 3.5 0 0 1 0 7H7a3.5 3.5 0 0 1 0-7z"/><path d="M12 5l2.5 3.5L12 11"/>',
+    sun: '<circle cx="12" cy="12" r="3.6"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
+    moon: '<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    bell: '<path d="M6.5 16v-5a5.5 5.5 0 0 1 11 0v5l1.5 2h-14z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    repeat: '<path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H9a5 5 0 0 0-5 5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h11a5 5 0 0 0 5-5"/>',
+    hourglass: '<path d="M7 3.5h10M7 20.5h10M8 3.5c0 4.5 8 5 8 8.5s-8 4-8 8.5M16 3.5c0 4.5-8 5-8 8.5s8 4 8 8.5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
+    x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+    chevL: '<path d="M15 5.5L8.5 12l6.5 6.5"/>', chevR: '<path d="M9.5 6l6 6-6 6"/>',
+    arrowR: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+    inbox: '<path d="M4 13.5L6.5 5h11L20 13.5V19H4z"/><path d="M4 13.5h4.5a3.5 3.5 0 0 0 7 0H20"/>',
+    target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+    book: '<path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v15H7.5A2.5 2.5 0 0 0 5 20.5z"/><path d="M5 20.5A2.5 2.5 0 0 1 7.5 18H19"/>',
+    timer: '<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V10M10 3h4M18 7l1.2-1.2"/>',
+    share: '<path d="M12 3.5v11M8 7l4-3.5L16 7"/><path d="M7.5 10.5H6a1.5 1.5 0 0 0-1.5 1.5v7A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5h-1.5"/>',
+    addbox: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/>',
+    home: '<path d="M4 11l8-7 8 7v9.5H4z"/><path d="M10 20.5v-5.5h4v5.5"/>',
+    mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M4 7l8 6 8-6"/>',
+    vib: '<rect x="8" y="4" width="8" height="16" rx="2"/><path d="M4.5 9v6M19.5 9v6M2 11v2M22 11v2"/>',
+    sound: '<path d="M5 9.5h3l4-3.5v12l-4-3.5H5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>',
+    term: '<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M7.5 10l2.5 2-2.5 2M12.5 14.5h4"/>',
+  };
+  const ic = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${I[n] || ""}</svg>`;
+  const GOOGLE = '<svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1A10 10 0 0 0 2 12c0 1.6.4 3.1 1.1 4.6z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10c.8-2.3 3-4.1 5.6-4.1z"/></svg>';
+
+  // why notes: "Source | explanation"
+  const WHY = {
+    welcome: "Joi (App Store) | The first screen is the product: a day told in one sentence, two tones, one red dot. No feature tour.",
+    helps: "Tiimo onboarding (Mobbin) | 'I'd like Tiimo to help me with' as big tappable rows. The answer only orders what Kriyan shows first; nothing is locked behind it.",
+    wheels: "Structured onboarding (Mobbin) | Wake and bed time on wheels, the first thing Structured asks. They frame the day every later screen draws.",
+    commit: "Planning fallacy (Buehler 1994) | Count fixed hours first, so the free-time number is honest instead of optimistic.",
+    math: "Jomo onboarding (Mobbin) | 'Let's do the math' turns answers into one personal number. Framed as time you get to choose, never as time wasted.",
+    fresh: "Fresh start effect (Dai, Milkman & Riis 2014) | A temporal landmark makes starting feel like a new chapter. The end of the year is one.",
+    nl: "Apple Reminders + implementation intentions | Words turn blue as they're understood. A task with a when is an if-then plan (Gollwitzer & Sheeran 2006).",
+    sugg: "Structured onboarding (Mobbin) | 'Here are some suggestions' so a blank field never stalls the first plan.",
+    land: "Structured onboarding (Mobbin) | 'That's a great plan': you see your own day with your thing on it before any sign-up.",
+    nolen: "Kriyan rule + planning fallacy | No time or length is guessed. If you didn't say one, the task stays 'Anytime'.",
+    signin: "Claude onboarding (Mobbin) | One screen: Google or email, then a 6-digit code. Clerk supports both; Apple comes later.",
+    savecard: "Value before sign-up (Structured, Tiimo) | Sign-in is framed as saving the plan you already made, not as a gate.",
+    code: "Claude onboarding (Mobbin) | Six boxes with one-time-code autofill, so the code from the email fills itself on iPhone and Android.",
+    a2hs: "iOS Web Push (iOS 16.4+) | On iPhone a web app can only send reminders after it's added to the Home Screen, so install is a real step, shown with Safari's own icons.",
+    notif: "Tiimo onboarding (Mobbin) | Ask for notifications with a preview of a real reminder, built from the plan you just made.",
+    feel: "Critly: Haptics + Interface SFX | Toggle each one and feel or hear it right away. Sound only confirms what the screen already shows.",
+    ai: "Your automations idea | Automations add straight to your day and say who added it; an Undo is always there. No approval queue.",
+    cards: "Tiimo 'Get started' (Mobbin) | Three small next steps as cards, each a minute or two, ticked off as you do them.",
+    greet: "Joi (App Store) | The same one-sentence day, now with your own plan in it.",
+  };
+  const W = (k) => (WHY[k] ? ` data-why="${esc(WHY[k])}"` : "");
+
+  // ---------- state ----------
+  const ua = navigator.userAgent;
+  // iPhone needs the Home Screen step for reminders; desktop browsers and Android don't.
+  const detected = /Android/i.test(ua) ? "android" : /iPhone|iPad|iPod/i.test(ua) ? "ios" : innerWidth >= 900 ? "desktop" : "ios";
+  const standaloneNow = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const S = {
+    step: Math.min(9, Math.max(1, parseInt(P.get("step") || "1", 10) || 1)),
+    platform: ["ios", "android", "desktop"].includes(P.get("platform")) ? P.get("platform") : detected,
+    standalone: P.get("standalone") === "1" || standaloneNow,
+    helps: new Set(["days", "uni"]),
+    wake: "07:00", wind: "22:30", fixed: 6,
+    text: "", added: null,
+    name: "", email: "", auth: "choose", code: ["", "", "", "", "", ""], codeErr: "",
+    a2hsDone: false, notif: false, dlg: false, vib: true, sfx: true,
+    conn: { cal: false, claude: false, codex: false }, open: null,
+    cardsDone: new Set(),
+  };
+  if (S.step >= 6 && S.step !== 6) { S.name = "Kausthubh"; S.email = "kausthubh@example.com"; }
+  if (S.step >= 6 && !S.added) S.added = K.parseQuickAdd("Read 20 pages tonight at 21:30 for 30m");
+  if (S.step === 5) S.text = "Read 20 pages tonight at 21:30 for 30m";
+
+  // ---------- derived ----------
+  const awakeDaily = () => { let d = toMin(S.wind) - toMin(S.wake); if (d <= 0) d += 1440; return d / 60; };
+  const math = () => {
+    const awake = Math.round(awakeDaily() * 7);
+    const fixed = S.fixed * 5;
+    const everyday = 2 * 7; // meals, getting ready, travel: a stated assumption shown on screen
+    const free = Math.max(0, awake - fixed - everyday);
+    return { awake, fixed, everyday, free };
+  };
+  const firstItem = () => {
+    const p = S.added;
+    if (!p) return null;
+    const isToday = !p.date || p.date.toDateString() === NOW.toDateString();
+    return { p, isToday };
+  };
+
+  // ---------- feedback: haptics and sound (Android previews them; iOS Safari has no vibrate) ----------
+  let actx = null;
+  function tickSound() {
+    if (!S.sfx) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(880, actx.currentTime); o.frequency.exponentialRampToValueAtTime(1320, actx.currentTime + 0.06);
+      g.gain.setValueAtTime(0.0001, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.12, actx.currentTime + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.14);
+      o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.16);
+    } catch (e) { /* no audio, fine */ }
+  }
+  const buzz = (ms = 12) => { if (S.vib && navigator.vibrate) navigator.vibrate(ms); };
+
+  // ---------- pieces ----------
+  const TOTAL = 8; // steps 2..9 show progress; 1 is the welcome
+  function topbar(opts = {}) {
+    const n = S.step - 1;
+    const bars = Array.from({ length: TOTAL }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("");
+    const back = S.step > 1 ? `<button class="iconbtn" data-act="back" aria-label="Back">${ic("chevL")}</button>` : `<span style="width:44px"></span>`;
+    const skip = opts.noSkip ? `<span style="width:44px"></span>` : `<button class="link" data-act="skip">Skip</button>`;
+    return `<div class="topbar">${back}<div class="sp"><div class="prog" role="progressbar" aria-label="Setup progress" aria-valuemin="1" aria-valuemax="${TOTAL}" aria-valuenow="${n}">${bars}</div></div>${skip}</div>`;
+  }
+  const sentenceSample = () =>
+    `<span class="d">Good morning, </span><span>Kausthubh. </span><span class="d">You have </span><span class="nw">${ic("cal")}3 events,</span> <span class="nw">${ic("box")}6 tasks</span> <span class="d">and </span><span class="nw">${ic("loop")}2 habits</span> <span class="d">today. You're </span><span>mostly free </span><span class="d">after 18:00.</span>`;
+
+  function hlHTML(text, p) {
+    let h = "", last = 0;
+    for (const t of p.tokens) { h += esc(text.slice(last, t.start)) + `<span class="tok">${esc(text.slice(t.start, t.end))}</span>`; last = t.end; }
+    return h + esc(text.slice(last)) + "​";
+  }
+  function chipsHTML(p) {
+    const c = (set, icon, label) => `<span class="chip ${set ? "set" : "ghost"}">${ic(icon)}${esc(label)}</span>`;
+    const dWord = !p.date ? "Today" : p.date.toDateString() === NOW.toDateString() ? "Today" : p.date.toDateString() === K.atDay(1).toDateString() ? "Tomorrow" : K.fmtDate(p.date);
+    let h = c(true, "cal", dWord);
+    h += c(p.time, "clock", p.time || "Anytime");
+    h += `<span class="chip ${p.duration ? "set" : "ghost"}"${p.duration ? "" : W("nolen")}>${ic("hourglass")}${p.duration ? K.fmtDur(p.duration) : "No length"}</span>`;
+    if (p.repeat) h += c(true, "repeat", p.repeat);
+    p.reminders.forEach((r) => (h += c(true, "bell", r)));
+    return h;
+  }
+
+  // the person's own day: wake, their item, wind down
+  function dayRows(withNew, pending) {
+    const f = firstItem();
+    const rows = [];
+    rows.push({ m: toMin(S.wake), html: `<div class="row"><span class="ico">${ic("sun")}</span><div class="body"><div class="t">Wake up</div></div><div class="tm">${S.wake}</div></div>` });
+    if (f && f.isToday) {
+      const p = f.p;
+      const end = p.time && p.duration ? fromMin(toMin(p.time) + p.duration) : null;
+      const tm = p.time ? `${p.time}${end ? `<br><span style="font-size:12px">${end}</span>` : ""}` : "Anytime";
+      rows.push({ m: p.time ? toMin(p.time) : toMin(S.wake) + 1, html: `<div class="row ${withNew ? "new" : ""}"><span class="ico">${ic(p.repeat ? "loop" : "box")}</span><div class="body"><div class="t">${esc(p.title || "Your first thing")}</div>${p.duration || p.repeat ? `<div class="m">${[p.duration ? K.fmtDur(p.duration) : "", p.repeat || ""].filter(Boolean).join(", ")}</div>` : ""}</div><div class="tm">${tm}</div></div>` });
+    }
+    if (pending && pending.title && (!pending.date || pending.date.toDateString() === NOW.toDateString())) {
+      rows.push({ m: pending.time ? toMin(pending.time) : toMin(S.wake) + 1, html: `<div class="row ghost"><span class="ico">${ic("plus")}</span><div class="body"><div class="t">${esc(pending.title)}</div><div class="m">Lands here when you add it</div></div><div class="tm">${pending.time || "Anytime"}</div></div>` });
+    }
+    rows.push({ m: toMin(S.wind) < toMin(S.wake) ? toMin(S.wind) + 1440 : toMin(S.wind), html: `<div class="row"><span class="ico" style="color:#8a5cf6">${ic("moon")}</span><div class="body"><div class="t">Wind down</div></div><div class="tm">${S.wind}</div></div>` });
+    rows.sort((a, b) => a.m - b.m);
+    let html = rows.map((r) => r.html).join("");
+    if (f && !f.isToday) html += `<div class="gapline">${esc(f.p.title)} is on ${K.fmtDate(f.p.date)}${f.p.time ? `, ${f.p.time}` : ""}</div>`;
+    return html;
+  }
+
+  function personalSentence() {
+    const f = firstItem();
+    let s = S.name ? `<span class="d">Good morning, </span>${esc(S.name)}. ` : "";
+    if (!f) return s + `<span class="d">Your day runs </span>${S.wake}<span class="d"> to </span>${S.wind}<span class="d">. What's first?</span>`;
+    const p = f.p;
+    if (!f.isToday) return s + `<span class="d">Today is </span>open<span class="d">. </span>${esc(p.title)}<span class="d"> is on ${K.fmtDate(p.date)}.</span>`;
+    s += `<span class="d">You have </span><span class="nw">${ic("box")}1 task</span><span class="d"> today: </span>${esc(p.title)}`;
+    s += p.time ? `<span class="d"> at </span>${p.time}<span class="d">. You're </span>mostly free<span class="d"> until then.</span>` : `<span class="d">, any time you like.</span>`;
+    return s;
+  }
+
+  // ---------- steps ----------
+  function step1() {
+    return `<div class="ob dark welcome ${S.step === 1 && !S.seen1 ? "anim" : ""}">
+      <div class="brand">Kriyan<i></i></div>
+      <div class="dayrow"${W("welcome")}><div class="dayname">${K.WEEKDAYS[NOW.getDay()]}<i></i></div><div class="datebox">${NOW.getDate()} ${K.MONTHS_LONG[NOW.getMonth()]}<br>${NOW.getFullYear()}</div></div>
+      <p class="greet">${sentenceSample()}</p>
+      <h1>Your whole day, <span class="d">in one sentence.</span></h1>
+      <p class="lead" style="margin-top:12px">Tasks, events and habits on one calm timeline. Set up takes about a minute.</p>
+      <div class="foot" style="margin-top:28px">
+        <button class="btn-full inv" data-act="next">Plan my first day</button>
+        <button class="link" data-act="signin-direct">I already have an account</button>
+      </div>
+    </div>`;
+  }
+
+  const HELPS = [
+    ["days", "cal", "Plan my days", "One timeline for tasks, events and habits"],
+    ["uni", "book", "Uni deadlines and classes", "Repeating classes, due dates, reminders"],
+    ["habits", "loop", "Build habits", "Small daily things that stick"],
+    ["focus", "timer", "Focus and timebox", "Give work a time and protect it"],
+    ["goal", "target", "Reach a big goal", "Break it into weeks and steps"],
+    ["ai", "spark", "Let my AI plan with me", "Claude, ChatGPT or Codex, through Kriyan"],
+  ];
+  function step2() {
+    return `<div class="ob">${topbar()}
+      <h1 class="q">What should Kriyan help with?</h1>
+      <p class="lead">Pick any. It changes what you see first, nothing else.</p>
+      <div class="opts" role="group" aria-label="What Kriyan should help with"${W("helps")}>${HELPS.map(([k, icn, t, s]) => `<button class="opt" data-act="help" data-k="${k}" aria-pressed="${S.helps.has(k)}"><span class="ic">${ic(icn)}</span><span class="tx"><b>${t}</b><span>${s}</span></span><span class="ck">${S.helps.has(k) ? ic("check") : ""}</span></button>`).join("")}</div>
+      <div class="grow"></div>
+      <div class="foot"><button class="btn-full" data-act="next">Continue</button></div>
+    </div>`;
+  }
+
+  const TIMES_WAKE = Array.from({ length: (11 - 4) * 4 + 1 }, (_, i) => fromMin(4 * 60 + i * 15));
+  const TIMES_WIND = Array.from({ length: (25 - 19) * 4 + 1 }, (_, i) => fromMin(19 * 60 + i * 15));
+  function wheel(id, label, icon, list, val) {
+    return `<div class="wh"><div class="wh-l">${ic(icon)}${label}</div><div class="band"><div class="wheel" id="${id}" role="listbox" aria-label="${label}" tabindex="0"><div class="pad"></div>${list.map((t) => `<button role="option" data-act="pick" data-w="${id}" data-v="${t}" aria-selected="${t === val}" tabindex="-1">${t}</button>`).join("")}<div class="pad"></div></div></div></div>`;
+  }
+  function step3() {
+    return `<div class="ob">${topbar()}
+      <h1 class="q">When does your day <span class="d">start and end?</span></h1>
+      <p class="lead">Kriyan only plans inside these hours.</p>
+      <div class="wheels"${W("wheels")}>${wheel("w-wake", "Wake up", "sun", TIMES_WAKE, S.wake)}${wheel("w-wind", "Wind down", "moon", TIMES_WIND, S.wind)}</div>
+      <div class="stepper"${W("commit")}><div class="tx"><b>Classes or work on a weekday</b><span>Roughly, hours a day</span></div>
+        <button class="iconbtn" data-act="fixed" data-d="-1" aria-label="One hour less">${ic("minus")}</button><span class="v" aria-live="polite">${S.fixed}h</span><button class="iconbtn" data-act="fixed" data-d="1" aria-label="One hour more">${ic("plus")}</button></div>
+      <div class="grow"></div>
+      <div class="foot"><button class="btn-full" data-act="next">Continue</button></div>
+    </div>`;
+  }
+
+  function step4() {
+    const m = math();
+    const max = m.awake;
+    const bar = (label, v, cls = "") => `<div class="bar ${cls}"><span>${label}</span><b>${v}h</b><div class="trk"><i style="width:${Math.round((v / max) * 100)}%"></i></div></div>`;
+    return `<div class="ob">${topbar()}
+      <h1 class="q">Let's do the math.</h1>
+      <div${W("math")}><div class="big" aria-label="About ${m.free} free hours this week"><span id="countup">${m.free}</span><small>hours</small></div>
+      <p class="lead" style="color:var(--ink2);font-size:18px;margin-top:8px">That's about how much time you get to choose this week.</p></div>
+      <div class="bars">${bar(`Awake, ${S.wake} to ${S.wind}`, m.awake)}${bar("Classes or work", m.fixed)}${bar("Meals, getting ready, travel", m.everyday)}${bar("Yours to plan", m.free, "free")}</div>
+      <div class="yr"${W("fresh")}>${ic("hourglass")}<span><b>${K.timeLeft.yearDaysLeft} days</b> left in ${NOW.getFullYear()}. A good time to start.</span></div>
+      <div class="grow"></div>
+      <div class="foot"><button class="btn-full" data-act="next">Plan the first one</button></div>
+    </div>`;
+  }
+
+  const SUGG = ["Read 20 pages tonight at 21:30 for 30m", "Gym tomorrow 7am for 45m every Mon Wed Fri", "Call mum at 18:30", "Lab report at 14:00 for 90m remind 10m before"];
+  function step5() {
+    const p = K.parseQuickAdd(S.text || "");
+    const ready = !!(S.text.trim() && p.title);
+    const landed = !!S.added;
+    return `<div class="ob">${topbar()}
+      <h1 class="q">${landed ? `That's a plan.` : `What's one thing <span class="d">for today?</span>`}</h1>
+      <p class="lead">${landed ? "Here's your day. Add more any time with the + button." : "Type it like you'd say it. Add a time if it has one."}</p>
+      ${landed ? "" : `<div class="qa"${W("nl")}><div class="hl" id="qa-hl" aria-hidden="true">${hlHTML(S.text, p)}</div><textarea id="qa-in" rows="2" placeholder="Read 20 pages tonight at 21:30" spellcheck="false" autocomplete="off" enterkeyhint="done" aria-label="Your first task">${esc(S.text)}</textarea></div>
+      <div class="chips" id="qa-chips">${S.text.trim() ? chipsHTML(p) : ""}</div>
+      ${S.text.trim() ? "" : `<div class="sugg"${W("sugg")}>${SUGG.map((s) => `<button data-act="sugg" data-v="${esc(s)}">${esc(s.replace(/ (for|remind|every) .*/, ""))}</button>`).join("")}</div>`}`}
+      <div class="mini"${landed ? W("land") : ""}><div class="lbl">${landed ? "Today" : "Your day so far"}</div><div id="mini-rows">${dayRows(landed && S.justLanded, landed ? null : p)}</div></div>
+      ${landed ? `<div class="okline">${ic("check")}Saved on this phone. Next, keep it safe.</div>` : ""}
+      <div class="grow"></div>
+      <div class="foot">${landed ? `<button class="btn-full" data-act="next">Continue</button><button class="link" data-act="undo-add">Change it</button>` : `<button class="btn-full" data-act="add" ${ready ? "" : "disabled"}>Add to today</button>`}</div>
+    </div>`;
+  }
+
+  function step6() {
+    if (S.auth === "code") {
+      return `<div class="ob">${topbar({ noSkip: true })}
+        <h1 class="q">Check your email.</h1>
+        <p class="lead">We sent a 6-digit code to <b style="color:var(--ink)">${esc(S.email)}</b>.</p>
+        <div class="code" role="group" aria-label="6-digit code"${W("code")}>${S.code.map((d, i) => `<input inputmode="numeric" pattern="[0-9]*" ${i === 0 ? 'autocomplete="one-time-code"' : 'autocomplete="off"'} aria-label="Digit ${i + 1}" data-i="${i}" value="${esc(d)}">`).join("")}</div>
+        <div class="err" role="alert">${esc(S.codeErr)}</div>
+        <div class="foot" style="align-items:center"><button class="link u" data-act="resend">Send a new code</button><button class="link" data-act="change-email">Use a different email</button></div>
+        <div class="grow"></div>
+        <p class="legal">Any 6 digits work in this prototype.</p>
+      </div>`;
+    }
+    const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.email);
+    return `<div class="ob">${topbar({ noSkip: true })}
+      <h1 class="q">Save your plan.</h1>
+      <p class="lead">Sign in so your day follows you to every device, and your AI can help.</p>
+      ${S.added ? `<div class="savecard"${W("savecard")}><p class="greet">${personalSentence()}</p></div>` : ""}
+      <div class="auth"${W("signin")}>
+        <button class="btn-out" data-act="google">${GOOGLE}Continue with Google</button>
+        <div class="or">or</div>
+        <label class="field"><span class="sr">Email</span><input id="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="Your email" value="${esc(S.email)}"><button class="go" data-act="email" aria-label="Send code" ${valid ? "" : "disabled"}>${ic("arrowR")}</button></label>
+      </div>
+      <div class="grow"></div>
+      <p class="legal">By continuing you agree to the <a href="#" onclick="return false">Terms</a> and <a href="#" onclick="return false">Privacy policy</a>. Sign in with Apple is coming.</p>
+    </div>`;
+  }
+
+  function reminderPreview() {
+    const f = firstItem();
+    const t = f && f.p.title ? f.p.title : "Read 20 pages";
+    const tm = f && f.p.time ? f.p.time : "21:30";
+    return `<div class="notif"><span class="app">K<i></i></span><div class="nb"><div class="nh"><span>Kriyan</span><span>${fromMin(toMin(tm) - 10)}</span></div><div class="nt">${esc(t)} in 10 min</div><div class="nm">${tm}${f && f.p.duration ? `, ${K.fmtDur(f.p.duration)}` : ""}. Tap to start.</div></div></div>
+      <div class="notif" aria-hidden="true"><span class="app">K<i></i></span><div class="nb"><div class="nh"><span>Kriyan</span><span>${S.wake}</span></div><div class="nt">Your day</div><div class="nm">1 task, mostly free until ${tm}.</div></div></div>`;
+  }
+  function step7() {
+    if (S.platform === "ios" && !S.standalone && !S.a2hsDone) {
+      return `<div class="ob">${topbar()}
+        <h1 class="q">Add Kriyan to your <span class="d">Home Screen.</span></h1>
+        <p class="lead">It opens full screen like any app, and it's the only way iPhone lets Kriyan send reminders.</p>
+        <div class="steps7"${W("a2hs")}>
+          <div class="st"><span class="n">1</span><span class="tx">Tap <b>Share</b> in Safari's bar</span><span class="glyph">${ic("share")}</span></div>
+          <div class="st"><span class="n">2</span><span class="tx">Scroll and tap <b>Add to Home Screen</b></span><span class="glyph" style="color:var(--ink)">${ic("addbox")}</span></div>
+          <div class="st"><span class="n">3</span><span class="tx">Open <b>Kriyan</b> from your Home Screen. You'll land right back here.</span><span class="glyph" style="background:#0b0b0c;color:#fff;font-weight:700">K</span></div>
+        </div>
+        <p class="why7">Your plan is saved to your account, so nothing is lost in between.</p>
+        <div class="grow"></div>
+        <div class="foot"><button class="btn-full" data-act="a2hs">I've added it</button><button class="link" data-act="skip">Not now, no reminders yet</button></div>
+      </div>`;
+    }
+    const android = S.platform === "android";
+    return `<div class="ob">${topbar()}
+      <h1 class="q">${S.notif ? "Reminders are on." : "Get a nudge <span class=\"d\">before it starts.</span>"}</h1>
+      <p class="lead">${S.notif ? "You can change when and how in Settings." : "Like this, built from your plan. One morning summary, and only the reminders you set."}</p>
+      <div class="preview"${W("notif")}>${reminderPreview()}</div>
+      ${android ? `<div style="margin-top:18px"${W("feel")}>
+        <div class="sw"><span class="ico">${ic("vib")}</span><div class="tx"><b>Vibrate on actions</b><span>A light tap when you tick, swipe or snap</span></div><button class="switch" role="switch" aria-checked="${S.vib}" aria-label="Vibrate on actions" data-act="vib"></button></div>
+        <div class="sw"><span class="ico">${ic("sound")}</span><div class="tx"><b>Soft sounds</b><span>A quiet click when you finish something</span></div><button class="switch" role="switch" aria-checked="${S.sfx}" aria-label="Soft sounds" data-act="sfx"></button></div></div>` : ""}
+      <div class="grow"></div>
+      <div class="foot">${S.notif ? `<button class="btn-full" data-act="next">Continue</button>` : `<button class="btn-full" data-act="notif">${ic("bell")}Turn on reminders</button><button class="link" data-act="skip">Not now</button>`}</div>
+      ${S.dlg ? `<div class="sysdlg" role="dialog" aria-modal="true" aria-label="Permission request"><div class="box"><div class="bt">${android ? "Allow Kriyan to send you notifications?" : S.platform === "desktop" ? "app.kriyan.app wants to show notifications" : "“Kriyan” would like to send you notifications"}<span>${android || S.platform === "desktop" ? "" : "Notifications may include alerts, sounds and icon badges."}</span></div><div class="acts"><button data-act="dlg-no">${S.platform === "ios" ? "Don't Allow" : android ? "Don't allow" : "Block"}</button><button data-act="dlg-yes">Allow</button></div></div></div>` : ""}
+    </div>`;
+  }
+
+  const CONN = [
+    ["cal", "Google Calendar", "Your events on the same timeline, both ways", "#1a73e8", "31"],
+    ["claude", "Claude or ChatGPT", "Plan with you in chat: \"move my lab report to Saturday\"", "#a94f31", "AI"],
+    ["codex", "Codex automation", "Each morning, reads Moodle and Gmail and adds what's due", "#111113", ">_"],
+  ];
+  function step8() {
+    const row = ([k, t, s, bg, lg]) => {
+      const done = S.conn[k];
+      return `<div class="cn"><span class="lg" style="background:${bg}">${lg}</span><div class="tx"><b>${t}</b><span>${s}</span></div>${done ? `<span class="btn-sm done">${ic("check")}On</span>` : `<button class="btn-sm" data-act="conn" data-k="${k}" aria-expanded="${S.open === k}">${k === "cal" ? "Connect" : "Set up"}</button>`}</div>
+      ${S.open === k && !done ? `<div class="mcp">${k === "cal" ? "You'd pick a Google account and the calendars to show." : k === "claude" ? `Add Kriyan as a connector, then sign in with this account.<code>https://kriyan.app/mcp</code>` : `Kriyan gives Codex a key that can add and read tasks. Things it adds say <b>Added by Codex</b> and have Undo.<code>kriyan auth token --name codex</code>`}<div style="margin-top:10px"><button class="btn-sm" style="background:var(--ink);color:var(--bg)" data-act="conn-done" data-k="${k}">${k === "cal" ? "Choose account" : "Copy and done"}</button></div></div>` : ""}`;
+    };
+    return `<div class="ob">${topbar()}
+      <h1 class="q">Bring in what <span class="d">you already use.</span></h1>
+      <p class="lead">All optional. You can do this later in Settings.</p>
+      <div class="sec">Calendar</div>${row(CONN[0])}
+      <div class="sec">Your AI</div><div${W("ai")}>${row(CONN[1])}${row(CONN[2])}</div>
+      <div class="grow"></div>
+      <div class="foot"><button class="btn-full" data-act="next">${Object.values(S.conn).some(Boolean) ? "Continue" : "Set up later"}</button></div>
+    </div>`;
+  }
+
+  function step9() {
+    const cards = [
+      ["tomorrow", "plus", "Add tomorrow's first thing", "One line, with a time if it has one", "1 min"],
+      ["review", "moon", "Pick your evening review time", "Close the day so your head can let go", "1 min"],
+      ["ai", "spark", "Connect your AI", "Ask \"what do I have time for?\"", "2 min"],
+    ];
+    const done = cards.filter((c) => S.cardsDone.has(c[0])).length;
+    return `<div class="ob" style="padding-top:0">
+      <div class="done-head"><div class="dayrow"><div class="dayname">${K.WEEKDAYS[NOW.getDay()]}<i></i></div><div class="datebox">${NOW.getDate()} ${K.MONTHS_LONG[NOW.getMonth()]}<br>${NOW.getFullYear()}</div></div>
+        <p class="greet"${W("greet")}>${personalSentence()}</p></div>
+      <div class="done-body">
+        <div class="gs-h"><h2>Get started</h2><span>${done} of 3</span></div>
+        <div class="cards"${W("cards")}>${cards.map(([k, icn, t, s, tm]) => `<button class="gc ${S.cardsDone.has(k) ? "ok" : ""}" data-act="card" data-k="${k}"><span class="gi">${ic(icn)}</span><b>${t}</b><span>${s}</span><span class="tm">${S.cardsDone.has(k) ? `${ic("check")}Done` : `${ic("clock")}${tm}`}</span></button>`).join("")}</div>
+        <div class="mini" style="margin-top:18px"><div class="lbl">Today</div>${dayRows(false)}</div>
+        <div class="grow"></div>
+        <div class="foot"><button class="btn-full" data-act="finish">Open Today</button></div>
+      </div>
+    </div>`;
+  }
+
+  function live() {
+    return `<aside class="live" aria-label="Live preview of your day">
+      <div class="cap"><i></i>Your day, live</div>
+      <div class="lv"><div class="lv-h"><div class="dayrow"><div class="dayname">${K.WEEKDAYS[NOW.getDay()]}<i></i></div><div class="datebox">${NOW.getDate()} ${K.MONTHS_LONG[NOW.getMonth()]}<br>${NOW.getFullYear()}</div></div><p class="greet">${personalSentence()}</p></div>
+      <div class="lv-b">${dayRows(false)}</div></div>
+      <p class="note">${S.step <= 3 ? "Every answer shapes this. It's what you'll see each morning." : S.step === 4 ? `About ${math().free} hours this week are yours to plan.` : "This is your real Today. Signing in saves it."}</p>
+    </aside>`;
+  }
+
+  // ---------- render ----------
+  const STEPS = [null, step1, step2, step3, step4, step5, step6, step7, step8, step9];
+  function devbar() {
+    if (innerWidth < 900 && P.get("dev") !== "1") return "";
+    const b = (v, l) => `<button data-act="plat" data-v="${v}" aria-pressed="${S.platform === v}">${l}</button>`;
+    return `<div class="dev" role="toolbar" aria-label="Preview platform"><span>Preview as</span>${b("ios", "iPhone")}${b("android", "Android")}${b("desktop", "Desktop")}</div>`;
+  }
+  function render(focusSel) {
+    const app = document.getElementById("app");
+    app.innerHTML = `<div class="stage${S.step === 1 ? " solo" : ""}">${STEPS[S.step]()}${S.step === 1 ? "" : live()}</div>${devbar()}`;
+    S.justLanded = false;
+    if (S.step === 1) S.seen1 = true;
+    // stagger the welcome sentence, capped at ~450ms total
+    app.querySelectorAll(".anim .greet span").forEach((el, i) => (el.style.animationDelay = `${Math.min(i * 40, 450)}ms`));
+    centerWheels();
+    wire();
+    if (focusSel) { const el = app.querySelector(focusSel); if (el) { el.focus(); if (el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); } }
+    const u = new URL(location.href); u.searchParams.set("step", S.step); history.replaceState(null, "", u);
+  }
+  function centerWheels() {
+    document.querySelectorAll(".wheel").forEach((w) => {
+      const sel = w.querySelector("[aria-selected=true]");
+      if (sel) w.scrollTop = sel.offsetTop - w.clientHeight / 2 + sel.offsetHeight / 2;
+    });
+  }
+  function wire() {
+    const ta = document.getElementById("qa-in");
+    if (ta) ta.addEventListener("input", () => {
+      S.text = ta.value;
+      const p = K.parseQuickAdd(S.text);
+      document.getElementById("qa-hl").innerHTML = hlHTML(S.text, p);
+      document.getElementById("qa-chips").innerHTML = S.text.trim() ? chipsHTML(p) : "";
+      const sg = document.querySelector(".sugg"); if (sg) sg.style.display = S.text.trim() ? "none" : "";
+      const btn = document.querySelector('[data-act="add"]'); if (btn) btn.disabled = !(S.text.trim() && p.title);
+      const mr = document.getElementById("mini-rows"); if (mr) mr.innerHTML = dayRows(false, p);
+    });
+    if (ta) ta.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); act({ dataset: { act: "add" } }); } });
+    const em = document.getElementById("email");
+    if (em) {
+      em.addEventListener("input", () => { S.email = em.value.trim(); const g = document.querySelector('[data-act="email"]'); if (g) g.disabled = !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.email); });
+      em.addEventListener("keydown", (e) => { if (e.key === "Enter") act({ dataset: { act: "email" } }); });
+    }
+    const boxes = document.querySelectorAll(".code input");
+    boxes.forEach((inp) => {
+      inp.addEventListener("input", () => {
+        const i = +inp.dataset.i;
+        const v = inp.value.replace(/\D/g, "");
+        // A pasted or autofilled code arrives whole in one box: spread it from there.
+        if (v.length > 1) { v.slice(0, 6 - i).split("").forEach((d, k) => (S.code[i + k] = d)); }
+        else S.code[i] = v;
+        boxes.forEach((b, k) => (b.value = S.code[k] || ""));
+        const next = S.code.findIndex((d) => !d);
+        if (next === -1) { verify(); return; }
+        if (v) boxes[Math.min(5, i + 1)].focus();
+      });
+      inp.addEventListener("keydown", (e) => { const i = +inp.dataset.i; if (e.key === "Backspace" && !inp.value && i > 0) { boxes[i - 1].focus(); } });
+    });
+    document.querySelectorAll(".wheel").forEach((w) => {
+      let t;
+      w.addEventListener("scroll", () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          const mid = w.scrollTop + w.clientHeight / 2;
+          let best = null, bd = 1e9;
+          w.querySelectorAll("button").forEach((b) => { const d = Math.abs(b.offsetTop + b.offsetHeight / 2 - mid); if (d < bd) { bd = d; best = b; } });
+          if (best && best.getAttribute("aria-selected") !== "true") { setPick(w.id, best.dataset.v, false); buzz(6); }
+        }, 90);
+      }, { passive: true });
+      w.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        const list = w.id === "w-wake" ? TIMES_WAKE : TIMES_WIND;
+        const cur = list.indexOf(w.id === "w-wake" ? S.wake : S.wind);
+        const n = list[Math.max(0, Math.min(list.length - 1, cur + (e.key === "ArrowDown" ? 1 : -1)))];
+        setPick(w.id, n, true);
+      });
+    });
+  }
+  function setPick(id, v, scroll) {
+    if (id === "w-wake") S.wake = v; else S.wind = v;
+    const w = document.getElementById(id);
+    w.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.v === v)));
+    if (scroll) { const sel = w.querySelector("[aria-selected=true]"); w.scrollTo({ top: sel.offsetTop - w.clientHeight / 2 + sel.offsetHeight / 2, behavior: "smooth" }); }
+    const lv = document.querySelector(".live"); if (lv) lv.outerHTML = live();
+  }
+  function verify() {
+    if (S.code.join("").length === 6) { S.name = S.email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); S.auth = "choose"; S.codeErr = ""; go(7); }
+  }
+
+  function go(n) { S.step = Math.max(1, Math.min(9, n)); S.open = null; S.dlg = false; render(); scrollTo(0, 0); }
+  function act(el) {
+    const a = el.dataset.act;
+    switch (a) {
+      case "next": buzz(); go(S.step + 1); break;
+      case "back": if (S.step === 6 && S.auth === "code") { S.auth = "choose"; render(); } else go(S.step - 1); break;
+      case "skip": go(S.step + 1); break;
+      case "signin-direct": go(6); break;
+      case "help": { const k = el.dataset.k; S.helps.has(k) ? S.helps.delete(k) : S.helps.add(k); buzz(8); el.setAttribute("aria-pressed", String(S.helps.has(k))); el.querySelector(".ck").innerHTML = S.helps.has(k) ? ic("check") : ""; break; }
+      case "pick": setPick(el.dataset.w, el.dataset.v, true); buzz(6); break;
+      case "fixed": S.fixed = Math.max(0, Math.min(12, S.fixed + +el.dataset.d)); buzz(6); render(); break;
+      case "sugg": S.text = el.dataset.v; render("#qa-in"); break;
+      case "add": {
+        const p = K.parseQuickAdd(S.text || "");
+        if (!S.text.trim() || !p.title) return;
+        S.added = p; S.justLanded = true; buzz(14); tickSound(); render(); break;
+      }
+      case "undo-add": S.added = null; render("#qa-in"); break;
+      case "google": S.name = "Kausthubh"; S.email = "kausthubh@gmail.com"; buzz(); go(7); break;
+      case "email": if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.email)) { S.auth = "code"; S.code = ["", "", "", "", "", ""]; render('.code input[data-i="0"]'); } break;
+      case "resend": S.codeErr = "New code sent. It can take a minute."; render('.code input[data-i="0"]'); break;
+      case "change-email": S.auth = "choose"; render("#email"); break;
+      case "a2hs": S.a2hsDone = true; render(); break;
+      case "notif": S.dlg = true; render('.sysdlg [data-act="dlg-yes"]'); break;
+      case "dlg-yes": S.dlg = false; S.notif = true; buzz(14); tickSound(); render(); break;
+      case "dlg-no": S.dlg = false; render(); break;
+      case "vib": S.vib = !S.vib; el.setAttribute("aria-checked", String(S.vib)); buzz(20); break;
+      case "sfx": S.sfx = !S.sfx; el.setAttribute("aria-checked", String(S.sfx)); tickSound(); break;
+      case "conn": S.open = S.open === el.dataset.k ? null : el.dataset.k; render(); break;
+      case "conn-done": S.conn[el.dataset.k] = true; S.open = null; buzz(); render(); break;
+      case "card": { const k = el.dataset.k; S.cardsDone.has(k) ? S.cardsDone.delete(k) : S.cardsDone.add(k); buzz(10); if (S.cardsDone.has(k)) tickSound(); render(); break; }
+      case "finish": location.href = "variant-b.html?screen=today"; break;
+      case "plat": S.platform = el.dataset.v; S.a2hsDone = false; S.notif = false; render(); break;
+    }
+  }
+  document.addEventListener("click", (e) => { const el = e.target.closest("[data-act]"); if (!el || el.disabled) return; act(el); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.dlg) { S.dlg = false; render(); } });
+  let rw = innerWidth >= 900;
+  addEventListener("resize", () => { const w = innerWidth >= 900; if (w !== rw) { rw = w; render(); } });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -234,6 +234,7 @@
         if (ok !== false) tokens.push({ start: m.index, end: m.index + m[0].length, kind, text: m[0] });
       }
     };
+    let explicitDate = false;
     const toMin = (n, unit) => (/^h/.test(unit) ? Math.round(parseFloat(n) * 60) : parseInt(n, 10));
 
     // Reminders first so "remind 10m before" isn't read as a duration.
@@ -255,10 +256,10 @@
       out.repeat = m[0][0].toUpperCase() + m[0].slice(1).toLowerCase();
     });
 
-    take(/\bfor\s+(\d+(?:\.\d+)?)\s*(m|min|mins|minutes|h|hr|hrs|hours)\b|\b(\d+(?:\.\d+)?)\s*(h|hr|hrs|hours)\s*(?:(\d+)\s*(m|min|mins))?\b|\b(\d+)\s*(min|mins|minutes)\b/gi, "duration", (m) => {
-      if (m[1]) out.duration = toMin(m[1], m[2]);
-      else if (m[3]) out.duration = toMin(m[3], m[4]) + (m[5] ? parseInt(m[5], 10) : 0);
-      else out.duration = parseInt(m[7], 10);
+    take(/\bfor\s+(\d+(?:\.\d+)?)\s*(m|min|mins|minutes|h|hr|hrs|hours)(?:\s*(\d+)\s*(?:m|min|mins|minutes))?\b|\b(\d+(?:\.\d+)?)\s*(h|hr|hrs|hours)\s*(?:(\d+)\s*(m|min|mins))?\b|\b(\d+)\s*(min|mins|minutes)\b/gi, "duration", (m) => {
+      if (m[1]) out.duration = toMin(m[1], m[2]) + (m[3] ? parseInt(m[3], 10) : 0);
+      else if (m[4]) out.duration = toMin(m[4], m[5]) + (m[6] ? parseInt(m[6], 10) : 0);
+      else out.duration = parseInt(m[8], 10);
     });
 
     take(/\b(today|tonight|tomorrow|tmrw|next week)\b/gi, "date", (m) => {
@@ -269,8 +270,11 @@
     take(/\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/gi, "date", (m) => {
       out.date = new Date(2026, MONTHIDX[m[2].toLowerCase()], parseInt(m[1], 10));
       if (out.date < atDay(0)) out.date.setFullYear(2027);
+      explicitDate = true;
     });
     take(/\b(?:on\s+)?(mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday)\b/gi, "date", (m) => {
+      // "Tue 3 Nov": the explicit date wins; the weekday is just part of how people write it.
+      if (explicitDate) return;
       const target = DAYNAMES[m[1].toLowerCase()];
       let diff = (target - NOW.getDay() + 7) % 7;
       if (diff === 0) diff = 7;

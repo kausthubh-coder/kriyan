@@ -5,7 +5,7 @@
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Kriyan: B, Joi's look, chosen</title>
+<title>Kriyan: B2, onboarding and the ship plan</title>
 <style>
   :root {
     --bg: #fbfbfa; --surface: #ffffff; --sunken: #f2f2f0; --text: #1b1b1a; --muted: #5d5d59; --line: #e2e2de;
@@ -90,12 +90,13 @@
 </head>
 <body>
 <main>
-  <h1 id="answer">B is the base: Joi's look, now readable</h1>
-  <p class="lede">You picked B. Its 206 Critly errors are now 0 across all 8 screens: darker greys, solid tab bar, 44px tap targets, same Joi look.</p>
+  <h1 id="answer">B2: Ask, a lighter task, calmer review</h1>
+  <p class="lede">B2 keeps B's look. Agents became Ask: plain-language changes that apply at once with Undo, automations that log what they added, and one tip at a time. Onboarding and <a href="plan.html">the ship plan</a> are below.</p>
 
   <ol class="asks" aria-label="What I need from you">
-    <li>Say which of A's research features to add to B: reminders held during focus, "Park a thought", the obstacle question on goals, "Let it go" in review.</li>
-    <li>Say which of C's interactions to add to B: swipe a row to finish or move it, Ctrl+K command menu, the Next bar at the thumb.</li>
+    <li>Say yes to Ask applying changes straight away with Undo, so the proposal queue goes.</li>
+    <li>Pick who pays for Ask: Kriyan's own Claude key, or each person adds their own.</li>
+    <li>Say go, and I start building B2 into the app, in the order in <a href="plan.html">the plan</a>.</li>
   </ol>
 
   <section class="viewer" aria-label="Interactive prototypes">
@@ -103,8 +104,9 @@
       <div><span class="label">View</span>
         <div class="seg" id="mode">
           <button aria-pressed="false" data-v="compare">Side by side</button>
+          <button aria-pressed="true" data-v="b2">B2</button>
           <button aria-pressed="false" data-v="a">A</button>
-          <button aria-pressed="true" data-v="b">B</button>
+          <button aria-pressed="false" data-v="b">B</button>
           <button aria-pressed="false" data-v="c">C</button>
         </div>
       </div>
@@ -117,7 +119,7 @@
           <button aria-pressed="false" data-v="week">Week</button>
           <button aria-pressed="false" data-v="goals">Goals</button>
           <button aria-pressed="false" data-v="review">Review</button>
-          <button aria-pressed="false" data-v="agents">Agents</button>
+          <button aria-pressed="false" data-v="agents">Ask</button>
         </div>
       </div>
       <div><span class="label">Theme</span>
@@ -129,8 +131,20 @@
       <button class="toggle" id="why" aria-pressed="false" title="Numbered pins say which finding or reference each part comes from">Show why</button>
     </div>
     <div class="stage" id="stage"></div>
-    <p class="muted">Everything is live: tick tasks, type in quick add, start the timer. "Show why" pins name the study or app behind each part.</p>
+    <p class="muted">Everything is live. On B2 at phone size: swipe a row right to finish it or left to move it, long-press for a menu, double-tap free time to add there. "Show why" pins name the study or app behind each part.</p>
   </section>
+
+  <h2 id="onboarding">Onboarding builds your first day</h2>
+  <p>Nine short steps, all skippable except sign-in: what you want help with, your day's shape, your free hours, one real task, then Clerk sign-in. On iPhone it walks through Add to Home Screen, because that's the only way an iPhone web app gets reminders.</p>
+  <div class="controls" role="toolbar" aria-label="Onboarding controls" style="position:static">
+    <div><span class="label">Step</span><div class="seg" id="ostep">
+      <button aria-pressed="true" data-v="1">1</button><button aria-pressed="false" data-v="2">2</button><button aria-pressed="false" data-v="3">3</button><button aria-pressed="false" data-v="4">4</button><button aria-pressed="false" data-v="5">5</button><button aria-pressed="false" data-v="6">6</button><button aria-pressed="false" data-v="7">7</button><button aria-pressed="false" data-v="8">8</button><button aria-pressed="false" data-v="9">9</button>
+    </div></div>
+    <div><span class="label">Phone</span><div class="seg" id="oplat">
+      <button aria-pressed="true" data-v="ios">iPhone</button><button aria-pressed="false" data-v="android">Android</button>
+    </div></div>
+  </div>
+  <div class="stage single" id="ostage"></div>
 
   <h2 id="compare">How the three compare</h2>
   <p>Same checks for all three: <code>critly check</code> on Today, Task and Week, 390 and 1440 wide, light and dark. B's row shows the result after its fixes.</p>
@@ -271,11 +285,12 @@
 
 <script>
   const VARIANTS = {
+    b2: { name: "B2: Ask, task v2, review v2", file: "variant-b2.html", blurb: "B with Ask instead of Agents, a task sheet with chips, a one-card-at-a-time review, and swipe, long press and double-tap on phone." },
     a: { name: "A: research only", file: "variant-a.html", blurb: "From the research alone, with no reference screens. A day ruler shows free time. Teal marks the next action." },
     b: { name: "B: Mobbin", file: "variant-b.html", blurb: "Joi's look, plus patterns from Structured, Tiimo, Reminders, Notion Calendar and Things." },
     c: { name: "C: Mobbin + Critly", file: "variant-c.html", blurb: "The same references, built through Critly: a time spine, a red now line and a Next bar where your thumb rests." },
   };
-  const state = { mode: "b", screen: "today", theme: "light", why: false };
+  const state = { mode: "b2", screen: "today", theme: "light", why: false };
   const stage = document.getElementById("stage");
 
   function src(v) { return `${VARIANTS[v].file}?screen=${state.screen}&theme=${state.theme}${state.why ? "&why=1" : ""}`; }
@@ -302,7 +317,7 @@
     if (state.mode === "compare") {
       const row = document.createElement("div");
       row.className = "row3";
-      for (const v of ["a", "b", "c"]) {
+      for (const v of ["b", "b2", "c"]) {
         const col = document.createElement("div");
         col.className = "col";
         col.innerHTML = `<h3></h3><p></p>`;
@@ -370,6 +385,31 @@
     fig.querySelector("span").textContent = r.via;
     grid.appendChild(fig);
   }
+</script>
+<script>
+  (() => {
+    const st = { step: "1", plat: "ios" };
+    const stage = document.getElementById("ostage");
+    function fr(w, h, cls, q) {
+      const wrap = document.createElement("div"); wrap.className = `frame ${cls}`;
+      const f = document.createElement("iframe"); f.title = `Onboarding step ${st.step}`; f.width = w; f.height = h; f.loading = "lazy";
+      f.src = `onboarding.html?step=${st.step}&${q}`; wrap.appendChild(f);
+      new ResizeObserver(() => { const s = wrap.clientWidth / w; f.style.transform = `scale(${s})`; wrap.style.height = `${Math.round(h * s)}px`; }).observe(wrap);
+      return wrap;
+    }
+    function render() {
+      stage.innerHTML = "";
+      const l = document.createElement("div"); l.className = "col"; l.appendChild(fr(390, 844, "phone", `platform=${st.plat}`));
+      const r = document.createElement("div"); r.className = "col"; r.appendChild(fr(1440, 900, "desk", "platform=desktop"));
+      const a = document.createElement("a"); a.className = "open"; a.href = `onboarding.html?step=${st.step}&platform=${st.plat}`; a.target = "_blank"; a.textContent = "Open full screen"; l.appendChild(a);
+      stage.append(l, r);
+    }
+    for (const [id, key] of [["ostep", "step"], ["oplat", "plat"]]) {
+      const el = document.getElementById(id);
+      el.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; el.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); st[key] = b.dataset.v; render(); });
+    }
+    render();
+  })();
 </script>
 </body>
 </html>
