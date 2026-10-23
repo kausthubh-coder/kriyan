@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Kriyan: three design directions</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --surface: #ffffff; --sunken: #f2f2f0; --text: #1b1b1a; --muted: #5d5d59; --line: #e2e2de;
+    --accent: #d93a2b; --accent-fg: #ffffff; --good: #2f7d4a; --mixed: #9a6400; --bad: #b3261e;
+    --radius: 12px; --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141413; --surface: #1d1d1c; --sunken: #232322; --text: #ecece8; --muted: #a6a6a0; --line: #343432;
+      --accent: #ff6b5c; --accent-fg: #141413; --good: #6cc48a; --mixed: #e0a943; --bad: #ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; color: var(--text); font: 17px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+  main { max-width: 1240px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 12px; max-width: 22ch; text-wrap: balance; }
+  h2 { font-size: 26px; line-height: 1.2; letter-spacing: -0.01em; margin: 64px 0 12px; text-wrap: balance; }
+  h3 { font-size: 19px; margin: 32px 0 8px; }
+  p, li { max-width: 60ch; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 20px; color: var(--muted); max-width: 60ch; }
+  .lede strong { color: var(--text); font-weight: 600; }
+  a { color: inherit; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: currentColor; }
+  small, .muted { color: var(--muted); }
+  ol.asks { padding-left: 24px; margin: 16px 0 0; }
+  ol.asks li { margin: 6px 0; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Viewer */
+  .viewer { margin-top: 40px; }
+  .controls > div { min-width: 0; max-width: 100%; }
+  .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  .seg { display: inline-flex; background: var(--sunken); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button { font: inherit; font-size: 15px; border: 0; background: transparent; color: var(--muted); padding: 7px 12px; border-radius: 8px; cursor: pointer; min-height: 44px; min-width: 44px; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / .12); font-weight: 600; }
+  .seg button:focus-visible, .toggle:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .label { display: block; margin-bottom: 4px; font-size: 15px; color: var(--muted); margin-right: 6px; }
+  .toggle { font: inherit; font-size: 15px; display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 7px 12px; border-radius: 10px; cursor: pointer; min-height: 44px; }
+  .toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .stage { padding: 24px 0 8px; }
+  .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .col h3 { margin: 0 0 4px; font-size: 17px; }
+  .col p { font-size: 15px; color: var(--muted); margin: 0 0 12px; min-height: 3em; }
+  .frame { position: relative; overflow: hidden; border-radius: 28px; border: 1px solid var(--line); background: var(--surface); }
+  .frame iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: transparent; }
+  .frame.desk { border-radius: 12px; }
+  .open { font-size: 15px; display: inline-flex; align-items: center; min-height: 44px; }
+  .single { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
+
+  /* Tables */
+  .tablewrap { overflow-x: auto; margin: 12px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; font-size: 15px; color: var(--muted); }
+  td:first-child { font-weight: 600; min-width: 11ch; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .good { color: var(--good); } .mixed { color: var(--mixed); } .bad { color: var(--bad); }
+
+  details { border-top: 1px solid var(--line); padding: 12px 0; }
+  details:last-of-type { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+  summary::before { content: "+"; width: 1.2em; color: var(--muted); }
+  details[open] > summary::before { content: "−"; }
+  details > *:not(summary) { margin-top: 12px; }
+
+  .refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+  .refs figure { margin: 0; }
+  .refs img { width: 100%; aspect-ratio: 9 / 19.5; object-fit: cover; object-position: top; border-radius: 10px; background: var(--sunken); display: block; }
+  .refs figcaption { font-size: 15px; color: var(--muted); margin-top: 6px; }
+  .refs figcaption b { color: var(--text); font-weight: 600; display: block; }
+  code { font-family: var(--mono); font-size: .9em; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
+
+  @media (max-width: 900px) {
+    main { padding: 32px 16px 64px; }
+    h1 { font-size: 32px; }
+    .row3 { grid-template-columns: 1fr; }
+    .single { grid-template-columns: 1fr; }
+  }
+  @media print { .controls { position: static; } .viewer { display: none; } details { display: block; } }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="answer">Build on C, with B's Joi face</h1>
+  <p class="lede">C shows what to do now and how much time is free, and it is the only one with 0 Critly errors. B looks most like Joi, but Joi's light grey text fails contrast; A has the research ideas worth borrowing.</p>
+
+  <ol class="asks" aria-label="What I need from you">
+    <li>Pick the base: C as I recommend, or B if looking like Joi matters more than passing contrast.</li>
+    <li>Say which of B's Joi pieces to bring over: the black header with the sentence, the dark focus ring, the 71-dot year.</li>
+    <li>Say which of A's research features to keep: reminders held during focus, "Park a thought", the obstacle question on goals, "Let it go" in review.</li>
+  </ol>
+
+  <section class="viewer" aria-label="Interactive prototypes">
+    <div class="controls" role="toolbar" aria-label="Prototype controls">
+      <div><span class="label">View</span>
+        <div class="seg" id="mode">
+          <button aria-pressed="true" data-v="compare">Side by side</button>
+          <button aria-pressed="false" data-v="a">A</button>
+          <button aria-pressed="false" data-v="b">B</button>
+          <button aria-pressed="false" data-v="c">C</button>
+        </div>
+      </div>
+      <div><span class="label">Screen</span>
+        <div class="seg" id="screen">
+          <button aria-pressed="true" data-v="today">Today</button>
+          <button aria-pressed="false" data-v="add">Add</button>
+          <button aria-pressed="false" data-v="task">Task</button>
+          <button aria-pressed="false" data-v="focus">Focus</button>
+          <button aria-pressed="false" data-v="week">Week</button>
+          <button aria-pressed="false" data-v="goals">Goals</button>
+          <button aria-pressed="false" data-v="review">Review</button>
+          <button aria-pressed="false" data-v="agents">Agents</button>
+        </div>
+      </div>
+      <div><span class="label">Theme</span>
+        <div class="seg" id="theme">
+          <button aria-pressed="true" data-v="light">Light</button>
+          <button aria-pressed="false" data-v="dark">Dark</button>
+        </div>
+      </div>
+      <button class="toggle" id="why" aria-pressed="false" title="Numbered pins say which finding or reference each part comes from">Show why</button>
+    </div>
+    <div class="stage" id="stage"></div>
+    <p class="muted">Everything is live: tick tasks, type in quick add, start the timer. "Show why" pins name the study or app behind each part.</p>
+  </section>
+
+  <h2 id="compare">How the three compare</h2>
+  <p>Same checks for all three: <code>critly check</code> on Today, Task and Week, 390 and 1440 wide, light and dark.</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Variant</th><th>Made from</th><th>Strongest idea</th><th>Weakest spot</th><th class="n">Critly errors</th></tr></thead>
+    <tbody>
+      <tr><td>A: research only</td><td>14 findings, no reference screens</td><td>Reminders held during a focus block ("2 reminders held until 12:15"), "Park a thought", an obstacle question on goals, "Let it go" in review</td><td>Looks like a careful generic app; faint past rows and "Fill" fail contrast; 42px checkboxes</td><td class="n bad">75</td></tr>
+      <tr><td>B: Mobbin</td><td>Joi plus 8 apps' real screens</td><td>Feels like Joi: the black header with the sentence summary, a dark focus ring, a 71-dot "days left in 2026" grid</td><td>Joi's grey (#a3a3a8 on white, 2.5:1) fails 4.5:1; the red "Thu" is 4.45:1; 32 to 40px buttons</td><td class="n bad">82</td></tr>
+      <tr><td>C: Mobbin + Critly</td><td>Same screens, plus Critly's direction, tokens and checks</td><td>Today answers "what now, and how much time is free?": a time spine, a red now line, and a Next bar at the bottom. Swipe to finish or move a row, Undo instead of confirm, Ctrl+K</td><td>Less of Joi's personality; the review moves all 9 open items by default, even tonight's reading</td><td class="n good">0</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>All 8 screens load at both widths with no errors or sideways scroll (48 of 48). Scripted tap-throughs passed: A 30 of 30, B 26 of 26, C 22 of 22.</p>
+  <details>
+    <summary>How C picked its look: two first screens, one kept</summary>
+    <p>C built two versions of Today first. One was a Joi-style list under a big "Thu"; the other was a time spine with the next block pinned at the bottom. The spine won because Today's job is to show time, and the list could belong to any to-do app. C kept Joi's one-sentence summary and its monochrome palette. Its outside-the-category reference was the Swiss railway clock: one red hand means "now", and everything else stays black and quiet.</p>
+    <p>Its tokens: Geist type with tabular numbers, a warm neutral OKLCH ramp, ink for actions, red only for "now", 14px blocks, 22px sheets, one ease-out curve.</p>
+  </details>
+
+  <h2 id="findings">What the research says to build</h2>
+  <ul>
+    <li>Give every task a when: if-then plans had a medium-to-large effect on reaching goals (d = 0.65), and a plan quiets the open loop.</li>
+    <li>Never guess a length; only 30% of people finish by their own estimate.</li>
+    <li>No red "overdue", no fragile streaks: guilt and broken streaks make people quit.</li>
+    <li>Fewer, batched reminders; one focus block at a time.</li>
+  </ul>
+  <details>
+  <summary>All 14 findings and the rule each sets</summary>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Finding</th><th>Evidence</th><th>So Kriyan</th></tr></thead>
+    <tbody>
+      <tr><td>A plan closes the loop</td><td>Writing a specific plan for an unfinished goal stopped its intrusive thoughts (Masicampo &amp; Baumeister 2011).</td><td>Capture in one line, then give it a when. Anything without a day lives in Inbox, never in your head.</td></tr>
+      <tr><td>If-then beats intent</td><td>"When X, I'll do Y" plans: d = 0.65 on goal attainment across 94 tests (Gollwitzer &amp; Sheeran 2006).</td><td>Timeboxing is the default way to plan: a task with a time and place is an if-then plan.</td></tr>
+      <tr><td>Estimates run short</td><td>Only about 30% of students finished their thesis by their own estimate (Buehler, Griffin &amp; Ross 1994). Listing the steps lengthens estimates (Kruger &amp; Evans 2004).</td><td>Duration is optional and never guessed. Subtasks and tracked time suggest a better one; agents can propose a split.</td></tr>
+      <tr><td>Urgent crowds out important</td><td>People pick a smaller payoff when the task merely looks urgent (Zhu, Yang &amp; Hsee 2018).</td><td>No red counters. Today leads with your plan and the goal each block serves.</td></tr>
+      <tr><td>Switching costs focus</td><td>Interrupted people work faster but with more stress (Mark, Gudith &amp; Klocke 2008); unfinished work leaves attention residue (Leroy 2009).</td><td>Focus shows one block, its time left and what is next. A stray thought goes to a note, not a new tab.</td></tr>
+      <tr><td>Fewer pings, less stress</td><td>Checking email 3 times a day lowered daily stress for 124 adults (Kushlev &amp; Dunn 2015).</td><td>Multiple reminders when you ask for them, one morning summary by default, quiet hours.</td></tr>
+      <tr><td>Fresh starts motivate</td><td>Goal-seeking spikes after Mondays, birthdays and term starts (Dai, Milkman &amp; Riis 2014).</td><td>Weekly review on your chosen day; goal prompts at new weeks, months and semesters.</td></tr>
+      <tr><td>Near the end, people speed up</td><td>Coffee-card buyers bought faster as the free coffee got closer (Kivetz, Urminsky &amp; Zheng 2006).</td><td>Goals show milestones done and left ("3 of 5"), not a percentage from nowhere.</td></tr>
+      <tr><td>Habits take months, misses are fine</td><td>Median 66 days to automaticity, range 18 to 254; one missed day did not change the curve (Lally et al. 2010).</td><td>Habits show strength over weeks, not a fragile streak count.</td></tr>
+      <tr><td>Broken streaks make people quit</td><td>A visibly broken streak lowered later engagement; being able to repair it softened that (Silverman &amp; Barasch 2023).</td><td>"Never miss twice": a miss is a grey dot, and a skip day keeps the run.</td></tr>
+      <tr><td>Forgiving yourself helps</td><td>Students who forgave their own procrastination procrastinated less on the next exams (Wohl, Pychyl &amp; Bennett 2010).</td><td>"2 from earlier", never "overdue". Review moves them in one tap, with Undo.</td></tr>
+      <tr><td>Name the obstacle</td><td>Mental contrasting with if-then plans: g = 0.34 across 21 studies (Wang, Wang &amp; Gai 2021).</td><td>A goal asks what could get in the way and turns the answer into an if-then task.</td></tr>
+      <tr><td>Time left is a budget</td><td>Inferred from the planning fallacy and goal gradient above; no single study.</td><td>Free hours this week, days left in the year and weeks left in the semester sit next to what is already planned.</td></tr>
+      <tr><td>Agents need a yes</td><td>Design call, not a study: an agent edit you didn't see is a plan you don't trust.</td><td>CLI and MCP changes arrive as proposals you accept or decline, with the agent's reason.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  </details>
+
+  <details>
+    <summary>Sources: 13 papers, with links</summary>
+    <ul>
+      <li>Masicampo &amp; Baumeister (2011). Consider it done! <i>J. Personality and Social Psychology</i> 101(4), 667-683.</li>
+      <li>Gollwitzer &amp; Sheeran (2006). Implementation intentions and goal achievement. <i>Adv. Experimental Social Psychology</i> 38, 69-119. <a href="https://kops.uni-konstanz.de/entities/publication/2e749bfb-8533-437c-8203-7e788c910c5f">record</a></li>
+      <li>Buehler, Griffin &amp; Ross (1994). Exploring the planning fallacy. <i>JPSP</i> 67(3), 366-381. <a href="https://bear.warrington.ufl.edu/brenner/mar7588/Papers/buehler-et-al-1994.pdf">pdf</a></li>
+      <li>Kruger &amp; Evans (2004). If you don't want to be late, enumerate. <i>J. Experimental Social Psychology</i> 40, 586-598. Later replications are mixed.</li>
+      <li>Zhu, Yang &amp; Hsee (2018). The mere urgency effect. <i>J. Consumer Research</i> 45(3), 673-690. An independent replication was published Sep 2026; I haven't read it.</li>
+      <li>Mark, Gudith &amp; Klocke (2008). The cost of interrupted work. CHI 2008. <a href="https://www.ics.uci.edu/~gmark/chi08-mark.pdf">pdf</a></li>
+      <li>Leroy (2009). Why is it so hard to do my work? <i>OBHDP</i> 109(2), 168-181.</li>
+      <li>Kushlev &amp; Dunn (2015). Checking email less frequently reduces stress. <i>Computers in Human Behavior</i>. <a href="https://www.interruptions.net/literature/Kushlev-ComputHumBehav15.pdf">pdf</a></li>
+      <li>Dai, Milkman &amp; Riis (2014). The fresh start effect. <i>Management Science</i> 60(10). <a href="https://faculty.wharton.upenn.edu/wp-content/uploads/2014/06/Dai_Fresh_Start_2014_Mgmt_Sci.pdf">pdf</a></li>
+      <li>Kivetz, Urminsky &amp; Zheng (2006). The goal-gradient hypothesis resurrected. <i>J. Marketing Research</i> 43, 39-58. <a href="https://business.columbia.edu/sites/default/files-efs/pubfiles/1200/goalgradient.pdf">pdf</a></li>
+      <li>Lally et al. (2010). How are habits formed. <i>European J. Social Psychology</i>. 39 of 96 participants fit the model; not yet replicated.</li>
+      <li>Silverman &amp; Barasch (2023). On or off track: how (broken) streaks affect consumer decisions. <i>JCR</i>. <a href="https://doi.org/10.1093/jcr/ucac029">doi</a></li>
+      <li>Wohl, Pychyl &amp; Bennett (2010). I forgive myself, now I can study. <i>Personality and Individual Differences</i> 48(7).</li>
+      <li>Wang, Wang &amp; Gai (2021). Meta-analysis of mental contrasting with implementation intentions. <i>Frontiers in Psychology</i>. <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8149892/">full text</a></li>
+    </ul>
+    <p class="muted">I read abstracts and summaries, not every full paper. Effect sizes are as the papers report them.</p>
+  </details>
+
+  <h2 id="refs">What each reference app taught</h2>
+  <p>B and C used these screens; A did not. The biggest lessons: Joi's one-sentence day, Structured's duration-as-height timeline, Tiimo's "move to tomorrow" review.</p>
+  <details>
+  <summary>Lessons from all 9 apps</summary>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>App</th><th>Lesson taken</th><th>Where it shows up</th></tr></thead>
+    <tbody>
+      <tr><td>Joi</td><td>A sentence beats a dashboard: "You have 3 meetings, 2 tasks and 1 habit today. You're mostly free after 4 pm." Monochrome, one red dot, dotted rows.</td><td>Today's header and list in B and C</td></tr>
+      <tr><td>Structured</td><td>Duration as height on a vertical line; gaps get a note ("Task ahead, 8m to prep").</td><td>Today timeline</td></tr>
+      <tr><td>Tiimo</td><td>Anytime / Morning / Afternoon / Evening groups; "Remaining tasks: move 1 to tomorrow"; a focus ring that counts down.</td><td>Today groups, Review, Focus</td></tr>
+      <tr><td>Apple Reminders</td><td>Words you type turn blue as they're understood ("at 7am every day").</td><td>Quick add</td></tr>
+      <tr><td>Apple Notes</td><td>Notes are plain text that grows into checklists; nothing to set up.</td><td>Task notes and subtasks</td></tr>
+      <tr><td>Notion Calendar</td><td>"Upcoming in 19 min" card; event sheet reads "10:00 → 10:30 30min".</td><td>Next-up card, task sheet</td></tr>
+      <tr><td>Things 3</td><td>"4d left" deadlines; one bar with When and Move.</td><td>Deadlines, row actions</td></tr>
+      <tr><td>Jomo</td><td>Calm stat cards, Now vs Before, framed as time won back.</td><td>Time left on Goals</td></tr>
+      <tr><td>TickTick, Streaks</td><td>Power under a simple face: countdowns, habit circles, many reminder types.</td><td>Reminders, habits</td></tr>
+    </tbody>
+  </table>
+  </div>
+  </details>
+  <details>
+    <summary>Reference screens: 24 from App Store and Mobbin</summary>
+    <div class="refs" id="refgrid"></div>
+  </details>
+
+  <h2 id="coverage">All your features, in all three</h2>
+  <details>
+  <summary>Where to see each of your 8 features</summary>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>You asked for</th><th>Where to see it</th></tr></thead>
+    <tbody>
+      <tr><td>Repeating tasks</td><td>Task: repeat rule with advanced options (every Tue and Thu until a date, monthly on the 22nd, every 3 days after done). Quick add: "every Mon Wed Fri".</td></tr>
+      <tr><td>Duration or none</td><td>Quick add and Task: duration is a chip you can leave empty. Untimed tasks sit in Anytime.</td></tr>
+      <tr><td>Multiple reminders</td><td>Task: "Write lab report 4" has three; add or remove them. Quick add: "remind 15m before and 5m before".</td></tr>
+      <tr><td>Notes on a task</td><td>Task: notes plus subtasks.</td></tr>
+      <tr><td>Time tracking and timeboxing</td><td>Focus timer; Week: drag inbox tasks into free time on desktop.</td></tr>
+      <tr><td>Goals, habits, time left</td><td>Goals screen: milestones, habit history, days left in 2026, weeks left in semester, free hours.</td></tr>
+      <tr><td>CLI and MCP for agents</td><td>Agents screen: proposals with accept and decline, connect steps, <code>kriyan</code> commands.</td></tr>
+      <tr><td>Web and Android</td><td>Every prototype switches layout at 700px: phone below, desktop web above.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  </details>
+
+  <h2 id="method">How this was made</h2>
+  <p>Mobbin search needs a login, so the references are its public pages plus App Store screenshots. All three prototypes share one dataset, so every difference is design, not data.</p>
+  <details>
+    <summary>Sources and setup</summary>
+    <p>Mobbin public explore pages gave screens from Tiimo, Things 3, Apple Notes, Streaks, Timepage, Structured and Jomo. App Store screenshots covered Joi ("Joi: Daily Planner &amp; Organizer" by Alexey Sekachov), Structured, Tiimo, Jomo, Notion Calendar, TickTick, Reminders and Notes.</p>
+    <p>The data lives in <code>shared/kriyan-data.js</code>: Thu 22 Oct 2026, 10:40, with a repeating lecture, a birthday, multiple reminders and habits with 28 days of history.</p>
+  </details>
+  <details>
+    <summary>Not checked: 5 gaps</summary>
+    <ul>
+      <li>No real Android device or emulator; the phone layout was checked in Chromium at 390 wide with touch on.</li>
+      <li>Widths from 700 to 899px show the phone layout centred.</li>
+      <li>Long press and real haptics aren't built; C's swipe uses <code>navigator.vibrate</code> as a stand-in.</li>
+      <li>The MCP URL and <code>npm i -g kriyan</code> on the Agents screens are illustrative.</li>
+      <li>Reduced-motion styles exist in C but weren't tested.</li>
+    </ul>
+  </details>
+</main>
+
+<script>
+  const VARIANTS = {
+    a: { name: "A: research only", file: "variant-a.html", blurb: "From the research alone, with no reference screens. A day ruler shows free time. Teal marks the next action." },
+    b: { name: "B: Mobbin", file: "variant-b.html", blurb: "Joi's look, plus patterns from Structured, Tiimo, Reminders, Notion Calendar and Things." },
+    c: { name: "C: Mobbin + Critly", file: "variant-c.html", blurb: "The same references, built through Critly: a time spine, a red now line and a Next bar where your thumb rests." },
+  };
+  const state = { mode: "compare", screen: "today", theme: "light", why: false };
+  const stage = document.getElementById("stage");
+
+  function src(v) { return `${VARIANTS[v].file}?screen=${state.screen}&theme=${state.theme}${state.why ? "&why=1" : ""}`; }
+
+  function frame(v, w, h, cls) {
+    const wrap = document.createElement("div");
+    wrap.className = `frame ${cls}`;
+    const f = document.createElement("iframe");
+    f.title = `${VARIANTS[v].name}, ${state.screen}`;
+    f.width = w; f.height = h; f.loading = "lazy";
+    f.src = src(v);
+    wrap.appendChild(f);
+    const fit = () => {
+      const s = wrap.clientWidth / w;
+      f.style.transform = `scale(${s})`;
+      wrap.style.height = `${Math.round(h * s)}px`;
+    };
+    new ResizeObserver(fit).observe(wrap);
+    return wrap;
+  }
+
+  function render() {
+    stage.innerHTML = "";
+    if (state.mode === "compare") {
+      const row = document.createElement("div");
+      row.className = "row3";
+      for (const v of ["a", "b", "c"]) {
+        const col = document.createElement("div");
+        col.className = "col";
+        col.innerHTML = `<h3></h3><p></p>`;
+        col.querySelector("h3").textContent = VARIANTS[v].name;
+        col.querySelector("p").textContent = VARIANTS[v].blurb;
+        col.appendChild(frame(v, 390, 844, "phone"));
+        const a = document.createElement("a");
+        a.className = "open"; a.href = src(v); a.target = "_blank"; a.textContent = "Open full screen";
+        col.appendChild(a);
+        row.appendChild(col);
+      }
+      stage.appendChild(row);
+    } else {
+      const v = state.mode;
+      const wrap = document.createElement("div");
+      wrap.className = "single";
+      const left = document.createElement("div");
+      left.className = "col";
+      left.innerHTML = `<h3></h3><p></p>`;
+      left.querySelector("h3").textContent = `${VARIANTS[v].name}, phone`;
+      left.querySelector("p").textContent = VARIANTS[v].blurb;
+      left.appendChild(frame(v, 390, 844, "phone"));
+      const right = document.createElement("div");
+      right.className = "col";
+      right.innerHTML = `<h3>Desktop web, 1440 wide</h3><p>Same data, desktop layout.</p>`;
+      right.appendChild(frame(v, 1440, 900, "desk"));
+      const a = document.createElement("a");
+      a.className = "open"; a.href = src(v); a.target = "_blank"; a.textContent = "Open full screen";
+      right.appendChild(a);
+      wrap.append(left, right);
+      stage.appendChild(wrap);
+    }
+  }
+
+  function seg(id, key) {
+    const el = document.getElementById(id);
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      el.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      state[key] = b.dataset.v; render();
+    });
+  }
+  seg("mode", "mode"); seg("screen", "screen"); seg("theme", "theme");
+  if (matchMedia("(prefers-color-scheme: dark)").matches) {
+    state.theme = "dark";
+    document.querySelectorAll("#theme button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === "dark")));
+  }
+  document.getElementById("why").addEventListener("click", (e) => {
+    state.why = !state.why;
+    e.currentTarget.setAttribute("aria-pressed", String(state.why));
+    e.currentTarget.textContent = state.why ? "Hide why" : "Show why";
+    stage.querySelectorAll("iframe").forEach((f) => f.contentWindow?.postMessage({ why: state.why }, "*"));
+  });
+  render();
+
+  const REFS = [{"app": "Joi", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f8/fb/21/f8fb2152-f9aa-6dc7-c52d-ceff1e3273ba/01.jpg/392x0w.jpg", "page": "https://apps.apple.com/us/app/joi-daily-planner-organizer/id6736852235", "via": "App Store"}, {"app": "Joi", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/5d/7a/20/5d7a2016-006a-cfa0-0829-a7be5179b089/02.jpg/392x0w.jpg", "page": "https://apps.apple.com/us/app/joi-daily-planner-organizer/id6736852235", "via": "App Store"}, {"app": "Joi", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a5/44/6c/a5446c77-c443-e718-c72c-ed7780c74e2c/04.jpg/392x0w.jpg", "page": "https://apps.apple.com/us/app/joi-daily-planner-organizer/id6736852235", "via": "App Store"}, {"app": "Structured", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/3d/18/90/3d1890b0-748a-63d8-8c30-cafc21ffe0ae/6.9__baseline_2.jpg/392x0w.jpg", "page": "https://apps.apple.com/app/id1499198946", "via": "App Store"}, {"app": "Structured", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/22/88/28/228828b7-723d-3672-6148-28f2798119c7/6.9__baseline_3.jpg/392x0w.jpg", "page": "https://apps.apple.com/app/id1499198946", "via": "App Store"}, {"app": "Tiimo", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/40/ce/dc/40cedc1c-bb09-4693-9bf5-c5a280804582/iPhone_1290_U00d72796_03.png/392x0w.jpg", "page": "https://apps.apple.com/us/app/tiimo-to-do-list-planner/id1480220328", "via": "App Store"}, {"app": "Tiimo", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/dc/8b/b1/dc8bb15c-9108-217c-bedd-1982f98c18cd/iPhone_1290_U00d72796_06.png/392x0w.jpg", "page": "https://apps.apple.com/us/app/tiimo-to-do-list-planner/id1480220328", "via": "App Store"}, {"app": "Apple Reminders", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/7d/32/05/7d3205f7-0852-ae6e-8623-d259d66b13ae/iPhone_1_Today.PNG/392x0w.jpg", "page": "https://apps.apple.com/us/app/reminders/id1108187841", "via": "App Store"}, {"app": "Apple Reminders", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/e6/dc/89/e6dc89bb-4cda-eb0b-e931-7691c0e773c7/iPhone_2_Magic_Compose.PNG/392x0w.jpg", "page": "https://apps.apple.com/us/app/reminders/id1108187841", "via": "App Store"}, {"app": "Notion Calendar", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource126/v4/49/67/38/49673809-5722-9f8e-aeff-ee24efc5f883/77b32e48-e8a4-4c12-bef3-6e1f2ebf7944_1.png/392x0w.jpg", "page": "https://apps.apple.com/us/app/notion-calendar/id1607562761", "via": "App Store"}, {"app": "Notion Calendar", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource126/v4/bf/78/de/bf78ded1-e970-1d6e-791e-f7b99e06eba4/96abb491-e917-4acd-8f55-f10fd4a3cec2_5.png/392x0w.jpg", "page": "https://apps.apple.com/us/app/notion-calendar/id1607562761", "via": "App Store"}, {"app": "Jomo", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/32/53/53/32535300-7935-360b-4b0b-bb9224d8b3b7/64a42e1e-82a1-4bee-b301-62186efc53b0_1_APP_IPHONE_55_1.jpg/392x0w.jpg", "page": "https://apps.apple.com/us/app/jomo-screen-time-blocker/id1609960918", "via": "App Store"}, {"app": "TickTick", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c4/17/98/c41798a0-a25e-dc4b-e32e-35670a933f25/7.png/392x0w.jpg", "page": "https://apps.apple.com/us/app/ticktick-to-do-list-calendar/id626144601", "via": "App Store"}, {"app": "TickTick", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ea/4d/f3/ea4df37f-8964-a74c-0b63-5f49a4bb1781/8.png/392x0w.jpg", "page": "https://apps.apple.com/us/app/ticktick-to-do-list-calendar/id626144601", "via": "App Store"}, {"app": "Apple Notes", "src": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/04/16/68/041668d9-0672-cb3c-2e98-a9bf013e5594/1_Notes_screen_.PNG/392x0w.jpg", "page": "https://apps.apple.com/us/app/notes/id1110145109", "via": "App Store"}, {"app": "Tiimo", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.9U-pjvQMz8Z_RSUu.EZcr2_BmbReEkgcW2M5OC4w0rorVTCbjpBmKf4PZl6lOz5g8MCAmcfm0AOhKh18FZQGynaMXbX2AsjdYuutzw0ba2-JgaOFMOpsO8ahJfPhUmpcwnNu3LZuHsbkVQ2j1gQAZxCZ1Ay17Gi8BhfsxOWlpTFOlLruLjiFP8-lR1pIjiCIRsv47W-Wd7qPwidUd3gPScd6bhfLycnPZgMEMq7TjIykUa4PVh9ryboD6mpZ0Mb3PKnsqp4KCD98E9ATgEbluT84SmGm7G3UL7VLpsmA_Ln6kzwI3osh2pLwJjKlyaLRR1N5KX4588jGgkBZGmvWJiPwkb8vsUAsd_UZu7pnoczNLyUGpCtVEGhex3kW8gxJtsWflRA", "page": "https://mobbin.com/explore/screens/2d3235bc-37ba-45bb-86f1-6a3db21fa01b", "via": "Mobbin"}, {"app": "Tiimo", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.CV23pUhul_5KGsYA.d5FNQuMToBUrqbfDQvCoBh6OoNFm5NaHL9--HqhpEufFIGy0cfnbQvxu-3hdl6lf1b9aMb2Qk8F6R4nGkwrSK259_TqDTlxk4UfQniJl9GGE0vQiHYLyV25JDrPzjp-d7BIwU4Slkglu7UGaKdY4M0_FKLAriskHWToCZ2GaMFX7JPwwD1uJvZKmLapCSbhTshDKNtX423ZRJMw6iYFdFZbJfyWbv4VsFx8CVZOiOgzNDjQJBYBbaDAtR2m7S64P8eNButf7Q1zhpVC-QkrzHY-WiQgG8ejyBiq7dACKt48xQmIbC2or4XsO-Lp6zssj4W4PVrEbltVPgo3_o6epdyBoFs3y-n6SQ13E-tbKb2c9p6xFep7ZHQ", "page": "https://mobbin.com/explore/screens/fef7e27a-7a3d-4698-b9da-3de3779784fe", "via": "Mobbin"}, {"app": "Tiimo", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.E2vO21fPIg0zSeyZ.MZLTaBuugpbNd1Y-Ib_5aQo6czv83DpmEUsZBJu9Oeo54OiykyXZEqVLWmyKgR1X0SLKF8h5F8Ilge4MXAGqRJfx-pIo-hkripgGi-mYmoUpuaF4KreNxsiQvPOQs-AHwPeVHQWj8th5QVMuIIpDkRa7VuKYOFNi9Vlt7wPZd_rslScsxdHIefg8Rn4GwzzWBwCrGBn77dj7MpFryfzCAfTT2-QrCIlE5-unLGGN_MANWUHRwgYCvEEDA1x2qjcp0-9PpvxBHbjNGBegro0ma82ERe6BqZ-rqU3SJ6sK-n01hrOG4STFUGNf-5cDRw8LP1LsbipHT0W7TkXYu1oaSOkpKXwczPHxLlW7LFfxYr5LOb9G-n6QPA", "page": "https://mobbin.com/explore/screens/f6a61b24-612d-4536-8ca0-375231808968", "via": "Mobbin"}, {"app": "Things 3", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.Rft1k7XFdvBO342w.niEqsvdKRXWo3fg-cn4wgKZiwesRfpyJwlChbvhcjmIaCn6nkzKK0RXT5TfrlOPNyG_fpMpjlieNAACpfv-NPfgyNhYl-azlRbJaOG6aQ6rNQgvO6qrOAYB4ypTdr0CbJgAOJ0akyf8zhsb3SXb-UaQhLoHHNWvhTuTLSbbk-C-_ymGmGoIk3l64Li8R0zTspAEcPA2T1qZM2VC6hRxtBFjZpI6Ht_op8DABIBPhUv9j_2tc_R6BYJ2n_EYgp1K027uMu9RlnZil1E4c2P3IlZce38pzBNQm-7S-fM6kaa5Pgh_vQbtDBQfILyoNF-lwrypqfEs_Sd5Cgcd2yGjJx19V80yxfbRVpfvVi0UhAYIAYv-VJtVu-w", "page": "https://mobbin.com/explore/screens/590f4dd6-1a6d-45a3-91c3-3508a762b041", "via": "Mobbin"}, {"app": "Streaks", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.E8ofPUyIpSttDyZg.P69St-MkWNx5KPvdCwC8BGFUe5GPOM8JP6YMsvWmGbTT-CGajpVbt7oGPpCTrme6tGy_wWDZNVmGKIOPyOU90RBq_Ln7VrSMxerOpT0A2NziqJ5Ich7ojRTbbQP1fef2op4AmQ2lXkyfGqWx-3oMb2SS0hAceZMDvCj_s9SZwT6Z6JHwgvtX_PhcHZoBwf8PVJlrE31zDBJF8uFpBV_s9bUFBqtWMGP0GgToSvluxUTr6dZJNLfIl_zKDs_E1i9QC1pU0knm1XubLDOnwU_0_UDh8KePfbBW7VtFihCCW7JUNYMYOAgj3xr5GQwMseDuem8tR3slKcK5V-DaqJpC_ZzGRmxjdrvR6W2WfczvaDSo7gbRx8Kyjg", "page": "https://mobbin.com/explore/screens/52854766-e5a6-4700-8e15-fb2f74ae2fea", "via": "Mobbin"}, {"app": "Apple Notes", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.nbrpJCwLxyB8iCIB.L3ShYEYUTdqejeYT6wzSscUtuNuHj-aq7DMR_CYNU1SINFqElly6tuKl9cgVv4dlaqHXyvyVMI1NQXfXUsPxhX53x898JWDNAnJkD4AXdYCh1_CVIuoxkyw4H3NKKGkvVc3XTfOJR3znASZdxfBpxkN7XKbmp5vrmL3x0MKtr7nuF6hgs05phsS7jy1r6y061JcMSfPGN_F6wKfDelvY141yCyTDFQlS-0CVVSeO94XkSKn8h-gfrmxe_MY8T8EnE7Ddnimp9LzBMQZxzLdcOgD5rS0KtiakManGtqFrU1xUwUTOQkNj4WsAzUFtSiF1ko_45_XDt13YH7_6yVP8xJi90z9YRE9EMP0Hg6w2L-W1SzG_TgGYug", "page": "https://mobbin.com/explore/screens/6dee5806-60de-447e-81cc-ece69f876588", "via": "Mobbin"}, {"app": "Structured", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.jzB5SxYCBQ2DYfkh.0nJ6xYT8rtx3SDeWFCifLCcRcy7y614UggAEaghgZD8MQ0eib-EvUoi4EoFraIiRX-tPNXP6QBTyyM7HVheq3RwYgkVH8N4BwLtJFeu_j6kC6XYUlZw7dzq-z7XSi6OAwWwAd44zlAir9Qbg8ecJP3QDb73yU2ksETya_vmrxHUchQYpkW86utjjan7SBTWd5S4oLsN19XEG_udMb8o3-FGkaCLZ7-Ss7D2gVLo5RhMTNwySrfU-Q1QhqPg3L5WUVBQ3s1gVaID00iXQirlQgijb6s2ELza_a0pT3-vgN45LEwPNORT1Y3gOM0VwLS5cwCLekkpak_GSgqQOtgpaA_Nle5wGf-VebZvgTdLjG2oV0nvYjwbxcA", "page": "https://mobbin.com/explore/screens/6e3a7d35-9d0b-4be0-baa0-b7f819df6bc1", "via": "Mobbin"}, {"app": "Jomo", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.vb6FC7IivDkSrvHk.IuA8nxEC-biUPAL-RWSKa1fqzuoNCDalS8Irly_yvRFDuacWDslLXrgctLno69180whfnI9_dFDO1PO_0tXM8gzmYKwJjksF_ZloA34-Du6RcYxDUuYdA-BYi246fNdHBwPggJB8RHHFFc4fDsVGpPRMYjVCRPorADgtGj5cAbBGyE4wUtli0xrHaiC60DeWLnR8DrByC4HpFUhf7AAuaVjOnl_wwdPFlIcLtJAnTFKWMgMDYObGPOiSKpGNkry8nhjwrf9er4f2xHSTQkPVgzLgCwDk9Y7cr2NtAh6IEIC9xtSQNHgUsiGiVFdeQ0YEIoyNP9P_tdv0iEE6BQ2BNRh1esm3cwzQPBhjvKrTMIzRf3zuzmkQMQ", "page": "https://mobbin.com/explore/screens/3672cc9a-bc13-408b-8b3c-07e3f38ac6b1", "via": "Mobbin"}, {"app": "Timepage", "src": "https://bytescale.mobbin.com/FW25bBB/image/mobbin.com/prod/file.webp?enc=1.BQnbdJK6.Nz-CN6C1uuCdtgEr.QDNSppl2D6klsxbSGR8exUm7VRlKFThfb2RvxA1oY-_y0XKR2plyXmgwqhA_M2C5toQwOhLOtuosXbNdq01etC9ndd9-9yXQFsM38DunPjAO2o5BtDzb9NJjOSzGOVibPI3_9orrC7z4vqhWjMJAvQlgkXi-T1miH0YPmsgxb1xYrDmjq3oS0kHLHLnFrarmrUVOkuZYO-fTu-V0yhaNAEouxc6N9i3hiT9nAVHPg2RsoUnAI0QIa6N-gNyXjwZ1RzRnMLVOS0h6Vp4M2TzuwcCV5YTa_BAYM6f3m0da65nlGVxCGYnaSXjyzbvGNp8URLA3PiHdmPnSgjtbCExQiJKqVGpDIjNYQnSTZ_AjqwguKX-rd5sOQg", "page": "https://mobbin.com/explore/screens/4e5923df-0ec1-4ed9-9bd3-154945d5e019", "via": "Mobbin"}];
+  const grid = document.getElementById("refgrid");
+  for (const r of REFS) {
+    const fig = document.createElement("figure");
+    fig.innerHTML = `<a><img loading="lazy" alt=""></a><figcaption><b></b><span></span></figcaption>`;
+    fig.querySelector("a").href = r.page;
+    fig.querySelector("img").src = r.src;
+    fig.querySelector("img").alt = `${r.app} screen`;
+    fig.querySelector("b").textContent = r.app;
+    fig.querySelector("span").textContent = r.via;
+    grid.appendChild(fig);
+  }
+</script>
+</body>
+</html>
