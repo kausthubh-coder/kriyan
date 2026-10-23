@@ -6,6 +6,7 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNotifications } from "@/features/notifications/register";
 import { CommandMenu } from "@/features/shell/CommandMenu";
+import { TASK_SHEET_DETENTS } from "@/features/tasks/TaskPanel";
 import { OfflineNotice } from "@/features/shell/OfflineNotice";
 import { useSession } from "@/features/shell/session";
 import { c, r } from "@/theme/tokens";
@@ -41,7 +42,7 @@ export default function AppLayout() {
           name="task/[id]"
           options={{
             presentation: "formSheet",
-            sheetAllowedDetents: [0.6, 1],
+            sheetAllowedDetents: TASK_SHEET_DETENTS,
             sheetGrabberVisible: true,
             sheetCornerRadius: r.sheet,
             contentStyle: { backgroundColor: c.raised },

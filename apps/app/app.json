@@ -15,7 +15,7 @@
         "monochromeImage": "./assets/icons/adaptive-monochrome.png"
       },
       "softwareKeyboardLayoutMode": "resize",
-      "predictiveBackGestureEnabled": true,
+      "predictiveBackGestureEnabled": false,
       "versionCode": 5
     },
     "web": {

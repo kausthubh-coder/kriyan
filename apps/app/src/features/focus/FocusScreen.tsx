@@ -15,6 +15,7 @@ import { commitHaptic } from "@/features/tasks/haptics";
 import { c, hex, r, s } from "@/theme/tokens";
 import { Press } from "@/ui/Press";
 import { goBack } from "@/ui/Screen";
+import { LightStatusBar } from "@/ui/statusBar";
 import { Txt } from "@/ui/Txt";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft, Check, Pause, Play, Plus } from "lucide-react-native";
@@ -80,6 +81,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
         alignItems: "center",
       }}
     >
+      <LightStatusBar />
       <View style={{ alignSelf: "stretch", flexDirection: "row", alignItems: "center" }}>
         <Press role="button" accessibilityLabel="Back" onPress={() => goBack("/today")} style={round(44)}>
           <Icon icon={ArrowLeft} tone="headInk" />

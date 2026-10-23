@@ -28,6 +28,7 @@ import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
 import { Notice, Screen, SectionHead, usePanelOpen } from "@/ui/Screen";
+import { LightStatusBar } from "@/ui/statusBar";
 import { Txt } from "@/ui/Txt";
 import { DragGhost } from "./DragGhost";
 import { DragSource } from "./DragSource";
@@ -75,6 +76,7 @@ export function TodayScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <LightStatusBar enabled={phone} />
       <Screen
         title="Today"
         hero={header}
