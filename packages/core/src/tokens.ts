@@ -21,6 +21,8 @@ type Solid =
   | "head"
   | "headInk"
   | "headDim"
+  | "headFill"
+  | "headLine"
   | "parse"
   | "done";
 type Alpha = "hover" | "select" | "line" | "lineStrong" | "scrim";
@@ -43,6 +45,9 @@ const solid: Record<Scheme, Record<Solid, string>> = {
     head: "oklch(13% 0.003 286)",
     headInk: "oklch(100% 0 0)",
     headDim: "oklch(66% 0.008 286)",
+    // Raised surfaces and lines on the black header and focus screen, the same in both schemes.
+    headFill: "oklch(21% 0.004 286)",
+    headLine: "oklch(29% 0.005 286)",
     parse: "oklch(53% 0.18 255)",
     done: "oklch(52% 0.13 150)",
   },
@@ -59,6 +64,8 @@ const solid: Record<Scheme, Record<Solid, string>> = {
     head: "oklch(0% 0 0)",
     headInk: "oklch(100% 0 0)",
     headDim: "oklch(66% 0.008 286)",
+    headFill: "oklch(19% 0.004 286)",
+    headLine: "oklch(27% 0.005 286)",
     parse: "oklch(72% 0.14 250)",
     done: "oklch(72% 0.15 150)",
   },

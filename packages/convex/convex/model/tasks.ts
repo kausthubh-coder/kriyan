@@ -204,6 +204,30 @@ export async function completeTask(ctx: MutationCtx, ownerId: string, id: Id<"ta
   return { date: task.date ?? null, completionId, finished: !next, next };
 }
 
+/**
+ * Skips one occurrence of a repeating task without counting it as done: the task moves to its
+ * next date by its rule. Review's "Let it go" uses this for repeats, where deleting would end
+ * the whole series. Returns the date it was on, for Undo (a move back).
+ */
+export async function skipOccurrence(
+  ctx: MutationCtx,
+  ownerId: string,
+  id: Id<"tasks">,
+): Promise<{ date: string | null; next: string | null }> {
+  const task = owned(await ctx.db.get(id), ownerId, "task");
+  if (!task.repeat) throw new ConvexError("Only a repeating task has an occurrence to skip.");
+  const profile = await getProfile(ctx, ownerId);
+  const today = todayIn(profile.timeZone);
+  const date = task.date ?? today;
+  const next = nextAfterDone(task.repeat, task.repeatFirst ?? date, date, today);
+  // The last occurrence of a repeat that has ended: there's nothing after it, so it goes to the
+  // Trash, where Undo (restore) can bring it back.
+  if (next) await ctx.db.patch(id, { date: next });
+  else await ctx.db.patch(id, { deletedAt: Date.now() });
+  await scheduleReminders(ctx, id);
+  return { date: task.date ?? null, next };
+}
+
 /** Undoes `completeTask`. */
 export async function undoComplete(
   ctx: MutationCtx,

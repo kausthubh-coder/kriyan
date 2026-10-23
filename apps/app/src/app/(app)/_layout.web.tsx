@@ -2,7 +2,7 @@
 // The task and quick add are routes drawn over the screen behind them (transparent modals),
 // so the column stays put while the panel is open.
 
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
 import { CommandMenu } from "@/features/shell/CommandMenu";
 import { NavBar, NAVBAR_HEIGHT } from "@/features/shell/NavBar";
@@ -26,9 +26,11 @@ export default function AppLayout() {
   useSession();
   useShortcuts();
   const phone = useIsPhone();
+  // Focus takes the whole window: no sidebar, no navigation bar, one task.
+  const immersive = usePathname().startsWith("/focus/");
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg, height: "100%" }}>
-      {phone ? null : <Sidebar />}
+      {phone || immersive ? null : <Sidebar />}
       <View style={{ flex: 1, minWidth: 0 }}>
         <OfflineNotice />
         <Stack
@@ -39,11 +41,13 @@ export default function AppLayout() {
           <Stack.Screen name="space/[id]" />
           <Stack.Screen name="progress" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="review" />
+          <Stack.Screen name="focus/[id]" />
           <Stack.Screen name="task/[id]" options={overlay} />
           <Stack.Screen name="add" options={overlay} />
         </Stack>
       </View>
-      {phone ? <NavBar /> : null}
+      {phone && !immersive ? <NavBar /> : null}
       <ToastHost bottom={phone ? NAVBAR_HEIGHT + 56 + s.s8 : s.s6} />
       <CommandMenu />
     </View>

@@ -4,7 +4,7 @@
 import type { LucideIcon } from "lucide-react-native";
 import { hex } from "@/theme/tokens";
 
-export type IconTone = "ink" | "ink2" | "ink3" | "now" | "onInk";
+export type IconTone = "ink" | "ink2" | "ink3" | "now" | "onInk" | "headInk" | "headDim" | "parse" | "done";
 
 interface Props {
   icon: LucideIcon;

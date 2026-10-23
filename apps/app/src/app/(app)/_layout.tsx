@@ -31,6 +31,11 @@ export default function AppLayout() {
         <Stack.Screen name="space/[id]" />
         <Stack.Screen name="progress" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="review" />
+        <Stack.Screen
+          name="focus/[id]"
+          options={{ presentation: "fullScreenModal", animation: "fade_from_bottom" }}
+        />
         <Stack.Screen
           name="task/[id]"
           options={{

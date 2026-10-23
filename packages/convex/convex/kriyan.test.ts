@@ -90,6 +90,22 @@ describe("completing", () => {
     expect(day.done.map((t) => t.title)).toEqual(["Book the dentist"]);
   });
 
+  test("skipping a repeat moves it to its next date without counting it done", async () => {
+    const { alice, today } = await setup();
+    const id = await alice.mutation(api.tasks.addText, { text: "Read 20 pages every day" });
+    const skipped = await alice.mutation(api.tasks.skip, { id });
+    expect(skipped).toEqual({ date: "2026-10-13", next: "2026-10-14" });
+    expect((await alice.query(api.views.task, { id }))?.date).toBe("2026-10-14");
+    expect((await alice.query(api.views.today, { today })).done).toEqual([]);
+    expect((await alice.query(api.views.progress, { today })).weekMinutes).toBe(0);
+  });
+
+  test("a single task can't be skipped, so the series rule never deletes it", async () => {
+    const { alice } = await setup();
+    const id = await alice.mutation(api.tasks.addText, { text: "Book the dentist today" });
+    await expect(alice.mutation(api.tasks.skip, { id })).rejects.toThrow("Only a repeating task");
+  });
+
   test("tasks left on earlier days show as from earlier", async () => {
     const { alice } = await setup();
     await alice.mutation(api.tasks.add, { title: "Problem set 3", date: "2026-10-10" });

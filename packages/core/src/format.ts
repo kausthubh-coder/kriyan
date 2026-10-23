@@ -30,6 +30,21 @@ export const MONTH_SHORT = [
   "Dec",
 ] as const;
 
+export const MONTH_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 /** "Tue 13 Oct", with the year only when it isn't this year. */
 export function formatDate(date: CivilDate, today?: CivilDate): string {
   const [y, m, d] = parts(date);

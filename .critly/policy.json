@@ -9,7 +9,7 @@
       "media": true
     }
   },
-  "pages": ["/sign-in", "/today", "/upcoming", "/inbox", "/browse", "/progress", "/settings"],
+  "pages": ["/sign-in", "/today", "/review", "/upcoming", "/inbox", "/browse", "/progress", "/settings"],
   "bannedPhrases": ["overdue", "garden", "Oops", "lorem"],
   "rules": {
     "spacing-scale": "error",

@@ -2,7 +2,7 @@ import { Text, type TextProps, type TextStyle } from "react-native";
 import { useType, type RoleName } from "@/theme/layout";
 import { c } from "@/theme/tokens";
 
-export type Tone = "ink" | "ink2" | "ink3" | "now" | "onInk";
+export type Tone = "ink" | "ink2" | "ink3" | "now" | "onInk" | "headInk" | "headDim" | "parse" | "done";
 
 interface Props extends TextProps {
   variant?: RoleName;

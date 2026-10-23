@@ -75,6 +75,12 @@ export const undoComplete = mutation({
     Tasks.undoComplete(ctx, await requireOwner(ctx), id, completion),
 });
 
+export const skip = mutation({
+  args: { id: v.id("tasks") },
+  returns: v.object({ date: v.union(v.string(), v.null()), next: v.union(v.string(), v.null()) }),
+  handler: async (ctx, { id }) => Tasks.skipOccurrence(ctx, await requireOwner(ctx), id),
+});
+
 export const reopen = mutation({
   args: { id: v.id("tasks") },
   handler: async (ctx, { id }) => Tasks.reopenTask(ctx, await requireOwner(ctx), id),

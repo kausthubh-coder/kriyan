@@ -32,6 +32,11 @@ interface Props {
   footer?: ReactNode;
   /** The task panel covers this layout's right column instead of pushing the page left. */
   panelCovers?: boolean;
+  /**
+   * Phones: drawn edge to edge in place of the app bar (Today's black header), scrolling away
+   * with the page; the content sits on a sheet that overlaps its bottom edge.
+   */
+  hero?: ReactNode;
 }
 
 export function goBack(fallback: "/today" | "/browse" = "/today") {
@@ -115,39 +120,62 @@ export function Screen({
   scrollProps,
   footer,
   panelCovers,
+  hero,
 }: Props) {
   const phone = useIsPhone();
+  const insets = useSafeAreaInsets();
+  const heroed = phone && hero;
   const panelOpen = usePanelOpen();
   const maxWidth = width === "column" ? sz.column : width === "wide" ? undefined : width;
   // While the panel is open the column moves left so the panel never covers it (desktop).
   const shift = !phone && panelOpen && width !== "wide" && !panelCovers;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      {phone ? <AppBar title={title} back={back} actions={actions} /> : null}
+      {phone && !heroed ? <AppBar title={title} back={back} actions={actions} /> : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
         // On the phone web layout the navigation bar is fixed over the bottom; the list ends above it.
         style={{ flex: 1, ...(phone && Platform.OS === "web" ? { marginBottom: NAVBAR_HEIGHT + s.s4 } : {}) }}
-        contentContainerStyle={{
-          paddingTop: phone ? s.s2 : width === "wide" ? s.s8 : s.s12,
-          paddingHorizontal: phone ? s.s4 : s.s8,
-          paddingBottom: s.s16,
-        }}
+        contentContainerStyle={
+          heroed
+            ? { paddingBottom: s.s16 }
+            : {
+                paddingTop: phone ? s.s2 : width === "wide" ? s.s8 : s.s12,
+                paddingHorizontal: phone ? s.s4 : s.s8,
+                paddingBottom: s.s16,
+              }
+        }
         {...scrollProps}
       >
+        {heroed ? <View style={{ backgroundColor: c.head, paddingTop: insets.top }}>{hero}</View> : null}
         <View
-          style={{
-            width: "100%",
-            maxWidth,
-            alignSelf: shift ? "flex-start" : "center",
-            // The panel covers the right 440px; the column moves left to stay clear of it.
-            ...(shift ? { marginRight: sz.panel } : {}),
-            gap: phone ? s.s8 : s.s12,
-          }}
+          style={
+            heroed
+              ? {
+                  backgroundColor: c.bg,
+                  borderTopLeftRadius: r.sheet,
+                  borderTopRightRadius: r.sheet,
+                  marginTop: -r.sheet,
+                  paddingTop: s.s4,
+                  paddingHorizontal: s.s4,
+                }
+              : undefined
+          }
         >
-          {children}
-          {/* Room to scroll the last row clear of the floating add button. */}
-          {fab && phone ? <View style={{ height: 56 }} /> : null}
+          <View
+            style={{
+              width: "100%",
+              maxWidth,
+              alignSelf: shift ? "flex-start" : "center",
+              // The panel covers the right 440px; the column moves left to stay clear of it.
+              ...(shift ? { marginRight: sz.panel } : {}),
+              gap: phone ? s.s8 : s.s12,
+            }}
+          >
+            {children}
+            {/* Room to scroll the last row clear of the floating add button. */}
+            {fab && phone ? <View style={{ height: 56 }} /> : null}
+          </View>
         </View>
       </ScrollView>
       {footer}

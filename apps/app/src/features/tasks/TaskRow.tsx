@@ -37,6 +37,8 @@ interface Props {
   wrap?: (row: ReactNode) => ReactNode;
   /** Offer moving it to another day: buttons on hover, a swipe on phones. */
   movable?: boolean;
+  /** Today's grouped list: the start time on the right, in place of the length (Joi's rows). */
+  clock?: boolean;
 }
 
 function Fact({ icon, text }: { icon?: Parameters<typeof Icon>[0]["icon"]; text: string }) {
@@ -78,6 +80,7 @@ export const TaskRow = memo(function TaskRow({
   trailing,
   wrap,
   movable = false,
+  clock = false,
 }: Props) {
   const phone = useIsPhone();
   const { row } = useControl();
@@ -157,8 +160,12 @@ export const TaskRow = memo(function TaskRow({
           </View>
         ) : null}
       </Press>
-      {/* A shown time range already says how long; a day alone doesn't. */}
-      {task.length && !(showWhen && task.date && task.time !== null) ? (
+      {clock && task.time !== null ? (
+        <Txt variant="meta" tone="ink3" tnum style={{ marginTop: phone ? 12 : 4, textAlign: "right" }}>
+          {formatTimeRange(task.time, task.length ?? undefined)}
+        </Txt>
+      ) : /* A shown time range already says how long; a day alone doesn't. */
+      task.length && !(showWhen && task.date && task.time !== null) ? (
         <Txt variant="meta" tone="ink3" tnum style={{ marginTop: phone ? 12 : 4 }}>
           {formatDuration(task.length)}
         </Txt>

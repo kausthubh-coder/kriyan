@@ -1,38 +1,40 @@
-// Today: what am I doing now, what's next, and does today fit. The now block leads, then
-// habits, anytime tasks, one quiet row for earlier days, and the schedule: under the list in
-// one calm column, or beside it on a desktop wide enough for both.
+// Today (docs/design/v4, b2.html?screen=today): the black header with the day in one sentence,
+// the week, what's next with Start focus, habits, then the day as a list grouped by part of the
+// day or as a timeline. On a desktop wide enough, the timeline sits beside the list.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { ArrowRight, Check as CheckIcon, ListChecks, Plus } from "lucide-react-native";
+import { Check as CheckIcon, ListChecks, Moon, Play, Plus } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import { formatClock } from "@kriyan/core/dates";
-import { formatDate, formatDuration } from "@kriyan/core/format";
+import { formatDuration } from "@kriyan/core/format";
 import { freeMinutes } from "@kriyan/core/layout";
 import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
 import { useClock } from "@/data/time";
 import { useInboxView, useTodayView, type TaskView, type TodayView } from "@/data/views";
-import { closeDay, completeTask, moveTasks } from "@/features/tasks/actions";
+import { moveTasks } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { QuickAdd, type QuickAddHandle } from "@/features/tasks/QuickAdd";
-import { openTask, TaskRow } from "@/features/tasks/TaskRow";
+import { TaskRow } from "@/features/tasks/TaskRow";
 import { quickAddTarget } from "@/features/shell/context";
 import { useIsPhone } from "@/theme/layout";
-import { c, s, spaceTone, sz } from "@/theme/tokens";
+import { c, r, s, spaceTone, sz } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Ring, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
-import { Notice, PageHead, Screen, SectionHead, usePanelOpen } from "@/ui/Screen";
+import { Notice, Screen, SectionHead, usePanelOpen } from "@/ui/Screen";
 import { Txt } from "@/ui/Txt";
 import { DragGhost } from "./DragGhost";
 import { DragSource } from "./DragSource";
 import { PlanToday } from "./PlanToday";
 import { Timeline } from "./Timeline";
+import { TodayHeader } from "./TodayHeader";
+import { WeekStrip } from "./WeekStrip";
 
 export function TodayScreen() {
   const view = useTodayView();
@@ -55,54 +57,30 @@ export function TodayScreen() {
   }, [phone]);
 
   const free = view ? freeTime(view, now) : null;
-  const freeText = free === null ? "" : free === 0 ? "No free time left" : `${formatDuration(free)} free`;
   // Planning is offered when there's something to bring in, and never required.
   const toPlan = view ? view.earlier.length + (inbox?.length ?? 0) : 0;
   const planButton = toPlan ? (
     <Button
       ref={planRef}
       icon={ListChecks}
-      label={phone ? "Plan" : "Plan today"}
+      label="Plan today"
       accessibilityLabel="Plan today"
       onPress={() => setPlanning(true)}
     />
   ) : null;
   const add = phone ? null : <QuickAdd ref={quickAdd} variant="inline" defaultDate={today} />;
-  const head = (
-    <PageHead
-      title="Today"
-      sub={formatDate(today)}
-      right={
-        view ? (
-          <>
-            {planButton}
-            {/* Body size, so it shares the date's baseline across the head. */}
-            <Txt variant="body" tone="ink3" tnum>
-              {freeText}
-            </Txt>
-          </>
-        ) : null
-      }
-    />
-  );
+  const header = view ? <TodayHeader view={view} today={today} now={now} free={free} /> : null;
+  // Desktop: the header card heads the column (or the list, when the timeline sits beside it).
+  const head = phone ? null : header;
 
   return (
     <View style={{ flex: 1 }}>
       <Screen
         title="Today"
+        hero={header}
         fab
         width={split ? sz.column + s.s12 + sz.schedule : "column"}
         panelCovers={split}
-        actions={
-          view ? (
-            <>
-              {planButton}
-              <Txt variant="meta" tone="ink3" tnum style={{ marginRight: s.s1 }}>
-                {freeText}
-              </Txt>
-            </>
-          ) : null
-        }
       >
         {split ? null : head}
         {view === undefined ? (
@@ -120,6 +98,7 @@ export function TodayScreen() {
             panelOpen={panelOpen}
             head={split ? head : null}
             add={add}
+            planButton={planButton}
             onAdd={() => (phone ? router.push("/add") : quickAdd.current?.focus())}
           />
         )}
@@ -147,6 +126,16 @@ function freeTime(view: TodayView, now: number): number {
   return freeMinutes(busy, Math.max(now, view.profile.dayStart), view.profile.dayEnd);
 }
 
+/** The parts of the day the list is grouped by, as Tiimo does: by when, not by type. */
+const PARTS = [
+  { title: "Morning", from: 0, to: 12 * 60 },
+  { title: "Afternoon", from: 12 * 60, to: 17 * 60 },
+  { title: "Evening", from: 17 * 60, to: 24 * 60 },
+] as const;
+
+/** When the "Review today" card appears: two and a half hours before the day ends. */
+const REVIEW_BEFORE_END = 150;
+
 function TodayBody({
   view,
   today,
@@ -155,6 +144,7 @@ function TodayBody({
   panelOpen,
   head,
   add,
+  planButton,
   onAdd,
 }: {
   view: TodayView;
@@ -162,13 +152,16 @@ function TodayBody({
   now: number;
   split: boolean;
   panelOpen: boolean;
-  /** The page head, when it heads the list column rather than the page (split). */
+  /** The header, when it heads the list column rather than the page (split). */
   head: ReactNode;
   /** The inline quick add (desktop), at the top of the list. */
   add: ReactNode;
+  planButton: ReactNode;
   onAdd: () => void;
 }) {
+  const phone = useIsPhone();
   const [showEarlierHours, setShowEarlierHours] = useState(false);
+  const [mode, setMode] = useState<"list" | "timeline">("list");
   const nothing =
     view.scheduled.length === 0 &&
     view.anytime.length === 0 &&
@@ -179,6 +172,7 @@ function TodayBody({
     return (
       <>
         {head}
+        {phone ? <WeekStrip today={today} /> : null}
         {add}
         <Notice
           title="Nothing planned for today"
@@ -197,22 +191,40 @@ function TodayBody({
     left === 0 &&
     live.every((t) => (t.time ?? 0) + (t.length ?? 0) <= now) &&
     (view.done.length > 0 || view.scheduled.some((t) => t.done));
-  // In the last four hours of the person's day, one tap moves what's left to tomorrow.
   const stillOpen =
     left + view.scheduled.filter((t) => !t.done && !t.event && !t.proposedBy && !t.projected).length;
-  const evening = now >= view.profile.dayEnd - 240;
+  const reviewTime = view.profile.dayEnd - REVIEW_BEFORE_END;
   const fold = !showEarlierHours && now - 60 > view.profile.dayStart ? now - 60 : null;
   const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < now - 60).length;
+  // Beside the timeline (split) the list is always the list; otherwise the person picks.
+  const showList = split || mode === "list";
 
-  const list = (
-    <>
-      {head}
-      {add}
-      {current || next ? <NowBlock current={current} next={next} now={now} /> : null}
-      {view.habits.length ? <Habits habits={view.habits} today={today} /> : null}
+  const anytimeRows = (
+    <View>
+      {view.anytime.map((t) => (
+        <TaskRow
+          key={`${t._id}:${t.date}`}
+          task={t}
+          today={today}
+          movable
+          wrap={(row) => (
+            <DragSource taskId={t._id} title={t.title} color={spaceTone(t.color).dot} length={t.length}>
+              {row}
+            </DragSource>
+          )}
+        />
+      ))}
+      {view.done.map((t) => (
+        <TaskRow key={`${t._id}:${t.date}:done`} task={t} today={today} />
+      ))}
+    </View>
+  );
 
-      <View style={{ gap: s.s2 }}>
-        <SectionHead title="Anytime today" meta={left ? `${left} left` : undefined} />
+  const grouped = (
+    <View style={{ gap: s.s6 }}>
+      {view.earlier.length ? <Earlier tasks={view.earlier} today={today} /> : null}
+      <View style={{ gap: s.s1 }}>
+        <SectionHead title="Anytime" meta={left ? `${left} left` : undefined} />
         {cleared && view.earlier.length === 0 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingVertical: s.s2 }}>
             <Icon icon={CheckIcon} tone="ink2" />
@@ -221,40 +233,32 @@ function TodayBody({
             </Txt>
           </View>
         ) : null}
-        <View>
-          {view.anytime.map((t) => (
-            <TaskRow
-              key={`${t._id}:${t.date}`}
-              task={t}
-              today={today}
-              movable
-              wrap={(row) => (
-                <DragSource taskId={t._id} title={t.title} color={spaceTone(t.color).dot} length={t.length}>
-                  {row}
-                </DragSource>
-              )}
-            />
-          ))}
-          {view.done.map((t) => (
-            <TaskRow key={`${t._id}:${t.date}:done`} task={t} today={today} />
-          ))}
-        </View>
+        {anytimeRows}
         {!cleared && left === 0 && view.done.length === 0 ? (
           <Txt variant="body" tone="ink3">
             Everything today has a time.
           </Txt>
         ) : null}
-        {view.earlier.length ? <Earlier tasks={view.earlier} today={today} /> : null}
-        {evening && stillOpen ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: s.s2 }}>
-            <Txt variant="body" tone="ink3">
-              {stillOpen} still open today
-            </Txt>
-            <Button label="Move to tomorrow" onPress={() => void closeDay(today)} />
-          </View>
-        ) : null}
       </View>
-    </>
+      {split
+        ? null
+        : PARTS.map((part) => {
+            const items = view.scheduled.filter(
+              (t) => t.time !== null && t.time >= part.from && t.time < part.to,
+            );
+            if (!items.length) return null;
+            return (
+              <View key={part.title} style={{ gap: s.s1 }}>
+                <SectionHead title={part.title} meta={`${items.length}`} />
+                <View>
+                  {items.map((t) => (
+                    <TaskRow key={`${t._id}:${t.date}`} task={t} today={today} movable clock />
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+    </View>
   );
 
   const schedule = (
@@ -288,86 +292,169 @@ function TodayBody({
     </View>
   );
 
+  const tools = (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, flexWrap: "wrap" }}>
+      {split ? null : (
+        <Segmented
+          value={mode}
+          options={[
+            { value: "list", label: "List" },
+            { value: "timeline", label: "Timeline" },
+          ]}
+          onChange={setMode}
+        />
+      )}
+      <View style={{ flex: 1 }} />
+      {planButton}
+      {/* The phone gets the evening review card instead of a button that's there all day. */}
+      {stillOpen && !phone ? (
+        <Button icon={Moon} label="Close the day" onPress={() => router.push("/review")} />
+      ) : null}
+    </View>
+  );
+
+  const list = (
+    <>
+      {head}
+      {phone ? <WeekStrip today={today} /> : null}
+      {add}
+      {current || next ? <UpNext current={current} next={next} now={now} /> : null}
+      {view.habits.length ? <Habits habits={view.habits} today={today} /> : null}
+      {tools}
+      {showList ? grouped : null}
+      {now >= reviewTime && stillOpen ? <ReviewCard open={stillOpen} /> : null}
+    </>
+  );
+
   if (!split) {
     return (
       <>
         {list}
-        {schedule}
+        {showList ? null : schedule}
       </>
     );
   }
   return (
     <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s12 }}>
-      <View style={{ flex: 1, minWidth: 0, gap: s.s12 }}>{list}</View>
+      <View style={{ flex: 1, minWidth: 0, gap: s.s8 }}>{list}</View>
       <View style={{ width: sz.schedule }}>{panelOpen ? null : schedule}</View>
     </View>
   );
 }
 
-function NowBlock({ current, next, now }: { current?: TaskView; next?: TaskView; now: number }) {
-  const lead = current ?? next;
-  if (!lead) return null;
-  const end = current && current.time !== null && current.length ? current.time + current.length : null;
-  const progress =
-    current && end !== null && current.time !== null ? (now - current.time) / (end - current.time) : 0;
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
   return (
-    <View aria-label="Now" style={{ gap: s.s3 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
-        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: current ? c.now : c.ink3 }} />
-        <Txt variant="caption" tone={current ? "now" : "ink3"} tnum>
-          {current && end !== null
-            ? `Now, until ${formatClock(end)}`
-            : `Next, at ${formatClock(lead.time ?? 0)}`}
+    <View
+      role="radiogroup"
+      style={{ flexDirection: "row", backgroundColor: c.sunken, borderRadius: r.ctl + 2, padding: 2 }}
+    >
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <Press
+            key={o.value}
+            role="radio"
+            aria-checked={on}
+            accessibilityLabel={o.label}
+            onPress={() => onChange(o.value)}
+            hoverBg={null}
+            style={{
+              minHeight: 40,
+              paddingHorizontal: s.s3,
+              justifyContent: "center",
+              borderRadius: r.ctl,
+              backgroundColor: on ? c.raised : "transparent",
+              ...(on ? { boxShadow: "0 1px 2px rgba(0,0,0,0.12)" } : {}),
+            }}
+          >
+            <Txt variant="label" tone={on ? "ink" : "ink3"}>
+              {o.label}
+            </Txt>
+          </Press>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Notion Calendar's "Upcoming in 19 min" with Start focus; while it runs, how long is left. */
+function UpNext({ current, next, now }: { current?: TaskView; next?: TaskView; now: number }) {
+  const lead = current ?? next;
+  if (!lead || lead.time === null) return null;
+  const end = lead.length ? lead.time + lead.length : null;
+  const label = current
+    ? end !== null
+      ? `Now, ${formatDuration(Math.max(1, end - now))} left`
+      : "Now"
+    : lead.time - now <= 120
+      ? `Upcoming in ${formatDuration(Math.max(1, lead.time - now))}`
+      : `Next, at ${formatClock(lead.time)}`;
+  return (
+    <View
+      aria-label={current ? "Now" : "Up next"}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s3,
+        padding: s.s4,
+        borderRadius: r.card + 4,
+        backgroundColor: c.sunken,
+      }}
+    >
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Txt variant="caption" tone={current ? "now" : "ink3"}>
+          {label}
         </Txt>
-      </View>
-      <Press
-        role="button"
-        accessibilityLabel={`Open ${lead.title}`}
-        onPress={() => openTask(lead._id)}
-        hoverBg={null}
-        scale={false}
-        style={{ minHeight: 44, justifyContent: "center" }}
-      >
-        <Txt variant="headline" heading={2}>
+        <Txt variant="subhead" numberOfLines={2}>
           {lead.title}
         </Txt>
-      </Press>
-      {current && end !== null ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: s.s4 }}>
-          <View
-            style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: c.lineStrong, overflow: "hidden" }}
-          >
-            <View
-              style={{
-                width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`,
-                height: "100%",
-                backgroundColor: c.ink,
-              }}
-            />
-          </View>
-          <Txt variant="meta" tone="ink3" tnum>
-            {formatDuration(Math.max(1, end - now))} left
-          </Txt>
-          {current.event ? null : (
-            <Button icon={CheckIcon} label="Done" onPress={() => completeTask(current)} />
-          )}
-        </View>
-      ) : (
-        <Txt variant="meta" tone="ink3" tnum>
-          In {formatDuration(Math.max(1, (lead.time ?? 0) - now))}
+        <Txt variant="meta" tone="ink2" tnum>
+          {end !== null
+            ? `${formatClock(lead.time)} → ${formatClock(end)}  ${formatDuration(lead.length ?? 0)}`
+            : formatClock(lead.time)}
         </Txt>
+      </View>
+      {lead.event ? null : (
+        <Button
+          variant="primary"
+          icon={Play}
+          label={current ? "Focus" : "Start focus"}
+          onPress={() => router.push(`/focus/${lead._id}`)}
+        />
       )}
-      {current && next ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
-          <Icon icon={ArrowRight} size={16} />
-          <Txt variant="body" tone="ink3" tnum>
-            {formatClock(next.time ?? 0)}
-          </Txt>
-          <Txt variant="label" tone="ink2" numberOfLines={1} style={{ flex: 1 }}>
-            {next.title}
-          </Txt>
-        </View>
-      ) : null}
+    </View>
+  );
+}
+
+/** Tiimo's evening card: the day's review, offered at the review time, never forced. */
+function ReviewCard({ open }: { open: number }) {
+  return (
+    <View
+      style={{
+        gap: s.s3,
+        padding: s.s4,
+        borderRadius: r.card + 4,
+        backgroundColor: c.sunken,
+      }}
+    >
+      <View style={{ gap: 2 }}>
+        <Txt variant="subhead">Review today</Txt>
+        <Txt variant="body" tone="ink2">
+          {open === 1 ? "1 thing is still open." : `${open} things are still open.`} Give each one a place,
+          then stop thinking about it.
+        </Txt>
+      </View>
+      <View style={{ flexDirection: "row" }}>
+        <Button variant="primary" icon={Moon} label="Review today" onPress={() => router.push("/review")} />
+      </View>
     </View>
   );
 }

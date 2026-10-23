@@ -91,6 +91,24 @@ export function deleteTask(task: { _id: Id<"tasks">; title: string }, after?: ()
     .catch((e: unknown) => showToast(errorText(e)));
 }
 
+/** Skips one occurrence of a repeating task (it moves to its next date), and offers Undo. */
+export function skipTask(task: { _id: Id<"tasks">; title: string; time: number | null }) {
+  commitHaptic();
+  return convex
+    .mutation(api.tasks.skip, { id: task._id })
+    .then(({ date, next }) => {
+      const where = next ? formatDay(next, todayIn(deviceTimeZone())) : "the Trash";
+      showToast(`Skipped: ${task.title}. Next: ${where}`, {
+        label: "Undo",
+        run: () =>
+          void (next
+            ? convex.mutation(api.tasks.move, { ids: [task._id], date, time: task.time })
+            : convex.mutation(api.tasks.restore, { id: task._id })),
+      });
+    })
+    .catch((e: unknown) => showToast(errorText(e)));
+}
+
 /** Where a task sits now, so a move can be undone. */
 export interface Placement {
   _id: Id<"tasks">;
