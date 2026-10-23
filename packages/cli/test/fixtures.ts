@@ -46,7 +46,7 @@ export function task(fields: Partial<TaskView> & Pick<TaskView, "_id" | "title">
     repeatFirst: null,
     repeatText: null,
     reminders: [],
-    note: null,
+    hasNote: false,
     event: false,
     goalId: null,
     done: false,

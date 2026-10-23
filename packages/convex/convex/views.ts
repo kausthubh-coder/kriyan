@@ -21,6 +21,11 @@ export const inbox = query({
   handler: async (ctx) => Views.inboxView(ctx, await requireOwner(ctx)),
 });
 
+export const goals = query({
+  args: { today: v.string() },
+  handler: async (ctx, { today }) => Views.goalsList(ctx, await requireOwner(ctx), today),
+});
+
 export const trash = query({
   args: {},
   handler: async (ctx) => Views.trashView(ctx, await requireOwner(ctx)),

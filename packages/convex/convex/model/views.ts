@@ -27,7 +27,8 @@ export interface TaskView {
   repeatFirst: CivilDate | null;
   repeatText: string | null;
   reminders: Doc<"tasks">["reminders"];
-  note: string | null;
+  /** Lists only say whether there's a note; notes run to 50,000 characters, so get_task reads one. */
+  hasNote: boolean;
   event: boolean;
   goalId: Id<"goals"> | null;
   done: boolean;
@@ -57,7 +58,7 @@ function view(task: Doc<"tasks">, spaces: Map<string, SpaceNode>, at?: CivilDate
       ? describeRepeat(task.repeat, task.repeatFirst ?? task.date ?? date ?? "1970-01-01")
       : null,
     reminders: task.reminders,
-    note: task.note ?? null,
+    hasNote: Boolean(task.note),
     event: task.event,
     goalId: task.goalId ?? null,
     done: done || task.doneAt !== undefined,
@@ -288,12 +289,26 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
 }
 
 /** One task as the lists show it, note included: what an agent reads back after a write. */
-export async function oneTask(ctx: QueryCtx, ownerId: string, id: Id<"tasks">): Promise<TaskView> {
+export async function oneTask(
+  ctx: QueryCtx,
+  ownerId: string,
+  id: Id<"tasks">,
+): Promise<TaskView & { note: string | null }> {
   const task = owned(await ctx.db.get(id), ownerId, "task");
   if (task.deletedAt !== undefined)
     throw new ConvexError("That task is deleted; restore_task brings it back.");
   const { map } = await spaceMap(ctx, ownerId);
-  return view(task, map);
+  return { ...view(task, map), note: task.note ?? null };
+}
+
+/** The person's open goals, for the task editor's Goal field, without Progress's year of history. */
+export async function goalsList(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  civil(today, "date");
+  const goals = await ctx.db
+    .query("goals")
+    .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+    .take(200);
+  return goals.filter((g) => g.archivedAt === undefined).map((g) => goalView(g, today));
 }
 
 /** Deleted tasks, newest first. They stay until maintenance.emptyTrash removes them after 30 days. */

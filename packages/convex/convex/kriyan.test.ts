@@ -184,6 +184,30 @@ describe("completing", () => {
     expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Ship the CLI"]);
   });
 
+  test("the editor's goal list has the person's open goals, as Progress shows them", async () => {
+    const { t, alice, today } = await setup();
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    await bob.mutation(api.organize.addGoal, { title: "Bob's goal", kind: "tasks", target: 2 });
+    const run = await alice.mutation(api.organize.addGoal, {
+      title: "Run 100 km",
+      kind: "number",
+      target: 100,
+      unit: "km",
+      dueDate: "2026-12-31",
+    });
+    await alice.mutation(api.organize.updateGoal, { id: run, current: 25 });
+    const old = await alice.mutation(api.organize.addGoal, { title: "Old goal", kind: "tasks", target: 3 });
+    await alice.mutation(api.organize.updateGoal, { id: old, archived: true });
+
+    const goals = await alice.query(api.views.goals, { today });
+    expect(goals.map((g) => [g.title, g.current, g.target, g.unit, g.progress])).toEqual([
+      ["Run 100 km", 25, 100, "km", 0.25],
+    ]);
+    expect(goals).toEqual((await alice.query(api.views.progress, { today })).goals);
+    await expect(alice.query(api.views.goals, { today: "tomorrow" })).rejects.toThrow();
+  });
+
   test("a finished repeat shows once on its last day", async () => {
     const { alice, today } = await setup();
     const id = await alice.mutation(api.tasks.addText, { text: "Pills every day for 1 times" });

@@ -73,7 +73,7 @@ export function facts(
   if (task.deadline) out.push({ icon: Flag, text: `Due ${formatDay(task.deadline, today)}` });
   if (!yearly && task.repeatText) out.push({ icon: Repeat2, text: task.repeatText });
   if (task.reminders.length) out.push({ icon: Bell, text: String(task.reminders.length) });
-  if (task.note) out.push({ icon: NotebookText, text: "Note" });
+  if (task.hasNote) out.push({ icon: NotebookText, text: "Note" });
   if (task.proposedBy) out.push({ icon: Bot, text: `Proposed by ${task.proposedBy}` });
   return out;
 }

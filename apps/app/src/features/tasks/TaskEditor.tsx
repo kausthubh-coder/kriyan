@@ -41,7 +41,7 @@ import { firstOccurrence, parseTask } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import type { Repeat } from "@kriyan/core/repeat";
 import { useClock } from "@/data/time";
-import { useProgressView, useSpaces, type TaskDoc } from "@/data/views";
+import { useGoals, useSpaces, type TaskDoc } from "@/data/views";
 import { ensureNotifications } from "@/features/notifications/register";
 import { NoteEditor } from "@/features/notes/NoteEditor";
 import { useIsPhone, useType } from "@/theme/layout";
@@ -472,8 +472,9 @@ function GoalChip({
   expanded: boolean;
   onPress: () => void;
 }) {
-  const progress = useProgressView();
-  const goal = progress?.goals.find((g) => g._id === task.goalId);
+  // Goals only: the Progress query reads a year of history, and every tick would re-run it.
+  const goals = useGoals();
+  const goal = goals?.find((g) => g._id === task.goalId);
   return (
     <PropChip
       anchor={anchor}
@@ -540,8 +541,8 @@ function ThumbBar({
 }
 
 function GoalPicker({ value, onPick }: { value: string | null; onPick: (id: Id<"goals"> | null) => void }) {
-  const progress = useProgressView();
-  const goals = progress?.goals ?? [];
+  const loaded = useGoals();
+  const goals = loaded ?? [];
   return (
     <View style={{ gap: 2 }}>
       <Option label="No goal" selected={value === null} onPress={() => onPick(null)} />
@@ -554,7 +555,7 @@ function GoalPicker({ value, onPick }: { value: string | null; onPick: (id: Id<"
           leading={<Icon icon={Target} size={16} />}
         />
       ))}
-      {progress && goals.length === 0 ? (
+      {loaded && goals.length === 0 ? (
         <Txt variant="meta" tone="ink3" style={{ padding: s.s2 }}>
           You have no goals yet. Add one in Progress.
         </Txt>
