@@ -44,8 +44,8 @@ async function open(viewport, hhmm) {
 {
   const { ctx, page } = await open({ width: 1440, height: 900 }, "10:15");
   const now = (await page.getByLabel("Now", { exact: true }).first().innerText()).replace(/\s+/g, " ");
-  check(/until 10:30/.test(now) && /Calculus II lecture/.test(now), `10:15: Now is the lecture (${now})`);
-  check(/until 11:30 Write MCP tools/.test(now), "10:15: Next is the block already running, until 11:30");
+  check(/→ 10:30/.test(now) && /Calculus II lecture/.test(now), `10:15: Now is the lecture (${now})`);
+  check(/Then Write MCP tools, until 11:30/.test(now), "10:15: Next is the block already running, until 11:30");
   await page.screenshot({ path: artifact("today-clock-1015-1440.png") });
   await ctx.close();
 }
