@@ -7,7 +7,6 @@ import Animated, { FadeIn, Keyframe } from "react-native-reanimated";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, shadows } from "@/theme/tokens";
 import { useInertOutside } from "@/ui/inert";
-import { Txt } from "@/ui/Txt";
 import { QuickAdd } from "./QuickAdd";
 
 const sheetIn = new Keyframe({
@@ -15,7 +14,7 @@ const sheetIn = new Keyframe({
   100: { opacity: 1, transform: [{ translateY: 0 }] },
 }).duration(220);
 
-export function AddSheet({ onClose }: { onClose: () => void }) {
+export function AddSheet({ onClose, initialText }: { onClose: () => void; initialText?: string }) {
   const phone = useIsPhone();
   const layer = useRef<View>(null);
   useInertOutside(layer);
@@ -65,10 +64,7 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
             <View style={{ width: 32, height: 4, borderRadius: 2, backgroundColor: c.lineStrong }} />
           </View>
         ) : null}
-        <Txt variant="subhead" heading={1}>
-          Add a task
-        </Txt>
-        <QuickAdd variant="sheet" autoFocus onAdded={onClose} placeholder="Call mum fri 6pm #life" />
+        <QuickAdd variant="sheet" autoFocus initialText={initialText} onAdded={onClose} onClose={onClose} />
       </Animated.View>
     </View>
   );

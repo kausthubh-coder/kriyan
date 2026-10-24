@@ -1115,6 +1115,29 @@ describe("focus, steps and settings", () => {
     expect((await alice.query(api.views.task, { id }))?.steps).toBeUndefined();
   });
 
+  test("Today's rows carry their steps and the agent that added them", async () => {
+    const { t, alice, today } = await setup();
+    await alice.mutation(api.tasks.add, {
+      title: "Essay",
+      date: today,
+      steps: [
+        { title: "Outline", done: true },
+        { title: "Draft", done: false },
+      ],
+    });
+    await t.mutation(internal.agent.add_task, {
+      ownerId: ALICE.tokenIdentifier,
+      agent: "Codex",
+      title: "Reply to Dr. Okafor",
+      date: today,
+    });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.anytime.map((t) => [t.title, t.steps.length, t.steps.filter((s) => s.done).length, t.addedBy])).toEqual([
+      ["Essay", 2, 1, null],
+      ["Reply to Dr. Okafor", 0, 0, "Codex"],
+    ]);
+  });
+
   test("review time, sounds and the semester are saved and checked", async () => {
     const { alice } = await setup();
     await alice.mutation(api.account.updateProfile, {

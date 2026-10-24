@@ -22,6 +22,7 @@ import {
   CircleDot,
   Ellipsis,
   Flag,
+  Hourglass,
   Layers,
   Repeat2,
   Target,
@@ -32,12 +33,15 @@ import {
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import {
+  formatDate,
   formatDay,
+  WEEKDAY_SHORT,
   formatDuration,
   formatTimeRange,
   describeReminder,
   describeRepeat,
 } from "@kriyan/core/format";
+import { formatClock, weekday, zonedParts } from "@kriyan/core/dates";
 import { firstOccurrence, parseTask } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import type { Repeat } from "@kriyan/core/repeat";
@@ -59,6 +63,7 @@ import { completeTask, deleteTask, errorText, reopenTask, ticking } from "./acti
 import { DayPicker, Option, SpacePicker } from "./pickers";
 import { ReminderEditor } from "./ReminderEditor";
 import { RepeatEditor } from "./RepeatEditor";
+import { StepList } from "./StepList";
 import { showToast } from "@/ui/toast";
 
 type Sub = "space" | "when" | "repeat" | "reminders" | "deadline" | "goal" | "more";
@@ -73,7 +78,7 @@ interface Props {
 export function TaskEditor({ task, onClose, initialEdit }: Props) {
   const phone = useIsPhone();
   const roles = useType();
-  const { today } = useClock();
+  const { today, timeZone } = useClock();
   const spaces = useSpaces();
   const update = useMutation(api.tasks.update);
   const [sub, setSub] = useState<Sub | null>(initialEdit ?? null);
@@ -82,6 +87,7 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
   const repeatRef = useRef<View>(null);
   const remindersRef = useRef<View>(null);
   const deadlineRef = useRef<View>(null);
+  const lengthRef = useRef<View>(null);
   const goalRef = useRef<View>(null);
   const moreRef = useRef<View>(null);
   const anchor =
@@ -113,11 +119,13 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
     else setTitle(task.title);
   };
 
+  // B2's "Sat 10:30 → 12:00": the weekday alone this week's today, the date otherwise; the
+  // length has its own chip.
   const when = task.date
-    ? `${formatDay(task.date, today)}${task.time !== undefined ? `, ${formatTimeRange(task.time, task.length)}` : task.length ? `, ${formatDuration(task.length)}` : ""}`
-    : task.length
-      ? formatDuration(task.length)
-      : null;
+    ? task.time !== undefined
+      ? `${task.date === today ? WEEKDAY_SHORT[weekday(task.date)] : formatDate(task.date, today)} ${formatClock(task.time)}${task.length ? ` → ${formatClock(task.time + task.length)}` : ""}`
+      : `${formatDay(task.date, today)}, anytime`
+    : null;
 
   const subEditor = (which: Sub): { title: string; body: ReactNode; width?: number } | null => {
     switch (which) {
@@ -227,6 +235,17 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
     return null;
   };
 
+  const thumbBar = (
+    <ThumbBar
+      task={task}
+      moreRef={moreRef}
+      moreOpen={sub === "more"}
+      onWhen={() => setSub(sub === "when" ? null : "when")}
+      onMove={() => setSub(sub === "space" ? null : "space")}
+      onMore={() => setSub(sub === "more" ? null : "more")}
+    />
+  );
+
   // Phones: a sub-editor takes over the sheet.
   const open = sub ? subEditor(sub) : null;
   if (phone && open && sub !== "more") {
@@ -259,10 +278,11 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           paddingRight: phone ? s.s2 : s.s3,
         }}
       >
+        {/* Phones say what it is, like the prototype's sheet; the panel says where it lives. */}
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: s.s2, minWidth: 0 }}>
-          {space ? <Dot color={tone.dot} /> : null}
+          {space && !phone ? <Dot color={tone.dot} /> : null}
           <Txt variant="caption" tone="ink3" numberOfLines={1} style={family("600")}>
-            {space ? space.path : "Inbox"}
+            {phone ? (task.event ? "Event" : "Task") : space ? space.path : "Inbox"}
           </Txt>
         </View>
         <Button icon={X} accessibilityLabel="Close" onPress={onClose} />
@@ -273,13 +293,12 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
         contentContainerStyle={{
           paddingHorizontal: phone ? s.s4 : s.s6,
           paddingTop: s.s1,
-          // Room under the last chip for the floating thumb bar.
-          paddingBottom: BAR_ROOM,
+          paddingBottom: s.s4,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
           {/* Centres the box on the first line of the title. */}
-          <View style={{ paddingTop: (roles.headline.lineHeight ?? 32) / 2 - TICK / 2 }}>
+          <View style={{ paddingTop: (roles.headline.lineHeight ?? 32) / 2 - TICK / 2 + (phone ? s.s2 : 0) }}>
             {task.event ? (
               <View style={{ width: TICK, height: TICK, alignItems: "center", justifyContent: "center" }}>
                 <Dot color={tone.dot} size={10} />
@@ -305,6 +324,8 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             accessibilityLabel="Title"
             placeholderTextColor={hex.ink3}
             lineHeight={roles.headline.lineHeight ?? 32}
+            // 32 of text in 8 above and below: a target past 44 on touch.
+            padY={phone ? s.s2 : 0}
             style={[roles.headline, { flex: 1, color: done ? c.ink3 : c.ink }]}
           />
         </View>
@@ -331,15 +352,28 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             expanded={sub === "when"}
             onPress={() => setSub(sub === "when" ? null : "when")}
           />
-          <PropChip
-            anchor={deadlineRef}
-            icon={Flag}
-            text={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
-            empty="Deadline"
-            label="Deadline"
-            expanded={sub === "deadline"}
-            onPress={() => setSub(sub === "deadline" ? null : "deadline")}
-          />
+          {task.event && !task.length ? null : (
+            <PropChip
+              anchor={lengthRef}
+              icon={Hourglass}
+              text={task.length ? formatDuration(task.length) : null}
+              empty="Length"
+              label="Length"
+              expanded={false}
+              onPress={() => setSub(sub === "when" ? null : "when")}
+            />
+          )}
+          {task.event ? null : (
+            <PropChip
+              anchor={deadlineRef}
+              icon={Flag}
+              text={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
+              empty="Deadline"
+              label="Deadline"
+              expanded={sub === "deadline"}
+              onPress={() => setSub(sub === "deadline" ? null : "deadline")}
+            />
+          )}
           <PropChip
             anchor={repeatRef}
             icon={Repeat2}
@@ -371,30 +405,35 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           <PropChip
             anchor={spaceRef}
             icon={Layers}
-            text={space?.path ?? null}
+            text={space?.name ?? null}
             empty="Space"
             label="Space"
             leading={space ? <Dot color={tone.dot} /> : undefined}
             expanded={sub === "space"}
             onPress={() => setSub(sub === "space" ? null : "space")}
           />
-          <GoalChip
-            task={task}
-            anchor={goalRef}
-            expanded={sub === "goal"}
-            onPress={() => setSub(sub === "goal" ? null : "goal")}
-          />
+          {task.event ? null : (
+            <GoalChip
+              task={task}
+              anchor={goalRef}
+              expanded={sub === "goal"}
+              onPress={() => setSub(sub === "goal" ? null : "goal")}
+            />
+          )}
         </View>
+
+        {task.event ? null : <StepList task={task} />}
+        {task.addedBy ? (
+          <Txt variant="meta" tone="ink3" tnum style={{ marginTop: s.s4 }}>
+            {addedLine(task.addedBy, task._creationTime, timeZone, today)}
+          </Txt>
+        ) : null}
+        {/* Phones: room under the content for the floating thumb bar. Desktop: the bar sits
+            under the content and sticks to the panel's foot while it scrolls (b2.html `.rp`). */}
+        {phone ? <View style={{ height: BAR_ROOM }} /> : thumbBar}
       </ScrollView>
 
-      <ThumbBar
-        task={task}
-        moreRef={moreRef}
-        moreOpen={sub === "more"}
-        onWhen={() => setSub(sub === "when" ? null : "when")}
-        onMove={() => setSub(sub === "space" ? null : "space")}
-        onMore={() => setSub(sub === "more" ? null : "more")}
-      />
+      {phone ? thumbBar : null}
 
       {!phone || sub === "more" ? (
         <Popover
@@ -410,6 +449,14 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
       ) : null}
     </>
   );
+}
+
+/** "Added by Codex at 07:00" for a task an agent added today, else the day it did. */
+function addedLine(agent: string, at: number, timeZone: string, today: string): string {
+  const { date, minutes } = zonedParts(at, timeZone);
+  return date === today
+    ? `Added by ${agent} at ${formatClock(minutes)}`
+    : `Added by ${agent} on ${formatDate(date, today)}`;
 }
 
 /** A property as a chip: filled when it's set, quiet with a plus when it isn't. */
@@ -455,7 +502,7 @@ function PropChip({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
+              gap: s.s2,
               height: phone ? 36 : 32,
               paddingHorizontal: s.s3,
               borderRadius: r.card,
@@ -544,13 +591,17 @@ function ThumbBar({
   return (
     <View
       pointerEvents="box-none"
-      style={{
-        position: "absolute",
-        left: BAR_GAP,
-        right: BAR_GAP,
-        bottom: BAR_GAP + (phone ? insets.bottom : 0),
-        alignItems: "center",
-      }}
+      style={
+        phone
+          ? {
+              position: "absolute",
+              left: BAR_GAP,
+              right: BAR_GAP,
+              bottom: BAR_GAP + insets.bottom,
+              alignItems: "center",
+            }
+          : ({ position: "sticky", bottom: s.s4, marginTop: s.s6, alignItems: "center" } as object)
+      }
     >
       <View
         style={{
@@ -614,7 +665,7 @@ function BarButton({
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
-          gap: 6,
+          gap: s.s2,
           borderRadius: r.pill,
           overflow: "hidden",
         },

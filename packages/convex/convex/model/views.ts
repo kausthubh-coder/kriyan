@@ -29,12 +29,16 @@ export interface TaskView {
   reminders: Doc<"tasks">["reminders"];
   /** Lists only say whether there's a note; notes run to 50,000 characters, so get_task reads one. */
   hasNote: boolean;
+  /** The checklist inside the task, in order; rows say "2 of 5 steps". */
+  steps: NonNullable<Doc<"tasks">["steps"]>;
   event: boolean;
   goalId: Id<"goals"> | null;
   done: boolean;
   /** True for future occurrences of a repeat, which can't be ticked off yet. */
   projected: boolean;
   proposedBy: string | null;
+  /** The agent that added it, for the row's "from Codex". */
+  addedBy: string | null;
 }
 
 const LIMIT = 500;
@@ -59,11 +63,13 @@ function view(task: Doc<"tasks">, spaces: Map<string, SpaceNode>, at?: CivilDate
       : null,
     reminders: task.reminders,
     hasNote: Boolean(task.note),
+    steps: task.steps ?? [],
     event: task.event,
     goalId: task.goalId ?? null,
     done: done || task.doneAt !== undefined,
     projected: Boolean(at && task.date && at > task.date),
     proposedBy: task.proposedBy ?? null,
+    addedBy: task.addedBy ?? null,
   };
 }
 

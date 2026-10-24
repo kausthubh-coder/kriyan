@@ -2,8 +2,8 @@
 // line in vermilion. Blocks move and resize in 15-minute steps; tasks dragged from the list
 // land here.
 
-import { useCallback, useRef, useState } from "react";
-import { Platform, View, type LayoutChangeEvent } from "react-native";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { Platform, View, type LayoutChangeEvent, type ViewStyle } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { formatClock } from "@kriyan/core/dates";
 import { formatTimeRange } from "@kriyan/core/format";
@@ -31,6 +31,26 @@ interface Props {
   dayEnd: number;
   /** Hide hours before this (the "Earlier today" fold). */
   foldBefore?: number | null;
+}
+
+/** A block that tints under the mouse, like b2.html `.ev:hover`. */
+function Hoverable({ style, children }: { style: ViewStyle; children: ReactNode }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <View
+      style={style}
+      onPointerEnter={(e) => e.nativeEvent.pointerType === "mouse" && setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
+      {children}
+      {hovered ? (
+        <View
+          pointerEvents="none"
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.hover }}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Props) {
@@ -149,7 +169,7 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                 onMove={(start) => void placeTasks([t._id], date, start)}
                 onResize={(length) => void updateTask({ id: t._id, length })}
               >
-                <View
+                <Hoverable
                   style={{
                     flex: 1,
                     flexDirection: "row",
@@ -163,6 +183,9 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                     borderWidth: done || p.depth ? 1 : 0,
                     borderColor: done ? c.lineStrong : c.bg,
                     ...(t.proposedBy ? { backgroundColor: c.bg, borderWidth: 1, borderColor: tone.dot } : {}),
+                    // B2's bar down the left edge in the space's colour.
+                    borderLeftWidth: 3,
+                    borderLeftColor: done ? c.lineStrong : tone.dot,
                   }}
                 >
                   {t.event ? (
@@ -208,7 +231,7 @@ export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Pro
                       </Txt>
                     ) : null}
                   </Press>
-                </View>
+                </Hoverable>
               </BlockDrag>
             );
           })

@@ -1,7 +1,8 @@
-// The phone's day as a spine (b2.html `.tl`): start and end times on the left, a pill per item
-// on a dotted line, the title with its times, and a ring to tick it off. Free stretches of half
-// an hour or more offer adding a task there; the now line sits between what's done and what's
-// next. Desktop keeps the hour grid (Timeline.tsx), where dragging blocks makes sense.
+// The day as a spine (b2.html `.tl`): start and end times on the left, a pill per item on a
+// dotted line, the title with its times, and a ring to tick it off. Free stretches of half an
+// hour or more offer adding a task there; the now line sits between what's done and what's
+// next, and today's "Review today" card sits at the review time. Today's Timeline view on every
+// width; the hour grid (Timeline.tsx), with dragging, is the desktop's right column.
 
 import type { ReactNode } from "react";
 import { View } from "react-native";
@@ -19,14 +20,12 @@ import { Check } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
+import { dayRows } from "./dayRows";
+import { ReviewCard } from "./ReviewCard";
 
 const TIME_W = 48;
 const PILL_COL = 56;
 const PILL_W = 44;
-/** Where the title starts: the time and pill columns, the gaps between them, the body's inset. */
-const BODY_X = TIME_W + s.s1 + PILL_COL + s.s1 + s.s2;
-/** A free stretch shorter than this isn't worth offering. */
-const MIN_GAP = 30;
 // The prototype's small type (12 and 14) on phones, where the meta and body roles grow.
 const small = roleStyle(type.meta);
 const body14 = roleStyle(type.body);
@@ -38,55 +37,71 @@ interface Props {
   items: TaskView[];
   /** Minutes now when the day is today, else null (no now line, every gap offered). */
   now: number | null;
+  /** Free time today starts no earlier than the person's day. */
+  dayStart?: number;
+  /** Today's "Review today" card at the review time, or null for none. */
+  reviewAt?: number | null;
 }
 
-/** Opens quick add for a free stretch. The add route reads `date` and `time` once it supports them. */
-function addAt(date: string, minutes: number) {
+/** Opens quick add with the stretch's day and time already in, understood. */
+export function addAt(date: string, minutes: number) {
   router.push(`/add?date=${date}&time=${formatClock(minutes)}`);
 }
 
-export function Spine({ date, items, now }: Props) {
+export function Spine({ date, items, now, dayStart, reviewAt = null }: Props) {
   const ticked = ticking.useValue((t) => t);
-  const timed = items
-    .filter((t): t is TaskView & { time: number } => t.time !== null)
-    .sort((a, b) => a.time - b.time);
-
-  const rows: ReactNode[] = [];
-  let prevEnd: number | null = null;
-  let nowShown = now === null;
-  for (const t of timed) {
-    if (!nowShown && now !== null && t.time > now) {
-      const ahead = t.time - now;
-      rows.push(
-        <NowLine
-          key="now"
-          now={now}
-          note={ahead <= 20 && !t.event ? `task ahead, ${formatDuration(ahead)} to prep` : null}
-        />,
-      );
-      nowShown = true;
-      prevEnd = prevEnd !== null && prevEnd > now ? prevEnd : now;
+  const rows: ReactNode[] = dayRows(items, { now, dayStart, reviewAt }).map((row) => {
+    switch (row.kind) {
+      case "task":
+        return (
+          <Item
+            key={row.key}
+            task={row.task}
+            start={row.at}
+            done={row.task.done || Boolean(ticked[row.task._id])}
+          />
+        );
+      case "gap":
+        return (
+          <Indented key={row.key}>
+            <FreeGap start={row.at} minutes={row.minutes} date={date} />
+          </Indented>
+        );
+      case "now": {
+        const next = row.next;
+        const ahead = next?.time != null ? next.time - row.at : null;
+        return (
+          <NowLine
+            key={row.key}
+            now={row.at}
+            note={
+              ahead !== null && ahead <= 20 && !next?.event
+                ? `task ahead, ${formatDuration(ahead)} to prep`
+                : null
+            }
+          />
+        );
+      }
+      case "review":
+        return (
+          // Over the pill column too, so the card has room for its line and button.
+          <Indented key={row.key} flush wide>
+            <ReviewCard at={row.at} />
+          </Indented>
+        );
     }
-    // Today, only stretches still ahead are offered; a past gap can't be planned into.
-    if (prevEnd !== null && (now === null || t.time > now) && t.time - prevEnd >= MIN_GAP) {
-      rows.push(<Gap key={`gap-${prevEnd}`} start={prevEnd} minutes={t.time - prevEnd} date={date} />);
-    }
-    rows.push(
-      <Item key={`${t._id}:${t.date}`} task={t} start={t.time} done={t.done || Boolean(ticked[t._id])} />,
-    );
-    const end = t.time + (t.length ?? 0);
-    if (prevEnd === null || end > prevEnd) prevEnd = end;
-  }
-  if (!timed.length) {
-    rows.push(
-      <View key="empty" style={{ minHeight: sz.touch, justifyContent: "center", paddingLeft: BODY_X }}>
-        <Txt tone="ink3" style={body14}>
-          Nothing timed on this day yet
-        </Txt>
-      </View>,
+  });
+  if (!items.some((t) => t.time !== null)) {
+    rows.unshift(
+      <Indented key="empty">
+        <View style={{ minHeight: sz.touch, justifyContent: "center" }}>
+          <Txt tone="ink3" style={body14}>
+            Nothing timed on this day yet
+          </Txt>
+        </View>
+      </Indented>,
     );
   }
-  if (!nowShown && now !== null) rows.push(<NowLine key="now" now={now} note={null} />);
 
   return (
     <View aria-label="Schedule" style={{ position: "relative", gap: s.s1 }}>
@@ -186,10 +201,14 @@ function Item({ task: t, start, done }: { task: TaskView; start: number; done: b
   );
 }
 
-function Gap({ start, minutes, date }: { start: number; minutes: number; date: string }) {
+/**
+ * "1 h free  + 13:30" (b2.html `.gap`): a free stretch, with a button that opens quick add at
+ * its start.
+ */
+export function FreeGap({ start, minutes, date }: { start: number; minutes: number; date: string }) {
   const at = formatClock(start);
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingLeft: BODY_X }}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
       <Icon icon={Sun} size={16} />
       <Txt tone="ink3" tnum style={[body14, { flex: 1 }]}>
         {`${formatDuration(minutes)} free`}
@@ -238,16 +257,33 @@ function NowLine({ now, note }: { now: number; note: string | null }) {
           backgroundColor: c.now,
         }}
       />
-      <Txt
-        variant="caption"
-        tone="now"
-        tnum
-        numberOfLines={1}
-        aria-label={`Now, ${formatClock(now)}`}
-        style={{ alignSelf: "flex-start", marginLeft: BODY_X, paddingRight: s.s2, backgroundColor: c.bg }}
-      >
-        {label}
-      </Txt>
+      <Indented>
+        <Txt
+          variant="caption"
+          tone="now"
+          tnum
+          numberOfLines={1}
+          aria-label={`Now, ${formatClock(now)}`}
+          style={{ alignSelf: "flex-start", paddingRight: s.s2, backgroundColor: c.bg }}
+        >
+          {label}
+        </Txt>
+      </Indented>
+    </View>
+  );
+}
+
+/**
+ * Lines a row up with the titles: empty time and pill columns, then the row. Columns rather than
+ * one large padding, so every gap stays on the spacing scale. `flush` drops the title's inset;
+ * `wide` starts at the pill column.
+ */
+function Indented({ children, flush, wide }: { children: ReactNode; flush?: boolean; wide?: boolean }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1 }}>
+      <View style={{ width: TIME_W }} />
+      {wide ? null : <View style={{ width: PILL_COL }} />}
+      <View style={{ flex: 1, minWidth: 0, paddingLeft: flush ? 0 : s.s2 }}>{children}</View>
     </View>
   );
 }

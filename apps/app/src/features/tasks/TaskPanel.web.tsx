@@ -1,12 +1,21 @@
 // Web: the task opens in a side panel that slides in from the right without covering the
-// column (desktop), or a bottom sheet over a scrim (below 760px).
+// column (desktop), or a bottom sheet with two heights over a scrim (below 760px).
 
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { Pressable, View } from "react-native";
-import Animated, { FadeIn, Keyframe } from "react-native-reanimated";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Pressable, useWindowDimensions, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  FadeIn,
+  Keyframe,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, shadows, sz } from "@/theme/tokens";
 import { useInertOutside } from "@/ui/inert";
+import { Press } from "@/ui/Press";
 import { panelOpenedByKeyboard } from "./panelState";
 
 const slideIn = new Keyframe({
@@ -44,29 +53,9 @@ export function TaskPanel({
         >
           <Pressable accessibilityLabel="Close task" onPress={onClose} style={{ flex: 1 }} />
         </Animated.View>
-        <Animated.View
-          entering={animate ? sheetIn : undefined}
-          role="dialog"
-          aria-label={label}
-          aria-modal
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: "88%",
-            zIndex: 11,
-            backgroundColor: c.raised,
-            borderTopLeftRadius: r.sheet,
-            borderTopRightRadius: r.sheet,
-            boxShadow: shadows.overlay,
-          }}
-        >
-          <View style={{ alignItems: "center", paddingTop: s.s3 }}>
-            <View style={{ width: 32, height: 4, borderRadius: 2, backgroundColor: c.lineStrong }} />
-          </View>
+        <Sheet animate={animate} label={label} onClose={onClose}>
           {children}
-        </Animated.View>
+        </Sheet>
       </View>
     );
   }
@@ -91,6 +80,95 @@ export function TaskPanel({
         {children}
       </Animated.View>
     </View>
+  );
+}
+
+/** The sheet's two heights, as parts of the window (b2.html `detentY`): it opens at the first. */
+const MEDIUM = 0.64;
+const LARGE = 0.94;
+
+/**
+ * The phone's task sheet: opens at medium height; drag the grabber up for the full height,
+ * down to make it smaller or close it. Tapping the grabber switches between the two.
+ */
+function Sheet({
+  children,
+  animate,
+  label,
+  onClose,
+}: {
+  children: ReactNode;
+  animate: boolean;
+  label: string;
+  onClose: () => void;
+}) {
+  const { height: win } = useWindowDimensions();
+  const [large, setLarge] = useState(false);
+  const h = useSharedValue(win * MEDIUM);
+  const from = useSharedValue(0);
+  const snap = (toLarge: boolean) => {
+    setLarge(toLarge);
+    h.value = withTiming(win * (toLarge ? LARGE : MEDIUM), { duration: 220 });
+  };
+  const pan = Gesture.Pan()
+    .activeOffsetY([-4, 4])
+    .onBegin(() => {
+      from.value = h.value;
+    })
+    .onUpdate((e) => {
+      h.value = Math.min(win * LARGE, Math.max(win * 0.2, from.value - e.translationY));
+    })
+    .onEnd((e) => {
+      const medium = win * MEDIUM;
+      // Pulled well below medium, or flicked down from it: close.
+      if (h.value < medium * 0.75 || (e.velocityY > 1200 && from.value <= medium + 1)) scheduleOnRN(onClose);
+      else
+        scheduleOnRN(snap, e.velocityY < -600 || (e.velocityY < 600 && h.value > (medium + win * LARGE) / 2));
+    });
+  const style = useAnimatedStyle(() => ({ height: h.value }));
+  return (
+    <Animated.View
+      entering={animate ? sheetIn : undefined}
+      role="dialog"
+      aria-label={label}
+      aria-modal
+      style={[
+        {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 11,
+          backgroundColor: c.raised,
+          borderTopLeftRadius: r.sheet,
+          borderTopRightRadius: r.sheet,
+          boxShadow: shadows.overlay,
+        },
+        style,
+      ]}
+    >
+      <GestureDetector gesture={pan}>
+        <View style={{ alignItems: "center", touchAction: "none" } as object}>
+          <Press
+            role="button"
+            accessibilityLabel={large ? "Make smaller" : "Expand"}
+            onPress={() => snap(!large)}
+            hoverBg={null}
+            scale={false}
+            style={{
+              width: 96,
+              height: 44,
+              marginBottom: -s.s4,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <View style={{ width: 32, height: 4, borderRadius: 2, backgroundColor: c.lineStrong }} />
+          </Press>
+        </View>
+      </GestureDetector>
+      {children}
+    </Animated.View>
   );
 }
 

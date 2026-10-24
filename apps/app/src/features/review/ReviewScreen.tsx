@@ -4,7 +4,7 @@
 // "overdue". Swipe a card right for Tomorrow, left to let it go; the buttons do the same.
 
 import { Fragment, useRef, useState, type ReactNode } from "react";
-import { Platform, ScrollView, View } from "react-native";
+import { Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import Head from "expo-router/head";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -23,18 +23,22 @@ import {
 import { addDays, formatClock, startOfWeek } from "@kriyan/core/dates";
 import { formatDate, formatDuration } from "@kriyan/core/format";
 import { useClock } from "@/data/time";
-import { useTodayView, useWeekView, type TaskView } from "@/data/views";
+import { useTodayView, useWeekView, type TaskView, type TodayView } from "@/data/views";
+import { useFocusSummary } from "@/features/focus/focusSummary";
+import { closeDayOnDevice } from "./closedDay";
 import { deleteTask, moveTasks, skipTask } from "@/features/tasks/actions";
 import { armHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { SectionLabel } from "@/features/progress/SectionLabel";
 import { useIsPhone } from "@/theme/layout";
-import { c, family, r, s, spaceTone } from "@/theme/tokens";
+import { c, family, r, s, spaceTone, sz } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
-import { goBack, Screen } from "@/ui/Screen";
+import { goBack, Screen, SectionHead } from "@/ui/Screen";
+import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
+import { Timeline } from "@/features/today/Timeline";
 import { Txt } from "@/ui/Txt";
 
 type Step = "done" | "decide" | "tomorrow" | "feel" | "closed";
@@ -61,7 +65,7 @@ export function ReviewScreen() {
   }
   const open = (queue ?? []).filter((t) => !handled.includes(t._id));
   const done = view ? [...view.scheduled.filter((t) => t.done && !t.event), ...view.done] : [];
-  const focused = done.reduce((sum, t) => sum + (t.length ?? 0), 0);
+  const focus = useFocusSummary();
   const tomorrowDay = week?.days.find((d) => d.date === tomorrow);
 
   const handle = (t: TaskView) => {
@@ -70,9 +74,13 @@ export function ReviewScreen() {
   };
 
   const habitsDone = view ? view.habits.filter((h) => h.doneToday) : [];
+  const closeDay = () => {
+    closeDayOnDevice(today);
+    setStep("closed");
+  };
   const index = STEPS.indexOf(step);
   return (
-    <ReviewFrame>
+    <ReviewFrame day={view}>
       <View style={{ gap: s.s3 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
           <Press
@@ -124,59 +132,46 @@ export function ReviewScreen() {
 
       {step === "done" ? (
         <View>
-          {done.length || habitsDone.length ? (
-            <Txt variant="headline" heading={1} tone="ink3" style={{ lineHeight: 36 }}>
-              Today you finished{" "}
-              {[
-                done.length ? plural(done.length, "task") : null,
-                habitsDone.length ? plural(habitsDone.length, "habit") : null,
-              ]
-                .filter((x): x is string => x !== null)
-                .map((x, i) => (
-                  <Fragment key={x}>
-                    {i ? " and " : null}
-                    <Txt variant="headline" tnum>
-                      {x}
-                    </Txt>
-                  </Fragment>
-                ))}
-              {focused ? (
-                <>
-                  {", "}
-                  <Txt variant="headline" tnum>
-                    {formatDuration(focused)}
-                  </Txt>
-                  {" of planned work"}
-                </>
-              ) : null}
-              .
+          {/* What got done and the time focused, from Focus sessions: no score, no percentage. */}
+          <Txt variant="headline" heading={1} tone="ink3" style={{ lineHeight: 36 }}>
+            Today you finished{" "}
+            <Txt variant="headline" tnum>
+              {plural(done.length, "task")}
             </Txt>
-          ) : (
-            <View style={{ gap: s.s2 }}>
-              <Txt variant="headline" heading={1}>
-                Today, done
+            {habitsDone.length ? (
+              <>
+                {" and "}
+                <Txt variant="headline" tnum>
+                  {plural(habitsDone.length, "habit")}
+                </Txt>
+              </>
+            ) : null}
+            {", and focused for "}
+            <Txt variant="headline" tnum>
+              {focus ? formatDuration(focus.today) : "…"}
+            </Txt>
+            .
+          </Txt>
+          <View style={{ marginTop: s.s6 }}>
+            <SectionLabel title="Done" />
+            {done.slice(0, 8).map((t) => (
+              <DoneRow
+                key={`${t._id}:${t.date}`}
+                icon={SquareCheck}
+                title={t.title}
+                // Not the planned length: beside "focused for", it would read as time spent.
+                right={null}
+              />
+            ))}
+            {habitsDone.map((h) => (
+              <DoneRow key={h._id} icon={CircleCheck} title={h.title} right={null} />
+            ))}
+            {done.length || habitsDone.length ? null : (
+              <Txt variant="body" tone="ink2" style={{ marginTop: s.s2 }}>
+                Nothing ticked off today. That happens; tomorrow is a fresh start.
               </Txt>
-              <Txt variant="body" tone="ink2">
-                Some days are like that. What&apos;s left gets a place next.
-              </Txt>
-            </View>
-          )}
-          {done.length || habitsDone.length ? (
-            <View style={{ marginTop: s.s6 }}>
-              <SectionLabel title="Done" />
-              {done.slice(0, 8).map((t) => (
-                <DoneRow
-                  key={`${t._id}:${t.date}`}
-                  icon={SquareCheck}
-                  title={t.title}
-                  right={t.length ? formatDuration(t.length) : null}
-                />
-              ))}
-              {habitsDone.map((h) => (
-                <DoneRow key={h._id} icon={CircleCheck} title={h.title} right={null} />
-              ))}
-            </View>
-          ) : null}
+            )}
+          </View>
           <FullButton
             label={open.length ? `Next: ${plural(open.length, "thing")} still open` : "Next: tomorrow"}
             onPress={() => setStep(open.length ? "decide" : "tomorrow")}
@@ -264,14 +259,9 @@ export function ReviewScreen() {
             ))}
           </View>
           <View style={{ gap: s.s2 }}>
-            <FullButton label="Close the day" onPress={() => setStep("closed")} />
+            <FullButton label="Close the day" onPress={closeDay} />
             {feel === null ? (
-              <Button
-                variant="quiet"
-                label="Skip"
-                onPress={() => setStep("closed")}
-                style={{ alignSelf: "center" }}
-              />
+              <Button variant="quiet" label="Skip" onPress={closeDay} style={{ alignSelf: "center" }} />
             ) : null}
           </View>
         </View>
@@ -312,10 +302,34 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
  * Phones draw the review without the large title (b2.html `.rvpg`): "‹ Today" and the date lead
  * instead. Desktop keeps the usual column.
  */
-function ReviewFrame({ children }: { children: ReactNode }) {
+function ReviewFrame({ children, day }: { children: ReactNode; day: TodayView | undefined }) {
   const phone = useIsPhone();
   const insets = useSafeAreaInsets();
-  if (!phone) return <Screen title="Close the day">{children}</Screen>;
+  const { width } = useWindowDimensions();
+  const { today, now } = useClock();
+  if (!phone && width < SPLIT_MIN_WIDTH) return <Screen title="Close the day">{children}</Screen>;
+  if (!phone) {
+    // Wide enough: the day's hour grid stays beside the review, as in B2.
+    return (
+      <Screen title="Close the day" width={sz.column + s.s12 + sz.schedule}>
+        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s12 }}>
+          <View style={{ flex: 1, minWidth: 0, maxWidth: 560, gap: s.s6 }}>{children}</View>
+          <View style={{ width: sz.schedule, gap: s.s2 }}>
+            <SectionHead title={formatDate(today)} />
+            {day ? (
+              <Timeline
+                date={today}
+                items={day.scheduled}
+                now={now}
+                dayStart={day.profile.dayStart}
+                dayEnd={day.profile.dayEnd}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Screen>
+    );
+  }
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       {Platform.OS === "web" ? (
@@ -449,7 +463,7 @@ function DecideCard({
 
   const when =
     task.date && task.date < today
-      ? `From ${task.date === addDays(today, -1) ? "yesterday" : task.date}`
+      ? `From ${task.date === addDays(today, -1) ? "yesterday" : formatDate(task.date, today)}`
       : task.time !== null
         ? formatClock(task.time)
         : "Anytime";

@@ -11,7 +11,7 @@ import type { TaskView } from "@/data/views";
 import { selection } from "@/features/shell/context";
 import { rowRegistry } from "@/features/shell/rows";
 import { useControl, useIsPhone } from "@/theme/layout";
-import { c, r, s, spaceTone } from "@/theme/tokens";
+import { c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Check, Dot } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
@@ -20,6 +20,7 @@ import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
 import { completeTask, moveTasks, reopenTask, ticking } from "./actions";
 import { DayPicker } from "./pickers";
+import { stepsText } from "./steps";
 import { SwipeRow } from "./SwipeRow";
 
 export function openTask(id: string) {
@@ -52,6 +53,17 @@ function Fact({ icon, text }: { icon?: Parameters<typeof Icon>[0]["icon"]; text:
   );
 }
 
+/** The prototype's small "from Codex" tag (b2.html `.src`) on a task an agent added. */
+export function Source({ agent }: { agent: string }) {
+  return (
+    <View style={{ paddingHorizontal: s.s1, borderRadius: r.sm, backgroundColor: c.sunken }}>
+      <Txt variant="caption" tone="ink3" numberOfLines={1} style={family("600")}>
+        {`from ${agent}`}
+      </Txt>
+    </View>
+  );
+}
+
 export function facts(
   task: TaskView,
   today: string,
@@ -60,7 +72,8 @@ export function facts(
   const out: { icon?: Parameters<typeof Icon>[0]["icon"]; text: string }[] = [];
   // A yearly task (a birthday) says its day with a cake, once, whether or not the row shows when.
   const yearly = task.repeat?.freq === "year" && task.date !== null;
-  if ((showWhen || yearly) && task.date) {
+  // On its own day the row needn't say "Today".
+  if ((showWhen || (yearly && task.date !== today)) && task.date) {
     const day = formatDay(task.date, today);
     out.push({
       ...(yearly ? { icon: Cake } : {}),
@@ -74,6 +87,8 @@ export function facts(
   if (!yearly && task.repeatText) out.push({ icon: Repeat2, text: task.repeatText });
   if (task.reminders.length) out.push({ icon: Bell, text: String(task.reminders.length) });
   if (task.hasNote) out.push({ icon: NotebookText, text: "Note" });
+  const steps = stepsText(task.steps);
+  if (steps) out.push({ text: steps });
   if (task.proposedBy) out.push({ icon: Bot, text: `Proposed by ${task.proposedBy}` });
   return out;
 }
@@ -94,6 +109,8 @@ export const TaskRow = memo(function TaskRow({
   const done = task.done || isTicking;
   const tone = spaceTone(task.color);
   const info = facts(task, today, showWhen);
+  // A proposal already says who proposed it.
+  const source = task.proposedBy ? null : task.addedBy;
   const [picking, setPicking] = useState(false);
   // A Pressable's hover ends over the controls inside it (the title is one), so the row tracks
   // the mouse itself.
@@ -158,11 +175,20 @@ export const TaskRow = memo(function TaskRow({
         <Txt variant="body" tone={done ? "ink3" : "ink"} strike={done}>
           {task.title}
         </Txt>
-        {info.length ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: s.s3, rowGap: 2 }}>
+        {info.length || source ? (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "center",
+              columnGap: s.s3,
+              rowGap: 2,
+            }}
+          >
             {info.map((f, i) => (
               <Fact key={i} icon={f.icon} text={f.text} />
             ))}
+            {source ? <Source agent={source} /> : null}
           </View>
         ) : null}
       </Press>

@@ -1,8 +1,8 @@
 // Plan today: a one-minute sheet, never a gate. Bring tasks from earlier days, pull some from
 // the Inbox, and see whether they fit the free time left. Nothing moves until "Add".
 
-import { useState, type RefObject } from "react";
-import { View } from "react-native";
+import { useEffect, useState, type RefObject } from "react";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 import { formatDay, formatDuration } from "@kriyan/core/format";
 import type { TaskView } from "@/data/views";
 import { moveTasks } from "@/features/tasks/actions";
@@ -24,16 +24,49 @@ interface Props {
   free: number;
 }
 
+/** The popover's title and the summary and buttons under the list. */
+const CHROME = 168;
+
 export function PlanToday({ open, onClose, anchor, today, earlier, inbox, free }: Props) {
+  const { height: win } = useWindowDimensions();
+  // Opens on the side of the button with more room, and the list scrolls inside, so the
+  // summary and "Add to today" always show.
+  const [room, setRoom] = useState<{ side: "above" | "below"; height: number }>({
+    side: "below",
+    height: win,
+  });
+  useEffect(() => {
+    if (!open) return;
+    anchor.current?.measureInWindow((_x, y, _w, h) => {
+      const below = win - (y + h);
+      setRoom(y > below ? { side: "above", height: y } : { side: "below", height: below });
+    });
+  }, [open, anchor, win]);
   return (
-    <Popover open={open} onClose={onClose} anchor={anchor} title="Plan today" width={400}>
+    <Popover open={open} onClose={onClose} anchor={anchor} side={room.side} title="Plan today" width={400}>
       {/* Remounts each time it opens, so the picks start fresh. */}
-      {open ? <Picks onClose={onClose} today={today} earlier={earlier} inbox={inbox} free={free} /> : null}
+      {open ? (
+        <Picks
+          onClose={onClose}
+          today={today}
+          earlier={earlier}
+          inbox={inbox}
+          free={free}
+          listHeight={Math.max(120, room.height - CHROME)}
+        />
+      ) : null}
     </Popover>
   );
 }
 
-function Picks({ onClose, today, earlier, inbox, free }: Omit<Props, "open" | "anchor">) {
+function Picks({
+  onClose,
+  today,
+  earlier,
+  inbox,
+  free,
+  listHeight,
+}: Omit<Props, "open" | "anchor"> & { listHeight: number }) {
   // What's left from earlier days is usually meant for today; Inbox ideas are a choice. A
   // repeat's missed day isn't picked for you: its next occurrence is already coming.
   const [picked, setPicked] = useState<Set<string>>(
@@ -58,12 +91,14 @@ function Picks({ onClose, today, earlier, inbox, free }: Omit<Props, "open" | "a
 
   return (
     <View style={{ gap: s.s4 }}>
-      {earlier.length ? (
-        <Group title="From earlier" tasks={earlier} picked={picked} toggle={toggle} today={today} />
-      ) : null}
-      {inbox.length ? (
-        <Group title="From your Inbox" tasks={inbox} picked={picked} toggle={toggle} today={today} />
-      ) : null}
+      <ScrollView style={{ maxHeight: listHeight }} contentContainerStyle={{ gap: s.s4 }}>
+        {earlier.length ? (
+          <Group title="From earlier" tasks={earlier} picked={picked} toggle={toggle} today={today} />
+        ) : null}
+        {inbox.length ? (
+          <Group title="From your Inbox" tasks={inbox} picked={picked} toggle={toggle} today={today} />
+        ) : null}
+      </ScrollView>
       <Txt variant="meta" tone={minutes > free ? "now" : "ink3"} tnum>
         {fit}
       </Txt>

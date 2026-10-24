@@ -1,21 +1,25 @@
 // Focus (b2.html?screen=focus): one task, a ring that fills as its time passes with a red dot
-// at its head, the next step from its checklist, and what comes after. Dark in both schemes,
-// like Tiimo's focus. A task with no length counts up instead; Kriyan never invents how long
-// something takes.
+// at its head, the task's next step, and what comes after. Dark in both schemes, like Tiimo's
+// focus. A task with no length counts up instead; Kriyan never invents how long something
+// takes. The time spent is recorded (tasks.logFocus) when the session ends: Done, Back,
+// leaving the screen, or the app going to the background.
 
-import { useEffect, useMemo, useState } from "react";
-import { View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, View } from "react-native";
+import { router } from "expo-router";
+import { useMutation } from "convex/react";
+import { api } from "@kriyan/convex/api";
 import Svg, { Circle } from "react-native-svg";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
 import { formatDuration } from "@kriyan/core/format";
 import { useClock } from "@/data/time";
 import { useTaskDoc, useTodayView } from "@/data/views";
-import { completeTask, updateTask } from "@/features/tasks/actions";
+import { completeTask } from "@/features/tasks/actions";
 import { commitHaptic } from "@/features/tasks/haptics";
+import { nextStep, useSaveSteps } from "@/features/tasks/steps";
 import { c, family, hex, r, s } from "@/theme/tokens";
 import { Press } from "@/ui/Press";
-import { goBack } from "@/ui/Screen";
 import { LightStatusBar } from "@/ui/statusBar";
 import { Txt } from "@/ui/Txt";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,46 +31,29 @@ const STROKE = 14;
 const RADIUS = (RING - STROKE) / 2;
 const PLAY = 76;
 
-/** The first unticked "- [ ] step" in a Markdown note, and the note with it ticked. */
-export function nextStep(note: string | null): { text: string; tick: () => string } | null {
-  if (!note) return null;
-  const lines = note.split("\n");
-  const i = lines.findIndex((l) => /^\s*- \[ \] /.test(l));
-  const line = lines[i];
-  if (line === undefined) return null;
-  const text = line.replace(/^\s*- \[ \] /, "");
-  return {
-    text,
-    tick: () => lines.map((l, j) => (j === i ? l.replace("- [ ] ", "- [x] ") : l)).join("\n"),
-  };
-}
-
 export function FocusScreen({ id }: { id: Id<"tasks"> }) {
   const task = useTaskDoc(id);
   const day = useTodayView();
-  const { now } = useClock();
+  const { now, today } = useClock();
   const insets = useSafeAreaInsets();
-  const [running, setRunning] = useState(true);
-  const [elapsed, setElapsed] = useState(0);
+  const saveSteps = useSaveSteps(id);
+  const session = useFocusSession(id, today);
+  const { running, elapsed } = session;
   const [extra, setExtra] = useState(0);
-
-  useEffect(() => {
-    if (!running) return;
-    const started = Date.now() - elapsed * 1000;
-    const tick = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 250);
-    return () => clearInterval(tick);
-    // Restart the interval only when pausing or resuming.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
 
   const total = task?.length ? (task.length + extra) * 60 : null;
   const left = total !== null ? Math.max(0, total - elapsed) : null;
   const shown = left ?? elapsed;
   const progress = total ? Math.min(1, elapsed / total) : 0;
-  const step = nextStep(task?.note ?? null);
+  const step = nextStep(task?.steps);
+  // What comes after this task ends (or starts, without a length); an untimed task, after now.
+  const endsAt = task?.time != null ? Math.max(now, task.time + (task.length ?? 0)) : now;
   const after = useMemo(
-    () => day?.scheduled.find((t) => !t.done && t._id !== id && t.time !== null && t.time > now) ?? null,
-    [day, id, now],
+    () =>
+      day?.scheduled.find(
+        (t) => !t.done && !t.proposedBy && t._id !== id && t.time !== null && t.time >= endsAt,
+      ) ?? null,
+    [day, id, endsAt],
   );
 
   if (!task) return <View style={{ flex: 1, backgroundColor: c.head }} />;
@@ -74,7 +61,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
   // The dot rides the head of the arc, which starts at 12 o'clock.
   const angle = progress * 2 * Math.PI - Math.PI / 2;
   const end = task.time != null && task.length ? task.time + task.length : null;
-  const hasSteps = /^\s*- \[x\] /m.test(task.note ?? "");
+  const hasSteps = Boolean(task.steps?.length);
 
   return (
     <View
@@ -102,14 +89,17 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
       >
         <Press
           role="button"
-          accessibilityLabel="Back"
-          onPress={() => goBack("/today")}
+          accessibilityLabel="Back to Today"
+          onPress={() => {
+            session.end();
+            router.navigate("/today");
+          }}
           hoverBg={null}
           style={{ flexDirection: "row", alignItems: "center", gap: 2, minHeight: 44, paddingRight: s.s2 }}
         >
           <Icon icon={ChevronLeft} size={22} tone="headInk" />
           <Txt variant="label" tone="headInk">
-            Back
+            Today
           </Txt>
         </Press>
         <Txt variant="meta" tone="headDim" style={family("600")}>
@@ -204,7 +194,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
         <Press
           role="button"
           accessibilityLabel={running ? "Pause" : "Resume"}
-          onPress={() => setRunning(!running)}
+          onPress={session.toggle}
           hoverBg={null}
           style={{
             width: PLAY,
@@ -226,8 +216,9 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
           role="button"
           accessibilityLabel="Done"
           onPress={() => {
+            session.end();
             completeTask(task);
-            goBack("/today");
+            router.navigate("/today");
           }}
           hoverBg={null}
           style={ghost}
@@ -245,10 +236,10 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
         {step ? (
           <Press
             role="button"
-            accessibilityLabel={`Tick off: ${step.text}`}
+            accessibilityLabel={`Tick off: ${step.step.title}`}
             onPress={() => {
               commitHaptic();
-              void updateTask({ id: task._id, note: step.tick() });
+              saveSteps((task.steps ?? []).map((st, i) => (i === step.index ? { ...st, done: true } : st)));
             }}
             hoverBg={null}
             style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 44 }}
@@ -263,7 +254,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
               }}
             />
             <Txt variant="body" tone="headInk" style={{ flex: 1 }}>
-              {step.text}
+              {step.step.title}
             </Txt>
           </Press>
         ) : (
@@ -290,6 +281,80 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
       </View>
     </View>
   );
+}
+
+/**
+ * The session's clock and its record. Only running time counts. Each end point (Done, Back,
+ * leaving, the background) records the time since the last record, so a session that comes
+ * back from the background and ends later is never counted twice.
+ */
+function useFocusSession(taskId: Id<"tasks">, today: string) {
+  const logFocus = useMutation(api.tasks.logFocus);
+  const [running, setRunning] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+  /** Seconds from earlier runs, before the last pause. */
+  const banked = useRef(0);
+  /** When the current run started, or null while paused. */
+  const runStart = useRef<number | null>(null);
+  /** Seconds already recorded. */
+  const logged = useRef(0);
+  const day = useRef(today);
+  useEffect(() => {
+    day.current = today;
+  }, [today]);
+  // The clock starts when the screen opens.
+  useEffect(() => {
+    runStart.current = Date.now();
+  }, []);
+
+  const seconds = useCallback(
+    () => banked.current + (runStart.current === null ? 0 : (Date.now() - runStart.current) / 1000),
+    [],
+  );
+
+  const record = useCallback(() => {
+    const delta = seconds() - logged.current;
+    // The server rounds to whole minutes; under half a minute stays for the next record.
+    if (delta < 30) return;
+    logged.current += delta;
+    void logFocus({ taskId, minutes: delta / 60, date: day.current }).catch(() => undefined);
+  }, [logFocus, taskId, seconds]);
+
+  useEffect(() => {
+    if (!running) return;
+    const tick = setInterval(() => setElapsed(Math.floor(seconds())), 250);
+    return () => clearInterval(tick);
+  }, [running, seconds]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background") record();
+    });
+    return () => {
+      sub.remove();
+      record();
+    };
+  }, [record]);
+
+  const toggle = () => {
+    if (runStart.current === null) runStart.current = Date.now();
+    else {
+      banked.current += (Date.now() - runStart.current) / 1000;
+      runStart.current = null;
+    }
+    setElapsed(Math.floor(seconds()));
+    setRunning(runStart.current !== null);
+  };
+
+  /** Stops the clock and records what's left. */
+  const end = () => {
+    if (runStart.current !== null) banked.current += (Date.now() - runStart.current) / 1000;
+    runStart.current = null;
+    setRunning(false);
+    record();
+  };
+
+  return { running, elapsed, toggle, end };
 }
 
 function clock(seconds: number): string {

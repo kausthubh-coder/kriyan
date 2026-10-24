@@ -89,7 +89,8 @@ export function TodayHeader({
         variant="title"
         tone="headDim"
         accessibilityLabel={summaryText(parts)}
-        style={{ fontSize: phone ? 22 : 24, lineHeight: phone ? 28 : 32 }}
+        // 20 on phones and 28 on desktop: the type scale's steps either side of B2's 23.
+        style={{ fontSize: phone ? 20 : 28, lineHeight: phone ? 28 : 36 }}
       >
         {parts.map((part, i) => (
           <SentencePart key={i} part={part} />
@@ -131,7 +132,7 @@ function Stat({
   text: string;
 }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1 }}>
       <Icon icon={icon} size={14} color={color} strokeWidth={2} />
       <Txt variant="caption" tone="headInk" tnum>
         {text}

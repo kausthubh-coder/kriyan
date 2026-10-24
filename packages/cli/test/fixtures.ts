@@ -47,11 +47,13 @@ export function task(fields: Partial<TaskView> & Pick<TaskView, "_id" | "title">
     repeatText: null,
     reminders: [],
     hasNote: false,
+    steps: [],
     event: false,
     goalId: null,
     done: false,
     projected: false,
     proposedBy: null,
+    addedBy: null,
     ...fields,
   };
 }
