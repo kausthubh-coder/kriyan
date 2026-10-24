@@ -53,6 +53,7 @@ export const checkHabit = mutation({
 export const addGoal = mutation({
   args: {
     title: v.string(),
+    why: v.optional(v.string()),
     kind: v.union(v.literal("number"), v.literal("tasks")),
     target: v.number(),
     unit: v.optional(v.string()),
@@ -66,6 +67,7 @@ export const updateGoal = mutation({
   args: {
     id: v.id("goals"),
     title: v.optional(v.string()),
+    why: v.optional(v.union(v.string(), v.null())),
     target: v.optional(v.number()),
     current: v.optional(v.number()),
     unit: v.optional(v.union(v.string(), v.null())),

@@ -1,6 +1,7 @@
-// Settings (b2.html?screen=settings): who's signed in, how it feels (sounds), the evening review,
-// the semester, your day, default reminders, agents and the command line, access tokens,
-// installing it, recently deleted, and deleting your data.
+// Settings (b2.html?screen=settings): in B2's order, who's signed in, how it feels (sounds and
+// haptics), the evening review, agents and the command line, and installing it; then what B2
+// doesn't picture: the semester, your day, default reminders, access tokens, recently deleted,
+// and deleting your data.
 
 import { AllowReminders } from "@/features/notifications/AllowReminders";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -9,7 +10,16 @@ import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { BookOpen, KeyRound, Link, Play, RotateCcw, Sparkles, Terminal, Trash2 } from "lucide-react-native";
+import {
+  ChevronLeft,
+  KeyRound,
+  Link,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Terminal,
+  Trash2,
+} from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
@@ -21,19 +31,22 @@ import { useAccessTokens, useProfile, type Profile } from "@/data/views";
 import { hapticsOn, setHapticsOn, setSoundsOn, soundsOn } from "@/features/feel/setting";
 import { playSound } from "@/features/feel/sound";
 import { forgetDevice } from "@/features/notifications/register";
+import { canVibrate } from "@/features/feel/vibrate";
 import { SectionLabel } from "@/features/progress/SectionLabel";
+import { SmallButton } from "@/features/progress/SmallButton";
+import { Dock } from "@/features/shell/Dock";
 import { errorText } from "@/features/tasks/actions";
 import { commitHaptic, toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { ReminderEditor } from "@/features/tasks/ReminderEditor";
 import { useIsPhone } from "@/theme/layout";
-import { c, family, r, s, shadows } from "@/theme/tokens";
+import { c, family, r, s, shadows, sz } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Field, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
-import { PageHead, Screen } from "@/ui/Screen";
+import { goBack, PageHead, Screen } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
 import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
@@ -60,32 +73,93 @@ async function copy(text: string, what: string) {
 
 export function SettingsScreen() {
   const profile = useProfile();
+  const phone = useIsPhone();
   return (
-    <Screen title="Settings" back>
-      <PageHead big title="Settings" />
-      {profile === undefined ? (
-        <View testID="skeleton" style={{ gap: s.s4 }}>
-          <Skeleton width="100%" height={72} />
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} width={`${70 - i * 10}%`} />
-          ))}
-        </View>
-      ) : (
+    <Screen
+      title="Settings"
+      back
+      width="full"
+      // B2 keeps the dock on Settings. The web layout draws it on every phone page; on Android
+      // Settings is pushed over the tabs, so it draws its own.
+      footer={Platform.OS === "web" ? null : <Dock />}
+      // B2's desktop page starts 36 from the top, with Back above the title.
+      scrollProps={
+        phone
+          ? undefined
+          : { contentContainerStyle: { paddingTop: s.s8, paddingHorizontal: s.s8, paddingBottom: s.s16 } }
+      }
+    >
+      {/* One centred 680 column with B2's short section breaks (the frame's are 32 and 48 and
+          hold pages to its left edge). On phones it sits 16 under the title. */}
+      <View
+        style={{
+          width: "100%",
+          maxWidth: sz.column,
+          alignSelf: "center",
+          gap: s.s4,
+          ...(phone ? { marginTop: -s.s4 } : null),
+        }}
+      >
+        {phone ? null : (
+          <View>
+            <DeskBack />
+            <PageHead title="Settings" />
+          </View>
+        )}
+        {profile === undefined ? (
+          <View testID="skeleton" style={{ gap: s.s4 }}>
+            <Skeleton width="100%" height={72} />
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} width={`${70 - i * 10}%`} />
+            ))}
+          </View>
+        ) : (
+          <>
+            <AccountCard profile={profile} />
+            <Feel profile={profile} />
+            <EveningReview profile={profile} />
+            <ConnectAI profile={profile} />
+            <Install />
+            <Semester profile={profile} />
+            <YourDay profile={profile} />
+            <DefaultReminders profile={profile} />
+            <Tokens />
+            <Deleted />
+            <DeleteData />
+          </>
+        )}
+      </View>
+    </Screen>
+  );
+}
+
+/** "Back" above the desktop title (b2.html `.back`), like the phone's. */
+function DeskBack() {
+  return (
+    <Press
+      role="button"
+      accessibilityLabel="Back"
+      onPress={() => goBack()}
+      hoverBg={null}
+      scale={false}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        minHeight: sz.touch,
+        marginLeft: -s.s1,
+        paddingRight: s.s2,
+      }}
+    >
+      {({ hovered }) => (
         <>
-          <AccountCard profile={profile} />
-          <Feel profile={profile} />
-          <EveningReview profile={profile} />
-          <Semester profile={profile} />
-          <YourDay profile={profile} />
-          <DefaultReminders profile={profile} />
-          <ConnectAI profile={profile} />
-          <Tokens />
-          <Install />
-          <Deleted />
-          <DeleteData />
+          <Icon icon={ChevronLeft} size={20} tone={hovered ? "ink" : "ink2"} />
+          <Txt variant="label" tone={hovered ? "ink" : "ink2"}>
+            Back
+          </Txt>
         </>
       )}
-    </Screen>
+    </Press>
   );
 }
 
@@ -98,9 +172,10 @@ function useUpdateProfile() {
 /** A section: the quiet uppercase label, then its rows. */
 function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <View nativeID={id} style={{ gap: s.s2 }}>
+    <View nativeID={id} style={{ marginTop: s.s1 }}>
       <SectionLabel title={title} />
-      {children}
+      {/* The label's own height leaves 8 under its words, so its rows follow straight on. */}
+      <View style={{ gap: s.s2 }}>{children}</View>
     </View>
   );
 }
@@ -148,11 +223,7 @@ function AccountCard({ profile }: { profile: Profile }) {
           {how}
         </Txt>
       </View>
-      <Button
-        label="Sign out"
-        onPress={() => void forgetDevice().finally(() => void signOut())}
-        style={small}
-      />
+      <SmallButton label="Sign out" onPress={() => void forgetDevice().finally(() => void signOut())} />
     </View>
   );
 }
@@ -255,12 +326,13 @@ function Choice({
       accessibilityLabel={accessibilityLabel ?? label}
       onPress={onPress}
       hoverBg={null}
-      style={{ height: phone ? 44 : 32, justifyContent: "center" }}
+      style={{ height: phone ? sz.touch : sz.ctl, justifyContent: "center" }}
     >
       {({ hovered }) => (
         <View
           style={{
-            height: phone ? 36 : 28,
+            // B2's chips are compact on phones too (`.chip`, 34 high); the target stays 44.
+            height: sz.ctl,
             minWidth: 56,
             paddingHorizontal: s.s3,
             alignItems: "center",
@@ -270,7 +342,13 @@ function Choice({
             boxShadow: on ? undefined : `inset 0 0 0 1px ${c.lineStrong}`,
           }}
         >
-          <Txt variant="label" tone={on ? "onInk" : "ink2"} tnum numberOfLines={1}>
+          <Txt
+            variant="label"
+            tone={on ? "onInk" : "ink2"}
+            tnum
+            numberOfLines={1}
+            style={{ fontSize: 14, lineHeight: 20 }}
+          >
             {label}
           </Txt>
         </View>
@@ -320,13 +398,15 @@ function SwitchRow({
 }
 
 /**
- * Sounds and haptics (docs/design/v4: haptics on by default, sounds off). Haptics only exist in
- * the Android app, so the web leaves that switch out rather than show one that does nothing.
+ * Sounds and haptics (docs/design/v4: haptics on by default, sounds off). Haptics show where
+ * something can vibrate: the Android app, and a phone's browser with the Vibration API. Elsewhere
+ * (desktops, iPhone Safari) the switch is left out rather than shown doing nothing.
  */
 function Feel({ profile }: { profile: Profile }) {
   const update = useUpdateProfile();
   const on = profile.sounds === true;
   const [haptics, setHaptics] = useState(hapticsOn);
+  const [vibrates] = useState(canVibrate);
   return (
     <Section title="Feel">
       <View>
@@ -341,7 +421,7 @@ function Feel({ profile }: { profile: Profile }) {
             void update({ sounds: next });
           }}
         />
-        {Platform.OS === "android" ? (
+        {vibrates ? (
           <SwitchRow
             label="Haptics"
             hint="A light tap when you tick, move or drop something"
@@ -354,11 +434,11 @@ function Feel({ profile }: { profile: Profile }) {
           />
         ) : null}
       </View>
-      <View style={{ alignSelf: "flex-start" }}>
-        <Button
+      <View>
+        <SmallButton
           icon={Play}
+          filled
           label="Try it"
-          style={small}
           onPress={() => {
             commitHaptic();
             if (soundsOn()) playSound("done");
@@ -376,10 +456,12 @@ const DEFAULT_REVIEW = 20 * 60;
 
 function EveningReview({ profile }: { profile: Profile }) {
   const update = useUpdateProfile();
+  const phone = useIsPhone();
   const current = profile.reviewTime ?? DEFAULT_REVIEW;
   return (
     <Section title="Evening review">
-      <Txt variant="body" tone="ink3">
+      {/* 14 on phones too, so it stays one line like B2's. */}
+      <Txt variant={phone ? "meta" : "body"} tone="ink3">
         When “Review today” shows up in your evening.
       </Txt>
       <View
@@ -536,15 +618,15 @@ function DefaultReminders({ profile }: { profile: Profile }) {
   );
 }
 
-/** A value to copy, in monospace, with its Copy button (b2.html `.conn-r code`). */
+/** A value to copy, on a quiet fill, with its Copy button (b2.html `.conn-r code`; Inter, not monospace). */
 function CopyLine({ text, what, label = "Copy" }: { text: string; what: string; label?: string }) {
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: s.s2 }}>
       <View
         style={{
           flexShrink: 1,
-          paddingHorizontal: s.s3,
-          paddingVertical: s.s2,
+          paddingHorizontal: s.s2,
+          paddingVertical: s.s1,
           borderRadius: r.ctl,
           backgroundColor: c.hover,
         }}
@@ -553,46 +635,69 @@ function CopyLine({ text, what, label = "Copy" }: { text: string; what: string; 
           {text}
         </Txt>
       </View>
-      <Button
-        label={label}
-        accessibilityLabel={`Copy ${what}`}
-        onPress={() => void copy(text, what)}
-        style={small}
-      />
+      <SmallButton label={label} accessibilityLabel={`Copy ${what}`} onPress={() => void copy(text, what)} />
     </View>
   );
 }
 
-/** One way to connect (b2.html `.conn-r`): an icon, what it is, and what to do. */
+/**
+ * One way to connect (b2.html `.conn-r`): an icon, what it is in a few words, and what to copy on
+ * the right; on a phone what to copy wraps under the words.
+ */
 function ConnRow({
   icon,
   title,
   meta,
+  guide,
   children,
   last,
 }: {
   icon: typeof Link;
   title: string;
   meta: string;
+  /** The step-by-step guide on kriyan.app, linked after the words. */
+  guide?: string;
   children?: ReactNode;
   last?: boolean;
 }) {
   return (
-    <View style={{ gap: s.s3, paddingVertical: s.s3, ...(last ? null : rule) }}>
-      <View style={{ flexDirection: "row", gap: s.s3 }}>
-        <View style={{ paddingTop: 2 }}>
-          <Icon icon={icon} size={20} tone="ink2" />
-        </View>
+    <View
+      style={{
+        flexDirection: "row",
+        flexWrap: "wrap",
+        alignItems: "center",
+        columnGap: s.s3,
+        rowGap: s.s2,
+        paddingVertical: s.s3,
+        ...(last ? null : rule),
+      }}
+    >
+      <View style={{ flex: 1, minWidth: 180, flexDirection: "row", alignItems: "center", gap: s.s3 }}>
+        <Icon icon={icon} size={20} tone="ink2" />
         <View style={{ flex: 1 }}>
           <Txt variant="label" style={family("600")}>
             {title}
           </Txt>
           <Txt variant="meta" tone="ink3">
             {meta}
+            {guide ? (
+              <>
+                {" "}
+                <Txt
+                  variant="meta"
+                  tone="parse"
+                  role="link"
+                  accessibilityLabel={`${title} guide`}
+                  onPress={() => void Linking.openURL(guide)}
+                >
+                  Guide
+                </Txt>
+              </>
+            ) : null}
           </Txt>
         </View>
       </View>
-      {children ? <View style={{ gap: s.s2 }}>{children}</View> : null}
+      {children}
     </View>
   );
 }
@@ -609,41 +714,21 @@ function ConnectAI({ profile }: { profile: Profile }) {
           backgroundColor: c.sunken,
         }}
       >
-        <ConnRow
-          icon={Link}
-          title="MCP server"
-          meta="For Claude, ChatGPT, Cursor and other assistants. Add Kriyan as an MCP server with this address; you’ll sign in when it connects."
-        >
+        <ConnRow icon={Link} title="MCP server" meta="For Claude, ChatGPT and Codex." guide={MCP_DOCS}>
           <CopyLine text={MCP_URL} what="the MCP address" label="Copy URL" />
-          <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
-            <Button
-              icon={BookOpen}
-              label="Read the setup guide"
-              onPress={() => void Linking.openURL(MCP_DOCS)}
-            />
-          </View>
         </ConnRow>
+        {/* Not on npm yet, so the setup is a clone (shown below the card) rather than one line. */}
         <ConnRow
           icon={Terminal}
           title="Command line"
-          meta="For scripts and scheduled runs. It isn’t on npm yet, so it runs from a copy of Kriyan’s code: clone it, install, then sign in with an access token from below."
+          meta="For scripts and scheduled runs. Clone it, install, then sign in with a token."
+          guide={CLI_DOCS}
         >
-          <TerminalBlock lines={CLI_SETUP} label="Command line setup" nested />
-          <View style={{ alignSelf: "flex-start" }}>
-            <Button
-              label="Copy"
-              accessibilityLabel="Copy the setup commands"
-              onPress={() => void copy(CLI_SETUP.join("\n"), "the setup commands")}
-              style={small}
-            />
-          </View>
-          <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
-            <Button
-              icon={BookOpen}
-              label="Read the CLI guide"
-              onPress={() => void Linking.openURL(CLI_DOCS)}
-            />
-          </View>
+          <SmallButton
+            label="Copy setup"
+            accessibilityLabel="Copy the setup commands"
+            onPress={() => void copy(CLI_SETUP.join("\n"), "the setup commands")}
+          />
         </ConnRow>
         <ConnRow
           icon={Sparkles}
@@ -657,7 +742,6 @@ function ConnectAI({ profile }: { profile: Profile }) {
           last
         />
       </View>
-      <TerminalBlock lines={CLI_EXAMPLES} label="Command line examples" />
       <SwitchRow
         label="Let agents edit directly"
         hint={
@@ -668,6 +752,7 @@ function ConnectAI({ profile }: { profile: Profile }) {
         on={profile.agentsEditDirectly}
         onChange={(agentsEditDirectly) => void update({ agentsEditDirectly })}
       />
+      <TerminalBlock lines={[...CLI_SETUP, ...CLI_EXAMPLES]} label="Command line setup and examples" />
     </Section>
   );
 }
@@ -676,18 +761,15 @@ function ConnectAI({ profile }: { profile: Profile }) {
 const CLI_EXAMPLES = [
   "bun run kriyan today",
   'bun run kriyan add "Gym tomorrow 7:00 for 45m every Mon Wed Fri remind 10m before #health"',
-  "bun run kriyan week",
-  "bun run kriyan done 2",
 ];
 
 /** The prototype's terminal (b2.html `.term`): dark in both schemes, like the Today header. */
-function TerminalBlock({ lines, label, nested }: { lines: string[]; label: string; nested?: boolean }) {
+function TerminalBlock({ lines, label }: { lines: string[]; label: string }) {
   return (
     <View
       style={{
-        padding: nested ? s.s3 : s.s4,
-        // Inside the card its corner follows the card's (24) less the card's padding (16).
-        borderRadius: nested ? r.ctl : r.sheet,
+        padding: s.s4,
+        borderRadius: r.sheet,
         backgroundColor: c.head,
         gap: s.s1,
       }}
@@ -709,27 +791,29 @@ function TerminalBlock({ lines, label, nested }: { lines: string[]; label: strin
 function Install() {
   return (
     <Section title="Install">
-      <View style={{ gap: s.s2, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
-        <Txt variant="label" style={family("600")}>
-          On iPhone
-        </Txt>
-        {[
-          "Open app.kriyan.app in Safari.",
-          "Tap Share, then Add to Home Screen.",
-          "Open Kriyan from your Home Screen.",
-        ].map((line, i) => (
-          <Txt key={line} variant="body" tone="ink2">
-            {i + 1}. {line}
+      <View style={{ gap: s.s2 }}>
+        <View style={{ gap: s.s2, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
+          <Txt variant="label" style={family("600")}>
+            On iPhone
           </Txt>
-        ))}
-      </View>
-      <View style={{ gap: s.s1, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
-        <Txt variant="label" style={family("600")}>
-          On Android
-        </Txt>
-        <Txt variant="body" tone="ink2">
-          Install the Kriyan app for haptics and reminders that ring on your phone.
-        </Txt>
+          {[
+            "Open app.kriyan.app in Safari.",
+            "Tap Share, then Add to Home Screen.",
+            "Open Kriyan from your Home Screen.",
+          ].map((line, i) => (
+            <Txt key={line} variant="body" tone="ink2">
+              {i + 1}. {line}
+            </Txt>
+          ))}
+        </View>
+        <View style={{ gap: s.s1, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
+          <Txt variant="label" style={family("600")}>
+            On Android
+          </Txt>
+          <Txt variant="body" tone="ink2">
+            Install the Kriyan app for haptics and reminders that ring on your phone.
+          </Txt>
+        </View>
       </View>
     </Section>
   );
@@ -852,10 +936,9 @@ function Tokens() {
                   {t.lastUsedAt ? `, last used ${day(t.lastUsedAt)}` : ", never used"}
                 </Txt>
               </View>
-              <Button
+              <SmallButton
                 label="Revoke"
                 accessibilityLabel={`Revoke ${t.name}`}
-                style={small}
                 onPress={() =>
                   void revoke({ id: t._id as Id<"accessTokens"> })
                     .then(() => showToast(`Revoked ${t.name}. Anything using it is signed out.`))

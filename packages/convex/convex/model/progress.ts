@@ -19,6 +19,14 @@ function title(value: string, what: string) {
   return t;
 }
 
+/** A goal's reason: one short line, or nothing when it's blank. */
+function why(value: string | null | undefined): string | undefined {
+  const w = value?.trim();
+  if (!w) return undefined;
+  if (w.length > 300) throw new ConvexError("Keep the reason under 300 characters, a line or two.");
+  return w;
+}
+
 export async function createHabit(
   ctx: MutationCtx,
   ownerId: string,
@@ -81,6 +89,7 @@ export async function createGoal(
   ownerId: string,
   input: {
     title: string;
+    why?: string;
     kind: "number" | "tasks";
     target: number;
     unit?: string;
@@ -95,6 +104,7 @@ export async function createGoal(
   return await ctx.db.insert("goals", {
     ownerId,
     title: title(input.title, "goal"),
+    ...(why(input.why) ? { why: why(input.why) } : {}),
     kind: input.kind,
     target: input.target,
     current: 0,
@@ -111,6 +121,7 @@ export async function updateGoal(
   id: Id<"goals">,
   patch: {
     title?: string;
+    why?: string | null;
     target?: number;
     current?: number;
     unit?: string | null;
@@ -126,6 +137,8 @@ export async function updateGoal(
     throw new ConvexError("The due date must look like 2026-10-13.");
   await ctx.db.patch(id, {
     ...(patch.title !== undefined ? { title: title(patch.title, "goal") } : {}),
+    // An empty reason clears it, like null.
+    ...(patch.why !== undefined ? { why: why(patch.why) } : {}),
     ...(patch.target !== undefined ? { target: patch.target } : {}),
     ...(patch.current !== undefined ? { current: patch.current } : {}),
     ...(patch.unit !== undefined ? { unit: patch.unit === null ? undefined : unit(patch.unit) } : {}),

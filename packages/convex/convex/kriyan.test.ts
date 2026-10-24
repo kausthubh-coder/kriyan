@@ -447,6 +447,61 @@ describe("agent API", () => {
     });
   });
 
+  test("a goal says why it matters and what's next, from the app or an agent", async () => {
+    const { alice, call, today } = await withToken();
+    const added = await call("add_goal", {
+      title: "Finish the semester with a distinction",
+      why: "  Keeps the honours scholarship open. ",
+      kind: "tasks",
+      target: 5,
+    });
+    expect(added.status).toBe(200);
+    const { goalId } = ((await added.json()) as { result: { goalId: Id<"goals"> } }).result;
+    const plain = await alice.mutation(api.organize.addGoal, {
+      title: "Read 24 books",
+      kind: "tasks",
+      target: 24,
+    });
+    // Linked open tasks: the soonest dated one is next, before an undated one and a later one.
+    await alice.mutation(api.tasks.add, { title: "Outline the thesis", goalId });
+    await alice.mutation(api.tasks.add, { title: "Lab report 5", goalId, date: "2026-10-20" });
+    await alice.mutation(api.tasks.add, { title: "Lab report 4", goalId, date: today, time: 900 });
+    const done = await alice.mutation(api.tasks.add, {
+      title: "Lab report 3",
+      goalId,
+      date: today,
+      time: 600,
+    });
+    await alice.mutation(api.tasks.complete, { id: done });
+    await call("propose_plan", {
+      agent: "Claude",
+      blocks: [{ title: "Study block", date: today, time: 480, length: 60 }],
+    });
+
+    const shown = async () =>
+      (await alice.query(api.views.progress, { today })).goals.map((g) => [
+        g.title,
+        g.why,
+        g.next?.title ?? null,
+      ]);
+    expect(await shown()).toEqual([
+      ["Finish the semester with a distinction", "Keeps the honours scholarship open.", "Lab report 4"],
+      ["Read 24 books", null, null],
+    ]);
+
+    await call("update_goal", { goalId, why: null });
+    await alice.mutation(api.organize.updateGoal, { id: plain, why: "One a fortnight" });
+    expect(await shown()).toEqual([
+      ["Finish the semester with a distinction", null, "Lab report 4"],
+      ["Read 24 books", "One a fortnight", null],
+    ]);
+    await alice.mutation(api.organize.updateGoal, { id: plain, why: "   " });
+    expect((await shown())[1]).toEqual(["Read 24 books", null, null]);
+    await expect(
+      alice.mutation(api.organize.updateGoal, { id: plain, why: "x".repeat(301) }),
+    ).rejects.toThrow("Keep the reason under 300 characters, a line or two.");
+  });
+
   test("a plan arrives as proposals until the person accepts it", async () => {
     const { alice, call, today } = await withToken();
     const res = await call("propose_plan", {

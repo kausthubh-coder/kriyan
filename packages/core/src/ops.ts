@@ -375,10 +375,11 @@ const BASE_OPS: OpSpec[] = [
     title: "Add a goal",
     kind: "write",
     description:
-      "Add a goal: a number to reach (kind 'number', e.g. 100 km) or a count of linked tasks to finish (kind 'tasks').",
+      "Add a goal: a number to reach (kind 'number', e.g. 100 km) or a count of linked tasks to finish (kind 'tasks'). `why` is an optional line on why it matters, shown under the title.",
     input: obj(
       {
         title: { type: "string" },
+        why: { type: "string" },
         kind: { enum: ["number", "tasks"] },
         target: { type: "number" },
         unit: { type: "string" },
@@ -394,11 +395,13 @@ const BASE_OPS: OpSpec[] = [
     kind: "write",
     destructive: true,
     idempotent: true,
-    description: "Update a goal's progress (`current`), target, unit or due date.",
+    description:
+      "Update a goal's progress (`current`), title, reason (`why`, null clears it), target, unit or due date.",
     input: obj(
       {
         goalId: id("goal"),
         title: { type: "string" },
+        why: nullable({ type: "string" }),
         target: { type: "number" },
         current: { type: "number" },
         unit: nullable({ type: "string" }),

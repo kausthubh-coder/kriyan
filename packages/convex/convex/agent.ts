@@ -282,6 +282,7 @@ export const add_goal = internalMutation({
   args: {
     ...writer,
     title: v.string(),
+    why: v.optional(v.string()),
     kind: v.union(v.literal("number"), v.literal("tasks")),
     target: v.number(),
     unit: v.optional(v.string()),
@@ -300,6 +301,7 @@ export const update_goal = internalMutation({
     ...writer,
     goalId: v.id("goals"),
     title: v.optional(v.string()),
+    why: nullable(v.string()),
     target: v.optional(v.number()),
     current: v.optional(v.number()),
     unit: nullable(v.string()),

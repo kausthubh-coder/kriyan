@@ -126,6 +126,8 @@ export default defineSchema({
   goals: defineTable({
     ownerId: v.string(),
     title: v.string(),
+    /** Why it matters, in the person's words ("Keeps the scholarship open"), shown under the title. */
+    why: v.optional(v.string()),
     spaceId: v.optional(v.id("spaces")),
     /** "number": track a value (km, pages); "tasks": count linked tasks done. */
     kind: v.union(v.literal("number"), v.literal("tasks")),

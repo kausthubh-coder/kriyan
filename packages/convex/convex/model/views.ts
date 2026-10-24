@@ -314,7 +314,12 @@ export async function goalsList(ctx: QueryCtx, ownerId: string, today: CivilDate
     .query("goals")
     .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
     .take(200);
-  return goals.filter((g) => g.archivedAt === undefined).map((g) => goalView(g, today));
+  return await goalViews(
+    ctx,
+    ownerId,
+    goals.filter((g) => g.archivedAt === undefined),
+    today,
+  );
 }
 
 /** Deleted tasks, newest first. They stay until maintenance.emptyTrash removes them after 30 days. */
@@ -412,7 +417,7 @@ export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spa
     next: dated.map((t) => view(t, map)),
     later: tasks.filter((t) => !t.date).map((t) => view(t, map)),
     children: childCounts,
-    goals: goals.map((g) => goalView(g, today)),
+    goals: await goalViews(ctx, ownerId, goals, today),
     stats: {
       open: tasks.length,
       doneThisMonth: mine.filter((c) => c.doneOn >= monthStart).length,
@@ -433,6 +438,7 @@ export function goalView(g: Doc<"goals">, today: CivilDate) {
   return {
     _id: g._id,
     title: g.title,
+    why: g.why ?? null,
     kind: g.kind,
     target: g.target,
     current: g.current,
@@ -443,6 +449,31 @@ export function goalView(g: Doc<"goals">, today: CivilDate) {
     /** Where you'd be today at a steady pace, 0 to 1; null without a due date or in its first days. */
     pace,
   };
+}
+
+/**
+ * Goals as Progress, a space and the task editor show them, each with its next step: the soonest open
+ * task linked to it (by date, then time; undated ones after), or null when none is.
+ */
+async function goalViews(ctx: QueryCtx, ownerId: string, goals: Doc<"goals">[], today: CivilDate) {
+  if (goals.length === 0) return [];
+  const open = await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
+      q.eq("ownerId", ownerId).eq("deletedAt", undefined).eq("doneAt", undefined),
+    )
+    .take(LIMIT * 4);
+  const linked = open
+    .filter((t) => t.goalId !== undefined && t.proposedBy === undefined)
+    .sort(
+      (a, b) =>
+        (a.date ?? "9999").localeCompare(b.date ?? "9999") ||
+        (a.time ?? 1e9) - (b.time ?? 1e9) ||
+        a._creationTime - b._creationTime,
+    );
+  const next = new Map<string, { _id: Id<"tasks">; title: string }>();
+  for (const t of linked) if (!next.has(t.goalId!)) next.set(t.goalId!, { _id: t._id, title: t.title });
+  return goals.map((g) => ({ ...goalView(g, today), next: next.get(g._id) ?? null }));
 }
 
 export async function progressView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
@@ -502,7 +533,7 @@ export async function progressView(ctx: QueryCtx, ownerId: string, today: CivilD
         minutes,
       }))
       .sort((a, b) => b.minutes - a.minutes),
-    goals: goals.map((g) => goalView(g, today)),
+    goals: await goalViews(ctx, ownerId, goals, today),
     habits: habits.map((h) => ({
       ...h,
       days: Array.from({ length: 182 }, (_, i) => {

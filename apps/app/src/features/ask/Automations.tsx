@@ -10,8 +10,7 @@ import { zonedParts, type CivilDate } from "@kriyan/core/dates";
 import { formatDay, formatTime } from "@kriyan/core/format";
 import type { ActionView } from "@/data/views";
 import { SectionLabel } from "@/features/progress/SectionLabel";
-import { r, s, sz } from "@/theme/tokens";
-import { Button } from "@/ui/Button";
+import { family, r, s, sz } from "@/theme/tokens";
 import { Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
@@ -61,9 +60,7 @@ export function Automations({
           );
         })
       )}
-      <View style={{ alignItems: "flex-start", marginLeft: -s.s3, marginTop: s.s2 }}>
-        <Button icon={Plus} label="Connect an agent" onPress={openAgentSettings} />
-      </View>
+      <AddLine label="Connect an agent" onPress={openAgentSettings} />
     </View>
   );
 }
@@ -107,7 +104,7 @@ function RunItem({
       >
         <Initial name={run.agent} size={AVATAR} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt variant="label" numberOfLines={2}>
+          <Txt variant="label" numberOfLines={2} style={family("600")}>
             {`${run.agent} · ${summary}`}
           </Txt>
           <Txt variant="meta" tone="ink3" tnum>
@@ -129,5 +126,41 @@ function RunItem({
         </View>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * The one way forward from Automations (b2.html `.addline`): a blue line with a plus, like a
+ * link, since it leaves for Settings rather than changing anything here.
+ */
+function AddLine({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Press
+      role="link"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hoverBg={null}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        gap: s.s2,
+        minHeight: sz.touch,
+        marginTop: s.s1,
+      }}
+    >
+      {({ hovered }) => (
+        <>
+          <Icon icon={Plus} size={18} tone="parse" />
+          <Txt
+            variant="label"
+            tone="parse"
+            style={[family("600"), hovered ? { textDecorationLine: "underline" } : null]}
+          >
+            {label}
+          </Txt>
+        </>
+      )}
+    </Press>
   );
 }

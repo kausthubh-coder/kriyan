@@ -9,6 +9,7 @@ import { formatDate } from "@kriyan/core/format";
 import type { ProgressView } from "@/data/views";
 import { errorText } from "@/features/tasks/actions";
 import { DayPicker } from "@/features/tasks/pickers";
+import { useIsPhone } from "@/theme/layout";
 import { c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Chip, Field } from "@/ui/bits";
@@ -73,8 +74,10 @@ export function GoalView({
   week?: { focused: number; planned: number };
 }) {
   const update = useMutation(api.organize.updateGoal);
+  const phone = useIsPhone();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(String(goal.current));
+  const [why, setWhy] = useState(goal.why ?? "");
   const ref = useRef<View>(null);
   const unit = goal.kind === "tasks" ? (goal.target === 1 ? "task" : "tasks") : (goal.unit ?? "");
   const of = `${goal.current} of ${goal.target}${unit ? ` ${unit}` : ""}`;
@@ -91,12 +94,25 @@ export function GoalView({
         ref={ref}
         role="button"
         accessibilityLabel={`${goal.title}, ${of}. Update progress`}
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          // Start from what's saved now, which an agent may have changed since the last edit.
+          setValue(String(goal.current));
+          setWhy(goal.why ?? "");
+          setOpen(true);
+        }}
         hoverBg={null}
         scale={false}
         style={{ gap: s.s2, paddingVertical: s.s4 }}
       >
-        <Txt variant="subhead">{goal.title}</Txt>
+        <View>
+          <Txt variant="subhead">{goal.title}</Txt>
+          {/* Why it matters, quieter than the title (b2.html `.goal .why`): 14 on both sizes. */}
+          {goal.why ? (
+            <Txt variant={phone ? "meta" : "body"} tone="ink3">
+              {goal.why}
+            </Txt>
+          ) : null}
+        </View>
         {segments ? (
           <View style={{ flexDirection: "row", gap: s.s1 }} aria-hidden>
             {Array.from({ length: segments }, (_, k) => (
@@ -150,6 +166,12 @@ export function GoalView({
             </Txt>
           ) : null}
         </View>
+        {/* The soonest open task linked to it (b2.html `.goal .next`). */}
+        {goal.next && left > 0 ? (
+          <Txt variant={phone ? "meta" : "body"} tone="ink2" numberOfLines={2}>
+            Next: {goal.next.title}
+          </Txt>
+        ) : null}
         {pace ? (
           <Txt variant="meta" tone="ink2">
             {pace}
@@ -158,8 +180,8 @@ export function GoalView({
         {week && (week.focused > 0 || week.planned > 0) ? <WeekTime {...week} color={color} /> : null}
       </Press>
       <Popover open={open} onClose={() => setOpen(false)} anchor={ref} title={goal.title} width={300}>
-        {goal.kind === "number" ? (
-          <View style={{ gap: s.s3 }}>
+        <View style={{ gap: s.s3 }}>
+          {goal.kind === "number" ? (
             <Field
               label={`Progress${goal.unit ? ` in ${goal.unit}` : ""}`}
               value={value}
@@ -167,23 +189,35 @@ export function GoalView({
               keyboardType="decimal-pad"
               autoFocus
             />
-            <Button
-              variant="primary"
-              label="Save progress"
-              disabled={!(Number(value) >= 0)}
-              onPress={() => {
-                setOpen(false);
-                void update({ id: goal._id, current: Number(value) }).catch((e: unknown) =>
-                  showToast(errorText(e)),
-                );
-              }}
-            />
-          </View>
-        ) : (
-          <Txt variant="body" tone="ink3">
-            This goal counts linked tasks as you finish them. Link a task from its Goal field.
-          </Txt>
-        )}
+          ) : (
+            <Txt variant="body" tone="ink3">
+              This goal counts linked tasks as you finish them. Link a task from its Goal field.
+            </Txt>
+          )}
+          <Field
+            label="Why it matters (optional)"
+            value={why}
+            onChangeText={setWhy}
+            placeholder="Keeps the scholarship open"
+            maxLength={300}
+          />
+          <Button
+            variant="primary"
+            label="Save goal"
+            disabled={
+              (goal.kind === "number" && !(Number(value) >= 0)) ||
+              (why.trim() === (goal.why ?? "") && (goal.kind !== "number" || Number(value) === goal.current))
+            }
+            onPress={() => {
+              setOpen(false);
+              void update({
+                id: goal._id,
+                ...(goal.kind === "number" ? { current: Number(value) } : {}),
+                ...(why.trim() !== (goal.why ?? "") ? { why: why.trim() || null } : {}),
+              }).catch((e: unknown) => showToast(errorText(e)));
+            }}
+          />
+        </View>
         <Button
           variant="quiet"
           label="Archive goal"
@@ -230,6 +264,7 @@ function WeekTime({ focused, planned, color }: { focused: number; planned: numbe
 export function AddGoal({ today, onDone }: { today: string; onDone: () => void }) {
   const add = useMutation(api.organize.addGoal);
   const [title, setTitle] = useState("");
+  const [why, setWhy] = useState("");
   const [kind, setKind] = useState<"tasks" | "number">("tasks");
   const [target, setTarget] = useState("");
   const [unit, setUnit] = useState("");
@@ -244,6 +279,13 @@ export function AddGoal({ today, onDone }: { today: string; onDone: () => void }
         onChangeText={setTitle}
         placeholder="Run 100 km this term"
         autoFocus
+      />
+      <Field
+        label="Why it matters (optional)"
+        value={why}
+        onChangeText={setWhy}
+        placeholder="Training for the half marathon in March"
+        maxLength={300}
       />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
         <Chip label="Count tasks done" on={kind === "tasks"} onPress={() => setKind("tasks")} />
@@ -292,6 +334,7 @@ export function AddGoal({ today, onDone }: { today: string; onDone: () => void }
           onPress={() =>
             void add({
               title: title.trim(),
+              ...(why.trim() ? { why: why.trim() } : {}),
               kind,
               target: Number(target),
               ...(kind === "number" && unit.trim() ? { unit: unit.trim() } : {}),
