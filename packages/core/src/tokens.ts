@@ -170,9 +170,12 @@ export interface TypeRole {
   tracking: number;
 }
 
-/** Six sizes: 12, 14, 16, 20, 28, 40. Phones use `phoneType`, where body grows to 16. */
+/**
+ * Six sizes: 12, 14, 16, 20, 28, 40, and one figure size, 80. Phones use `phoneType`, where body
+ * grows to 16.
+ */
 export const type: Record<
-  "caption" | "meta" | "body" | "label" | "subhead" | "title" | "headline" | "display",
+  "caption" | "meta" | "body" | "label" | "subhead" | "title" | "headline" | "display" | "figure",
   TypeRole
 > = {
   caption: { size: 12, line: 16, weight: "500", tracking: 0 },
@@ -183,6 +186,9 @@ export const type: Record<
   title: { size: 20, line: 28, weight: "600", tracking: -0.01 },
   headline: { size: 28, line: 32, weight: "600", tracking: -0.02 },
   display: { size: 40, line: 44, weight: "600", tracking: -0.03 },
+  // The one number a screen is about, larger than any heading (B2 onboarding's free hours, 84px
+  // in the mockup). Twice display, so it stays on the scale's rhythm. Not for words.
+  figure: { size: 80, line: 80, weight: "600", tracking: -0.05 },
 };
 
 export const phoneType: typeof type = {

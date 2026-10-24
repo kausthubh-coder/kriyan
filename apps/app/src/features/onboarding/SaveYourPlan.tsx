@@ -4,10 +4,11 @@
 // the current time and nothing else.
 
 import { useRef, useState } from "react";
-import { Linking, Platform, TextInput, View } from "react-native";
+import { Platform, TextInput, View } from "react-native";
 import { ArrowRight, CircleAlert } from "lucide-react-native";
 import type { CivilDate } from "@kriyan/core/dates";
 import { GoogleMark } from "@/features/auth/GoogleMark";
+import { Legal } from "@/features/auth/Legal";
 import { useCodeSignIn } from "@/features/auth/useCodeSignIn";
 import { useType } from "@/theme/layout";
 import { c, family, hex, r, s } from "@/theme/tokens";
@@ -19,7 +20,6 @@ import type { Draft } from "./draft";
 import { Lead, LinkButton, Question, StepFrame } from "./Frame";
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const SITE = "https://kriyan.app";
 
 export function SaveYourPlan({ d, today, back }: { d: Draft; today: CivilDate; back: () => void }) {
   const auth = useCodeSignIn();
@@ -200,17 +200,7 @@ export function SaveYourPlan({ d, today, back }: { d: Draft; today: CivilDate; b
       </View>
       {errorLine}
       <View style={{ flex: 1, minHeight: s.s8 }} />
-      <Txt variant="meta" tone="ink3" style={{ textAlign: "center" }}>
-        By continuing you agree to the{" "}
-        <Txt variant="meta" tone="ink2" role="link" onPress={() => void Linking.openURL(`${SITE}/terms`)}>
-          Terms
-        </Txt>{" "}
-        and{" "}
-        <Txt variant="meta" tone="ink2" role="link" onPress={() => void Linking.openURL(`${SITE}/privacy`)}>
-          Privacy policy
-        </Txt>
-        .
-      </Txt>
+      <Legal />
       {Platform.OS === "web" ? <View nativeID="clerk-captcha" /> : null}
     </StepFrame>
   );

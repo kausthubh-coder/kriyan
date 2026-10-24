@@ -1,6 +1,6 @@
-// "Allow reminders on this device" for the web app and the iPhone Home Screen app. The only
-// place the web asks for notification permission. Shows nothing when the server has no VAPID
-// keys (it couldn't send) or the browser has no Web Push.
+// "Allow reminders on this device" for the web app and the iPhone Home Screen app: Settings' row
+// and onboarding's step 7, the only places the web asks for notification permission. Neither
+// shows when the server has no VAPID keys (it couldn't send) or the browser has no Web Push.
 
 import { useEffect, useState, type ReactNode } from "react";
 import { View } from "react-native";
@@ -12,15 +12,19 @@ import { c, r, s } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
+import type { ReminderState, WebReminders } from "./AllowReminders";
 import { allowReminders, isSubscribed, stopReminders, syncReminders, webPushSupport } from "./register.web";
 
-type State = "checking" | "off" | "on" | "blocked" | "busy";
-
-export function AllowReminders() {
+/**
+ * Whether this browser can get reminders, and the one way to turn them on. `available` is
+ * undefined while the server's key loads, false without Web Push here or keys on the server.
+ * Onboarding's step 7 and Settings both use it.
+ */
+export function useWebReminders(): WebReminders {
   const authed = useConvexAuth().isAuthenticated;
   const key = useQuery(api.account.webPushKey, authed ? {} : "skip");
   const support = webPushSupport();
-  const [state, setState] = useState<State>("checking");
+  const [state, setState] = useState<ReminderState>("checking");
 
   useEffect(() => {
     if (!key || support !== "supported") return;
@@ -36,16 +40,8 @@ export function AllowReminders() {
     };
   }, [key, support]);
 
-  if (!key || support === "unsupported") return null;
-  if (support === "add-to-home-screen")
-    return (
-      <Shell
-        title="Reminders on this iPhone"
-        hint="Add Kriyan to your Home Screen (Share, then Add to Home Screen), open it from there, and allow reminders in its Settings."
-      />
-    );
-
   const allow = () => {
+    if (!key) return;
     setState("busy");
     // Straight from the click: Safari asks only when the request follows a tap.
     void allowReminders(key)
@@ -62,6 +58,27 @@ export function AllowReminders() {
     setState("busy");
     void stopReminders().finally(() => setState("off"));
   };
+
+  return {
+    available: support !== "supported" || key === null ? false : key === undefined ? undefined : true,
+    needsHomeScreen: support === "add-to-home-screen" && Boolean(key),
+    state,
+    allow,
+    stop,
+  };
+}
+
+export function AllowReminders() {
+  const { available, needsHomeScreen, state, allow, stop } = useWebReminders();
+
+  if (needsHomeScreen)
+    return (
+      <Shell
+        title="Reminders on this iPhone"
+        hint="Add Kriyan to your Home Screen (Share, then Add to Home Screen), open it from there, and allow reminders in its Settings."
+      />
+    );
+  if (!available) return null;
 
   return (
     <Shell

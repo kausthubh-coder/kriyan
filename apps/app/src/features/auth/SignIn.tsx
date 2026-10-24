@@ -3,7 +3,7 @@
 // Errors say what happened and what to do, and go as soon as the input changes.
 
 import { useRef, useState } from "react";
-import { Linking, Platform, ScrollView, View, type TextInput } from "react-native";
+import { Platform, ScrollView, View, type TextInput } from "react-native";
 import { useSignIn, useSignUp } from "@clerk/expo";
 import { CircleAlert, Lock, Mail } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,11 +16,11 @@ import { Mark } from "@/ui/Mark";
 import { Txt } from "@/ui/Txt";
 import { clerkMessage as message } from "./clerkMessage";
 import { GoogleMark } from "./GoogleMark";
+import { Legal } from "./Legal";
 import { useCodeSignIn } from "./useCodeSignIn";
 
 type Mode = "sign-in" | "sign-up";
 type Method = "code" | "password";
-const SITE = "https://kriyan.app";
 type Step = "form" | "code";
 
 export function SignIn() {
@@ -299,24 +299,7 @@ export function SignIn() {
             />
           </View>
         ) : null}
-        {step === "form" ? (
-          <Txt variant="meta" tone="ink3" style={{ textAlign: "center" }}>
-            By continuing you agree to the{" "}
-            <Txt variant="meta" tone="ink2" role="link" onPress={() => void Linking.openURL(`${SITE}/terms`)}>
-              Terms
-            </Txt>{" "}
-            and{" "}
-            <Txt
-              variant="meta"
-              tone="ink2"
-              role="link"
-              onPress={() => void Linking.openURL(`${SITE}/privacy`)}
-            >
-              Privacy policy
-            </Txt>
-            .
-          </Txt>
-        ) : null}
+        {step === "form" ? <Legal /> : null}
         {Platform.OS === "web" ? <View nativeID="clerk-captcha" /> : null}
       </View>
     </ScrollView>

@@ -9,7 +9,9 @@ import Head from "expo-router/head";
 import { Redirect, router } from "expo-router";
 import { useAuth, useUser } from "@clerk/expo";
 import { useClock } from "@/data/time";
+import { useWebReminders } from "@/features/notifications/AllowReminders";
 import { c, s } from "@/theme/tokens";
+import { LightStatusBar } from "@/ui/statusBar";
 import { ConnectAI, GetStarted, Step7 } from "./AfterSignIn";
 import { FirstTask, Helps, Hours, TheMath, Welcome, weekMath } from "./BeforeSignIn";
 import { LivePreview } from "./Day";
@@ -28,7 +30,8 @@ export function OnboardingScreen() {
   const { today } = useClock();
   const { width } = useWindowDimensions();
   const desktop = Platform.OS === "web" && width >= DESKTOP_MIN_WIDTH;
-  const step7 = hasStep7();
+  const reminders = useWebReminders();
+  const step7 = hasStep7(reminders.available);
   const [copied, setCopied] = useState({ claude: false, codex: false });
   // Signed in and not mid-way: there's nothing to set up here.
   const [nothingToDo] = useState(() => Boolean(isSignedIn) && !inProgress());
@@ -40,6 +43,8 @@ export function OnboardingScreen() {
     // through goes back to signing in.
     if (isSignedIn && d.step <= 6) updateDraft({ step: step7 ? 7 : 8 });
     if (!isSignedIn && d.step >= 7) updateDraft({ step: 6 });
+    // On step 7 in a browser that turned out unable to send reminders: there's nothing to ask.
+    if (isSignedIn && d.step === 7 && !step7) updateDraft({ step: 8 });
   }, [isSignedIn, d.step, step7, nothingToDo]);
 
   if (nothingToDo) return <Redirect href="/today" />;
@@ -74,7 +79,7 @@ export function OnboardingScreen() {
       body = <SaveYourPlan d={d} today={today} back={back} />;
       break;
     case 7:
-      body = step7 ? <Step7 d={d} today={today} next={next} /> : null;
+      body = step7 ? <Step7 d={d} today={today} next={next} reminders={reminders} /> : null;
       break;
     case 8:
       body = (
@@ -114,6 +119,8 @@ export function OnboardingScreen() {
           <title>Welcome | Kriyan</title>
         </Head>
       ) : null}
+      {/* Light status bar icons over the black welcome and the black head of the last step. */}
+      <LightStatusBar enabled={!desktop && (d.step === 1 || d.step === 9)} />
       {desktop ? (
         <View
           style={{
@@ -126,7 +133,13 @@ export function OnboardingScreen() {
           }}
         >
           <DesktopCard.Provider value>{body}</DesktopCard.Provider>
-          {d.step === 1 || d.step === 9 ? null : <LivePreview d={d} today={today} note={note} />}
+          {/* The last step keeps the preview too, so its card stays where the others were. */}
+          {/* 64 + 8: the prototype's 72 between the card and the preview, from scale steps. */}
+          {d.step === 1 ? null : (
+            <View style={{ marginLeft: s.s2 }}>
+              <LivePreview d={d} today={today} note={note} />
+            </View>
+          )}
         </View>
       ) : (
         body

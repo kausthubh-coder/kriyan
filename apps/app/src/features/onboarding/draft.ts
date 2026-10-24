@@ -97,11 +97,14 @@ export function standalone(): boolean {
 }
 
 /**
- * The steps this person sees after signing in. Step 7 is Add to Home Screen on an iPhone in
- * Safari, or reminders in the Android app; the web app has no reminders of its own, so other
- * browsers skip it.
+ * Whether this person gets step 7 after signing in: Add to Home Screen on an iPhone in Safari,
+ * reminders in the Android app, and reminders through Web Push in a browser that has it (an
+ * iPhone once opened from the Home Screen). `webReminders` is useWebReminders().available:
+ * while it loads the step counts, so a browser that can't is moved on from step 7 itself.
  */
-export function hasStep7(): boolean {
+export function hasStep7(webReminders: boolean | undefined): boolean {
   const where = surface();
-  return where === "android" || (where === "iphone" && !standalone());
+  if (where === "android") return true;
+  if (where === "iphone" && !standalone()) return true;
+  return webReminders !== false;
 }

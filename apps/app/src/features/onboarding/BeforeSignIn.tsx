@@ -15,6 +15,7 @@ import {
   Repeat2,
   Bell,
   Sparkles,
+  Square,
   Sun,
   Target,
   Timer,
@@ -23,9 +24,10 @@ import {
 import { diffDays, formatClock, parts, type CivilDate } from "@kriyan/core/dates";
 import { describeReminder, describeRepeat, formatDay, formatDuration } from "@kriyan/core/format";
 import { parseTask, type ParsedTask } from "@kriyan/core/parse";
+import { type } from "@kriyan/core/tokens";
 import { playSound } from "@/features/feel/sound";
 import { commitHaptic, toggleHaptic } from "@/features/tasks/haptics";
-import { useType } from "@/theme/layout";
+import { roleStyle, useType } from "@/theme/layout";
 import { c, family, hex, r, s } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Icon } from "@/ui/Icon";
@@ -43,10 +45,28 @@ export interface StepProps {
   back: () => void;
 }
 
+/** An icon set in a line of text, like the Today sentence's (`.greet svg.i`). */
+function InlineIcon({ icon }: { icon: LucideIcon }) {
+  return (
+    <View
+      style={[
+        { marginRight: s.s1, transform: [{ translateY: 2 }] },
+        // A View is a block on the web; inside a sentence it has to flow like a word.
+        Platform.OS === "web" ? ({ display: "inline-flex" } as object) : null,
+      ]}
+    >
+      <Icon icon={icon} size={20} strokeWidth={1.9} tone="headInk" />
+    </View>
+  );
+}
+
+/** An icon and its words wrap as one (the calendar with "3 events,"), like the prototype's `.nw`. */
+const keep = Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as object) : undefined;
+
 /** Step 1: the product itself, a day told in one sentence. No feature tour. */
 export function Welcome({ today, next, signIn }: { today: CivilDate; next: () => void; signIn: () => void }) {
   const dim = (t: string) => (
-    <Txt variant="title" tone="headDim">
+    <Txt variant="headline" tone="headDim">
       {t}
     </Txt>
   );
@@ -69,8 +89,19 @@ export function Welcome({ today, next, signIn }: { today: CivilDate; next: () =>
       </View>
       <View style={{ marginTop: s.s8, gap: s.s6 }}>
         <DayName today={today} big />
-        <Txt variant="title" tone="headInk" aria-label="An example day">
-          {dim("Good morning. You have ")}3 events, 6 tasks{dim(" and ")}2 habits{dim(" today. You're ")}
+        <Txt variant="headline" tone="headInk" aria-label="An example day">
+          {dim("Good morning. You have ")}
+          <Txt variant="headline" tone="headInk" style={keep}>
+            <InlineIcon icon={CalendarDays} />3 events,
+          </Txt>{" "}
+          <Txt variant="headline" tone="headInk" style={keep}>
+            <InlineIcon icon={Square} />6 tasks
+          </Txt>
+          {dim(" and ")}
+          <Txt variant="headline" tone="headInk" style={keep}>
+            <InlineIcon icon={Repeat2} />2 habits
+          </Txt>
+          {dim(" today. You're ")}
           mostly free{dim(" after 18:00.")}
         </Txt>
       </View>
@@ -81,7 +112,8 @@ export function Welcome({ today, next, signIn }: { today: CivilDate; next: () =>
           in one sentence.
         </Txt>
       </Txt>
-      <Txt variant="body" tone="headDim" style={{ marginTop: s.s3 }}>
+      {/* The extra 12 below matches the prototype's gap before the buttons (`.foot` margin 28). */}
+      <Txt variant="body" tone="headDim" style={{ marginTop: s.s3, marginBottom: s.s3 }}>
         Tasks, events and habits on one calm timeline. Set up takes about a minute.
       </Txt>
     </StepFrame>
@@ -103,7 +135,7 @@ export function Helps({ d, next, back }: StepProps) {
     <StepFrame step={2} onBack={back} onSkip={next} foot={<FullButton label="Continue" onPress={next} />}>
       <Question text="What should Kriyan help with?" />
       <Lead>Pick any. It changes what you see first, nothing else.</Lead>
-      <View role="group" aria-label="What Kriyan should help with" style={{ gap: s.s2, marginTop: s.s6 }}>
+      <View role="group" aria-label="What Kriyan should help with" style={{ gap: s.s3, marginTop: s.s6 }}>
         {HELPS.map(([key, icon, title, sub]) => {
           const on = d.helps.includes(key);
           return (
@@ -121,20 +153,21 @@ export function Helps({ d, next, back }: StepProps) {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: s.s3,
-                minHeight: 64,
+                minHeight: 60,
                 paddingVertical: s.s2,
                 paddingHorizontal: s.s3,
                 borderRadius: r.card,
                 backgroundColor: on ? c.raised : c.sunken,
-                boxShadow: `inset 0 0 0 ${on ? 2 : 1}px ${on ? c.ink : "transparent"}`,
+                boxShadow: `inset 0 0 0 1.5px ${on ? c.ink : "transparent"}`,
               }}
             >
+              {/* The same white tile either way: picked, it melts into the white row (`.opt .ic`). */}
               <View
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: r.ctl,
-                  backgroundColor: on ? c.sunken : c.raised,
+                  borderRadius: r.card,
+                  backgroundColor: c.raised,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -212,11 +245,10 @@ export function Hours({ d, next, back }: StepProps) {
           backgroundColor: c.sunken,
         }}
       >
+        {/* The desktop sizes on phones too: a compact card under the wheels (`.stepper .tx`). */}
         <View style={{ flex: 1 }}>
-          <Txt variant="label" style={family("600")}>
-            Classes or work on a weekday
-          </Txt>
-          <Txt variant="meta" tone="ink3">
+          <Txt style={[roleStyle(type.label), family("600")]}>Classes or work on a weekday</Txt>
+          <Txt style={roleStyle(type.meta)} tone="ink3">
             Roughly, hours a day
           </Txt>
         </View>
@@ -267,23 +299,25 @@ export function TheMath({ d, today, next, back }: StepProps) {
   const m = weekMath(d);
   const [year] = parts(today);
   const daysLeft = diffDays(`${year}-12-31`, today) + 1;
+  // Compact rows at the desktop size on phones too (`.bar`): the number above leads, not these.
+  const small = roleStyle(type.body);
   const bar = (label: string, hours: number, free?: boolean) => (
     <View key={label} style={{ gap: s.s1 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: s.s3 }}>
-        <Txt variant="body" tone="ink2">
+        <Txt tone="ink2" style={small}>
           {label}
         </Txt>
-        <Txt variant="body" tnum style={family("600")}>
+        <Txt tnum style={[small, family("600")]}>
           {`${hours}h`}
         </Txt>
       </View>
-      <View style={{ height: 8, borderRadius: 4, backgroundColor: c.hover, overflow: "hidden" }}>
+      <View style={{ height: 10, borderRadius: 5, backgroundColor: c.hover, overflow: "hidden" }}>
         <View
           style={{
             width: `${m.awake ? Math.round((hours / m.awake) * 100) : 0}%`,
             height: "100%",
-            borderRadius: 4,
-            backgroundColor: free ? c.ink : c.lineStrong,
+            borderRadius: 5,
+            backgroundColor: free ? c.ink : c.select,
           }}
         />
       </View>
@@ -298,7 +332,7 @@ export function TheMath({ d, today, next, back }: StepProps) {
     >
       <Question text="Let's do the math." />
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: s.s2, marginTop: s.s6 }}>
-        <Txt variant="display" tnum aria-label={`About ${m.free} free hours this week`}>
+        <Txt variant="figure" tnum aria-label={`About ${m.free} free hours this week`}>
           {m.free}
         </Txt>
         <Txt variant="title">hours</Txt>
@@ -318,16 +352,15 @@ export function TheMath({ d, today, next, back }: StepProps) {
           alignItems: "center",
           gap: s.s3,
           marginTop: s.s6,
-          padding: s.s4,
+          paddingVertical: s.s3,
+          paddingHorizontal: s.s4,
           borderRadius: r.card,
           backgroundColor: c.sunken,
         }}
       >
         <Icon icon={Hourglass} size={20} tone="ink" />
-        <Txt variant="body" tone="ink2" style={{ flex: 1 }}>
-          <Txt variant="body" style={family("600")}>
-            {`${daysLeft} ${daysLeft === 1 ? "day" : "days"}`}
-          </Txt>
+        <Txt tone="ink2" style={[small, { flex: 1 }]}>
+          <Txt style={[small, family("600")]}>{`${daysLeft} ${daysLeft === 1 ? "day" : "days"}`}</Txt>
           {` left in ${year}. A good time to start.`}
         </Txt>
       </View>
@@ -366,12 +399,19 @@ function ParseChip({ icon, label, set }: { icon: LucideIcon; label: string; set:
         height: 32,
         paddingHorizontal: s.s3,
         borderRadius: r.ctl,
-        backgroundColor: set ? c.select : "transparent",
+        overflow: "hidden",
         boxShadow: set ? undefined : `inset 0 0 0 1px ${c.lineStrong}`,
       }}
     >
+      {/* Understood words get a blue-tinted chip (`.chip.set`): the parse blue, faint. */}
+      {set ? (
+        <View
+          aria-hidden
+          style={{ position: "absolute", inset: 0, backgroundColor: c.parse, opacity: 0.1 }}
+        />
+      ) : null}
       <Icon icon={icon} size={14} tone={set ? "parse" : "ink3"} />
-      <Txt variant="label" tone={set ? "parse" : "ink3"}>
+      <Txt tone={set ? "parse" : "ink3"} style={roleStyle(type.label)}>
         {label}
       </Txt>
     </View>
@@ -432,10 +472,17 @@ export function FirstTask({ d, today, next, back }: StepProps) {
     updateDraft({ task: { text: text.trim(), date: today } });
   };
   const big = { ...roles.title, ...family("600") };
-  // On the web the field's own text is see-through over the coloured copy, so the understood
-  // words turn blue in place; the field sits right on the card so the focus ring is the card's.
-  // Android shows the coloured copy under the field instead.
+  // A soft ink edge while typing (`.qa:focus-within`) instead of the page's offset focus outline.
+  const [focused, setFocused] = useState(false);
+  // The understood words turn blue in place, one sentence. On the web the field's own text is
+  // see-through over a coloured copy (a textarea can't colour its words); Android's TextInput
+  // takes the coloured pieces as its children, as quick add does.
   const overlay = Platform.OS === "web";
+  const coloured = pieces(text, parsed).map((p, i) => (
+    <Txt key={i} style={[big, { color: p.understood ? c.parse : c.ink }]}>
+      {p.text}
+    </Txt>
+  ));
   return (
     <StepFrame
       step={5}
@@ -462,28 +509,30 @@ export function FirstTask({ d, today, next, back }: StepProps) {
           <Question text="What's one thing" dim="for today?" />
           <Lead>{"Type it like you'd say it. Add a time if it has one."}</Lead>
           <View
-            style={{
-              marginTop: s.s6,
-              paddingHorizontal: s.s4,
-              paddingVertical: s.s3,
-              borderRadius: r.sheet,
-              backgroundColor: c.sunken,
-            }}
+            style={[
+              {
+                marginTop: s.s6,
+                paddingHorizontal: s.s4,
+                paddingVertical: s.s3,
+                borderRadius: r.sheet,
+                backgroundColor: c.sunken,
+                boxShadow: focused ? `inset 0 0 0 1.5px ${c.ink}` : undefined,
+              },
+              overlay ? ({ outlineStyle: "none" } as object) : null,
+            ]}
           >
             {overlay ? (
               <Txt aria-hidden style={[big, { color: c.ink, minHeight: 56 }]}>
-                {pieces(text, parsed).map((p, i) => (
-                  <Txt key={i} style={[big, { color: p.understood ? c.parse : c.ink }]}>
-                    {p.text}
-                  </Txt>
-                ))}
+                {coloured}
                 {"​"}
               </Txt>
             ) : null}
             <TextInput
-              value={text}
+              {...(overlay ? { value: text } : null)}
               onChangeText={setText}
               onSubmitEditing={add}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               submitBehavior="submit"
               returnKeyType="done"
               multiline
@@ -517,26 +566,12 @@ export function FirstTask({ d, today, next, back }: StepProps) {
                     } as object)
                   : { color: c.ink },
               ]}
-            />
+            >
+              {overlay ? null : coloured}
+            </TextInput>
           </View>
           {text.trim() ? (
-            <>
-              {overlay ? null : (
-                <Txt
-                  variant="body"
-                  tone="ink3"
-                  style={{ marginTop: s.s2 }}
-                  accessibilityLabel={`Understood: ${parsed.title}`}
-                >
-                  {pieces(text, parsed).map((p, i) => (
-                    <Txt key={i} variant="body" tone={p.understood ? "parse" : "ink3"}>
-                      {p.text}
-                    </Txt>
-                  ))}
-                </Txt>
-              )}
-              <ParseChips parsed={parsed} today={today} />
-            </>
+            <ParseChips parsed={parsed} today={today} />
           ) : (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: s.s4 }}>
               {SUGGESTIONS.map((sug) => (
@@ -553,7 +588,7 @@ export function FirstTask({ d, today, next, back }: StepProps) {
                     boxShadow: `inset 0 0 0 1px ${c.lineStrong}`,
                   }}
                 >
-                  <Txt variant="label" tone="ink2">
+                  <Txt tone="ink2" style={roleStyle(type.label)}>
                     {sug.replace(/ (for|remind|every) .*/, "")}
                   </Txt>
                 </Press>

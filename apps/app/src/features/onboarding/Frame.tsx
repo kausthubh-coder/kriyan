@@ -3,7 +3,7 @@
 // fills the screen; on desktop it is a card beside the live preview of the day.
 
 import { createContext, useContext, type ReactNode } from "react";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { ChevronLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { c, family, r, s, shadows } from "@/theme/tokens";
@@ -125,10 +125,13 @@ function TopBar({ step, onBack, onSkip }: { step: number; onBack?: () => void; o
   );
 }
 
+/** Balanced lines on the web ("What should / Kriyan help with?"), not a lonely last word. */
+const balance = Platform.OS === "web" ? ({ textWrap: "balance" } as object) : null;
+
 /** The step's question: two tones, like the Today sentence (`.q` and `.q .d`). */
 export function Question({ text, dim }: { text: string; dim?: string }) {
   return (
-    <Txt variant="headline" heading={1} style={{ marginTop: s.s4 }}>
+    <Txt variant="headline" heading={1} style={[{ marginTop: s.s4 }, balance]}>
       {text}
       {dim ? <Txt variant="headline" tone="ink3">{` ${dim}`}</Txt> : null}
     </Txt>
@@ -213,7 +216,7 @@ export function StepFrame({
         <View
           style={{
             gap: s.s1,
-            paddingTop: s.s2,
+            paddingTop: s.s4,
             paddingHorizontal: pad,
             paddingBottom: card ? s.s6 : insets.bottom + s.s4,
             backgroundColor: dark ? c.head : c.raised,

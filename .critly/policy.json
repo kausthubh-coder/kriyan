@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@kausthubh/critly/policy.schema.json",
   "fonts": ["Inter"],
-  "typeScale": [12, 14, 16, 20, 28, 40],
+  "typeScale": [12, 14, 16, 20, 28, 40, 80],
   "spacing": [4, 8, 12, 16, 24, 32, 48, 64],
   "schemes": {
     "light": {},

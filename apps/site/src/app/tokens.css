@@ -49,6 +49,7 @@
   --title: 600 20px/28px var(--font);
   --headline: 600 28px/32px var(--font);
   --display: 600 40px/44px var(--font);
+  --figure: 600 80px/80px var(--font);
   --tracking-caption: 0;
   --tracking-meta: 0;
   --tracking-body: 0;
@@ -57,6 +58,7 @@
   --tracking-title: -0.01em;
   --tracking-headline: -0.02em;
   --tracking-display: -0.03em;
+  --tracking-figure: -0.05em;
   --s1: 4px;
   --s2: 8px;
   --s3: 12px;

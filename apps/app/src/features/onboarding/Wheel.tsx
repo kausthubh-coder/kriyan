@@ -3,9 +3,11 @@
 // a screen reader.
 
 import { useEffect, useRef } from "react";
-import { ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Platform, ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import type { LucideIcon } from "lucide-react-native";
 import { formatClock } from "@kriyan/core/dates";
+import { type } from "@kriyan/core/tokens";
+import { roleStyle } from "@/theme/layout";
 import { c, family, r, s } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
@@ -15,6 +17,19 @@ const ITEM = 44;
 const HEIGHT = 220;
 /** Room above the first time and below the last, so either can sit in the middle band. */
 const PAD = (HEIGHT - ITEM) / 2;
+
+/**
+ * The wheel's depth: the times two rows from the band fade into the card (`.wheel` mask). On the
+ * web a mask follows the scroll; Android dims each time by its distance from the chosen one.
+ */
+const fade =
+  Platform.OS === "web"
+    ? ({
+        maskImage: "linear-gradient(transparent, black 30%, black 70%, transparent)",
+        WebkitMaskImage: "linear-gradient(transparent, black 30%, black 70%, transparent)",
+      } as object)
+    : null;
+const dim = (distance: number) => (Platform.OS === "web" || distance < 2 ? 1 : 0.35);
 
 export function Wheel({
   label,
@@ -52,10 +67,19 @@ export function Wheel({
   };
 
   return (
-    <View style={{ flex: 1, minWidth: 0, backgroundColor: c.sunken, borderRadius: r.sheet, padding: s.s3 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingHorizontal: s.s2 }}>
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        backgroundColor: c.sunken,
+        borderRadius: r.sheet,
+        padding: s.s3,
+        paddingBottom: s.s2,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingHorizontal: s.s1 }}>
         <Icon icon={icon} size={16} tone="ink2" />
-        <Txt variant="label" tone="ink2" style={family("600")}>
+        <Txt tone="ink2" style={[roleStyle(type.caption), family("600")]}>
           {label}
         </Txt>
       </View>
@@ -78,6 +102,7 @@ export function Wheel({
           role="radiogroup"
           aria-label={label}
           showsVerticalScrollIndicator={false}
+          style={fade}
           snapToInterval={ITEM}
           decelerationRate="fast"
           onScroll={onScroll}
@@ -99,10 +124,15 @@ export function Wheel({
                 }}
                 hoverBg={null}
                 scale={false}
-                style={{ height: ITEM, alignItems: "center", justifyContent: "center" }}
+                style={{
+                  height: ITEM,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: dim(Math.abs(i - index)),
+                }}
               >
                 <Txt
-                  variant={on ? "title" : "subhead"}
+                  variant={on ? "headline" : "title"}
                   tone={on ? "ink" : "ink3"}
                   tnum
                   style={on ? undefined : family("500")}

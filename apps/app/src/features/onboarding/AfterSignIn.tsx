@@ -1,8 +1,8 @@
 // Steps 7 to 9 of onboarding.html, once signed in: on an iPhone in Safari, Add to Home Screen;
-// in the Android app, reminders and sounds; then bringing in your AI; then three small next
-// steps and your day.
+// in the Android app, reminders and sounds; in a browser with Web Push, reminders; then bringing
+// in your AI; then three small next steps and your day.
 
-import { useState, type ReactNode } from "react";
+import { useContext, useEffect, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
@@ -21,24 +21,26 @@ import {
   Volume2,
   type LucideIcon,
 } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@kriyan/convex/api";
 import { addDays, formatClock, startOfWeek, type CivilDate } from "@kriyan/core/dates";
 import { formatDuration } from "@kriyan/core/format";
 import { useAccessTokens, useProfile, useWeekView } from "@/data/views";
 import { hapticsOn, setHapticsOn, setSoundsOn } from "@/features/feel/setting";
 import { playSound } from "@/features/feel/sound";
+import type { WebReminders } from "@/features/notifications/AllowReminders";
 import { ensureNotifications } from "@/features/notifications/register";
 import { MCP_URL } from "@/features/settings/SettingsScreen";
 import { errorText } from "@/features/tasks/actions";
 import { commitHaptic, toggleHaptic } from "@/features/tasks/haptics";
-import { c, family, r, s, shadows } from "@/theme/tokens";
+import { c, family, r, s, shadows, spaceTone } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 import { DayName, DayRows, firstTask, PersonalSentence } from "./Day";
-import { surface, type Draft } from "./draft";
-import { FullButton, Lead, LinkButton, MiniLabel, Question, StepFrame } from "./Frame";
+import { standalone, surface, type Draft } from "./draft";
+import { DesktopCard, FullButton, Lead, LinkButton, MiniLabel, Question, StepFrame } from "./Frame";
 
 /** A numbered instruction with Safari's own icon beside it (`.st`). */
 function Instruction({ n, children, glyph }: { n: number; children: ReactNode; glyph: ReactNode }) {
@@ -141,7 +143,8 @@ function ReminderPreview({ d, today }: { d: Draft; today: CivilDate }) {
           flexDirection: "row",
           gap: s.s3,
           padding: s.s3,
-          borderRadius: r.card,
+          // Concentric with the 24 surface around it, 16 out.
+          borderRadius: r.ctl,
           backgroundColor: c.raised,
           boxShadow: shadows.overlay,
         }}
@@ -159,6 +162,18 @@ function ReminderPreview({ d, today }: { d: Draft; today: CivilDate }) {
           <Txt variant="subhead" tone="headInk">
             K
           </Txt>
+          {/* The app icon's red dot, as on the Home Screen. */}
+          <View
+            style={{
+              position: "absolute",
+              top: s.s2,
+              right: s.s2,
+              width: 5,
+              height: 5,
+              borderRadius: r.pill,
+              backgroundColor: c.now,
+            }}
+          />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -237,13 +252,28 @@ function FeelSwitch({
   );
 }
 
-/** Step 7 in the Android app: reminders, asked with a preview of a real one, and sounds. */
-export function Reminders({ d, today, next }: { d: Draft; today: CivilDate; next: () => void }) {
-  const profile = useProfile();
-  const update = useMutation(api.account.updateProfile);
-  const [on, setOn] = useState(false);
-  const sounds = profile?.sounds === true;
-  const [haptics, setHaptics] = useState(hapticsOn);
+/**
+ * Step 7's reminders ask (`step7`, not on an iPhone in Safari): a preview of a real reminder,
+ * Turn on reminders or Not now, and once they're on, Continue. `children` sit under the preview.
+ */
+function NudgeStep({
+  d,
+  today,
+  next,
+  on,
+  waiting,
+  turnOn,
+  children,
+}: {
+  d: Draft;
+  today: CivilDate;
+  next: () => void;
+  on: boolean;
+  /** The ask can't run yet (still checking, or the browser's prompt is open). */
+  waiting?: boolean;
+  turnOn: () => void;
+  children?: ReactNode;
+}) {
   return (
     <StepFrame
       step={7}
@@ -255,15 +285,9 @@ export function Reminders({ d, today, next }: { d: Draft; today: CivilDate; next
           <>
             <FullButton
               label="Turn on reminders"
-              icon={<Icon icon={Bell} size={20} tone="onInk" />}
-              onPress={() =>
-                void ensureNotifications().then((granted) => {
-                  if (granted) {
-                    commitHaptic();
-                    setOn(true);
-                  } else showToast("Reminders are off. You can allow them in Android's settings.");
-                })
-              }
+              icon={<Icon icon={Bell} size={20} tone={waiting ? "ink3" : "onInk"} />}
+              disabled={waiting}
+              onPress={turnOn}
             />
             <LinkButton label="Not now" onPress={next} />
           </>
@@ -277,6 +301,33 @@ export function Reminders({ d, today, next }: { d: Draft; today: CivilDate; next
           : "Like this, built from your plan. Only the reminders you set, and nothing else."}
       </Lead>
       <ReminderPreview d={d} today={today} />
+      {children}
+    </StepFrame>
+  );
+}
+
+/** Step 7 in the Android app: reminders, and the feel switches to try right away (`.sw`). */
+export function Reminders({ d, today, next }: { d: Draft; today: CivilDate; next: () => void }) {
+  const profile = useProfile();
+  const update = useMutation(api.account.updateProfile);
+  const [on, setOn] = useState(false);
+  const sounds = profile?.sounds === true;
+  const [haptics, setHaptics] = useState(hapticsOn);
+  return (
+    <NudgeStep
+      d={d}
+      today={today}
+      next={next}
+      on={on}
+      turnOn={() =>
+        void ensureNotifications().then((granted) => {
+          if (granted) {
+            commitHaptic();
+            setOn(true);
+          } else showToast("Reminders are off. You can allow them in Android's settings.");
+        })
+      }
+    >
       <View style={{ marginTop: s.s4 }}>
         <FeelSwitch
           icon={Vibrate}
@@ -301,12 +352,52 @@ export function Reminders({ d, today, next }: { d: Draft; today: CivilDate; next
           }}
         />
       </View>
-    </StepFrame>
+    </NudgeStep>
+  );
+}
+
+/**
+ * Step 7 in a browser with Web Push, and in the iPhone Home Screen app: the same ask, through
+ * the browser's own prompt. A browser that turns out unable to (no keys on the server) moves on.
+ */
+function BrowserReminders({
+  d,
+  today,
+  next,
+  reminders,
+}: {
+  d: Draft;
+  today: CivilDate;
+  next: () => void;
+  reminders: WebReminders;
+}) {
+  const { available, state, allow } = reminders;
+  const [asked, setAsked] = useState(false);
+  useEffect(() => {
+    if (available === false) next();
+  }, [available, next]);
+  useEffect(() => {
+    if (asked && state === "blocked")
+      showToast("This browser blocks notifications from Kriyan. You can allow them in its site settings.");
+  }, [asked, state]);
+  return (
+    <NudgeStep
+      d={d}
+      today={today}
+      next={next}
+      on={state === "on"}
+      waiting={available !== true || state === "checking" || state === "busy"}
+      turnOn={() => {
+        setAsked(true);
+        allow();
+      }}
+    />
   );
 }
 
 function ConnectRow({
-  icon,
+  logo,
+  tint,
   title,
   sub,
   open,
@@ -314,7 +405,9 @@ function ConnectRow({
   onOpen,
   children,
 }: {
-  icon: LucideIcon;
+  /** The service's own tile (`.cn .lg`): white on its colour, so each connection reads apart. */
+  logo: ReactNode;
+  tint: string;
   title: string;
   sub: string;
   open: boolean;
@@ -333,17 +426,19 @@ function ConnectRow({
           paddingVertical: s.s3,
         }}
       >
+        {/* A logo beside the name it stands for: decorative, so screen readers skip it. */}
         <View
+          aria-hidden
           style={{
             width: 40,
             height: 40,
-            borderRadius: r.ctl,
-            backgroundColor: c.head,
+            borderRadius: r.card,
+            backgroundColor: tint,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Icon icon={icon} size={20} tone="headInk" />
+          {logo}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt variant="subhead">{title}</Txt>
@@ -453,7 +548,12 @@ export function ConnectAI({
       <View style={{ marginTop: s.s6 }}>
         <MiniLabel text="Your AI" />
         <ConnectRow
-          icon={Sparkles}
+          logo={
+            <Txt variant="label" tone="headInk" style={family("600")}>
+              AI
+            </Txt>
+          }
+          tint={spaceTone("orange").dot}
           title="Claude or ChatGPT"
           sub="Plan with you in chat: “move my lab report to Saturday”"
           open={open === "claude"}
@@ -467,7 +567,8 @@ export function ConnectAI({
           {copyButton("claude")}
         </ConnectRow>
         <ConnectRow
-          icon={Terminal}
+          logo={<Icon icon={Terminal} size={20} tone="headInk" />}
+          tint={c.head}
           title="Codex automation"
           sub="Each morning, reads Moodle and Gmail and adds what's due"
           open={open === "codex"}
@@ -494,6 +595,7 @@ function StartCard({
   minutes,
   done,
   onPress,
+  width,
 }: {
   icon: LucideIcon;
   title: string;
@@ -501,6 +603,7 @@ function StartCard({
   minutes: number;
   done: boolean;
   onPress: () => void;
+  width: number;
 }) {
   return (
     <Press
@@ -509,8 +612,8 @@ function StartCard({
       onPress={onPress}
       hoverBg={null}
       style={{
-        width: 240,
-        minHeight: 160,
+        width,
+        minHeight: 150,
         gap: s.s1,
         padding: s.s4,
         borderRadius: r.sheet,
@@ -601,10 +704,22 @@ export function GetStarted({
     },
   ];
   const done = cards.filter((x) => x.done).length;
+  const [rail, setRail] = useState(340);
+  const card = useContext(DesktopCard);
+  const insets = useSafeAreaInsets();
   return (
     <StepFrame step={9} bare foot={<FullButton label="Open Today" onPress={finish} />}>
-      <View style={{ backgroundColor: c.head, padding: s.s6, paddingBottom: s.s12, gap: s.s4 }}>
-        <DayName today={today} />
+      <View
+        style={{
+          backgroundColor: c.head,
+          padding: s.s6,
+          // The black head runs up under the phone's status bar; the day starts below it.
+          paddingTop: (card ? 0 : insets.top) + s.s6,
+          paddingBottom: s.s12,
+          gap: s.s4,
+        }}
+      >
+        <DayName today={today} big />
         <PersonalSentence d={d} today={today} name={name} />
       </View>
       <View
@@ -635,8 +750,9 @@ export function GetStarted({
         <ScrollView
           horizontal
           style={{ flexGrow: 0 }}
+          onLayout={(e) => setRail(e.nativeEvent.layout.width)}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: s.s3, paddingHorizontal: s.s6, paddingVertical: s.s3 }}
+          contentContainerStyle={{ gap: s.s3, paddingHorizontal: s.s6, paddingTop: s.s3 }}
         >
           {cards.map((card) => (
             <StartCard
@@ -647,10 +763,12 @@ export function GetStarted({
               minutes={card.minutes}
               done={card.done}
               onPress={card.go}
+              // Most of the rail, so the next card peeks in (`.gc` is 72%).
+              width={Math.round((rail - 2 * s.s6) * 0.72)}
             />
           ))}
         </ScrollView>
-        <View style={{ paddingHorizontal: s.s6, marginTop: s.s3 }}>
+        <View style={{ paddingHorizontal: s.s6, marginTop: s.s4 }}>
           <MiniLabel text="Today" />
           <DayRows d={d} today={today} />
         </View>
@@ -659,11 +777,20 @@ export function GetStarted({
   );
 }
 
-/** Which step 7 this surface gets, if any. */
-export function Step7({ d, today, next }: { d: Draft; today: CivilDate; next: () => void }) {
-  return surface() === "android" ? (
-    <Reminders d={d} today={today} next={next} />
-  ) : (
-    <AddToHomeScreen next={next} />
-  );
+/** Which step 7 this surface gets: reminders in the app, Add to Home Screen or reminders on the web. */
+export function Step7({
+  d,
+  today,
+  next,
+  reminders,
+}: {
+  d: Draft;
+  today: CivilDate;
+  next: () => void;
+  reminders: WebReminders;
+}) {
+  const where = surface();
+  if (where === "android") return <Reminders d={d} today={today} next={next} />;
+  if (where === "iphone" && !standalone()) return <AddToHomeScreen next={next} />;
+  return <BrowserReminders d={d} today={today} next={next} reminders={reminders} />;
 }
