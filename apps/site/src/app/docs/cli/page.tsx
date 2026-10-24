@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Code } from "@/components/Code";
 import css from "@/components/Prose.module.css";
 import { GITHUB_URL } from "@/lib/site";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/docs/cli",
   title: "CLI",
+  heading: "The kriyan command",
   description:
     "Plan your days with Kriyan from a terminal: today, the week, quick add, and JSON for scripts.",
-  alternates: { canonical: "/docs/cli" },
-};
+});
 
 const COMMANDS: { group: string; rows: [string, string][] }[] = [
   {

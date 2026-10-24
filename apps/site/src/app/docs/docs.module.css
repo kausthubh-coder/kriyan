@@ -1,5 +1,5 @@
 .shell {
-  max-width: 1120px;
+  max-width: var(--page);
   margin: 0 auto;
   padding: 0 var(--s8);
   display: grid;

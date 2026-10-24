@@ -1,22 +1,22 @@
 .header {
-  max-width: 1120px;
+  max-width: var(--page);
   margin: 0 auto;
   padding: var(--s4) var(--s8);
   display: flex;
   align-items: center;
-  gap: var(--s6);
+  justify-content: space-between;
+  gap: var(--s4);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
-  height: var(--ctl);
+  min-height: var(--touch);
   font: var(--title);
   letter-spacing: var(--tracking-headline);
   color: var(--ink);
   text-decoration: none;
-  margin-right: auto;
   border-radius: var(--r-ctl);
 }
 
@@ -27,9 +27,9 @@
 }
 
 .footer {
-  max-width: 1120px;
+  max-width: var(--page);
   margin: 0 auto;
-  padding: var(--s12) var(--s8) var(--s16);
+  padding: var(--s8);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -53,7 +53,6 @@
   flex-wrap: wrap;
   gap: var(--s1);
   list-style: none;
-  margin-left: calc(var(--s3) * -1);
 }
 
 @media (max-width: 760px) {
@@ -65,7 +64,11 @@
     display: none;
   }
   .footer {
-    padding: var(--s8) var(--s4) var(--s12);
+    padding: var(--s6) var(--s4);
     flex-direction: column;
+  }
+  /* The first link's text lines up with the brand above it, not its pill. */
+  .footerLinks {
+    margin-left: calc(var(--s4) * -1);
   }
 }

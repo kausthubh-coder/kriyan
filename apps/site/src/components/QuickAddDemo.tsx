@@ -30,7 +30,9 @@ export function QuickAddDemo() {
   const id = useId();
   const today = useToday();
   const [text, setText] = useState(EXAMPLES[0] ?? "");
-  const parsed = today ? parseTask(text, today) : null;
+  // An empty field describes nothing, rather than a task called "Untitled".
+  const parsed = today && text.trim() ? parseTask(text, today) : null;
+  const empty = today !== null && !text.trim();
   const chips = parsed && today ? describeParsed(parsed, today) : [];
 
   return (
@@ -56,10 +58,14 @@ export function QuickAddDemo() {
       </div>
 
       <div className={css.result} aria-label="What Kriyan understood">
-        <p className={css.title}>
-          <span className={css.chipLabel}>Task</span>
-          <span>{parsed ? parsed.title || "Untitled" : " "}</span>
-        </p>
+        {empty ? (
+          <p className={css.hint}>Type a task to see what Kriyan reads.</p>
+        ) : (
+          <p className={css.title}>
+            <span className={css.chipLabel}>Task</span>
+            <span>{parsed ? parsed.title || "Untitled" : " "}</span>
+          </p>
+        )}
         <ul className={css.chips}>
           {chips.map((chip, index) => (
             <li key={`${chip.label}-${index}`} className={css.chip}>

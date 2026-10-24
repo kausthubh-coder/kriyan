@@ -1,236 +1,94 @@
-/* The landing page's own B2 values, light and dark. Kept here (not in tokens.css) so the page
-   doesn't depend on the shared site tokens while those move to B2. Names start with --k-. */
-:global(html):has(.root) {
-  --k-bg: #ffffff;
-  --k-ink: #111113;
-  --k-ink-2: #3c3c41;
-  --k-muted: #6a6a6f;
-  --k-dim: #76767b;
-  --k-line: #e6e6ea;
-  --k-fill: #f2f2f4;
-  --k-card: #f4f4f6;
-  --k-on-ink: #ffffff;
-  --k-focus: #0a68d6;
-  --k-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 18px 48px rgb(0 0 0 / 0.1);
-  color-scheme: light;
-  background: var(--k-bg);
-}
-@media (prefers-color-scheme: dark) {
-  :global(html):has(.root) {
-    --k-bg: #000000;
-    --k-ink: #f3f3f5;
-    --k-ink-2: #d0d0d5;
-    --k-muted: #a1a1a7;
-    --k-dim: #8e8e94;
-    --k-line: #2e2e32;
-    --k-fill: #1e1e21;
-    --k-card: #151517;
-    --k-on-ink: #000000;
-    --k-focus: #5aa8ff;
-    --k-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 18px 48px rgb(0 0 0 / 0.5);
-    color-scheme: dark;
-  }
-}
+/* The landing page. Colours, type and space come from the site's tokens (tokens.css); only the
+   headline's 56px and the 96px between sections are the page's own, both on the site's scale. */
 
-:global(body):has(.root) {
-  background: var(--k-bg);
-}
-
-.root {
-  /* The shared components on this page (Code, QuickAddDemo, ProductShot) read the site's names;
-     map those names to the landing values inside this page only. */
-  --font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --caption: 500 12px/16px var(--font);
-  --meta: 400 12px/16px var(--font);
-  --body: 400 16px/24px var(--font);
-  --label: 500 16px/24px var(--font);
-  --subhead: 600 16px/24px var(--font);
-  --bg: var(--k-bg);
-  --raised: var(--k-card);
-  --overlay: var(--k-fill);
-  --sunken: var(--k-fill);
-  --ink: var(--k-ink);
-  --ink-2: var(--k-ink-2);
-  --ink-3: var(--k-muted);
-  --on-ink: var(--k-on-ink);
-  --hover: color-mix(in oklab, var(--k-ink) 6%, transparent);
-  --select: color-mix(in oklab, var(--k-ink) 10%, transparent);
-  --line: var(--k-line);
-  --line-strong: var(--k-line);
-  --shadow-raised: none;
-  --shadow-overlay: var(--k-shadow);
-  --r-card: 16px;
-
-  min-height: 100%;
-  background: var(--k-bg);
-  color: var(--k-ink);
-  font: 400 16px/24px var(--font);
-  -webkit-font-smoothing: antialiased;
-}
-
-.root :focus-visible {
-  outline: 2px solid var(--k-focus);
-  outline-offset: 2px;
-}
-
-/* Header */
-.header {
-  max-width: 1184px;
-  margin: 0 auto;
-  padding: 16px 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  font: 600 20px/28px var(--font);
-  letter-spacing: -0.02em;
-  color: var(--k-ink);
-  text-decoration: none;
-}
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 999px;
-  font: 600 16px/24px var(--font);
-  color: var(--k-ink);
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    transform 120ms ease-out,
-    background-color 120ms ease-out;
-}
-.btn:active {
-  transform: scale(0.97);
-}
-.quiet {
-  font-weight: 500;
-}
-.quiet:hover {
-  background: var(--k-fill);
-}
-.primary {
-  background: var(--k-ink);
-  color: var(--k-on-ink);
-}
-.secondary {
-  background: var(--k-fill);
-}
-.secondary:hover {
-  background: color-mix(in oklab, var(--k-fill) 88%, var(--k-ink));
-}
-.large {
-  min-height: 48px;
-  padding: 0 24px;
-}
-
-/* Page */
 .main {
-  max-width: 1184px;
+  max-width: var(--page);
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 var(--s8);
 }
 
 .hero {
-  padding: 64px 0 48px;
+  padding: var(--s16) 0 var(--s12);
 }
 .headline {
-  font: 700 56px/60px var(--font);
+  font: 600 56px/60px var(--font);
   letter-spacing: -0.035em;
   max-width: 15ch;
-  text-wrap: balance;
 }
 .dim {
-  color: var(--k-dim);
+  color: var(--ink-3);
 }
 .lede {
-  margin-top: 24px;
+  margin-top: var(--s6);
   font: 400 20px/28px var(--font);
-  color: var(--k-muted);
+  color: var(--ink-3);
   max-width: 46ch;
-  text-wrap: pretty;
 }
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 32px;
+  gap: var(--s3);
+  margin-top: var(--s8);
 }
 .note {
-  margin-top: 16px;
+  margin-top: var(--s4);
   font: 400 14px/20px var(--font);
-  color: var(--k-muted);
+  color: var(--ink-3);
 }
 .shot {
-  margin-top: 48px;
+  margin-top: var(--s12);
 }
 
 .section {
   display: grid;
-  gap: 32px;
+  gap: var(--s8);
   padding: 96px 0 0;
 }
 .intro {
   display: grid;
-  gap: 12px;
+  gap: var(--s3);
   max-width: 640px;
 }
 .intro h2,
 .closing h2 {
-  font: 700 40px/48px var(--font);
-  letter-spacing: -0.03em;
-  text-wrap: balance;
+  font: var(--display);
+  letter-spacing: var(--tracking-display);
 }
 .intro p {
   font: 400 20px/28px var(--font);
-  color: var(--k-muted);
-  text-wrap: pretty;
+  color: var(--ink-3);
 }
 .link {
-  color: var(--k-ink);
+  color: var(--ink);
   text-decoration: underline;
-  text-decoration-color: var(--k-dim);
+  text-decoration-color: var(--ink-3);
   text-underline-offset: 4px;
+  border-radius: var(--r-sm);
 }
 .link:hover {
   text-decoration-color: currentColor;
 }
 
-/* Three short points, set as columns on wide screens. */
+/* Three short points, set as columns on wide screens. Each starts at the top of its column, so
+   the shorter ones don't spread their title and text apart to match the tallest. */
 .points {
   list-style: none;
-  padding: 0;
-  margin: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px;
+  gap: var(--s8);
 }
 .points li {
   display: grid;
-  gap: 8px;
-  padding-top: 16px;
-  border-top: 1px solid var(--k-line);
+  align-content: start;
+  gap: var(--s2);
+  padding-top: var(--s4);
+  box-shadow: inset 0 1px 0 var(--line);
 }
 .points b {
-  font: 500 16px/24px var(--font);
+  font: var(--label);
 }
 .points span {
-  color: var(--k-muted);
+  color: var(--ink-3);
 }
 
 .demo {
@@ -240,111 +98,67 @@
 .setup {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  gap: var(--s8);
 }
 .setup > div {
   display: grid;
-  gap: 12px;
+  gap: var(--s3);
   align-content: start;
 }
 .setup h3 {
-  font: 600 20px/28px var(--font);
-  letter-spacing: -0.01em;
+  font: var(--title);
+  letter-spacing: var(--tracking-title);
 }
 .setup p {
-  color: var(--k-muted);
+  color: var(--ink-3);
 }
 
 .closing {
   padding: 96px 0;
   display: grid;
-  gap: 8px;
+  gap: var(--s2);
   justify-items: start;
 }
 
-/* Footer */
-.footer {
-  max-width: 1184px;
-  margin: 0 auto;
-  padding: 32px;
-  border-top: 1px solid var(--k-line);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 24px;
-}
-.footer p {
-  margin-top: 8px;
-  font: 400 14px/20px var(--font);
-  color: var(--k-muted);
-}
-.footerLinks {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
 @media (max-width: 760px) {
-  .header,
   .main {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-  .hideOnPhone {
-    display: none;
+    padding: 0 var(--s4);
   }
   .hero {
-    padding: 32px 0 32px;
+    padding: var(--s8) 0;
   }
   .headline {
-    font: 700 40px/48px var(--font);
-    letter-spacing: -0.03em;
+    font: var(--display);
+    letter-spacing: var(--tracking-display);
   }
   .lede {
-    font: 400 16px/24px var(--font);
+    font: var(--body);
   }
   .actions {
     display: grid;
     width: 100%;
   }
   .section {
-    padding-top: 64px;
-    gap: 24px;
+    padding-top: var(--s16);
+    gap: var(--s6);
   }
   .intro h2,
   .closing h2 {
-    font: 700 28px/32px var(--font);
-    letter-spacing: -0.02em;
+    font: var(--headline);
+    letter-spacing: var(--tracking-headline);
   }
   .intro p {
-    font: 400 16px/24px var(--font);
+    font: var(--body);
   }
   .points,
   .setup {
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: var(--s6);
   }
   .closing {
-    padding: 64px 0;
+    padding: var(--s16) 0;
   }
   .closing .actions {
-    margin-top: 24px;
+    margin-top: var(--s6);
   }
-  .footer {
-    padding: 24px 16px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn {
-    transition: none;
-  }
-}
-
-/* The header's link to the app stays quieter than the hero's buttons. */
-.nav .secondary {
-  font-weight: 500;
 }

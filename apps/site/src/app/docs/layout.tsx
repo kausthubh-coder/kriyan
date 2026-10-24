@@ -5,7 +5,7 @@ import css from "./docs.module.css";
 export default function DocsLayout({ children }: LayoutProps<"/docs">) {
   return (
     <>
-      <SiteHeader />
+      <SiteHeader current="docs" />
       <div className={css.shell}>
         <DocsNav />
         {children}

@@ -66,14 +66,18 @@
   max-width: 46ch;
 }
 
-/* Inline code: same typeface, a quiet tint so it reads as something you type. */
+/* Inline code: same typeface, a quiet tint so it reads as something you type. It breaks only
+   where a word would (a long address still fits a phone), so a table column is never squeezed to
+   one letter; a phrase that wraps keeps its padding and corners on both lines. */
 .prose :not(pre) > code {
   font: inherit;
   color: var(--ink);
   background: var(--hover);
   border-radius: var(--r-sm);
   padding: 0 var(--s1);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .tableWrap {
@@ -149,8 +153,45 @@
   .prose {
     padding: var(--s4) 0 var(--s12);
   }
-  .table td:first-child {
+  /* Quick add's examples are whole sentences; on a phone they wrap, whole words at a time. */
+  .examples td:first-child {
     white-space: normal;
+    width: 50%;
+  }
+}
+
+/* Field tables (Field, Type, About) are too wide for a phone as three columns, so there each row
+   becomes a stack: the name, its type underneath, then what it does. */
+@media (max-width: 760px) {
+  .fields thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .fields,
+  .fields tbody,
+  .fields tr,
+  .fields td {
+    display: block;
+  }
+  .fields tr {
+    display: grid;
+    gap: var(--s1);
+    padding: var(--s3) var(--s4);
+    box-shadow: inset 0 -1px 0 var(--line);
+  }
+  .fields tr:last-child {
+    box-shadow: none;
+  }
+  .fields td {
+    padding: 0;
+    box-shadow: none;
+  }
+  .fields td:nth-child(2) {
+    font: var(--meta);
+    color: var(--ink-3);
   }
 }
 

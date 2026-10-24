@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PlainPage } from "@/components/PlainPage";
 import css from "@/components/Prose.module.css";
 import ui from "@/components/ui.module.css";
+
+export const metadata: Metadata = {
+  title: "Page not found",
+  robots: { index: false },
+};
 
 export default function NotFound() {
   return (

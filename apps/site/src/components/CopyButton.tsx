@@ -23,7 +23,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
   }
 
   return (
-    <button type="button" className={ui.btn} onClick={copy} aria-live="polite">
+    <button type="button" className={`${ui.btn} ${ui.compact}`} onClick={copy} aria-live="polite">
       {state === "copied" ? "Copied" : state === "failed" ? "Select and copy" : label}
     </button>
   );

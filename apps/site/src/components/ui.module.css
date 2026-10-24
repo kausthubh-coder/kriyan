@@ -1,4 +1,5 @@
-/* Shared controls, after docs/design/v3/app.css. Hover is instant; press scales (Button Press). */
+/* Shared controls, after B2's pill buttons (docs/design/v4/b2.html). Hover is instant; press
+   scales (Button Press). One look for every page of the site. */
 
 .btn {
   position: relative;
@@ -6,11 +7,11 @@
   align-items: center;
   justify-content: center;
   gap: var(--s2);
-  height: var(--ctl);
-  padding: 0 var(--s3);
-  border-radius: var(--r-ctl);
+  min-height: var(--touch);
+  padding: 0 var(--s4);
+  border-radius: var(--r-pill);
   font: var(--label);
-  color: var(--ink-2);
+  color: var(--ink);
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
@@ -18,7 +19,6 @@
 }
 .btn:hover {
   background: var(--hover);
-  color: var(--ink);
 }
 .btn:active {
   transform: scale(0.97);
@@ -34,46 +34,42 @@
   flex: none;
 }
 
+/* Where the page is: the header's Docs inside /docs. */
+.btn[aria-current="page"] {
+  background: var(--select);
+}
+
+/* Controls inside a panel (Copy on a snippet): the app's control height, 44px on phones. */
+.compact {
+  min-height: var(--ctl);
+  padding: 0 var(--s3);
+  color: var(--ink-2);
+}
+.compact:hover {
+  color: var(--ink);
+}
+
 .primary {
   background: var(--ink);
   color: var(--on-ink);
 }
 .primary:hover {
-  background: oklch(from var(--ink) calc(l + 0.03) c h);
-  color: var(--on-ink);
+  background: oklch(from var(--ink) calc(l + 0.06) c h);
 }
 
+/* Outlined, like B2's .btn-out, so a primary beside it is the one solid button (in dark a filled
+   secondary read as a second solid one). */
 .secondary {
-  background: var(--raised);
-  box-shadow: var(--shadow-raised);
-  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .secondary:hover {
-  background: var(--overlay);
+  background: var(--hover);
 }
 
-/* Big calls to action: 44px everywhere, so they read as the main thing on the page. */
+/* Big calls to action, so they read as the main thing in their section. */
 .large {
-  height: var(--touch);
-  padding: 0 var(--s4);
-}
-
-.icon {
-  width: var(--ctl);
-  padding: 0;
-  color: var(--ink-3);
-}
-.icon:hover {
-  color: var(--ink);
-}
-
-@media (pointer: coarse) {
-  .btn {
-    min-height: var(--touch);
-  }
-  .icon {
-    min-width: var(--touch);
-  }
+  min-height: var(--s12);
+  padding: 0 var(--s6);
 }
 
 @media (prefers-reduced-motion: reduce) {

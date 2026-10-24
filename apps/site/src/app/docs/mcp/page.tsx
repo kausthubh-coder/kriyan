@@ -1,15 +1,18 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { OPS } from "@kriyan/core/ops";
 import { Code } from "@/components/Code";
+import { OpDescription } from "@/components/OpDescription";
 import css from "@/components/Prose.module.css";
 import { MCP_URL } from "@/lib/site";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/docs/mcp",
   title: "MCP",
-  description: "Connect Claude, ChatGPT, Cursor or any MCP client to your Kriyan plan.",
-  alternates: { canonical: "/docs/mcp" },
-};
+  heading: "Plan with your AI over MCP",
+  description:
+    "Connect Claude, ChatGPT, Codex, Cursor or any MCP client to your Kriyan plan.",
+});
 
 const cursorConfig = JSON.stringify({ mcpServers: { kriyan: { url: MCP_URL } } }, null, 2);
 const tokenConfig = JSON.stringify(
@@ -83,6 +86,14 @@ export default function McpDocs() {
         </li>
         <li>Agents never guess how long something takes. A length is only set when you said one.</li>
         <li>
+          Kriyan has no AI of its own. In Ask, the app does a few things by itself, like adding a task or
+          finding free time; anything else waits for your agent. <code>get_asks</code> lists what
+          is waiting, and <code>answer_ask</code> replies under the request once the agent has done it.
+        </li>
+        <li>
+          Every change an agent makes is listed in the app with the agent&apos;s name, and each one has Undo.
+        </li>
+        <li>
           Captured tasks use the same words as quick add, so an agent can pass your sentence as it is. See{" "}
           <Link href="/docs/quick-add">Quick add</Link>.
         </li>
@@ -108,7 +119,7 @@ export default function McpDocs() {
                   <code>{op.name}</code>
                 </td>
                 <td>
-                  {op.description}
+                  <OpDescription text={op.description} />
                   {op.kind === "read" ? " Read-only." : ""}
                 </td>
               </tr>

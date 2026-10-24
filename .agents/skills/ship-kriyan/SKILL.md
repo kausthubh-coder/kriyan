@@ -108,6 +108,7 @@ cd dist && VERCEL_ORG_ID=team_eG2BEkfqMmQSwwGiTPzlC622 VERCEL_PROJECT_ID=prj_8r2
    gh release create android-v<version> kriyan.apk kriyan-<version>.apk --target $(git rev-parse HEAD) --title "Kriyan Android <version>" --notes-file <notes> --latest
    ```
    Follow the notes of `android-v1.0.1`: install steps, minimum Android 7, SHA-256, size, the source commit and the version code.
+5. Set `ANDROID_RELEASE` in `apps/site/src/lib/site.ts` to the new version and the APK's size in MB (`wc -c < kriyan.apk` divided by 1,000,000, rounded), so kriyan.app/android describes the file it serves; commit and land it as in step 3.
 
 ## 6. CLI
 

@@ -1,13 +1,13 @@
 {
   "$schema": "../../../node_modules/@kausthubh/critly/policy.schema.json",
-  "fonts": ["Figtree", "Inter"],
+  "fonts": ["Inter"],
   "typeScale": [12, 14, 16, 20, 28, 40, 56],
   "spacing": [4, 8, 12, 16, 24, 32, 48, 64, 96],
   "schemes": {
     "light": {},
     "dark": {}
   },
-  "pages": ["/", "/docs", "/docs/quick-add", "/docs/mcp", "/docs/cli", "/docs/api", "/privacy", "/terms"],
+  "pages": ["/", "/docs", "/docs/quick-add", "/docs/mcp", "/docs/cli", "/docs/api", "/android", "/privacy", "/terms"],
   "bannedPhrases": ["overdue", "garden", "Oops", "lorem"],
   "rules": {
     "spacing-scale": "error",
@@ -15,5 +15,5 @@
     "off-token-color": "error",
     "focus-ring": "error"
   },
-  "note": "Tokens live in packages/core/src/tokens.ts; see docs/design/v3/README.md. The landing page (/) carries the B2 direction on its own: Inter, light and dark, a 56px headline and 96px section gaps (src/app/page.module.css)."
+  "note": "Tokens live in packages/core/src/tokens.ts; see docs/design/v4/README.md. Every page uses the B2 tokens (src/app/tokens.css): Inter only, light and dark, a 16px body. The landing page (/) adds a 56px headline and 96px section gaps (src/app/page.module.css)."
 }

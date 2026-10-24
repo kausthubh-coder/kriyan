@@ -1,7 +1,7 @@
 import { CopyButton } from "./CopyButton";
 import css from "./Code.module.css";
 
-/** A copyable snippet. Set in Figtree like everything else; there is one typeface. */
+/** A copyable snippet. Set in Inter like everything else; there is one typeface. */
 export function Code({
   children,
   caption,

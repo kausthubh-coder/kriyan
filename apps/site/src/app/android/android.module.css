@@ -1,0 +1,60 @@
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4) var(--s8);
+}
+.facts dt {
+  font: var(--caption);
+  color: var(--ink-3);
+}
+.facts dd {
+  font: var(--subhead);
+  letter-spacing: var(--tracking-subhead);
+  font-variant-numeric: tabular-nums;
+}
+
+.get {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s12);
+  padding: var(--s4) 0;
+}
+
+.qr {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  max-width: 400px;
+}
+/* Dark modules on white in both schemes: some camera apps can't read an inverted code. The header
+   pair (--head on --head-ink) is the token pair that stays the same in light and dark. */
+.qr svg {
+  width: 112px;
+  height: 112px;
+  flex: none;
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.qr rect {
+  fill: var(--head-ink);
+}
+.qr path {
+  fill: none;
+  stroke: var(--head);
+}
+.qr figcaption {
+  font: var(--body);
+  color: var(--ink-3);
+}
+
+/* On a phone the download button is the way; the code is for computers. */
+@media (max-width: 760px) {
+  .qr {
+    display: none;
+  }
+  .get > div,
+  .get a {
+    width: 100%;
+  }
+}

@@ -1,14 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { PlainPage } from "@/components/PlainPage";
 import css from "@/components/Prose.module.css";
 import { GITHUB_URL } from "@/lib/site";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/terms",
   title: "Terms",
-  description: "The terms for using Kriyan.",
-  alternates: { canonical: "/terms" },
-};
+  heading: "Terms",
+  description:
+    "The terms for using Kriyan.",
+});
 
 export default function Terms() {
   return (
@@ -16,7 +18,7 @@ export default function Terms() {
       <h1>Terms</h1>
       <p className={css.lede}>
         Short and plain: use Kriyan to plan your own life, keep your account safe, and don&apos;t abuse the
-        service. Last updated Mon 12 Oct 2026.
+        service. Last updated Sat 24 Oct 2026.
       </p>
 
       <h2>The software</h2>
@@ -55,7 +57,7 @@ export default function Terms() {
       <h2>Changes and ending</h2>
       <p>
         These terms may change; a change that matters is announced in the app before it takes effect. You can
-        stop using Kriyan at any time and ask for your account to be deleted.
+        stop using Kriyan at any time, and delete your account and everything in it from Settings.
       </p>
     </PlainPage>
   );

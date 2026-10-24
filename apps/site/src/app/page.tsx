@@ -1,13 +1,13 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Inter } from "next/font/google";
+import { SiteFooter, SiteHeader } from "@/components/Chrome";
 import { Code } from "@/components/Code";
 import { ProductShot } from "@/components/ProductShot";
 import { QuickAddDemo } from "@/components/QuickAddDemo";
-import { BrandMark } from "@/lib/brand";
-import { APK_URL, APP_URL, DESCRIPTION, GITHUB_URL, MCP_URL } from "@/lib/site";
+import ui from "@/components/ui.module.css";
+import { ANDROID_PAGE, APP_URL, DESCRIPTION, GITHUB_URL, HEADLINE, MCP_URL, SITE_NAME } from "@/lib/site";
 // Prototype renders of the B2 design (scripts/render-product.mjs). Re-render them from the real app
-// once it ships the B2 screens.
+// once it ships the B2 screens (2.2.0), so every picture shows what the app does.
 import todayDesktop from "@/assets/product/b2-today-desktop.png";
 import todayPhone from "@/assets/product/b2-today-phone.png";
 import askDesktop from "@/assets/product/b2-assistant-desktop.png";
@@ -26,42 +26,16 @@ import reviewDarkDesktop from "@/assets/product/b2-review-dark-desktop.png";
 import reviewDarkPhone from "@/assets/product/b2-review-dark-phone.png";
 import css from "./page.module.css";
 
-// The landing page carries the B2 look on its own (light and dark, Inter); the docs keep the
-// site's shared tokens until those move to B2 too.
-const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
-
+// The home page keeps the layout's default title; it only adds its own address.
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
-};
-
-export const viewport: Viewport = {
-  colorScheme: "light dark",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
+  openGraph: { type: "website", siteName: SITE_NAME, title: HEADLINE, description: DESCRIPTION, url: "/" },
 };
 
 export default function Home() {
   return (
-    <div className={`${css.root} ${inter.variable}`}>
-      <header className={css.header}>
-        <Link href="/" className={css.brand} aria-label="Kriyan home">
-          <BrandMark size={24} />
-          Kriyan
-        </Link>
-        <nav className={css.nav} aria-label="Site">
-          <Link href="/docs" className={`${css.btn} ${css.quiet}`}>
-            Docs
-          </Link>
-          <a href={GITHUB_URL} className={`${css.btn} ${css.quiet} ${css.hideOnPhone}`}>
-            GitHub
-          </a>
-          <a href={APP_URL} className={`${css.btn} ${css.secondary}`}>
-            Open the web app
-          </a>
-        </nav>
-      </header>
+    <>
+      <SiteHeader />
 
       <main className={css.main}>
         <section className={css.hero} aria-labelledby="headline">
@@ -70,12 +44,12 @@ export default function Home() {
           </h1>
           <p className={css.lede}>{DESCRIPTION}</p>
           <div className={css.actions}>
-            <a href={APP_URL} className={`${css.btn} ${css.primary} ${css.large}`}>
+            <a href={APP_URL} className={`${ui.btn} ${ui.primary} ${ui.large}`}>
               Open the web app
             </a>
-            <a href={APK_URL} className={`${css.btn} ${css.secondary} ${css.large}`}>
+            <Link href={ANDROID_PAGE} className={`${ui.btn} ${ui.secondary} ${ui.large}`}>
               Get it on Android
-            </a>
+            </Link>
           </div>
           <p className={css.note}>
             On iPhone, open it in Safari and add it to your Home Screen. No App Store needed.
@@ -137,10 +111,11 @@ export default function Home() {
 
         <section className={css.section} aria-labelledby="ask">
           <div className={css.intro}>
-            <h2 id="ask">Ask, and it&apos;s done</h2>
+            <h2 id="ask">Ask in plain words</h2>
             <p>
-              Ask Kriyan in plain words: &ldquo;what do I have time for?&rdquo; or &ldquo;move the lab report
-              to after lunch&rdquo;. Changes land in your plan straight away, each with Undo.
+              Kriyan does a few things by itself: add a task from a sentence, move what&apos;s left to
+              tomorrow, find free time, say what&apos;s next, and tell you how the week went. Anything else
+              waits for an AI you connect, which does it and replies in Ask.
             </p>
           </div>
           <ProductShot
@@ -148,23 +123,29 @@ export default function Home() {
             phone={askPhone}
             darkDesktop={askDarkDesktop}
             darkPhone={askDarkPhone}
-            alt="Ask Kriyan answering what do I have time for: 3 hours 45 minutes free from 17:45, with inbox tasks that fit and a button to place each one."
+            alt="Ask answering what do I have time for: 3 hours 45 minutes free from 17:45, with inbox tasks that fit and a button to place each one."
           />
           <ul className={css.points}>
             <li>
-              <b>Automations</b>
+              <b>No AI of its own</b>
               <span>
-                Let Codex read Moodle and Gmail each morning and add what&apos;s due, marked with where it
-                came from.
+                Kriyan works the same with nothing connected. A request it can&apos;t do says so, and waits
+                until your agent answers it.
               </span>
             </li>
             <li>
-              <b>Your AI, through MCP</b>
-              <span>Claude, ChatGPT or Cursor can read your week and plan it with you.</span>
+              <b>Your agent, through MCP or the CLI</b>
+              <span>
+                Connect Claude, ChatGPT or Codex. It reads your plan, does what you asked, and replies under
+                your request.
+              </span>
             </li>
             <li>
-              <b>One tip at a time</b>
-              <span>&ldquo;Lab reports take you 1h 50m, not 1h 30m&rdquo;, from your own history.</span>
+              <b>Every change, with Undo</b>
+              <span>
+                Each task an agent adds, moves or changes is listed with the agent&apos;s name, and each one
+                has Undo.
+              </span>
             </li>
           </ul>
           <div className={css.setup}>
@@ -176,12 +157,13 @@ export default function Home() {
             <div>
               <h3>The command line</h3>
               <p>
-                Every view and change, in a terminal and as JSON for scripts.{" "}
+                Every view and change, in a terminal and as JSON for scripts. For now it runs from a copy of
+                the code.{" "}
                 <Link href="/docs/cli" className={css.link}>
                   Set up the CLI
                 </Link>
               </p>
-              <Code caption="Terminal">{`kriyan today\nkriyan add "essay fri 17:00 #school every week"`}</Code>
+              <Code caption="Terminal, in your copy of Kriyan">{`bun run kriyan today\nbun run kriyan add "essay fri 17:00 #school every week"`}</Code>
             </div>
           </div>
         </section>
@@ -238,10 +220,10 @@ export default function Home() {
             <li>
               <b>Android</b>
               <span>
-                <a href={APK_URL} className={css.link}>
-                  Download the app
-                </a>{" "}
-                for swipes, haptics and reminders on your phone.
+                <Link href={ANDROID_PAGE} className={css.link}>
+                  Get the app
+                </Link>{" "}
+                for swipes, haptics and reminders on your phone. Android 7 or later.
               </span>
             </li>
             <li>
@@ -268,49 +250,17 @@ export default function Home() {
             Start with today. <span className={css.dim}>It takes a minute.</span>
           </h2>
           <div className={css.actions}>
-            <a href={APP_URL} className={`${css.btn} ${css.primary} ${css.large}`}>
+            <a href={APP_URL} className={`${ui.btn} ${ui.primary} ${ui.large}`}>
               Open the web app
             </a>
-            <a href={APK_URL} className={`${css.btn} ${css.secondary} ${css.large}`}>
+            <Link href={ANDROID_PAGE} className={`${ui.btn} ${ui.secondary} ${ui.large}`}>
               Get it on Android
-            </a>
+            </Link>
           </div>
         </section>
       </main>
 
-      <footer className={css.footer}>
-        <div>
-          <Link href="/" className={css.brand} aria-label="Kriyan home">
-            <BrandMark size={20} />
-            Kriyan
-          </Link>
-          <p>Open source under the MIT licence. Kriyan is Sanskrit for action.</p>
-        </div>
-        <nav aria-label="Footer">
-          <ul className={css.footerLinks}>
-            <li>
-              <a href={GITHUB_URL} className={`${css.btn} ${css.quiet}`}>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <Link href="/docs" className={`${css.btn} ${css.quiet}`}>
-                Docs
-              </Link>
-            </li>
-            <li>
-              <Link href="/privacy" className={`${css.btn} ${css.quiet}`}>
-                Privacy
-              </Link>
-            </li>
-            <li>
-              <Link href="/terms" className={`${css.btn} ${css.quiet}`}>
-                Terms
-              </Link>
-            </li>
-          </ul>
-        </nav>
-      </footer>
-    </div>
+      <SiteFooter />
+    </>
   );
 }

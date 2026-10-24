@@ -8,6 +8,21 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  // Pages can't be framed or sniffed into another type, and send only the origin to other sites.
+  // /mcp, /api and /.well-known are left alone: MCP clients and the agent API read them across
+  // origins, with their own CORS headers.
+  async headers() {
+    return [
+      {
+        source: "/((?!mcp|api/|\\.well-known/).*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
+    ];
+  },
   // Addresses from the first version of Kriyan, so old links still land somewhere useful.
   async redirects() {
     return [

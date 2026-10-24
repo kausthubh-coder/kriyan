@@ -63,6 +63,12 @@
   letter-spacing: var(--tracking-subhead);
 }
 
+.hint {
+  font: var(--subhead);
+  letter-spacing: var(--tracking-subhead);
+  color: var(--ink-3);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

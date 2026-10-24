@@ -1,9 +1,15 @@
 /* Base styles. Every value comes from tokens.css, generated from packages/core/src/tokens.ts. */
 @import "./tokens.css";
 
-/* next/font self-hosts Figtree and sets --font-figtree on <html>, with a size-matched fallback. */
 :root {
-  --font: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  /* tokens.css names Inter; next/font self-hosts it under --font-inter, with a size-matched fallback. */
+  --font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* The site is read more than it is operated, so body and label text use the 16px steps at every
+     width (the app's phone sizes), not the app's 14px desktop ones. */
+  --body: 400 16px/24px var(--font);
+  --label: 500 16px/24px var(--font);
+  /* One page width for the header, the footer and every page, so the logo never shifts. */
+  --page: 1184px;
 }
 
 *,
@@ -20,7 +26,6 @@ body {
 }
 
 html {
-  color-scheme: dark;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -44,10 +49,10 @@ input {
   border: 0;
 }
 
+/* The ring follows each control's own corners (pills stay pills). */
 :focus-visible {
   outline: 2px solid var(--ink-2);
   outline-offset: 2px;
-  border-radius: var(--r-ctl);
 }
 
 img,

@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import css from "@/components/Prose.module.css";
-import { APP_URL, GITHUB_URL, MCP_URL, RELEASES_URL } from "@/lib/site";
+import { ANDROID_PAGE, APP_URL, GITHUB_URL, MCP_URL, RELEASES_URL } from "@/lib/site";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/docs",
   title: "Docs",
+  heading: "Kriyan docs",
   description:
     "How to use Kriyan in the browser, on Android, with your AI through MCP, from the command line and over HTTP.",
-  alternates: { canonical: "/docs" },
-};
+});
 
 export default function DocsHome() {
   return (
@@ -23,19 +24,19 @@ export default function DocsHome() {
       <h2>Where you can use it</h2>
       <ul>
         <li>
-          <strong>On the web:</strong> <a href={APP_URL}>app.kriyan.app</a>. Sign in with your email.
+          <strong>On the web:</strong> <a href={APP_URL}>app.kriyan.app</a>. Sign in with Google or your email.
         </li>
         <li>
-          <strong>On Android:</strong> install the latest build from{" "}
-          <a href={RELEASES_URL}>GitHub releases</a>.
+          <strong>On Android:</strong> <Link href={ANDROID_PAGE}>get the app</Link>, with the steps to
+          install it. Every build is on <a href={RELEASES_URL}>GitHub releases</a>.
         </li>
         <li>
-          <strong>With your AI:</strong> Claude, ChatGPT, Cursor and other MCP clients connect to{" "}
+          <strong>With your AI:</strong> Claude, ChatGPT, Codex, Cursor and other MCP clients connect to{" "}
           <code>{MCP_URL}</code>. See <Link href="/docs/mcp">MCP</Link>.
         </li>
         <li>
-          <strong>In a terminal:</strong> the <code>kriyan</code> command. See{" "}
-          <Link href="/docs/cli">CLI</Link>.
+          <strong>In a terminal:</strong> the <code>kriyan</code> command, run from a copy of the code for
+          now. See <Link href="/docs/cli">CLI</Link>.
         </li>
         <li>
           <strong>From your own scripts:</strong> one HTTP call per operation. See{" "}

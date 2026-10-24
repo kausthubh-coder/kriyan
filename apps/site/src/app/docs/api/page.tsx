@@ -1,15 +1,18 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { OPS, type OpSpec } from "@kriyan/core/ops";
 import { Code } from "@/components/Code";
+import { OpDescription } from "@/components/OpDescription";
 import css from "@/components/Prose.module.css";
 import { SITE_URL } from "@/lib/site";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/docs/api",
   title: "API",
-  description: "The Kriyan agent API: one HTTP call per operation, the same operations as MCP and the CLI.",
-  alternates: { canonical: "/docs/api" },
-};
+  heading: "Agent API",
+  description:
+    "The Kriyan agent API: one HTTP call per operation, the same operations as MCP and the CLI.",
+});
 
 // Everything below the introduction is generated from OPS in @kriyan/core/ops, the registry the
 // HTTP API, the MCP server and the CLI all read, so this page can't drift from what the server accepts.
@@ -142,12 +145,14 @@ export default function ApiDocs() {
             <p className={css.opMeta}>
               {op.title}. {op.kind === "read" ? "Reads only, never changes anything." : "Changes your plan."}
             </p>
-            <p>{op.description}</p>
+            <p>
+              <OpDescription text={op.description} />
+            </p>
             {rows.length === 0 ? (
               <p>Send an empty object.</p>
             ) : (
               <div className={css.tableWrap}>
-                <table className={css.table}>
+                <table className={`${css.table} ${css.fields}`}>
                   <thead>
                     <tr>
                       <th scope="col">Field</th>
@@ -163,7 +168,9 @@ export default function ApiDocs() {
                           {row.required ? " (required)" : ""}
                         </td>
                         <td>{row.type}</td>
-                        <td>{row.description}</td>
+                        <td>
+                          <OpDescription text={row.description} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

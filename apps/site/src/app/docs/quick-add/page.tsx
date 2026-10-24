@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import { parseTask } from "@kriyan/core/parse";
 import { formatDate } from "@kriyan/core/format";
 import css from "@/components/Prose.module.css";
 import { describeParsed } from "@/lib/parsed";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
+  path: "/docs/quick-add",
   title: "Quick add",
+  heading: "Quick add",
   description:
     "Every phrase Kriyan's quick add understands: dates, times, lengths, spaces, repeats, reminders and deadlines.",
-  alternates: { canonical: "/docs/quick-add" },
-};
+});
 
 // Every example is run through the real parser when the page is built, so the page shows exactly what
 // the app, the CLI and MCP do. The reference day is fixed so the dates read the same for everyone.
@@ -150,7 +151,7 @@ export default function QuickAddDocs() {
           <h2 id={section.id}>{section.title}</h2>
           <p>{section.intro}</p>
           <div className={css.tableWrap}>
-            <table className={css.table}>
+            <table className={`${css.table} ${css.examples}`}>
               <thead>
                 <tr>
                   <th scope="col">You type</th>
