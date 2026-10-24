@@ -1,13 +1,14 @@
-// Settings (b2.html?screen=settings): who's signed in, then your day, default reminders, agents
-// and the command line, access tokens, recently deleted, and deleting your data.
+// Settings (b2.html?screen=settings): who's signed in, how it feels (sounds), the evening review,
+// the semester, your day, default reminders, agents and the command line, access tokens,
+// installing it, recently deleted, and deleting your data.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Linking, Modal, Platform, View } from "react-native";
+import { Linking, Modal, Platform, useWindowDimensions, View } from "react-native";
 import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { BookOpen, KeyRound, Link, RotateCcw, Terminal, Trash2 } from "lucide-react-native";
+import { BookOpen, KeyRound, Link, Play, RotateCcw, Sparkles, Terminal, Trash2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
@@ -16,15 +17,20 @@ import { parseClock } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import { useClock } from "@/data/time";
 import { useAccessTokens, useProfile, type Profile } from "@/data/views";
+import { hapticsOn, setHapticsOn, setSoundsOn, soundsOn } from "@/features/feel/setting";
+import { playSound } from "@/features/feel/sound";
 import { forgetDevice } from "@/features/notifications/register";
 import { SectionLabel } from "@/features/progress/SectionLabel";
 import { errorText } from "@/features/tasks/actions";
+import { commitHaptic, toggleHaptic } from "@/features/tasks/haptics";
+import { DayPicker } from "@/features/tasks/pickers";
 import { ReminderEditor } from "@/features/tasks/ReminderEditor";
 import { useIsPhone } from "@/theme/layout";
 import { c, family, r, s, shadows } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
-import { Chip, Field, Skeleton } from "@/ui/bits";
+import { Field, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
+import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
 import { PageHead, Screen } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
@@ -36,8 +42,10 @@ export const MCP_URL = "https://kriyan.app/mcp";
 export const CLI_LINE = "bun run kriyan login";
 export const MCP_DOCS = "https://kriyan.app/docs/mcp";
 export const CLI_DOCS = "https://kriyan.app/docs/cli";
+const GITHUB_URL = "https://github.com/kausthubh-coder/kriyan";
 
-const MONO = Platform.OS === "web" ? "ui-monospace, Menlo, Consolas, monospace" : "monospace";
+/** The CLI isn't on npm, so its setup starts from a clone. */
+const CLI_SETUP = [`git clone ${GITHUB_URL}`, "cd kriyan && bun install", CLI_LINE];
 
 /** The prototype's small round button on a card (b2.html `.btn-sm`). */
 const small = { borderRadius: r.pill, backgroundColor: c.hover } as const;
@@ -64,10 +72,14 @@ export function SettingsScreen() {
       ) : (
         <>
           <AccountCard profile={profile} />
+          <Feel profile={profile} />
+          <EveningReview profile={profile} />
+          <Semester profile={profile} />
           <YourDay profile={profile} />
           <DefaultReminders profile={profile} />
           <ConnectAI profile={profile} />
           <Tokens />
+          <Install />
           <Deleted />
           <DeleteData />
         </>
@@ -196,6 +208,7 @@ function TimeField({
   value: number;
   onSave: (minutes: number) => void;
 }) {
+  const { fontScale } = useWindowDimensions();
   const [text, setText] = useState(formatClock(value));
   const commit = () => {
     const m = parseClock(text.trim());
@@ -212,8 +225,253 @@ function TimeField({
       onChangeText={setText}
       onBlur={commit}
       onSubmitEditing={commit}
-      containerStyle={{ width: 96 }}
+      // Wide enough for "08:00" at the phone's text size, so large text never clips it.
+      containerStyle={{ width: Math.round(96 * Math.max(1, fontScale)) }}
     />
+  );
+}
+
+/**
+ * One of a few values for a setting (b2.html `.chip`, `.chip.on`): the chosen one is filled, the
+ * others are outlined, so the current value reads at a glance.
+ */
+function Choice({
+  label,
+  on,
+  onPress,
+  accessibilityLabel,
+}: {
+  label: string;
+  on: boolean;
+  onPress: () => void;
+  accessibilityLabel?: string;
+}) {
+  const phone = useIsPhone();
+  return (
+    <Press
+      role="radio"
+      aria-checked={on}
+      accessibilityLabel={accessibilityLabel ?? label}
+      onPress={onPress}
+      hoverBg={null}
+      style={{ height: phone ? 44 : 32, justifyContent: "center" }}
+    >
+      {({ hovered }) => (
+        <View
+          style={{
+            height: phone ? 36 : 28,
+            minWidth: 56,
+            paddingHorizontal: s.s3,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: r.ctl,
+            backgroundColor: on ? c.ink : hovered ? c.hover : "transparent",
+            boxShadow: on ? undefined : `inset 0 0 0 1px ${c.lineStrong}`,
+          }}
+        >
+          <Txt variant="label" tone={on ? "onInk" : "ink2"} tnum numberOfLines={1}>
+            {label}
+          </Txt>
+        </View>
+      )}
+    </Press>
+  );
+}
+
+/** A setting that is on or off (b2.html `.togrow`): the whole row flips it. */
+function SwitchRow({
+  label,
+  hint,
+  on,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <Press
+      role="switch"
+      aria-checked={on}
+      accessibilityLabel={label}
+      onPress={() => onChange(!on)}
+      scale={false}
+      hoverBg={null}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s4,
+        minHeight: 48,
+        paddingVertical: s.s2,
+        ...rule,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <Txt variant="label">{label}</Txt>
+        <Txt variant="meta" tone="ink3">
+          {hint}
+        </Txt>
+      </View>
+      <Switch on={on} />
+    </Press>
+  );
+}
+
+/**
+ * Sounds and haptics (docs/design/v4: haptics on by default, sounds off). Haptics only exist in
+ * the Android app, so the web leaves that switch out rather than show one that does nothing.
+ */
+function Feel({ profile }: { profile: Profile }) {
+  const update = useUpdateProfile();
+  const on = profile.sounds === true;
+  const [haptics, setHaptics] = useState(hapticsOn);
+  return (
+    <Section title="Feel">
+      <View>
+        <SwitchRow
+          label="Sounds"
+          hint="A soft tick when you finish or move something"
+          on={on}
+          onChange={(next) => {
+            // On at once, so turning it on is the first sound you hear.
+            setSoundsOn(next);
+            if (next) playSound("done");
+            void update({ sounds: next });
+          }}
+        />
+        {Platform.OS === "android" ? (
+          <SwitchRow
+            label="Haptics"
+            hint="A light tap when you tick, move or drop something"
+            on={haptics}
+            onChange={(next) => {
+              setHapticsOn(next);
+              setHaptics(next);
+              toggleHaptic(next);
+            }}
+          />
+        ) : null}
+      </View>
+      <View style={{ alignSelf: "flex-start" }}>
+        <Button
+          icon={Play}
+          label="Try it"
+          style={small}
+          onPress={() => {
+            commitHaptic();
+            if (soundsOn()) playSound("done");
+            else showToast("Sounds are off. Turn them on to hear one.");
+          }}
+        />
+      </View>
+    </Section>
+  );
+}
+
+/** The prototype's four review times. Unset means 20:00, like the backend. */
+const REVIEW_TIMES = [19 * 60, 20 * 60, 21 * 60, 22 * 60];
+const DEFAULT_REVIEW = 20 * 60;
+
+function EveningReview({ profile }: { profile: Profile }) {
+  const update = useUpdateProfile();
+  const current = profile.reviewTime ?? DEFAULT_REVIEW;
+  return (
+    <Section title="Evening review">
+      <Txt variant="body" tone="ink3">
+        When “Review today” shows up in your evening.
+      </Txt>
+      <View
+        role="radiogroup"
+        aria-label="Review time"
+        style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}
+      >
+        {REVIEW_TIMES.map((m) => (
+          <Choice
+            key={m}
+            label={formatClock(m)}
+            on={current === m}
+            accessibilityLabel={`Review at ${formatClock(m)}`}
+            onPress={() => void update({ reviewTime: m })}
+          />
+        ))}
+      </View>
+    </Section>
+  );
+}
+
+/** One end of the semester: the date as a button that opens the app's day picker. */
+function SemesterDay({
+  label,
+  value,
+  today,
+  onPick,
+}: {
+  label: string;
+  value: string | undefined;
+  today: string;
+  onPick: (date: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<View>(null);
+  return (
+    <Row label={label}>
+      <View ref={ref} collapsable={false}>
+        <Button
+          label={value ? formatDate(value, today) : "Pick a day"}
+          accessibilityLabel={`${label}: ${value ? formatDate(value, today) : "not set"}`}
+          onPress={() => setOpen(true)}
+          expanded={open}
+          style={small}
+        />
+      </View>
+      <Popover open={open} onClose={() => setOpen(false)} anchor={ref} title={label}>
+        <DayPicker
+          value={value ?? null}
+          today={today}
+          onPick={(date) => {
+            setOpen(false);
+            onPick(date);
+          }}
+        />
+      </Popover>
+    </Row>
+  );
+}
+
+/** The semester's first and last days, for the weeks-left card on Goals. */
+function Semester({ profile }: { profile: Profile }) {
+  const update = useUpdateProfile();
+  const { today } = useClock();
+  const set = Boolean(profile.semesterStart || profile.semesterEnd);
+  return (
+    <Section title="Semester" id="semester">
+      <Txt variant="body" tone="ink3">
+        Goals shows the weeks left between these days.
+      </Txt>
+      <View>
+        <SemesterDay
+          label="First day"
+          value={profile.semesterStart}
+          today={today}
+          onPick={(semesterStart) => void update({ semesterStart })}
+        />
+        <SemesterDay
+          label="Last day"
+          value={profile.semesterEnd}
+          today={today}
+          onPick={(semesterEnd) => void update({ semesterEnd })}
+        />
+      </View>
+      {set ? (
+        <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
+          <Button
+            label="Clear semester"
+            onPress={() => void update({ semesterStart: null, semesterEnd: null })}
+          />
+        </View>
+      ) : null}
+    </Section>
   );
 }
 
@@ -240,14 +498,20 @@ function YourDay({ profile }: { profile: Profile }) {
           />
         </Row>
         <Row label="Daily capacity" hint="Planned work a day can hold, for the load lines" below>
-          {[4, 5, 6, 7, 8].map((h) => (
-            <Chip
-              key={h}
-              label={`${h} h`}
-              on={hours === h}
-              onPress={() => void update({ dailyCapacity: h * 60 })}
-            />
-          ))}
+          <View
+            role="radiogroup"
+            aria-label="Daily capacity"
+            style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}
+          >
+            {[4, 5, 6, 7, 8].map((h) => (
+              <Choice
+                key={h}
+                label={`${h} h`}
+                on={hours === h}
+                onPress={() => void update({ dailyCapacity: h * 60 })}
+              />
+            ))}
+          </View>
         </Row>
       </View>
     </Section>
@@ -283,7 +547,7 @@ function CopyLine({ text, what, label = "Copy" }: { text: string; what: string; 
           backgroundColor: c.hover,
         }}
       >
-        <Txt variant="body" selectable numberOfLines={1} style={{ fontFamily: MONO }}>
+        <Txt variant="body" selectable numberOfLines={1} tnum>
           {text}
         </Txt>
       </View>
@@ -360,10 +624,17 @@ function ConnectAI({ profile }: { profile: Profile }) {
         <ConnRow
           icon={Terminal}
           title="Command line"
-          meta="For scripts and scheduled runs. In a copy of Kriyan’s code, run this, then paste an access token from below."
-          last
+          meta="For scripts and scheduled runs. It isn’t on npm yet, so it runs from a copy of Kriyan’s code: clone it, install, then sign in with an access token from below."
         >
-          <CopyLine text={CLI_LINE} what="the command" />
+          <TerminalBlock lines={CLI_SETUP} label="Command line setup" nested />
+          <View style={{ alignSelf: "flex-start" }}>
+            <Button
+              label="Copy"
+              accessibilityLabel="Copy the setup commands"
+              onPress={() => void copy(CLI_SETUP.join("\n"), "the setup commands")}
+              style={small}
+            />
+          </View>
           <View style={{ alignSelf: "flex-start", marginLeft: -s.s3 }}>
             <Button
               icon={BookOpen}
@@ -372,33 +643,92 @@ function ConnectAI({ profile }: { profile: Profile }) {
             />
           </View>
         </ConnRow>
+        <ConnRow
+          icon={Sparkles}
+          title="Codex"
+          meta={`Add the MCP URL, then schedule: “Every day at 07:00, read Moodle and Gmail and add what's due to Kriyan.”`}
+        />
+        <ConnRow
+          icon={Sparkles}
+          title="Claude and ChatGPT"
+          meta="Settings, Connectors, Add custom connector, then paste the URL. Ask “plan my week” from there."
+          last
+        />
       </View>
-      <Press
-        role="switch"
-        aria-checked={profile.agentsEditDirectly}
-        accessibilityLabel="Let agents edit directly"
-        onPress={() => void update({ agentsEditDirectly: !profile.agentsEditDirectly })}
-        scale={false}
-        hoverBg={null}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: s.s4,
-          minHeight: 48,
-          paddingVertical: s.s2,
-          ...rule,
-        }}
-      >
-        <View style={{ flex: 1 }}>
-          <Txt variant="label">Let agents edit directly</Txt>
-          <Txt variant="meta" tone="ink3">
-            {profile.agentsEditDirectly
-              ? "On: an agent's plans go straight onto your days."
-              : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."}
+      <TerminalBlock lines={CLI_EXAMPLES} label="Command line examples" />
+      <SwitchRow
+        label="Let agents edit directly"
+        hint={
+          profile.agentsEditDirectly
+            ? "On: an agent's plans go straight onto your days."
+            : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."
+        }
+        on={profile.agentsEditDirectly}
+        onChange={(agentsEditDirectly) => void update({ agentsEditDirectly })}
+      />
+    </Section>
+  );
+}
+
+/** What the command line looks like in use: real commands from `kriyan --help`. */
+const CLI_EXAMPLES = [
+  "bun run kriyan today",
+  'bun run kriyan add "Gym tomorrow 7:00 for 45m every Mon Wed Fri remind 10m before #health"',
+  "bun run kriyan week",
+  "bun run kriyan done 2",
+];
+
+/** The prototype's terminal (b2.html `.term`): dark in both schemes, like the Today header. */
+function TerminalBlock({ lines, label, nested }: { lines: string[]; label: string; nested?: boolean }) {
+  return (
+    <View
+      style={{
+        padding: nested ? s.s3 : s.s4,
+        // Inside the card its corner follows the card's (24) less the card's padding (16).
+        borderRadius: nested ? r.ctl : r.sheet,
+        backgroundColor: c.head,
+        gap: s.s1,
+      }}
+      aria-label={label}
+    >
+      {lines.map((line) => (
+        <Txt key={line} variant="body" tone="headInk" selectable tnum>
+          <Txt variant="body" tone="headDim" tnum>
+            ${" "}
           </Txt>
-        </View>
-        <Switch on={profile.agentsEditDirectly} />
-      </Press>
+          {line}
+        </Txt>
+      ))}
+    </View>
+  );
+}
+
+/** Getting Kriyan onto a phone (b2.html Install). */
+function Install() {
+  return (
+    <Section title="Install">
+      <View style={{ gap: s.s2, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
+        <Txt variant="label" style={family("600")}>
+          On iPhone
+        </Txt>
+        {[
+          "Open app.kriyan.app in Safari.",
+          "Tap Share, then Add to Home Screen.",
+          "Open Kriyan from your Home Screen.",
+        ].map((line, i) => (
+          <Txt key={line} variant="body" tone="ink2">
+            {i + 1}. {line}
+          </Txt>
+        ))}
+      </View>
+      <View style={{ gap: s.s1, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
+        <Txt variant="label" style={family("600")}>
+          On Android
+        </Txt>
+        <Txt variant="body" tone="ink2">
+          Install the Kriyan app for haptics and reminders that ring on your phone.
+        </Txt>
+      </View>
     </Section>
   );
 }

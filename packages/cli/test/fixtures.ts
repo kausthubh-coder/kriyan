@@ -204,7 +204,9 @@ export function progress(): ProgressResult {
     today: "2026-10-13",
     heat: [],
     weekMinutes: 270,
+    weekDone: 6,
     yearMinutes: 7215,
+    yearDone: 140,
     bySpace: [
       { spaceId: ids.school, name: "School", color: "blue", minutes: 4800 },
       { spaceId: ids.life, name: "Life", color: "green", minutes: 2415 },

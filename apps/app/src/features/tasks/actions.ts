@@ -9,6 +9,7 @@ import { createStore } from "@/data/store";
 import { formatDay } from "@kriyan/core/format";
 import { todayIn } from "@kriyan/core/dates";
 import { deviceTimeZone } from "@/data/time";
+import { playSound } from "@/features/feel/sound";
 import { showToast, updateToast } from "@/ui/toast";
 import { commitHaptic } from "./haptics";
 
@@ -50,6 +51,7 @@ export function completeTask(task: {
   if (task.event || ticking.get()[id]) return;
   setTicking(id, true);
   commitHaptic();
+  playSound("done");
   let completion: Completion | null = null;
   let sent = false;
   let undoAsked = false;
@@ -118,6 +120,7 @@ export function restoreTask(task: { _id: Id<"tasks">; title: string }) {
 /** Skips one occurrence of a repeating task (it moves to its next date), and offers Undo. */
 export function skipTask(task: { _id: Id<"tasks">; title: string; time: number | null }) {
   commitHaptic();
+  playSound("swoosh");
   return convex
     .mutation(api.tasks.skip, { id: task._id })
     .then(({ date, next }) => {
@@ -143,6 +146,7 @@ export interface Placement {
 
 /** Gives tasks a time on the day they're on (a drag on the timeline). The block itself shows it. */
 export function placeTasks(ids: Id<"tasks">[], date: string | null, time?: number | null) {
+  playSound("tick");
   return convex
     .mutation(api.tasks.move, { ids, date, ...(time !== undefined ? { time } : {}) })
     .catch((e: unknown) => showToast(errorText(e)));
@@ -152,6 +156,7 @@ export function placeTasks(ids: Id<"tasks">[], date: string | null, time?: numbe
 export function moveTasks(tasks: Placement[], date: string | null, time?: number | null) {
   if (!tasks.length) return Promise.resolve();
   commitHaptic();
+  playSound("swoosh");
   const where = date ? formatDay(date, todayIn(deviceTimeZone())) : "no date";
   const [only] = tasks;
   const text =
@@ -167,6 +172,7 @@ export function moveTasks(tasks: Placement[], date: string | null, time?: number
 /** Moves what's still open today to tomorrow, and offers Undo. */
 export function closeDay(today: string) {
   commitHaptic();
+  playSound("swoosh");
   return convex
     .mutation(api.tasks.closeDay, { today })
     .then((moved) => {

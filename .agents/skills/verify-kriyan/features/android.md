@@ -27,6 +27,6 @@ Preconditions: emulator booted (SKILL.md Launch), `bun run dev` serving Metro on
 ## Gotchas
 
 - A black screen right after launch is the bundle still loading; wait and read `ui` again before calling it broken.
-- Signing in on Android: the session persists in the dev build. If it shows the sign-in screen, sign in with the test account and code `424242` by tapping the fields from `ui`.
+- Signing in on Android: the session persists in the dev build. A fresh install opens on onboarding: tap "I already have an account", type the test account into Email, tap "Send code" and type `424242`. After a sign-out it opens on the sign-in screen: type the email, tap "Email me a code", then the code.
 - `Open debugger to view warnings.` at the bottom is the dev LogBox; it isn't shown in release builds, but read the warnings in Metro's log when it appears after your change.
 - The emulator is shared by every checkout on the machine; check `adb devices` and who launched the app before driving it.

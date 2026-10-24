@@ -50,7 +50,8 @@ export async function signedInContext(
         .waitFor({ timeout: 60000 })
         .then(() => true),
       page
-        .getByRole("button", { name: "Sign in", exact: true })
+        .getByRole("button", { name: /^(Sign in|Continue with Google|Plan my first day)$/ })
+        .first()
         .waitFor({ timeout: 60000 })
         .then(() => false),
     ]).catch(() => false);
@@ -70,6 +71,8 @@ export async function signIn(page) {
   page.setDefaultTimeout(120000);
   await page.goto(`${BASE}/sign-in`);
   await page.getByRole("textbox", { name: "Email" }).fill(EMAIL);
+  // Sign-in leads with an email code; the password form is one quiet link away.
+  await page.getByRole("button", { name: "Use a password instead" }).click();
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   const outcome = await Promise.race([

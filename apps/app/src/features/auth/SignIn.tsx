@@ -1,9 +1,10 @@
-// A calm sign-in: Google first (one tap for most people), then email and password, or a code
-// by email. One column, one solid button. Errors say what happened and what to do.
+// A calm sign-in for someone who has signed in before (onboarding.html step 6, B2): Google
+// first, then an email code; a password only behind a quiet link. One column, one solid button.
+// Errors say what happened and what to do, and go as soon as the input changes.
 
 import { useRef, useState } from "react";
-import { Platform, ScrollView, View, type TextInput } from "react-native";
-import { useSignIn, useSignUp, useSSO } from "@clerk/expo";
+import { Linking, Platform, ScrollView, View, type TextInput } from "react-native";
+import { useSignIn, useSignUp } from "@clerk/expo";
 import { CircleAlert, Lock, Mail } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsPhone } from "@/theme/layout";
@@ -13,41 +14,26 @@ import { Field } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Mark } from "@/ui/Mark";
 import { Txt } from "@/ui/Txt";
+import { clerkMessage as message } from "./clerkMessage";
 import { GoogleMark } from "./GoogleMark";
+import { useCodeSignIn } from "./useCodeSignIn";
 
 type Mode = "sign-in" | "sign-up";
+type Method = "code" | "password";
+const SITE = "https://kriyan.app";
 type Step = "form" | "code";
-
-interface ClerkResult {
-  error: {
-    message?: string;
-    longMessage?: string;
-    errors?: { longMessage?: string; message?: string }[];
-  } | null;
-}
-
-function message(result: ClerkResult | unknown, fallback: string): string | null {
-  const error = (result as ClerkResult | undefined)?.error ?? (result instanceof Error ? result : null);
-  if (!error) return null;
-  const first = (error as { errors?: { longMessage?: string; message?: string }[] }).errors?.[0];
-  return (
-    first?.longMessage ??
-    first?.message ??
-    (error as { longMessage?: string }).longMessage ??
-    error.message ??
-    fallback
-  );
-}
 
 export function SignIn() {
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
-  const { startSSOFlow } = useSSO();
+  const auth = useCodeSignIn();
   const phone = useIsPhone();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>("sign-in");
+  const [method, setMethod] = useState<Method>("code");
   const [step, setStep] = useState<Step>("form");
-  const [codeFor, setCodeFor] = useState<"sign-in" | "sign-up" | "trust">("sign-in");
+  // "email": the code from the email-code path, which signs in or makes the account itself.
+  const [codeFor, setCodeFor] = useState<"email" | "sign-up" | "trust">("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -104,10 +90,9 @@ export function SignIn() {
   const sendCode = () =>
     run(async () => {
       if (!email.trim()) return "Enter your email address first.";
-      const res = await signIn.emailCode.sendCode({ emailAddress: email.trim() });
-      const err = message(res, "Couldn't send a code to that address. Check it and try again.");
+      const err = await auth.sendCode(email.trim());
       if (err) return err;
-      setCodeFor("sign-in");
+      setCodeFor("email");
       setStep("code");
       return null;
     });
@@ -121,25 +106,19 @@ export function SignIn() {
         if (err) return err;
         return message(await signIn.finalize(), "Couldn't finish signing in. Try again.");
       }
-      if (codeFor === "sign-in") {
-        const res = await signIn.emailCode.verifyCode({ code: code.trim() });
-        const err = message(res, "That code didn't work. Check it or send a new one.");
-        if (err) return err;
-        return message(await signIn.finalize(), "Couldn't finish signing in. Try again.");
-      }
+      if (codeFor === "email") return auth.verify(code.trim());
       const res = await signUp.verifications.verifyEmailCode({ code: code.trim() });
       const err = message(res, "That code didn't work. Check it or send a new one.");
       if (err) return err;
       return message(await signUp.finalize(), "Couldn't finish creating the account. Try again.");
     });
 
-  const google = () =>
-    run(async () => {
-      const result = await startSSOFlow({ strategy: "oauth_google" });
-      if (result.createdSessionId && result.setActive)
-        await result.setActive({ session: result.createdSessionId });
-      return null;
-    });
+  const google = () => run(auth.google);
+  /** A stale error goes the moment the input it was about changes. */
+  const edit = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    if (error) setError(null);
+  };
 
   return (
     <ScrollView
@@ -184,7 +163,7 @@ export function SignIn() {
             <View style={{ flexDirection: "row", alignItems: "center", gap: s.s3 }} aria-hidden>
               <View style={{ flex: 1, height: 1, backgroundColor: c.line }} />
               <Txt variant="meta" tone="ink3">
-                or with email
+                or
               </Txt>
               <View style={{ flex: 1, height: 1, backgroundColor: c.line }} />
             </View>
@@ -193,46 +172,71 @@ export function SignIn() {
                 label="Email"
                 icon={Mail}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={edit(setEmail)}
                 placeholder="you@example.com"
                 autoCapitalize="none"
                 autoComplete="email"
                 keyboardType="email-address"
                 textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
+                returnKeyType={method === "code" ? "go" : "next"}
+                onSubmitEditing={() => (method === "code" ? void sendCode() : passwordRef.current?.focus())}
                 containerStyle={{ height: 44 }}
               />
-              <Field
-                ref={passwordRef}
-                label="Password"
-                icon={Lock}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Password"
-                secureTextEntry
-                autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-                textContentType={mode === "sign-in" ? "password" : "newPassword"}
-                returnKeyType="go"
-                onSubmitEditing={submitPassword}
-                containerStyle={{ height: 44 }}
-              />
-              <Button
-                variant="primary"
-                label={busy ? "One moment" : mode === "sign-in" ? "Sign in" : "Create account"}
-                onPress={submitPassword}
-                disabled={busy}
-                style={{ height: 44, marginTop: s.s1 }}
-              />
-              {mode === "sign-in" ? (
-                <Button
-                  variant="quiet"
-                  label="Email me a code instead"
-                  onPress={sendCode}
-                  disabled={busy}
-                  style={{ height: 44 }}
-                />
-              ) : null}
+              {method === "code" ? (
+                <>
+                  <Button
+                    variant="primary"
+                    label={busy ? "One moment" : "Email me a code"}
+                    onPress={sendCode}
+                    disabled={busy}
+                    style={{ height: 44, marginTop: s.s1 }}
+                  />
+                  <Button
+                    variant="quiet"
+                    label="Use a password instead"
+                    onPress={() => {
+                      setMethod("password");
+                      setError(null);
+                    }}
+                    style={{ height: 44 }}
+                  />
+                </>
+              ) : (
+                <>
+                  <Field
+                    ref={passwordRef}
+                    label="Password"
+                    icon={Lock}
+                    value={password}
+                    onChangeText={edit(setPassword)}
+                    placeholder="Password"
+                    secureTextEntry
+                    autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                    textContentType={mode === "sign-in" ? "password" : "newPassword"}
+                    returnKeyType="go"
+                    onSubmitEditing={submitPassword}
+                    containerStyle={{ height: 44 }}
+                  />
+                  <Button
+                    variant="primary"
+                    label={busy ? "One moment" : mode === "sign-in" ? "Sign in" : "Create account"}
+                    onPress={submitPassword}
+                    disabled={busy}
+                    style={{ height: 44, marginTop: s.s1 }}
+                  />
+                  <Button
+                    variant="quiet"
+                    label="Email me a code instead"
+                    onPress={() => {
+                      setMethod("code");
+                      setMode("sign-in");
+                      setError(null);
+                    }}
+                    disabled={busy}
+                    style={{ height: 44 }}
+                  />
+                </>
+              )}
             </View>
           </View>
         ) : (
@@ -240,7 +244,7 @@ export function SignIn() {
             <Field
               label="Code from the email"
               value={code}
-              onChangeText={setCode}
+              onChangeText={edit(setCode)}
               placeholder="123456"
               keyboardType="number-pad"
               autoComplete="one-time-code"
@@ -280,7 +284,7 @@ export function SignIn() {
           </View>
         ) : null}
 
-        {step === "form" ? (
+        {step === "form" && method === "password" ? (
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
             <Txt variant="body" tone="ink3">
               {mode === "sign-in" ? "New to Kriyan?" : "Have an account?"}
@@ -294,6 +298,24 @@ export function SignIn() {
               style={{ height: 44, paddingHorizontal: s.s2 }}
             />
           </View>
+        ) : null}
+        {step === "form" ? (
+          <Txt variant="meta" tone="ink3" style={{ textAlign: "center" }}>
+            By continuing you agree to the{" "}
+            <Txt variant="meta" tone="ink2" role="link" onPress={() => void Linking.openURL(`${SITE}/terms`)}>
+              Terms
+            </Txt>{" "}
+            and{" "}
+            <Txt
+              variant="meta"
+              tone="ink2"
+              role="link"
+              onPress={() => void Linking.openURL(`${SITE}/privacy`)}
+            >
+              Privacy policy
+            </Txt>
+            .
+          </Txt>
         ) : null}
         {Platform.OS === "web" ? <View nativeID="clerk-captcha" /> : null}
       </View>

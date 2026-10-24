@@ -11,6 +11,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { convex } from "@/data/convex";
+import { SoundSetting } from "@/features/feel/setting";
+import { inProgress, rememberSignedInHere, signedInHere } from "@/features/onboarding/draft";
 import { useAppFonts } from "@/theme/fonts";
 import { c, scheme } from "@/theme/tokens";
 
@@ -36,6 +38,7 @@ export default function RootLayout() {
             <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
               <ThemeProvider value={navTheme}>
                 <StatusBar style="auto" />
+                <SoundSetting />
                 <Gate />
               </ThemeProvider>
             </ConvexProviderWithClerk>
@@ -54,18 +57,29 @@ function Gate() {
   useEffect(() => {
     if (ready) SplashScreen.hide();
   }, [ready]);
+  useEffect(() => {
+    if (isSignedIn) rememberSignedInHere();
+  }, [isSignedIn]);
 
   // The splash stays up while the fonts and the saved session load (both local, never the network).
   if (!ready) return <View style={{ flex: 1, backgroundColor: c.bg }} />;
 
+  // Signed out, a new person starts on onboarding and someone who has signed in here before
+  // starts on sign-in: the first screen they may see is where they land. Onboarding stays
+  // open once signed in, because its last steps come after signing in.
+  const returning = signedInHere() && !inProgress();
+  const signInScreen = (
+    <Stack.Protected key="sign-in" guard={!isSignedIn}>
+      <Stack.Screen name="sign-in" />
+    </Stack.Protected>
+  );
+  const onboardingScreen = <Stack.Screen key="onboarding" name="onboarding" />;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: "fade" }}>
       <Stack.Protected guard={Boolean(isSignedIn)}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
-      <Stack.Protected guard={!isSignedIn}>
-        <Stack.Screen name="sign-in" />
-      </Stack.Protected>
+      {returning ? [signInScreen, onboardingScreen] : [onboardingScreen, signInScreen]}
     </Stack>
   );
 }

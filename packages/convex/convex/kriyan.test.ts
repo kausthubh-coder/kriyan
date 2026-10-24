@@ -619,6 +619,39 @@ describe("habits and progress", () => {
     expect(progress.weekMinutes).toBe(120);
     expect(progress.bySpace.map((s) => [s.name, s.minutes])).toEqual([["Work", 120]]);
   });
+
+  test("a goal made today with a head start shows no pace until it has run a while", async () => {
+    const { t, alice, today } = await setup();
+    const id = await alice.mutation(api.organize.addGoal, {
+      title: "Run 100 km",
+      kind: "number",
+      target: 100,
+      unit: "km",
+      dueDate: "2027-01-20",
+    });
+    await alice.mutation(api.organize.updateGoal, { id, current: 42 });
+    const fresh = (await alice.query(api.views.progress, { today })).goals[0];
+    expect(fresh?.pace).toBeNull();
+    // A month in, the pace is 30 of its 129 days.
+    await t.run((ctx) => ctx.db.patch(id, { startDate: "2026-09-13" }));
+    const later = (await alice.query(api.views.progress, { today })).goals[0];
+    expect(later?.pace).toBeCloseTo(30 / 129);
+  });
+
+  test("a task done without a length counts as done, never as invented minutes", async () => {
+    const { alice, today } = await setup();
+    const timed = await alice.mutation(api.tasks.addText, { text: "Deep work today 10am for 2h #work" });
+    const untimed = await alice.mutation(api.tasks.addText, { text: "Book the dentist today #life" });
+    await alice.mutation(api.tasks.complete, { id: timed });
+    await alice.mutation(api.tasks.complete, { id: untimed });
+    const progress = await alice.query(api.views.progress, { today });
+    expect(progress.weekMinutes).toBe(120);
+    expect(progress.weekDone).toBe(2);
+    expect(progress.yearMinutes).toBe(120);
+    expect(progress.yearDone).toBe(2);
+    expect(progress.bySpace.map((s) => [s.name, s.minutes])).toEqual([["Work", 120]]);
+    expect(progress.heat.find((d) => d.date === today)).toEqual({ date: today, minutes: 120, done: 2 });
+  });
 });
 
 describe("editing a repeat", () => {

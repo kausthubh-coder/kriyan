@@ -404,10 +404,12 @@ export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spa
 export function goalView(g: Doc<"goals">, today: CivilDate) {
   const progress = g.target > 0 ? Math.min(1, g.current / g.target) : 0;
   let pace: number | null = null;
-  if (g.dueDate) {
-    const total = Math.max(1, diffDays(g.dueDate, g.startDate));
-    pace = Math.min(1, Math.max(0, diffDays(today, g.startDate) / total));
-  }
+  const total = g.dueDate ? Math.max(1, diffDays(g.dueDate, g.startDate)) : 0;
+  const age = diffDays(today, g.startDate);
+  // A goal starts with whatever progress it already had, so in its first days that head start
+  // would read as far ahead of a pace that has barely begun: no pace until it has run a week,
+  // or a quarter of its span when that's shorter.
+  if (g.dueDate && age >= Math.min(7, Math.ceil(total / 4))) pace = Math.min(1, Math.max(0, age / total));
   return {
     _id: g._id,
     title: g.title,
@@ -418,7 +420,7 @@ export function goalView(g: Doc<"goals">, today: CivilDate) {
     dueDate: g.dueDate ?? null,
     spaceId: g.spaceId ?? null,
     progress,
-    /** Where you'd be today at a steady pace, 0 to 1; null without a due date. */
+    /** Where you'd be today at a steady pace, 0 to 1; null without a due date or in its first days. */
     pace,
   };
 }
@@ -433,14 +435,19 @@ export async function progressView(ctx: QueryCtx, ownerId: string, today: CivilD
       q.eq("ownerId", ownerId).gte("doneOn", yearStart).lte("doneOn", today),
     )
     .take(10_000);
-  const perDay = new Map<string, number>();
-  // A done task with no length still counts, as 15 minutes, so the heatmap shows the day.
-  for (const c of completions) perDay.set(c.doneOn, (perDay.get(c.doneOn) ?? 0) + (c.minutes || 15));
+  // Only real minutes count: a task done without a length adds to the day's count of tasks
+  // done, never to its time, because Kriyan never invents a task's length.
+  const perDay = new Map<string, { minutes: number; done: number }>();
+  for (const c of completions) {
+    const day = perDay.get(c.doneOn) ?? { minutes: 0, done: 0 };
+    perDay.set(c.doneOn, { minutes: day.minutes + (c.minutes ?? 0), done: day.done + 1 });
+  }
   const weekStart = addDays(today, -weekday(today));
   const bySpace = new Map<string, number>();
   for (const c of completions) {
+    if (!c.minutes) continue;
     const root = c.spaceId ? rootOf(c.spaceId, map) : "none";
-    bySpace.set(root, (bySpace.get(root) ?? 0) + (c.minutes || 15));
+    bySpace.set(root, (bySpace.get(root) ?? 0) + c.minutes);
   }
   const goals = (
     await ctx.db
@@ -459,10 +466,14 @@ export async function progressView(ctx: QueryCtx, ownerId: string, today: CivilD
     today,
     heat: Array.from({ length: 365 }, (_, i) => {
       const date = addDays(yearStart, i);
-      return { date, minutes: perDay.get(date) ?? 0 };
+      const day = perDay.get(date);
+      /** `done` counts tasks finished that day, with or without a length. */
+      return { date, minutes: day?.minutes ?? 0, done: day?.done ?? 0 };
     }),
-    weekMinutes: completions.filter((c) => c.doneOn >= weekStart).reduce((s, c) => s + (c.minutes || 15), 0),
-    yearMinutes: [...perDay.values()].reduce((a, b) => a + b, 0),
+    weekMinutes: completions.filter((c) => c.doneOn >= weekStart).reduce((s, c) => s + (c.minutes ?? 0), 0),
+    weekDone: completions.filter((c) => c.doneOn >= weekStart).length,
+    yearMinutes: [...perDay.values()].reduce((a, b) => a + b.minutes, 0),
+    yearDone: completions.length,
     bySpace: [...bySpace.entries()]
       .map(([id, minutes]) => ({
         spaceId: id === "none" ? null : id,

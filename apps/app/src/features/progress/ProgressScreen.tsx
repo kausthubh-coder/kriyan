@@ -1,11 +1,11 @@
-// Goals and habits (b2.html?screen=goals): the time left in the year and free this week, goals
-// with what's left and when they're due, habits by the week ("weeks on target", never a streak
+// Goals and habits (b2.html?screen=goals): the time left in the year, the semester and free this
+// week, goals with what's left, when they're due and this week's focused time, habits by the week ("weeks on target", never a streak
 // that resets), then the last 12 months of time done, split by space.
 
 import { useRef, useState, type ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
-import { useMutation } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { CalendarCheck, Circle, CircleCheck, Pencil, Plus } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
@@ -13,7 +13,14 @@ import { addDays, diffDays, parts, startOfWeek, weekday, type CivilDate } from "
 import { formatDate, MONTH_SHORT, WEEKDAY_SHORT } from "@kriyan/core/format";
 import { freeMinutes } from "@kriyan/core/layout";
 import { useClock } from "@/data/time";
-import { useProfile, useProgressView, useSpaces, useWeekView, type ProgressView } from "@/data/views";
+import {
+  useProfile,
+  useProgressView,
+  useSpaces,
+  useWeekView,
+  type Profile,
+  type ProgressView,
+} from "@/data/views";
 import { errorText } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
@@ -35,11 +42,21 @@ const SUB = "What you're working towards, and the time you still have.";
 
 const hoursText = (m: number) => (m < 60 ? `${m} min` : `${Math.round(m / 60)} h`);
 
+/**
+ * From this window width goals and habits sit side by side under the cards, like B2's desktop.
+ * B2 splits from 900, but beside the 248 sidebar that leaves two 270 px columns where a goal's
+ * due line wraps; 1100 keeps each column near 380.
+ */
+const TWO_COLUMNS_MIN_WIDTH = 1100;
+/** B2's wide desktop page (`.dpg.wide`). */
+const WIDE_PAGE = 1040;
+
 export function ProgressScreen() {
   const view = useProgressView();
   const { today } = useClock();
+  const twoColumns = useWindowDimensions().width >= TWO_COLUMNS_MIN_WIDTH;
   return (
-    <Screen title={TITLE} sub={SUB}>
+    <Screen title={TITLE} sub={SUB} width={twoColumns ? WIDE_PAGE : "column"}>
       <PageHead big title={TITLE} sub={SUB} />
       {view === undefined ? (
         <View testID="skeleton" style={{ gap: s.s6 }}>
@@ -48,13 +65,40 @@ export function ProgressScreen() {
           <Skeleton width="100%" height={84} />
         </View>
       ) : (
-        <ProgressBody view={view} today={today} />
+        <ProgressBody view={view} today={today} twoColumns={twoColumns} />
       )}
     </Screen>
   );
 }
 
-function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
+/** Focused and planned minutes on each goal this week: Focus sessions, and linked tasks' lengths. */
+function useGoalWeek(today: CivilDate): Map<string, { focused: number; planned: number }> {
+  const authed = useConvexAuth().isAuthenticated;
+  const focus = useQuery(api.views.focus, authed ? { today } : "skip");
+  const week = useWeekView(startOfWeek(today));
+  const out = new Map<string, { focused: number; planned: number }>();
+  const at = (id: string) => {
+    const row = out.get(id) ?? { focused: 0, planned: 0 };
+    out.set(id, row);
+    return row;
+  };
+  for (const g of focus?.byGoal ?? []) at(g.goalId).focused += g.minutes;
+  for (const day of week?.days ?? [])
+    for (const t of [...day.scheduled, ...day.anytime])
+      if (t.goalId && t.length && !t.event && !t.proposedBy) at(t.goalId).planned += t.length;
+  return out;
+}
+
+function ProgressBody({
+  view,
+  today,
+  twoColumns,
+}: {
+  view: ProgressView;
+  today: string;
+  twoColumns: boolean;
+}) {
+  const goalWeek = useGoalWeek(today);
   const [addingGoal, setAddingGoal] = useState(false);
   const [addingHabit, setAddingHabit] = useState(false);
   const total = view.bySpace.reduce((sum, b) => sum + b.minutes, 0);
@@ -63,87 +107,77 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
     <>
       <TimeLeft today={today} />
 
-      <View>
-        <SectionLabel
-          title="Goals"
-          count={view.goals.length ? String(view.goals.length) : undefined}
-          right={
-            <Button
-              variant="quiet"
-              icon={Plus}
-              label="Add goal"
-              onPress={() => setAddingGoal(!addingGoal)}
-              expanded={addingGoal}
-            />
-          }
-        />
-        {addingGoal ? <AddGoal today={today} onDone={() => setAddingGoal(false)} /> : null}
-        {view.goals.length ? (
-          <View>
-            {view.goals.map((g) => (
-              <GoalView key={g._id} goal={g} color={c.ink} today={today} />
-            ))}
-          </View>
-        ) : addingGoal ? null : (
-          <Txt variant="body" tone="ink3">
-            A goal is a target with a date: a number of tasks, kilometres or pages. Kriyan shows whether
-            you’re on pace.
-          </Txt>
-        )}
-      </View>
-
-      <View>
-        <SectionLabel
-          title="Habits today"
-          count={view.habits.length ? `${doneToday} of ${view.habits.length}` : undefined}
-          right={
-            <Button
-              variant="quiet"
-              icon={Plus}
-              label="Add habit"
-              onPress={() => setAddingHabit(!addingHabit)}
-              expanded={addingHabit}
-            />
-          }
-        />
-        {addingHabit ? <AddHabit onDone={() => setAddingHabit(false)} /> : null}
-        {view.habits.length ? (
-          <>
-            {view.habits.map((h) => (
-              <HabitRow key={h._id} habit={h} today={today} />
-            ))}
-            <Txt variant="meta" tone="ink3" style={{ marginTop: s.s3 }}>
-              Missed days stay quiet. One miss never resets anything.
+      <View
+        style={twoColumns ? { flexDirection: "row", alignItems: "flex-start", gap: s.s12 } : { gap: s.s8 }}
+      >
+        <View style={twoColumns ? { flex: 1, minWidth: 0 } : undefined}>
+          <SectionLabel
+            title="Goals"
+            count={view.goals.length ? String(view.goals.length) : undefined}
+            right={
+              <Button
+                variant="quiet"
+                icon={Plus}
+                label="Add goal"
+                onPress={() => setAddingGoal(!addingGoal)}
+                expanded={addingGoal}
+              />
+            }
+          />
+          {addingGoal ? <AddGoal today={today} onDone={() => setAddingGoal(false)} /> : null}
+          {view.goals.length ? (
+            <View>
+              {view.goals.map((g) => (
+                <GoalView key={g._id} goal={g} color={c.ink} today={today} week={goalWeek.get(g._id)} />
+              ))}
+            </View>
+          ) : addingGoal ? null : (
+            <Txt variant="body" tone="ink3">
+              A goal is a target with a date: a number of tasks, kilometres or pages. Kriyan shows whether
+              you’re on pace.
             </Txt>
-          </>
-        ) : addingHabit ? null : (
-          <Txt variant="body" tone="ink3">
-            A habit has a weekly target, like reading 4 times a week. Missing a day never resets anything.
-          </Txt>
-        )}
+          )}
+        </View>
+
+        <View style={twoColumns ? { flex: 1, minWidth: 0 } : undefined}>
+          <SectionLabel
+            title="Habits today"
+            count={view.habits.length ? `${doneToday} of ${view.habits.length}` : undefined}
+            right={
+              <Button
+                variant="quiet"
+                icon={Plus}
+                label="Add habit"
+                onPress={() => setAddingHabit(!addingHabit)}
+                expanded={addingHabit}
+              />
+            }
+          />
+          {addingHabit ? <AddHabit onDone={() => setAddingHabit(false)} /> : null}
+          {view.habits.length ? (
+            <>
+              {view.habits.map((h) => (
+                <HabitRow key={h._id} habit={h} today={today} />
+              ))}
+              <Txt variant="meta" tone="ink3" style={{ marginTop: s.s3 }}>
+                Missed days stay quiet. One miss never resets anything.
+              </Txt>
+            </>
+          ) : addingHabit ? null : (
+            <Txt variant="body" tone="ink3">
+              A habit has a weekly target, like reading 4 times a week. Missing a day never resets anything.
+            </Txt>
+          )}
+        </View>
       </View>
 
       <View style={{ gap: s.s3 }}>
         <SectionLabel title="The last 12 months" />
         {/* Two big zeros on a new account read as a score; the line below says what comes. */}
-        {view.yearMinutes > 0 ? (
+        {view.yearDone > 0 ? (
           <View style={{ flexDirection: "row", gap: s.s12 }}>
-            <View style={{ gap: s.s1 }}>
-              <Txt variant="title" tnum>
-                {hoursText(view.weekMinutes)}
-              </Txt>
-              <Txt variant="meta" tone="ink3">
-                done this week
-              </Txt>
-            </View>
-            <View style={{ gap: s.s1 }}>
-              <Txt variant="title" tnum>
-                {hoursText(view.yearMinutes)}
-              </Txt>
-              <Txt variant="meta" tone="ink3">
-                in the last 12 months
-              </Txt>
-            </View>
+            <DoneStat done={view.weekDone} minutes={view.weekMinutes} when="this week" />
+            <DoneStat done={view.yearDone} minutes={view.yearMinutes} when="in the last 12 months" />
           </View>
         ) : null}
         {total > 0 ? (
@@ -175,7 +209,7 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
           </>
         ) : (
           <Txt variant="body" tone="ink3">
-            Tick tasks off and the time they take shows up here, split by space.
+            Tick off tasks that have a length and their time shows up here, split by space.
           </Txt>
         )}
         <YearHeat heat={view.heat} />
@@ -184,7 +218,24 @@ function ProgressBody({ view, today }: { view: ProgressView; today: string }) {
   );
 }
 
-/** One square per week of the year (b2.html `.weeks`): weeks gone are grey, this one is red. */
+/**
+ * Tasks done, and the time of those that had a length. Time is only what tasks said they'd take:
+ * a task without a length counts as done, never as minutes.
+ */
+function DoneStat({ done, minutes, when }: { done: number; minutes: number; when: string }) {
+  return (
+    <View style={{ gap: s.s1 }}>
+      <Txt variant="title" tnum>
+        {`${done} ${done === 1 ? "task" : "tasks"}`}
+      </Txt>
+      <Txt variant="meta" tone="ink3">
+        {minutes > 0 ? `done ${when}, ${hoursText(minutes)} of them timed` : `done ${when}`}
+      </Txt>
+    </View>
+  );
+}
+
+/** One square per week (b2.html `.weeks`): weeks gone are grey, this one is red. */
 function WeekDots({ count, current }: { count: number; current: number }) {
   return (
     <View aria-hidden style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s1, marginTop: s.s3 }}>
@@ -203,29 +254,42 @@ function WeekDots({ count, current }: { count: number; current: number }) {
   );
 }
 
-function Card({ children, flex }: { children: ReactNode; flex?: number }) {
+function Card({ children, flex, wide }: { children: ReactNode; flex?: number; wide?: boolean }) {
   return (
     <View
-      style={{ flex, minWidth: 0, gap: 2, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}
+      style={{
+        flex,
+        flexBasis: wide ? "100%" : undefined,
+        minWidth: 0,
+        gap: 2,
+        padding: s.s4,
+        borderRadius: r.sheet,
+        backgroundColor: c.sunken,
+      }}
     >
       {children}
     </View>
   );
 }
 
+/** The prototype's small round button on a card (b2.html `.btn-sm`). */
+const small = { borderRadius: r.pill, backgroundColor: c.hover, alignSelf: "flex-start" } as const;
+
 /**
- * The time you still have (b2.html `.tlc`): days left in the year, and the free time left this
- * week. The prototype's semester card waits for the app to know about semesters.
+ * The time you still have (b2.html `.tlc`): days left in the year, weeks left in the semester,
+ * and the free time left this week. On the phone the year spans the top and the other two
+ * share a row; on desktop the three sit in one row.
  */
 function TimeLeft({ today }: { today: CivilDate }) {
   const phone = useIsPhone();
+  const profile = useProfile();
   const [year] = parts(today);
   const daysLeft = diffDays(`${year}-12-31`, today) + 1;
   const week = Math.min(51, Math.floor(diffDays(today, `${year}-01-01`) / 7));
   const free = useFreeThisWeek(today);
   return (
-    <View style={{ flexDirection: phone ? "column" : "row", gap: s.s3 }}>
-      <Card flex={phone ? undefined : 1.6}>
+    <View style={{ flexDirection: "row", flexWrap: phone ? "wrap" : "nowrap", gap: s.s3 }}>
+      <Card flex={phone ? undefined : 1.6} wide={phone}>
         <Txt variant="headline" tnum>
           {daysLeft}
         </Txt>
@@ -234,32 +298,76 @@ function TimeLeft({ today }: { today: CivilDate }) {
         </Txt>
         <WeekDots count={52} current={week} />
       </Card>
-      <Card flex={phone ? undefined : 1}>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: phone ? "row" : "column",
-            alignItems: phone ? "center" : "flex-start",
-            gap: s.s3,
-          }}
-        >
-          <View style={{ flex: phone ? 1 : undefined, gap: 2 }}>
-            <Txt variant="headline" tnum>
-              {free === null ? "–" : `${Math.round(free.minutes / 6) / 10} h`}
-            </Txt>
-            <Txt variant="meta" tone="ink3">
-              {free === null ? "free this week" : `free this week, ${free.range}`}
-            </Txt>
-          </View>
-          {phone ? null : <View style={{ flex: 1 }} />}
-          <Button
-            label="Plan it"
-            onPress={() => router.push("/upcoming")}
-            style={{ borderRadius: r.pill, backgroundColor: c.hover }}
-          />
-        </View>
+      <Card flex={1}>
+        <SemesterLeft profile={profile} today={today} />
+      </Card>
+      <Card flex={1}>
+        <Txt variant="headline" tnum>
+          {free === null ? "–" : `${Math.round(free.minutes / 6) / 10} h`}
+        </Txt>
+        <Txt variant="meta" tone="ink3">
+          {free === null ? "free this week" : `free this week, ${free.range}`}
+        </Txt>
+        <View style={{ flex: 1, minHeight: s.s3 }} />
+        <Button label="Plan it" onPress={() => router.push("/upcoming")} style={small} />
       </Card>
     </View>
+  );
+}
+
+/** Weeks left in the semester, from the dates in Settings; until they're set, a way to set them. */
+function SemesterLeft({ profile, today }: { profile: Profile | undefined; today: CivilDate }) {
+  if (profile === undefined) return <Skeleton width="60%" height={32} />;
+  const start = profile.semesterStart;
+  const end = profile.semesterEnd;
+  if (!start || !end)
+    return (
+      <>
+        <Txt variant="subhead">Semester</Txt>
+        <Txt variant="meta" tone="ink3">
+          Add its first and last days to count the weeks left.
+        </Txt>
+        <View style={{ flex: 1, minHeight: s.s3 }} />
+        <Button label="Set dates" onPress={() => router.push("/settings")} style={small} />
+      </>
+    );
+  const total = Math.max(1, Math.ceil((diffDays(end, start) + 1) / 7));
+  if (today > end)
+    return (
+      <>
+        <Txt variant="subhead">Semester over</Txt>
+        <Txt variant="meta" tone="ink3">
+          It ended {formatDate(end, today)}.
+        </Txt>
+        <View style={{ flex: 1, minHeight: s.s3 }} />
+        <Button label="Set the next one" onPress={() => router.push("/settings")} style={small} />
+      </>
+    );
+  if (today < start)
+    return (
+      <>
+        <Txt variant="headline" tnum>
+          {total} wks
+        </Txt>
+        <Txt variant="meta" tone="ink3">
+          in the semester, from {formatDate(start, today)}
+        </Txt>
+        <WeekDots count={total} current={-1} />
+      </>
+    );
+  const current = Math.min(total - 1, Math.floor(diffDays(today, start) / 7));
+  // The current week counts as left: it isn't over yet.
+  const left = total - current;
+  return (
+    <>
+      <Txt variant="headline" tnum>
+        {left} {left === 1 ? "wk" : "wks"}
+      </Txt>
+      <Txt variant="meta" tone="ink3">
+        left in the semester
+      </Txt>
+      <WeekDots count={total} current={current} />
+    </>
   );
 }
 
@@ -287,11 +395,14 @@ function useFreeThisWeek(today: CivilDate): { minutes: number; range: string } |
   return { minutes, range };
 }
 
+/** The faintest cell: a day with something done but no time to show. */
+const LEAST = 0.18;
+
 /** Four steps of opacity, from a little to a lot. */
 function level(value: number, max: number): number {
   if (value <= 0 || max <= 0) return 0;
   const f = value / max;
-  return f < 0.25 ? 0.18 : f < 0.5 ? 0.36 : f < 0.8 ? 0.6 : 0.88;
+  return f < 0.25 ? LEAST : f < 0.5 ? 0.36 : f < 0.8 ? 0.6 : 0.88;
 }
 
 const CELL = 8;
@@ -303,7 +414,8 @@ function Heat({
   label,
   months,
 }: {
-  days: { date: string; value: number }[];
+  /** `any`: something happened that day without a value to show, like a task with no length. */
+  days: { date: string; value: number; any?: boolean }[];
   color: string;
   label: string;
   /** Label every other month above the column its first day falls in. */
@@ -312,7 +424,7 @@ function Heat({
   const max = Math.max(...days.map((d) => d.value));
   const first = days[0]?.date;
   const lead = first ? weekday(first) : 0;
-  const cells: ({ date: string; value: number } | null)[] = [
+  const cells: ({ date: string; value: number; any?: boolean } | null)[] = [
     ...Array.from({ length: lead }, () => null),
     ...days,
   ];
@@ -360,8 +472,8 @@ function Heat({
                       width: CELL,
                       height: CELL,
                       borderRadius: 2,
-                      backgroundColor: d.value > 0 ? color : c.hover,
-                      opacity: d.value > 0 ? level(d.value, max) : 1,
+                      backgroundColor: d.value > 0 || d.any ? color : c.hover,
+                      opacity: d.value > 0 ? level(d.value, max) : d.any ? LEAST : 1,
                     }}
                   />
                 ),
@@ -378,9 +490,9 @@ function YearHeat({ heat }: { heat: ProgressView["heat"] }) {
   const total = heat.reduce((sum, d) => sum + d.minutes, 0);
   return (
     <Heat
-      days={heat.map((d) => ({ date: d.date, value: d.minutes }))}
+      days={heat.map((d) => ({ date: d.date, value: d.minutes, any: d.done > 0 }))}
       color={c.ink}
-      label={`Time done each day, ${hoursText(total)} in total`}
+      label={`Tasks done each day, ${hoursText(total)} of timed work in total`}
       months
     />
   );

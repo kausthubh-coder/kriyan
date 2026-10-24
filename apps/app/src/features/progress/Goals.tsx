@@ -26,7 +26,10 @@ function amount(goal: Goal, n: number) {
     : `${v}${goal.unit ? ` ${goal.unit}` : ""}`;
 }
 
-/** Where the goal stands against a steady pace, in words; null when done or without a due date. */
+/**
+ * Where the goal stands against a steady pace, in words; null when done, or when the server
+ * gives no pace (no due date, or a goal too new to judge).
+ */
 function paceText(goal: Goal): string | null {
   if (goal.current >= goal.target || goal.pace === null) return null;
   const diff = goal.current - goal.pace * goal.target;
@@ -44,11 +47,10 @@ function dueText(goal: Goal, today: string): string | null {
   return `${due} · ${left} ${left === 1 ? "day" : "days"} left`;
 }
 
-function daysLeftText(goal: Goal, today: string): string | null {
-  if (!goal.dueDate) return null;
-  const left = diffDays(goal.dueDate, today);
-  if (left <= 0) return dueText(goal, today);
-  return `${left} ${left === 1 ? "day" : "days"} left`;
+/** "45 min", "2 h", "6.5 h". */
+function timeText(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.round(minutes / 6) / 10} h`;
 }
 
 /** Up to this many steps, a count goal draws one segment per step, like the prototype. */
@@ -58,7 +60,18 @@ const MAX_SEGMENTS = 12;
  * One goal as the prototype draws it (b2.html `.goal`): the title, a segmented bar (or a plain one
  * for big numbers), what's left beside the due date, and where a steady pace would put you.
  */
-export function GoalView({ goal, color, today }: { goal: Goal; color: string; today: string }) {
+export function GoalView({
+  goal,
+  color,
+  today,
+  week,
+}: {
+  goal: Goal;
+  color: string;
+  today: string;
+  /** Minutes focused on it this week, and planned on its tasks this week. */
+  week?: { focused: number; planned: number };
+}) {
   const update = useMutation(api.organize.updateGoal);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(String(goal.current));
@@ -70,8 +83,7 @@ export function GoalView({ goal, color, today }: { goal: Goal; color: string; to
     goal.kind === "tasks" && Number.isInteger(goal.target) && goal.target > 1 && goal.target <= MAX_SEGMENTS
       ? goal.target
       : null;
-  // Beside a plain bar the prototype keeps the right side short: just the days left.
-  const due = segments ? dueText(goal, today) : daysLeftText(goal, today);
+  const due = dueText(goal, today);
   const pace = paceText(goal);
   return (
     <View style={{ borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong }}>
@@ -143,6 +155,7 @@ export function GoalView({ goal, color, today }: { goal: Goal; color: string; to
             {pace}
           </Txt>
         ) : null}
+        {week && (week.focused > 0 || week.planned > 0) ? <WeekTime {...week} color={color} /> : null}
       </Press>
       <Popover open={open} onClose={() => setOpen(false)} anchor={ref} title={goal.title} width={300}>
         {goal.kind === "number" ? (
@@ -180,6 +193,36 @@ export function GoalView({ goal, color, today }: { goal: Goal; color: string; to
           }}
         />
       </Popover>
+    </View>
+  );
+}
+
+/**
+ * This week's time on a goal (b2.html `.goal .row2` and `.bar`): time focused out of the time
+ * planned on its tasks. With nothing planned, just the time focused.
+ */
+function WeekTime({ focused, planned, color }: { focused: number; planned: number; color: string }) {
+  return (
+    <View style={{ gap: s.s2 }}>
+      <Txt variant="meta" tone="ink3" tnum>
+        This week:{" "}
+        <Txt variant="meta" tnum style={family("600")}>
+          {timeText(focused)}
+        </Txt>
+        {planned > 0 ? ` of ${timeText(planned)} planned` : " focused"}
+      </Txt>
+      {planned > 0 ? (
+        <View style={{ height: 6, borderRadius: 3, backgroundColor: c.line, overflow: "hidden" }} aria-hidden>
+          <View
+            style={{
+              width: `${Math.min(100, Math.round((focused / planned) * 100))}%`,
+              height: "100%",
+              borderRadius: 3,
+              backgroundColor: color,
+            }}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
