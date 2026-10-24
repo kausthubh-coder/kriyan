@@ -12,7 +12,7 @@ export const ANDROID_PAGE = "/android";
  * The Android build APK_URL serves, as shown on /android. ship-kriyan updates the version and the
  * size with every Android release; the size is the APK's in MB (1,000,000 bytes) as the release lists it.
  */
-export const ANDROID_RELEASE = { version: "2.1.0", sizeMb: 116, minAndroid: "7" } as const;
+export const ANDROID_RELEASE = { version: "2.2.0", sizeMb: 73, minAndroid: "7" } as const;
 export const MCP_URL = `${SITE_URL}/mcp`;
 
 export const SITE_NAME = "Kriyan";
