@@ -1,15 +1,25 @@
-// Writes every logo file for the three directions from one definition each.
-// Keep these paths in step with apps/site/src/lib/brand.tsx.  Run: node docs/design/brand/build.mjs
+// Writes every logo file for each direction from one definition each, then the app's icons
+// (launcher, adaptive, themed, favicon, splash) as PNGs for the mark in use.
+// Keep these paths and colours in step with apps/site/src/lib/brand.tsx.
+// Run from the repo root: node docs/design/brand/build.mjs
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { launchBrowser } from "../../../scripts/browser.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const RED = "#ff3b30",
-  BG = "#0b0b0c",
-  INK = "#f3f3f5";
+const icons = join(here, "..", "..", "..", "apps", "app", "assets", "icons");
+// The light and dark `now` tokens, the Today header's black, and the light ink.
+const RED = "#c93126",
+  RED_ON_DARK = "#f75e54",
+  BG = "#070708",
+  INK = "#ffffff",
+  INK_LIGHT = "#0f0f11";
+const CURRENT = "ring";
 
 const marks = {
+  ring: (ink, dot) =>
+    `<path d="M19.78 11.46A7.8 7.8 0 1 1 12.54 4.22" fill="none" stroke="${ink}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17.52" cy="6.48" r="2.6" fill="${dot}"/>`,
   "k-dot": (ink, dot) =>
     `<path fill="${ink}" d="M3.6 3.5h3.9v6.6l6-6.6h4.7l-6.6 7 7 9.9h-4.7l-5-7.2-1.4 1.5v5.7H3.6z"/><circle cx="20.6" cy="5.4" r="2" fill="${dot}"/>`,
   "day-line": (ink, dot) =>
@@ -29,13 +39,37 @@ for (const [name, draw] of Object.entries(marks)) {
     join(here, `${name}-app-icon.svg`),
     svg(
       "0 0 1024 1024",
-      `<rect width="1024" height="1024" fill="${BG}"/><g transform="translate(225.3 225.3) scale(23.89)">${draw(INK, RED)}</g>`,
+      `<rect width="1024" height="1024" fill="${BG}"/><g transform="translate(225.3 225.3) scale(23.89)">${draw(INK, RED_ON_DARK)}</g>`,
     ),
   );
   // Android adaptive foreground: 108 units, mark inside the 66-unit safe circle (40 units wide).
   writeFileSync(
     join(here, `${name}-adaptive-foreground.svg`),
-    svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw(INK, RED)}</g>`),
+    svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw(INK, RED_ON_DARK)}</g>`),
   );
 }
-console.log("wrote", Object.keys(marks).length * 4, "files");
+console.log("wrote", Object.keys(marks).length * 4, "SVG files");
+
+// The app's PNGs for the mark in use. Android masks the adaptive foreground to a circle or
+// squircle and crops to the middle 66%, so the mark stays inside 40 of its 108 units.
+const draw = marks[CURRENT];
+const png = {
+  "icon.png": [1024, svg("0 0 1024 1024", `<rect width="1024" height="1024" fill="${BG}"/><g transform="translate(225.3 225.3) scale(23.89)">${draw(INK, RED_ON_DARK)}</g>`)],
+  "adaptive-foreground.png": [1024, svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw(INK, RED_ON_DARK)}</g>`)],
+  "adaptive-monochrome.png": [1024, svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw("#ffffff", "#ffffff")}</g>`)],
+  "favicon.png": [96, svg("0 0 96 96", `<rect width="96" height="96" rx="21" fill="${BG}"/><g transform="translate(18 18) scale(2.5)">${draw(INK, RED_ON_DARK)}</g>`)],
+  // The splash shows the mark alone on the scheme's own ground, so it needs both inks.
+  "splash.png": [1024, svg("0 0 24 24", draw(INK_LIGHT, RED))],
+  "splash-dark.png": [1024, svg("0 0 24 24", draw(INK, RED_ON_DARK))],
+};
+const browser = await launchBrowser();
+const page = await browser.newPage();
+for (const [file, [size, markup]] of Object.entries(png)) {
+  await page.setViewportSize({ width: size, height: size });
+  await page.setContent(
+    `<style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${markup}`,
+  );
+  await page.screenshot({ path: join(icons, file), omitBackground: true });
+}
+await browser.close();
+console.log("wrote", Object.keys(png).length, "app icons for", CURRENT);

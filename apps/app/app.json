@@ -10,7 +10,7 @@
     "android": {
       "package": "app.kriyan",
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#070708",
         "foregroundImage": "./assets/icons/adaptive-foreground.png",
         "monochromeImage": "./assets/icons/adaptive-monochrome.png"
       },
@@ -35,7 +35,8 @@
           "image": "./assets/icons/splash.png",
           "imageWidth": 96,
           "dark": {
-            "backgroundColor": "#070709"
+            "backgroundColor": "#070709",
+            "image": "./assets/icons/splash-dark.png"
           }
         }
       ],

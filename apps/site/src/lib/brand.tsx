@@ -2,16 +2,18 @@
 // draw from here, so switching to another direction is changing CURRENT below.
 // Sources and the comparison page: docs/design/brand/.
 
-export type MarkName = "k-dot" | "day-line" | "k-line";
+export type MarkName = "ring" | "k-dot" | "day-line" | "k-line";
 
-/** The direction in use. */
-export const CURRENT: MarkName = "k-dot";
+/** The direction in use: an open ring, the day, with now as the red dot in its gap (chosen 24 Oct 2026). */
+export const CURRENT: MarkName = "ring";
 
-/** The red "now" dot, the same red as "Thu•" in the app's header. */
-export const NOW_RED = "#ff3b30";
-/** App icon ground and ink: the black of the app's Joi-style header. */
-export const ICON_BG = "#0b0b0c";
-export const ICON_INK = "#f3f3f5";
+/** The red "now" dot on a light ground: the app's light `now` token. */
+export const NOW_RED = "#c93126";
+/** The same red on the black icon ground: the dark `now` token, which holds up on black. */
+export const NOW_RED_ON_DARK = "#f75e54";
+/** App icon ground and ink: the black of the app's Today header. */
+export const ICON_BG = "#070708";
+export const ICON_INK = "#ffffff";
 
 /**
  * Each mark drawn on a 24-unit square. `ink` is the letter or line colour; `dot` is the now-dot,
@@ -20,6 +22,21 @@ export const ICON_INK = "#f3f3f5";
  * inside <svg>.
  */
 export function markPaths({ name = CURRENT, ink, dot }: { name?: MarkName; ink: string; dot: string }) {
+  if (name === "ring") {
+    return (
+      <g>
+        <path
+          d="M19.78 11.46A7.8 7.8 0 1 1 12.54 4.22"
+          fill="none"
+          stroke={ink}
+          strokeWidth="3.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="17.52" cy="6.48" r="2.6" fill={dot} />
+      </g>
+    );
+  }
   if (name === "day-line") {
     return (
       <g fill="none" stroke={ink} strokeLinecap="round">
@@ -50,7 +67,8 @@ export function markPaths({ name = CURRENT, ink, dot }: { name?: MarkName; ink: 
 export function BrandMark({
   size = 22,
   ink = "currentColor",
-  dot = NOW_RED,
+  // The page's own red, so the dot follows light and dark; next/og passes a colour instead.
+  dot = "var(--now)",
   title,
   name = CURRENT,
 }: {
@@ -92,7 +110,7 @@ export function AppIcon({ size, name = CURRENT }: { size: number; name?: MarkNam
       }}
     >
       <svg width={inner} height={inner} viewBox="0 0 24 24">
-        {markPaths({ name, ink: ICON_INK, dot: NOW_RED })}
+        {markPaths({ name, ink: ICON_INK, dot: NOW_RED_ON_DARK })}
       </svg>
     </div>
   );
