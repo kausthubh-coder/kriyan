@@ -86,11 +86,14 @@ export function DayPicker({
   today,
   onPick,
   allowNone = true,
+  quick: showQuick = true,
 }: {
   value: CivilDate | null;
   today: CivilDate;
   onPick: (date: CivilDate | null) => void;
   allowNone?: boolean;
+  /** The Today / Tomorrow chips, off where the picker already lists those days. */
+  quick?: boolean;
 }) {
   const phone = useIsPhone();
   const [ty, tm] = parts(value ?? today);
@@ -116,19 +119,21 @@ export function DayPicker({
 
   return (
     <View style={{ gap: s.s3 }}>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-        {quick.map(([label, date], i) => (
-          <Chip
-            key={label}
-            label={label}
-            // On a Saturday "Today" and "This weekend" are the same day: the first one says so.
-            on={value === date && quick.findIndex(([, d]) => d === date) === i}
-            onPress={() => onPick(date)}
-            accessibilityLabel={`${label}, ${formatDay(date, today)}`}
-          />
-        ))}
-        {allowNone ? <Chip label="No date" on={value === null} onPress={() => onPick(null)} /> : null}
-      </View>
+      {showQuick ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+          {quick.map(([label, date], i) => (
+            <Chip
+              key={label}
+              label={label}
+              // On a Saturday "Today" and "This weekend" are the same day: the first one says so.
+              on={value === date && quick.findIndex(([, d]) => d === date) === i}
+              onPress={() => onPick(date)}
+              accessibilityLabel={`${label}, ${formatDay(date, today)}`}
+            />
+          ))}
+          {allowNone ? <Chip label="No date" on={value === null} onPress={() => onPick(null)} /> : null}
+        </View>
+      ) : null}
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <Txt variant="label" style={{ flex: 1 }}>
           {MONTH_SHORT[month[1] - 1]} {month[0]}

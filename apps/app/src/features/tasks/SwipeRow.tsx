@@ -241,7 +241,7 @@ export function SwipeRow({ children, color, onComplete, moveLabel, onMove, onPic
         </Animated.View>
       </Animated.View>
       <GestureDetector gesture={pan}>
-        <Animated.View style={[{ backgroundColor: c.bg }, row]}>
+        <Animated.View style={[{ backgroundColor: c.raised }, row]}>
           {children}
           {isOpen ? (
             // While open, a tap on the row closes it instead of opening the task.

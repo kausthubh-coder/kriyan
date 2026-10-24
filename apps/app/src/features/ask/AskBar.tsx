@@ -165,7 +165,7 @@ function Starter({ label, phone, onPress }: { label: string; phone: boolean; onP
             justifyContent: "center",
             paddingHorizontal: s.s3,
             borderRadius: r.ctl,
-            backgroundColor: hovered ? c.hover : c.bg,
+            backgroundColor: hovered ? c.hover : "transparent",
             boxShadow: `inset 0 0 0 1px ${c.lineStrong}`,
           }}
         >

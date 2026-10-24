@@ -8,7 +8,7 @@ import { formatClock, parts, weekday, type CivilDate } from "@kriyan/core/dates"
 import { describeRepeat, formatDate, formatDuration, MONTH_LONG, WEEKDAY_SHORT } from "@kriyan/core/format";
 import { parseTask, type ParsedTask } from "@kriyan/core/parse";
 import { useClock } from "@/data/time";
-import { c, r, s, shadows, spaceTone } from "@/theme/tokens";
+import { bold, c, r, s, shadows, spaceTone } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Txt } from "@/ui/Txt";
 import type { Draft } from "./draft";
@@ -94,7 +94,7 @@ export function DayName({ today, big }: { today: CivilDate; big?: boolean }) {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s1 }}>
-        <Txt variant={big ? "display" : "headline"} tone="headInk">
+        <Txt variant={big ? "display" : "headline"} tone="headInk" style={bold}>
           {WEEKDAY_SHORT[weekday(today)]}
         </Txt>
         <View

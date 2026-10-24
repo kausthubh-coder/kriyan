@@ -15,6 +15,9 @@ import {
   ArrowRight,
   Bell,
   Calendar,
+  CalendarDays,
+  Check as CheckGlyph,
+  Clock,
   Play,
   Plus,
   CircleDot,
@@ -35,11 +38,10 @@ import {
   formatDay,
   WEEKDAY_SHORT,
   formatDuration,
-  formatTimeRange,
   describeReminder,
   describeRepeat,
 } from "@kriyan/core/format";
-import { formatClock, weekday, zonedParts } from "@kriyan/core/dates";
+import { addDays, formatClock, weekday, zonedParts } from "@kriyan/core/dates";
 import { firstOccurrence, parseTask } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import type { Repeat } from "@kriyan/core/repeat";
@@ -64,7 +66,7 @@ import { RepeatEditor } from "./RepeatEditor";
 import { StepList } from "./StepList";
 import { showToast } from "@/ui/toast";
 
-type Sub = "space" | "when" | "repeat" | "reminders" | "deadline" | "goal" | "more";
+type Sub = "space" | "when" | "length" | "repeat" | "reminders" | "deadline" | "goal" | "more";
 
 interface Props {
   task: TaskDoc;
@@ -101,7 +103,9 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
               ? deadlineRef
               : sub === "goal"
                 ? goalRef
-                : moreRef;
+                : sub === "length"
+                  ? lengthRef
+                  : moreRef;
   const [title, setTitle] = useState(task.title);
   const isTicking = ticking.useValue((t) => Boolean(t[task._id]));
   const done = task.doneAt !== undefined || isTicking;
@@ -146,7 +150,15 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
       case "when":
         return {
           title: "When",
-          body: <WhenEditor task={task} today={today} save={save} />,
+          body: (
+            <WhenPicker task={task} today={today} when={when} save={save} onPicked={() => setSub(null)} />
+          ),
+          width: 340,
+        };
+      case "length":
+        return {
+          title: "How long?",
+          body: <LengthPicker value={task.length ?? null} today={today} save={save} />,
           width: 340,
         };
       case "repeat":
@@ -372,8 +384,8 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
               text={task.length ? formatDuration(task.length) : null}
               empty="Length"
               label="Length"
-              expanded={false}
-              onPress={() => setSub(sub === "when" ? null : "when")}
+              expanded={sub === "length"}
+              onPress={() => setSub(sub === "length" ? null : "length")}
             />
           )}
           {task.event ? null : (
@@ -789,118 +801,240 @@ function GoalPicker({ value, onPick }: { value: string | null; onPick: (id: Id<"
   );
 }
 
-const LENGTHS = [15, 30, 45, 60, 90, 120];
+/** B2's length presets (`DUR`): none first, then the usual blocks. */
+const LENGTHS = [null, 5, 15, 30, 45, 60, 90, 120, 180] as const;
+const TIMES = [9 * 60, 12 * 60, 14 * 60, 17 * 60, 19 * 60];
 
 function withOwn(presets: number[], own: number | undefined): number[] {
   return own === undefined || presets.includes(own) ? presets : [...presets, own].sort((a, b) => a - b);
 }
 
-function WhenEditor({
+type WhenSave = (patch: {
+  date?: string | null;
+  time?: number | null;
+  length?: number | null;
+}) => Promise<unknown>;
+
+/**
+ * B2's When picker (`pickerHTML` "when"): what's set, then five big choices with their dates.
+ * A day picks and closes. A date further out and the time are one more tap each, so the
+ * resting picker stays short and the task shows behind it.
+ */
+function WhenPicker({
   task,
   today,
+  when,
   save,
+  onPicked,
 }: {
   task: TaskDoc;
   today: string;
-  save: (patch: { date?: string | null; time?: number | null; length?: number | null }) => Promise<unknown>;
+  /** The When chip's own words ("Sat 10:30 → 12:00"). */
+  when: string | null;
+  save: WhenSave;
+  onPicked: () => void;
 }) {
+  const [more, setMore] = useState<"date" | "time" | null>(null);
   const [timeText, setTimeText] = useState("");
-  const [lengthText, setLengthText] = useState("");
   const typedTime = timeText.trim() ? parseTask(`x at ${timeText.trim()}`, today).time : undefined;
-  const typedLength = lengthText.trim() ? parseTask(`x for ${lengthText.trim()}`, today).length : undefined;
-  // The task's own time and length show as picked chips even when they aren't presets, so the
-  // editor always says what's set.
-  const times = withOwn([9 * 60, 12 * 60, 14 * 60, 17 * 60, 19 * 60], task.time);
-  const lengths = withOwn(LENGTHS, task.length);
+  const saturday = addDays(today, (5 - weekday(today) + 7) % 7);
+  const days: [string, string][] = [
+    ["Today", today],
+    ["Tomorrow", addDays(today, 1)],
+    ["This weekend", saturday],
+    ["Next week", addDays(today, 7 - weekday(today))],
+  ];
+  const pickDay = (date: string | null) => {
+    void save(date ? { date } : { date: null, time: null });
+    onPicked();
+  };
+  const setTime = (time: number | null) =>
+    void save({ time, ...(task.date || time === null ? {} : { date: today }) });
   return (
-    <View style={{ gap: s.s4 }}>
-      <View style={{ gap: s.s2 }}>
-        <Txt variant="caption" tone="ink3">
-          Day
-        </Txt>
-        <DayPicker
-          value={task.date ?? null}
-          today={today}
-          allowNone={!task.repeat}
-          onPick={(date) => void save(date ? { date } : { date: null, time: null })}
+    <View>
+      <Txt variant="meta" tone="ink3" tnum style={{ marginBottom: s.s1 }}>
+        {when ?? "Not scheduled yet"}
+      </Txt>
+      {days.map(([label, date], i) => (
+        <PickRow
+          key={label}
+          label={label}
+          hint={formatDate(date, today)}
+          // On a Saturday "Today" and "This weekend" are the same day: the first one says so.
+          selected={task.date === date && days.findIndex(([, d]) => d === date) === i}
+          onPress={() => pickDay(date)}
         />
-      </View>
-      <View style={{ gap: s.s2 }}>
-        <Txt variant="caption" tone="ink3">
-          Time
-        </Txt>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-          {times.map((m) => (
-            <Chip
-              key={m}
-              label={formatTimeRange(m, undefined)}
-              on={task.time === m}
-              onPress={() => void save({ time: m, ...(task.date ? {} : { date: today }) })}
-            />
-          ))}
-          <Chip label="No time" on={task.time === undefined} onPress={() => void save({ time: null })} />
-        </View>
-        <Field
-          label="Time"
-          value={timeText}
-          onChangeText={setTimeText}
-          placeholder="Type a time, like 14:30 or 2pm"
-          onSubmitEditing={() => {
-            if (typedTime !== undefined) {
-              void save({ time: typedTime, ...(task.date ? {} : { date: today }) });
-              setTimeText("");
-            }
-          }}
-          trailing={
-            timeText.trim() ? (
-              <Txt variant="meta" tone="ink3">
-                {typedTime !== undefined
-                  ? `Enter for ${formatTimeRange(typedTime, undefined)}`
-                  : "Not a time yet"}
-              </Txt>
-            ) : null
-          }
-        />
-      </View>
-      <View style={{ gap: s.s2 }}>
-        <Txt variant="caption" tone="ink3">
-          Length (optional)
-        </Txt>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-          {lengths.map((m) => (
-            <Chip
-              key={m}
-              label={formatDuration(m)}
-              on={task.length === m}
-              onPress={() => void save({ length: m })}
-            />
-          ))}
-          <Chip
-            label="No length"
-            on={task.length === undefined}
-            onPress={() => void save({ length: null })}
+      ))}
+      {task.repeat ? null : (
+        <PickRow label="Someday, in the inbox" selected={!task.date} onPress={() => pickDay(null)} />
+      )}
+      <PickRow
+        label="Pick a date"
+        icon={CalendarDays}
+        expanded={more === "date"}
+        onPress={() => setMore(more === "date" ? null : "date")}
+      />
+      {more === "date" ? (
+        <View style={{ paddingVertical: s.s3 }}>
+          <DayPicker
+            value={task.date ?? null}
+            today={today}
+            allowNone={false}
+            quick={false}
+            onPick={pickDay}
           />
         </View>
-        <Field
-          label="Length"
-          value={lengthText}
-          onChangeText={setLengthText}
-          placeholder="Type a length, like 1h45"
-          onSubmitEditing={() => {
-            if (typedLength !== undefined) {
-              void save({ length: typedLength });
-              setLengthText("");
+      ) : null}
+      <PickRow
+        label="Time"
+        icon={Clock}
+        hint={task.time !== undefined ? formatClock(task.time) : "Anytime"}
+        expanded={more === "time"}
+        last={more !== "time"}
+        onPress={() => setMore(more === "time" ? null : "time")}
+      />
+      {more === "time" ? (
+        <View style={{ gap: s.s3, paddingTop: s.s3 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+            {withOwn(TIMES, task.time).map((m) => (
+              <Chip key={m} label={formatClock(m)} on={task.time === m} onPress={() => setTime(m)} />
+            ))}
+            <Chip label="Anytime" on={task.time === undefined} onPress={() => setTime(null)} />
+          </View>
+          <Field
+            label="Time"
+            value={timeText}
+            onChangeText={setTimeText}
+            placeholder="Type a time, like 14:30 or 2pm"
+            onSubmitEditing={() => {
+              if (typedTime !== undefined) {
+                setTime(typedTime);
+                setTimeText("");
+              }
+            }}
+            trailing={
+              timeText.trim() ? (
+                <Txt variant="meta" tone="ink3">
+                  {typedTime !== undefined ? `Enter for ${formatClock(typedTime)}` : "Not a time yet"}
+                </Txt>
+              ) : null
             }
-          }}
-          trailing={
-            lengthText.trim() ? (
-              <Txt variant="meta" tone="ink3">
-                {typedLength !== undefined ? `Enter for ${formatDuration(typedLength)}` : "Not a length yet"}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** One big choice in a field's picker (b2.html `.plist button`): 48 tall, dotted apart. */
+function PickRow({
+  label,
+  hint,
+  icon,
+  selected,
+  expanded,
+  last,
+  onPress,
+}: {
+  label: string;
+  hint?: string;
+  icon?: LucideIcon;
+  selected?: boolean;
+  expanded?: boolean;
+  last?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Press
+      role="button"
+      accessibilityLabel={hint ? `${label}, ${hint}` : label}
+      aria-pressed={selected}
+      aria-expanded={expanded}
+      onPress={onPress}
+      scale={false}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s3,
+        minHeight: 48,
+        borderBottomWidth: last ? 0 : 1,
+        borderStyle: "dotted",
+        borderColor: c.lineStrong,
+      }}
+    >
+      {icon ? <Icon icon={icon} size={18} tone="ink2" /> : null}
+      <Txt variant="body" numberOfLines={1} style={[{ flex: 1 }, selected ? family("600") : null]}>
+        {label}
+      </Txt>
+      {hint ? (
+        <Txt variant="meta" tone="ink3" tnum>
+          {hint}
+        </Txt>
+      ) : null}
+      {selected ? <Icon icon={CheckGlyph} size={16} tone="ink2" /> : null}
+    </Press>
+  );
+}
+
+/** B2's "How long?" (`.pgrid`): nine presets three across, and a typed length for the rest. */
+function LengthPicker({ value, today, save }: { value: number | null; today: string; save: WhenSave }) {
+  const [text, setText] = useState("");
+  const typed = text.trim() ? parseTask(`x for ${text.trim()}`, today).length : undefined;
+  const presets: (number | null)[] = [...LENGTHS];
+  if (value !== null && !presets.includes(value)) presets.push(value);
+  return (
+    <View style={{ gap: s.s3 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+        {presets.map((m) => {
+          const on = value === m;
+          return (
+            <Press
+              key={m ?? "none"}
+              role="button"
+              aria-pressed={on}
+              accessibilityLabel={m ? formatDuration(m) : "No length"}
+              onPress={() => void save({ length: m })}
+              hoverBg={on ? null : c.select}
+              style={{
+                // Three to a row: a third of the row less the gaps.
+                flexBasis: "30%",
+                flexGrow: 1,
+                minHeight: 48,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: r.card,
+                backgroundColor: on ? c.ink : c.sunken,
+              }}
+            >
+              <Txt tone={on ? "onInk" : "ink"} tnum style={barLabel}>
+                {m ? formatDuration(m) : "No length"}
               </Txt>
-            ) : null
-          }
-        />
+            </Press>
+          );
+        })}
       </View>
+      <Txt variant="meta" tone="ink3">
+        Optional. Kriyan never guesses a length, so leave it empty if you don&apos;t know.
+      </Txt>
+      <Field
+        label="Length"
+        value={text}
+        onChangeText={setText}
+        placeholder="Another length, like 1h45"
+        onSubmitEditing={() => {
+          if (typed !== undefined) {
+            void save({ length: typed });
+            setText("");
+          }
+        }}
+        trailing={
+          text.trim() ? (
+            <Txt variant="meta" tone="ink3">
+              {typed !== undefined ? `Enter for ${formatDuration(typed)}` : "Not a length yet"}
+            </Txt>
+          ) : null
+        }
+      />
     </View>
   );
 }

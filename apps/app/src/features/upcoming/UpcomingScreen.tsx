@@ -1,11 +1,11 @@
 // Week: plan the week (b2.html `weekDesk`, `weekPhone`). Desktop: a tray of tasks not scheduled
 // yet (Inbox, no date) beside seven day columns with a load line per day (planned against
-// capacity), deadlines and birthdays, and the time grid; drag from the tray onto a day or a
-// time. Phones: the week strip over the picked day's spine, then what's still to plan.
+// capacity), a dot for each deadline, birthday or task with no time (press a day to list them),
+// and the time grid; drag from the tray onto a day or a time. Phones: the week strip over the picked day's spine, then what's still to plan.
 // An agent's proposed blocks wait in a banner with Accept all and Discard. A full day is never
 // red: red means now, and planning more than usual is the person's call, not a fault.
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import Head from "expo-router/head";
@@ -137,25 +137,15 @@ export function UpcomingScreen() {
   }
 
   return (
-    <Screen
-      title="Week"
-      sub={free !== null ? `${weekRange(start)} · ${hoursFree(free)} free` : weekRange(start)}
-      actions={
-        // The strip shows one week; these are the only way to another on a phone.
-        <>
-          <Button
-            icon={ChevronLeft}
-            accessibilityLabel="Previous week"
-            onPress={() => pickDay(addDays(day, -7))}
-          />
-          <Button
-            icon={ChevronRight}
-            accessibilityLabel="Next week"
-            onPress={() => pickDay(addDays(day, 7))}
-          />
-        </>
-      }
-    >
+    <Screen title="Week">
+      {/* B2's title row holds only "Week". The strip shows one week, so the way to another sits
+          small at the end of the dates line under it. */}
+      <View style={{ marginTop: -s.s8 + s.s1, flexDirection: "row", alignItems: "center", gap: s.s2 }}>
+        <Txt variant="body" tone="ink3" tnum style={{ flex: 1 }}>
+          {free !== null ? `${weekRange(start)} · ${hoursFree(free)} free` : weekRange(start)}
+        </Txt>
+        <WeekStep onStep={(n) => pickDay(addDays(day, 7 * n))} />
+      </View>
       {/* b2.html `.pg-head` is 18 above the strip; the screen's gap between sections is 32. */}
       <View style={{ marginTop: -s.s4, gap: s.s8 }}>
         {/* In the list's flow, so it never covers a row (it floated over the spine). */}
@@ -253,22 +243,12 @@ function DesktopWeek({
           <Txt variant="body" tone="ink3" tnum>
             {weekRange(start)}
           </Txt>
-          {/* Quiet, after the dates they change; "This week" only once you've left it. */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginRight: -s.s2 }}>
-            {thisWeek ? null : (
-              <Button variant="quiet" label="This week" onPress={() => onWeek(startOfWeek(today))} />
-            )}
-            <Button
-              icon={ChevronLeft}
-              accessibilityLabel="Previous week"
-              onPress={() => onWeek(addDays(start, -7))}
-            />
-            <Button
-              icon={ChevronRight}
-              accessibilityLabel="Next week"
-              onPress={() => onWeek(addDays(start, 7))}
-            />
-          </View>
+          {/* B2 shows only the dates here. Small and quiet after them, with the arrow keys as the
+              quicker way; "This week" only once you've left it. */}
+          {thisWeek ? null : (
+            <Button variant="quiet" label="This week" onPress={() => onWeek(startOfWeek(today))} />
+          )}
+          <WeekStep onStep={(n) => onWeek(addDays(start, 7 * n))} keys />
         </View>
         {week === undefined ? (
           <View style={{ paddingHorizontal: s.s6 }}>
@@ -292,6 +272,72 @@ function DesktopWeek({
       <DragGhost />
     </View>
   );
+}
+
+/**
+ * Back and forward a week: two small chevrons that don't add to the line they sit on. On
+ * desktop the left and right arrow keys do the same while the Week is on screen.
+ */
+function WeekStep({ onStep, keys }: { onStep: (weeks: -1 | 1) => void; keys?: boolean }) {
+  const step = useRef(onStep);
+  useEffect(() => {
+    step.current = onStep;
+  });
+  useFocusEffect(
+    useCallback(() => {
+      if (!keys || Platform.OS !== "web") return;
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || typingIn(e.target)) return;
+        if (document.querySelector('[aria-modal="true"]')) return;
+        e.preventDefault();
+        step.current(e.key === "ArrowLeft" ? -1 : 1);
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [keys]),
+  );
+  const phone = useIsPhone();
+  // 44 to a finger and 32 to a pointer, pulled into the line so it grows no taller.
+  const size = phone ? sz.touch : sz.ctl;
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        marginVertical: phone ? -s.s3 : -s.s1,
+        marginRight: phone ? -s.s3 : -s.s2,
+      }}
+    >
+      {(
+        [
+          [-1, ChevronLeft, "Previous week"],
+          [1, ChevronRight, "Next week"],
+        ] as const
+      ).map(([n, glyph, label]) => (
+        <Press
+          key={n}
+          role="button"
+          accessibilityLabel={label}
+          onPress={() => onStep(n)}
+          scale={false}
+          style={{
+            width: size,
+            height: size,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: r.ctl,
+          }}
+        >
+          {({ hovered }) => <Icon icon={glyph} size={16} tone={hovered ? "ink" : "ink3"} />}
+        </Press>
+      ))}
+    </View>
+  );
+}
+
+function typingIn(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  return Boolean(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)));
 }
 
 /** Nothing on any day: no blocks, no anytime tasks, no deadlines. */
@@ -496,8 +542,27 @@ function Due({ task }: { task: TaskView }) {
   );
 }
 
-/** A day's all-day row shows this many deadlines, birthdays and anytime tasks before "N more". */
-const HEADER_ITEMS = 2;
+/** A day header marks at most this many things with no time, one dot each. */
+const MARKS = 3;
+
+/**
+ * A dot per deadline, birthday or task with no time, in its space's colour, in the room under
+ * the date, so the header keeps B2's height.
+ */
+function UntimedMarks({ items }: { items: { t: TaskView }[] }) {
+  if (!items.length) return null;
+  return (
+    <View
+      aria-hidden
+      pointerEvents="none"
+      style={{ position: "absolute", bottom: 2, flexDirection: "row", gap: s.s1 }}
+    >
+      {items.slice(0, MARKS).map(({ t }) => (
+        <Dot key={`${t._id}:${t.date}`} color={t.color ? spaceTone(t.color).dot : c.ink3} size={5} />
+      ))}
+    </View>
+  );
+}
 
 /** The hour labels' column, left of the day columns (b2.html `.wk-grid`). */
 const GUTTER = 52;
@@ -517,8 +582,9 @@ function WeekGrid({
   dayStart: number;
   dayEnd: number;
 }) {
-  // One switch for the whole week, so the day columns' all-day rows stay the same height.
-  const [allShown, setAllShown] = useState(false);
+  // B2 keeps the dates right on the timed grid. Deadlines, birthdays and tasks with no time are a
+  // few dots under a day's date; pressing a day lays them out under the dates for the whole week.
+  const [untimedOpen, setUntimedOpen] = useState(false);
   const allTimed = week.days.flatMap((d) => d.scheduled);
   // The person's day from Settings, stretched to fit anything planned outside it.
   const from = Math.min(
@@ -538,7 +604,7 @@ function WeekGrid({
     ...d.anytime.filter((t) => t.repeat?.freq !== "year").map((t) => ({ t, anytime: true })),
   ]);
   const anyAllDay = dayItems.some((items) => items.length > 0);
-  const longest = Math.max(0, ...dayItems.map((items) => items.length));
+  const bandOpen = untimedOpen && anyAllDay;
 
   // The week is a drop zone: over a day's header a task lands on that day, over the grid at a
   // time. The headers stick to the top of the scroll view, so the grid's offset is the scroll.
@@ -605,18 +671,10 @@ function WeekGrid({
             {week.days.map((d, i) => {
               const past = pastUsual(d);
               const target = drag?.over?.date === d.date && drag.over.minutes === null;
-              return (
-                <View
-                  key={d.date}
-                  accessibilityLabel={`${WEEKDAY_LONG[i]} ${parts(d.date)[2]}, ${loadText(d)}${past ? `, ${past}` : ""}`}
-                  style={{
-                    flex: 1,
-                    alignItems: "center",
-                    paddingBottom: s.s2,
-                    borderRadius: r.ctl,
-                    backgroundColor: target ? c.hover : "transparent",
-                  }}
-                >
+              const items = dayItems[i] ?? [];
+              const name = `${WEEKDAY_LONG[i]} ${parts(d.date)[2]}, ${loadText(d)}${past ? `, ${past}` : ""}`;
+              const body = (
+                <>
                   <Txt
                     variant="caption"
                     tone={d.isToday ? "now" : "ink3"}
@@ -628,19 +686,42 @@ function WeekGrid({
                   <Txt variant="title" tone={d.isToday ? "now" : "ink"} tnum>
                     {parts(d.date)[2]}
                   </Txt>
+                  <UntimedMarks items={items} />
                   <LoadLine day={d} />
+                </>
+              );
+              const cell = {
+                flex: 1,
+                alignItems: "center",
+                paddingBottom: s.s2,
+                borderRadius: r.ctl,
+                backgroundColor: target ? c.hover : "transparent",
+              } as const;
+              return items.length ? (
+                <Press
+                  key={d.date}
+                  role="button"
+                  aria-expanded={bandOpen}
+                  accessibilityLabel={`${name}, ${items.length} with no time. ${bandOpen ? "Hide" : "Show"} them`}
+                  onPress={() => setUntimedOpen(!untimedOpen)}
+                  scale={false}
+                  style={cell}
+                >
+                  {body}
+                </Press>
+              ) : (
+                <View key={d.date} accessibilityLabel={name} style={cell}>
+                  {body}
                 </View>
               );
             })}
           </View>
-          {/* Deadlines, birthdays and tasks for the day with no time; only when there are any. */}
-          {anyAllDay ? (
+          {/* Deadlines, birthdays and tasks for the day with no time, once a day is pressed. */}
+          {bandOpen ? (
             <View style={{ flexDirection: "row", paddingBottom: s.s2 }}>
               <View style={{ width: GUTTER }} />
               {week.days.map((d, i) => {
                 const items = dayItems[i] ?? [];
-                const shown = allShown ? items : items.slice(0, HEADER_ITEMS);
-                const more = items.length - shown.length;
                 const target = drag?.over?.date === d.date && drag.over.minutes === null;
                 return (
                   <View
@@ -654,25 +735,9 @@ function WeekGrid({
                       backgroundColor: target ? c.hover : "transparent",
                     }}
                   >
-                    {shown.map(({ t, anytime }) =>
+                    {items.map(({ t, anytime }) =>
                       anytime ? <Anytime key={t._id} task={t} /> : <Due key={t._id} task={t} />,
                     )}
-                    {more > 0 || (allShown && longest > HEADER_ITEMS && i === 0) ? (
-                      <Press
-                        role="button"
-                        accessibilityLabel={
-                          more > 0 ? `Show ${more} more on ${WEEKDAY_LONG[i]}` : "Show fewer"
-                        }
-                        onPress={() => setAllShown(!allShown)}
-                        hoverBg={null}
-                        scale={false}
-                        style={{ minHeight: 24, justifyContent: "center" }}
-                      >
-                        <Txt variant="meta" tone="ink3">
-                          {more > 0 ? `${more} more` : "Show fewer"}
-                        </Txt>
-                      </Press>
-                    ) : null}
                   </View>
                 );
               })}

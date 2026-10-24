@@ -13,8 +13,8 @@
   --head: oklch(13% 0.003 286);
   --head-ink: oklch(100% 0 0);
   --head-dim: oklch(66% 0.008 286);
-  --head-fill: oklch(21% 0.004 286);
-  --head-line: oklch(29% 0.005 286);
+  --head-fill: oklch(19% 0.004 286);
+  --head-line: oklch(26% 0.005 286);
   --parse: oklch(53% 0.18 255);
   --done: oklch(52% 0.13 150);
   --side: oklch(98.5% 0 0);
@@ -88,7 +88,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: oklch(13% 0.004 286);
+    --bg: oklch(0% 0 0);
     --raised: oklch(19.5% 0.005 286);
     --overlay: oklch(23% 0.005 286);
     --sunken: oklch(21.5% 0.005 286);
@@ -101,7 +101,7 @@
     --head-ink: oklch(100% 0 0);
     --head-dim: oklch(66% 0.008 286);
     --head-fill: oklch(19% 0.004 286);
-    --head-line: oklch(27% 0.005 286);
+    --head-line: oklch(26% 0.005 286);
     --parse: oklch(72% 0.14 250);
     --done: oklch(72% 0.15 150);
     --side: oklch(15% 0.003 286);
@@ -134,7 +134,7 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: oklch(13% 0.004 286);
+  --bg: oklch(0% 0 0);
   --raised: oklch(19.5% 0.005 286);
   --overlay: oklch(23% 0.005 286);
   --sunken: oklch(21.5% 0.005 286);
@@ -147,7 +147,7 @@
   --head-ink: oklch(100% 0 0);
   --head-dim: oklch(66% 0.008 286);
   --head-fill: oklch(19% 0.004 286);
-  --head-line: oklch(27% 0.005 286);
+  --head-line: oklch(26% 0.005 286);
   --parse: oklch(72% 0.14 250);
   --done: oklch(72% 0.15 150);
   --side: oklch(15% 0.003 286);

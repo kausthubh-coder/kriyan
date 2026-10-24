@@ -113,7 +113,9 @@ export function OnboardingScreen() {
           : "This is your real Today. Signing in saves it.";
 
   return (
-    <View style={{ flex: 1, backgroundColor: desktop ? c.sunken : d.step === 1 ? c.head : c.raised }}>
+    // The desktop canvas is the sidebar's breath off white (the prototype's `--side`), so the
+    // card reads by its shadow, not by a grey ground.
+    <View style={{ flex: 1, backgroundColor: desktop ? c.side : d.step === 1 ? c.head : c.raised }}>
       {Platform.OS === "web" ? (
         <Head>
           <title>Welcome | Kriyan</title>

@@ -142,7 +142,7 @@ export function AskScreen() {
     // The box floats above the dock (b2.html `.askbar`: 12 above the dock's top edge).
     const barBottom = insets.bottom + DOCK_GAP + DOCK_HEIGHT + s.s3;
     return (
-      <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <View style={{ flex: 1, backgroundColor: c.raised }}>
         {title}
         <ScrollView
           {...scrollProps}
@@ -177,8 +177,8 @@ export function AskScreen() {
           style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
         >
           <KeyboardLift rest={barBottom} gap={s.s2} style={{ pointerEvents: "box-none" }}>
-            <View pointerEvents="none" style={[{ height: s.s6 }, fade]} />
-            <View style={{ alignItems: "center", paddingHorizontal: DOCK_GAP, backgroundColor: c.bg }}>
+            <View pointerEvents="none" style={[{ height: s.s6 }, phoneFade]} />
+            <View style={{ alignItems: "center", paddingHorizontal: DOCK_GAP, backgroundColor: c.raised }}>
               <View style={{ width: "100%", maxWidth: 528 }}>{bar}</View>
               {/* The dock floats over this. */}
               <View style={{ height: barBottom }} />
@@ -196,7 +196,7 @@ export function AskScreen() {
               left: 0,
               right: 0,
               height: insets.top,
-              backgroundColor: c.bg,
+              backgroundColor: c.raised,
             }}
           />
         ) : null}
@@ -234,7 +234,14 @@ export function AskScreen() {
           role="complementary"
           aria-label="Automations"
           // B2's right column on Ask is 400 wide, like Today's schedule, not the task panel's 440.
-          style={{ width: sz.schedule, flexGrow: 0, borderLeftWidth: 1, borderLeftColor: c.line }}
+          // A raised panel beside the page, like B2's `.rp` (#151517 against the black canvas in dark).
+          style={{
+            width: sz.schedule,
+            flexGrow: 0,
+            borderLeftWidth: 1,
+            borderLeftColor: c.line,
+            backgroundColor: c.raised,
+          }}
           contentContainerStyle={{ padding: s.s6 }}
         >
           {automations}
@@ -284,4 +291,9 @@ function Column({ children }: { children: ReactNode }) {
 const fade =
   Platform.OS === "web"
     ? ({ backgroundImage: `linear-gradient(to bottom, transparent, ${c.bg})` } as object)
+    : null;
+/** Phones draw Ask on the raised sheet like every other page (ui/Screen.tsx's phone ground). */
+const phoneFade =
+  Platform.OS === "web"
+    ? ({ backgroundImage: `linear-gradient(to bottom, transparent, ${c.raised})` } as object)
     : null;

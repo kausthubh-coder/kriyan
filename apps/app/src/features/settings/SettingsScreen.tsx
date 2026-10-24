@@ -118,12 +118,12 @@ export function SettingsScreen() {
             <AccountCard profile={profile} />
             <Feel profile={profile} />
             <EveningReview profile={profile} />
-            <ConnectAI profile={profile} />
+            <ConnectAI />
             <Install />
             <Semester profile={profile} />
             <YourDay profile={profile} />
             <DefaultReminders profile={profile} />
-            <Tokens />
+            <AgentAccess profile={profile} />
             <Deleted />
             <DeleteData />
           </>
@@ -702,8 +702,7 @@ function ConnRow({
   );
 }
 
-function ConnectAI({ profile }: { profile: Profile }) {
-  const update = useUpdateProfile();
+function ConnectAI() {
   return (
     <Section title="Agents and automations" id="connect-ai">
       <View
@@ -742,16 +741,8 @@ function ConnectAI({ profile }: { profile: Profile }) {
           last
         />
       </View>
-      <SwitchRow
-        label="Let agents edit directly"
-        hint={
-          profile.agentsEditDirectly
-            ? "On: an agent's plans go straight onto your days."
-            : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."
-        }
-        on={profile.agentsEditDirectly}
-        onChange={(agentsEditDirectly) => void update({ agentsEditDirectly })}
-      />
+      {/* B2 goes straight from the card to the terminal; what agents may do lives with the
+          tokens that let them in, after Install. */}
       <TerminalBlock lines={[...CLI_SETUP, ...CLI_EXAMPLES]} label="Command line setup and examples" />
     </Section>
   );
@@ -846,7 +837,9 @@ function Switch({ on }: { on: boolean }) {
   );
 }
 
-function Tokens() {
+/** What agents may do, and the tokens that let the command line and scripts in. */
+function AgentAccess({ profile }: { profile: Profile }) {
+  const update = useUpdateProfile();
   const tokens = useAccessTokens();
   const create = useMutation(api.account.createToken);
   const revoke = useMutation(api.account.revokeToken);
@@ -869,10 +862,20 @@ function Tokens() {
   };
   const day = (ms: number) => formatDate(new Date(ms).toISOString().slice(0, 10), today);
   return (
-    <Section title="Access tokens">
+    <Section title="Agent access">
+      <SwitchRow
+        label="Let agents edit directly"
+        hint={
+          profile.agentsEditDirectly
+            ? "On: an agent's plans go straight onto your days."
+            : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."
+        }
+        on={profile.agentsEditDirectly}
+        onChange={(agentsEditDirectly) => void update({ agentsEditDirectly })}
+      />
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
-        For the command line and scripts. Each token can read and change your plan, so give it a name you’ll
-        recognise and revoke it when you stop using it.
+        Access tokens are for the command line and scripts. Each token can read and change your plan, so give
+        it a name you’ll recognise and revoke it when you stop using it.
       </Txt>
       {fresh ? (
         <View

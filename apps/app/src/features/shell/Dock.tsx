@@ -21,16 +21,16 @@ export const DOCK_CLEARANCE = DOCK_HEIGHT + DOCK_GAP + s.s4;
 const FAB = 58;
 const MAX_WIDTH = 528;
 
-// Ask is the fourth tab (b2.html `asknav`). The places reached from it on a phone (the Inbox,
-// spaces, Settings, Recently deleted) keep it lit, so the dock still says where you are.
+// Ask is the fourth tab (b2.html `asknav`). The places that live under it on a phone (the Inbox,
+// spaces) keep it lit, so the dock still says where you are. Settings and Recently deleted are
+// pushed over the tabs with Back, and B2 leaves every tab unlit there.
 const TABS: { href: Href; match: (p: string) => boolean; icon: LucideIcon; label: string }[] = [
   { href: "/today", match: (p) => p === "/today" || p === "/", icon: Sun, label: "Today" },
   { href: "/upcoming", match: (p) => p === "/upcoming", icon: Columns3, label: "Week" },
   { href: "/progress", match: (p) => p === "/progress", icon: Target, label: "Goals" },
   {
     href: "/ask",
-    match: (p) =>
-      p === "/ask" || p === "/inbox" || p.startsWith("/space/") || p === "/settings" || p === "/trash",
+    match: (p) => p === "/ask" || p === "/inbox" || p.startsWith("/space/"),
     icon: Sparkles,
     label: "Ask",
   },

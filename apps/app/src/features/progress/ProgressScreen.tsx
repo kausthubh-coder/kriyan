@@ -1,13 +1,14 @@
 // Goals and habits (b2.html?screen=goals): the time left in the year, the semester and free this
 // week; goals with why they matter, what's left, when they're due, the next linked task and this
 // week's focused time; habits over the last four weeks against their weekly target (never a
-// streak that resets); then the last 12 months of time done, split by space.
+// streak that resets). The last 12 months of time done, split by space, open from a quiet link
+// under them: B2's page ends after the habits.
 
 import { useRef, useState, type ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { CalendarCheck, CircleCheck, CircleDashed, Plus } from "lucide-react-native";
+import { CalendarCheck, ChevronDown, ChevronUp, CircleCheck, CircleDashed, Plus } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { addDays, diffDays, parts, startOfWeek, weekday, type CivilDate } from "@kriyan/core/dates";
@@ -165,20 +166,8 @@ function ProgressBody({
       >
         {/* B2 gives goals a little more room than habits (`.g-cols` 1.1fr 1fr). */}
         <View style={twoColumns ? { flex: 1.1, minWidth: 0 } : undefined}>
-          <SectionLabel
-            title="Goals"
-            count={view.goals.length ? String(view.goals.length) : undefined}
-            right={
-              <Button
-                variant="quiet"
-                icon={Plus}
-                label="Add goal"
-                onPress={() => setAddingGoal(!addingGoal)}
-                expanded={addingGoal}
-              />
-            }
-          />
-          {addingGoal ? <AddGoal today={today} onDone={() => setAddingGoal(false)} /> : null}
+          {/* B2's headings hold only their counts; adding sits at the end of each list. */}
+          <SectionLabel title="Goals" count={view.goals.length ? String(view.goals.length) : undefined} />
           {view.goals.length ? (
             <View>
               {view.goals.map((g) => (
@@ -191,83 +180,123 @@ function ProgressBody({
               you’re on pace.
             </Txt>
           )}
+          {addingGoal ? (
+            <View style={{ marginTop: s.s3 }}>
+              <AddGoal today={today} onDone={() => setAddingGoal(false)} />
+            </View>
+          ) : (
+            <AddRow label="Add goal" onPress={() => setAddingGoal(true)} />
+          )}
         </View>
 
         <View style={twoColumns ? { flex: 1, minWidth: 0 } : undefined}>
           <SectionLabel
             title="Habits today"
             count={view.habits.length ? `${doneToday} of ${view.habits.length}` : undefined}
-            right={
-              <Button
-                variant="quiet"
-                icon={Plus}
-                label="Add habit"
-                onPress={() => setAddingHabit(!addingHabit)}
-                expanded={addingHabit}
-              />
-            }
           />
-          {addingHabit ? <AddHabit onDone={() => setAddingHabit(false)} /> : null}
-          {view.habits.length ? (
-            <>
-              {view.habits.map((h) => (
-                <HabitRow key={h._id} habit={h} today={today} />
-              ))}
-              <Txt variant="meta" tone="ink3" style={{ marginTop: s.s3 }}>
-                Missed days stay quiet. One miss never resets a habit.
-              </Txt>
-            </>
-          ) : addingHabit ? null : (
+          {view.habits.map((h) => (
+            <HabitRow key={h._id} habit={h} today={today} />
+          ))}
+          {view.habits.length || addingHabit ? null : (
             <Txt variant="body" tone="ink3">
               A habit has a weekly target, like reading 4 times a week. Missing a day never resets anything.
             </Txt>
           )}
+          {/* The note explains the dots, so it stays right under them, as in B2. */}
+          {view.habits.length ? (
+            <Txt variant="meta" tone="ink3" style={{ marginTop: s.s3 }}>
+              Missed days stay quiet. One miss never resets a habit.
+            </Txt>
+          ) : null}
+          {addingHabit ? (
+            <View style={{ marginTop: s.s3 }}>
+              <AddHabit onDone={() => setAddingHabit(false)} />
+            </View>
+          ) : (
+            <AddRow label="Add habit" onPress={() => setAddingHabit(true)} />
+          )}
         </View>
       </View>
 
-      <View style={{ gap: s.s3, marginTop: s.s6 }}>
-        <SectionLabel title="The last 12 months" />
-        {/* Two big zeros on a new account read as a score; the line below says what comes. */}
-        {view.yearDone > 0 ? (
-          <View style={{ flexDirection: "row", gap: s.s12 }}>
-            <DoneStat done={view.weekDone} minutes={view.weekMinutes} when="this week" />
-            <DoneStat done={view.yearDone} minutes={view.yearMinutes} when="in the last 12 months" />
-          </View>
-        ) : null}
-        {total > 0 ? (
-          <>
-            <View
-              style={{ flexDirection: "row", gap: 2, height: 6, borderRadius: 3, overflow: "hidden" }}
-              aria-label="Time by space"
-            >
-              {view.bySpace.map((b) => (
-                <View
-                  key={b.spaceId ?? "none"}
-                  style={{ flex: b.minutes, backgroundColor: spaceTone(b.color).dot }}
-                />
-              ))}
-            </View>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s4 }}>
-              {view.bySpace.map((b) => (
-                <View
-                  key={b.spaceId ?? "none"}
-                  style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}
-                >
-                  <Dot color={spaceTone(b.color).dot} />
-                  <Txt variant="meta" tone="ink2" tnum>
-                    {b.name} {Math.round((b.minutes / total) * 100)}%
-                  </Txt>
-                </View>
-              ))}
-            </View>
-          </>
-        ) : (
-          <Txt variant="body" tone="ink3">
-            Tick off tasks that have a length and their time shows up here, split by space.
-          </Txt>
-        )}
-        <YearHeat heat={view.heat} />
+      <YearSection view={view} total={total} />
+    </>
+  );
+}
+
+/** Adding at the end of a list: a quiet "+ Add goal" whose icon sits on the list's left edge. */
+function AddRow({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <View style={{ alignItems: "flex-start", marginLeft: -s.s3, marginTop: s.s1 }}>
+      <Button variant="quiet" icon={Plus} label={label} onPress={onPress} />
+    </View>
+  );
+}
+
+/**
+ * The last 12 months, behind a quiet link: B2's page ends after the habits, and a year of
+ * history is something to look back on, not to see every visit.
+ */
+function YearSection({ view, total }: { view: ProgressView; total: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ gap: s.s3, marginTop: s.s2 }}>
+      <View style={{ alignItems: "flex-start", marginLeft: -s.s3 }}>
+        <Button
+          variant="quiet"
+          label={open ? "Hide the last 12 months" : "See the last 12 months"}
+          trailing={open ? ChevronUp : ChevronDown}
+          onPress={() => setOpen(!open)}
+          expanded={open}
+        />
       </View>
+      {open ? <YearBody view={view} total={total} /> : null}
+    </View>
+  );
+}
+
+function YearBody({ view, total }: { view: ProgressView; total: number }) {
+  return (
+    <>
+      {/* Two big zeros on a new account read as a score; the line below says what comes. */}
+      {view.yearDone > 0 ? (
+        <View style={{ flexDirection: "row", gap: s.s12 }}>
+          <DoneStat done={view.weekDone} minutes={view.weekMinutes} when="this week" />
+          <DoneStat done={view.yearDone} minutes={view.yearMinutes} when="in the last 12 months" />
+        </View>
+      ) : null}
+      {total > 0 ? (
+        <>
+          <View
+            style={{ flexDirection: "row", gap: 2, height: 6, borderRadius: 3, overflow: "hidden" }}
+            aria-label="Time by space"
+          >
+            {view.bySpace.map((b) => (
+              <View
+                key={b.spaceId ?? "none"}
+                style={{ flex: b.minutes, backgroundColor: spaceTone(b.color).dot }}
+              />
+            ))}
+          </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s4 }}>
+            {view.bySpace.map((b) => (
+              <View
+                key={b.spaceId ?? "none"}
+                style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}
+              >
+                <Dot color={spaceTone(b.color).dot} />
+                <Txt variant="meta" tone="ink2" tnum>
+                  {b.name} {Math.round((b.minutes / total) * 100)}%
+                </Txt>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : (
+        <Txt variant="body" tone="ink3">
+          Tick off tasks that have a length and their time shows up here, split by space.
+        </Txt>
+      )}
+      <YearHeat heat={view.heat} />
     </>
   );
 }
@@ -578,6 +607,11 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
   const doneOn = new Set(habit.days.filter((d) => d.done).map((d) => d.date));
   const doneToday = doneOn.has(today);
   const { recent, done, due } = lastFourWeeks(habit, doneOn);
+  // Round at any width: a flexed dot with an aspect ratio came out taller than wide on phones.
+  const [dotsWidth, setDotsWidth] = useState(0);
+  const dot = dotsWidth
+    ? Math.min(s.s4, Math.floor((dotsWidth - s.s1 * (recent.length - 1)) / recent.length))
+    : s.s2;
   return (
     <View
       style={{
@@ -638,6 +672,7 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
       <View
         role="img"
         aria-label={`${done} of the last ${recent.length} days done`}
+        onLayout={(e) => setDotsWidth(e.nativeEvent.layout.width)}
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
@@ -650,10 +685,9 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
           <View
             key={d.date}
             style={{
-              flex: 1,
-              // Past this a dot reads as a coin; the row spreads the rest as space.
-              maxWidth: s.s4,
-              aspectRatio: 1,
+              // Past 16 a dot reads as a coin; the row spreads the rest as space.
+              width: Math.max(1, dot),
+              height: Math.max(1, dot),
               borderRadius: r.pill,
               alignItems: "center",
               justifyContent: "center",

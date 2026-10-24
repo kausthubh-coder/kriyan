@@ -3,7 +3,7 @@
 // in your AI; then three small next steps and your day.
 
 import { useContext, useEffect, useState, type ReactNode } from "react";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
 import * as Clipboard from "expo-clipboard";
@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@kriyan/convex/api";
 import { addDays, formatClock, startOfWeek, type CivilDate } from "@kriyan/core/dates";
 import { formatDuration } from "@kriyan/core/format";
+import { type } from "@kriyan/core/tokens";
 import { useAccessTokens, useProfile, useWeekView } from "@/data/views";
 import { hapticsOn, setHapticsOn, setSoundsOn } from "@/features/feel/setting";
 import { playSound } from "@/features/feel/sound";
@@ -33,7 +34,8 @@ import { ensureNotifications } from "@/features/notifications/register";
 import { MCP_URL } from "@/features/settings/SettingsScreen";
 import { errorText } from "@/features/tasks/actions";
 import { commitHaptic, toggleHaptic } from "@/features/tasks/haptics";
-import { c, family, r, s, shadows, spaceTone } from "@/theme/tokens";
+import { roleStyle } from "@/theme/layout";
+import { bold, c, family, r, s, shadows, spaceTone } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
@@ -88,7 +90,7 @@ function Instruction({ n, children, glyph }: { n: number; children: ReactNode; g
   );
 }
 
-const bold = (t: string) => (
+const strong = (t: string) => (
   <Txt variant="body" style={family("600")}>
     {t}
   </Txt>
@@ -114,13 +116,13 @@ export function AddToHomeScreen({ next }: { next: () => void }) {
       <Lead>It opens full screen, like any app on your phone.</Lead>
       <View style={{ gap: s.s2, marginTop: s.s6 }}>
         <Instruction n={1} glyph={<Icon icon={Share} size={20} tone="parse" />}>
-          Tap {bold("Share")} {"in Safari's bar"}
+          Tap {strong("Share")} {"in Safari's bar"}
         </Instruction>
         <Instruction n={2} glyph={<Icon icon={SquarePlus} size={20} tone="ink" />}>
-          Scroll and tap {bold("Add to Home Screen")}
+          Scroll and tap {strong("Add to Home Screen")}
         </Instruction>
         <Instruction n={3} glyph={<Txt variant="subhead">K</Txt>}>
-          Open {bold("Kriyan")} from your Home Screen and sign in again.
+          Open {strong("Kriyan")} from your Home Screen and sign in again.
         </Instruction>
       </View>
       <Txt variant="body" tone="ink3" style={{ marginTop: s.s4 }}>
@@ -137,14 +139,16 @@ function ReminderPreview({ d, today }: { d: Draft; today: CivilDate }) {
   const at = f?.parsed.time ?? 21 * 60 + 30;
   const length = f?.parsed.length;
   return (
-    <View style={{ marginTop: s.s6, padding: s.s4, borderRadius: r.box, backgroundColor: c.sunken }}>
+    // The prototype's `--fill` ground (`.preview`), the same tint as the Set up buttons; in dark
+    // the sunken fill would all but vanish against the card.
+    <View style={{ marginTop: s.s6, padding: s.s3, borderRadius: r.sheet, backgroundColor: c.hover }}>
       <View
         style={{
           flexDirection: "row",
           gap: s.s3,
           padding: s.s3,
-          // Concentric with the 24 surface around it, 16 out.
-          borderRadius: r.ctl,
+          // A round notification like the prototype's `.notif`, concentric with the 24 around it.
+          borderRadius: r.card,
           backgroundColor: c.raised,
           boxShadow: shadows.overlay,
         }}
@@ -187,7 +191,8 @@ function ReminderPreview({ d, today }: { d: Draft; today: CivilDate }) {
           <Txt variant="label" style={family("600")} numberOfLines={1}>
             {`${title} in 10 min`}
           </Txt>
-          <Txt variant="body" tone="ink2">
+          {/* The notification's own small size on phones too (`.notif .nm` is 14). */}
+          <Txt tone="ink2" style={roleStyle(type.body)}>
             {`${formatClock(at)}${length ? `, ${formatDuration(length)}` : ""}. Tap to start.`}
           </Txt>
         </View>
@@ -378,7 +383,7 @@ function BrowserReminders({
   }, [available, next]);
   useEffect(() => {
     if (asked && state === "blocked")
-      showToast("This browser blocks notifications from Kriyan. You can allow them in its site settings.");
+      showToast("Notifications are blocked. Allow them in this browser's site settings.");
   }, [asked, state]);
   return (
     <NudgeStep
@@ -587,6 +592,10 @@ export function ConnectAI({
   );
 }
 
+/** The Get started carousel's snapping on the web (`.cards`, `.gc`); Android uses snapToInterval. */
+const snapRail = Platform.OS === "web" ? ({ scrollSnapType: "x mandatory" } as object) : null;
+const snapStart = Platform.OS === "web" ? ({ scrollSnapAlign: "start" } as object) : {};
+
 /** One "Get started" card (`.gc`): a next step of a minute or two, ticked once it's done. */
 function StartCard({
   icon,
@@ -612,6 +621,7 @@ function StartCard({
       onPress={onPress}
       hoverBg={null}
       style={{
+        ...snapStart,
         width,
         minHeight: 150,
         gap: s.s1,
@@ -637,13 +647,14 @@ function StartCard({
       <Txt variant="subhead" tone={done ? "ink3" : "ink"} strike={done}>
         {title}
       </Txt>
-      <Txt variant="meta" tone="ink3">
+      {/* The card's small line at the desktop size on phones too (`.gc span` is 13). */}
+      <Txt tone="ink3" style={roleStyle(type.meta)}>
         {sub}
       </Txt>
       <View style={{ flex: 1 }} />
       <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1 }}>
         <Icon icon={done ? Check : Clock} size={14} tone={done ? "done" : "ink2"} />
-        <Txt variant="caption" tone="ink2">
+        <Txt variant="caption" tone="ink2" style={family("600")}>
           {done ? "Done" : `${minutes} min`}
         </Txt>
       </View>
@@ -707,12 +718,16 @@ export function GetStarted({
   const [rail, setRail] = useState(340);
   const card = useContext(DesktopCard);
   const insets = useSafeAreaInsets();
+  // The card's own gutters: 32 on the desktop card, 24 on a phone, as on every other step.
+  const gutter = card ? s.s8 : s.s6;
+  const cardWidth = Math.round((rail - 2 * gutter) * 0.72);
   return (
     <StepFrame step={9} bare foot={<FullButton label="Open Today" onPress={finish} />}>
       <View
         style={{
           backgroundColor: c.head,
-          padding: s.s6,
+          paddingVertical: s.s6,
+          paddingHorizontal: gutter,
           // The black head runs up under the phone's status bar; the day starts below it.
           paddingTop: (card ? 0 : insets.top) + s.s6,
           paddingBottom: s.s12,
@@ -737,10 +752,10 @@ export function GetStarted({
             flexDirection: "row",
             alignItems: "baseline",
             justifyContent: "space-between",
-            paddingHorizontal: s.s6,
+            paddingHorizontal: gutter,
           }}
         >
-          <Txt variant="title" heading={1}>
+          <Txt variant="title" heading={1} style={bold}>
             Get started
           </Txt>
           <Txt variant="meta" tone="ink3" tnum>
@@ -749,10 +764,16 @@ export function GetStarted({
         </View>
         <ScrollView
           horizontal
-          style={{ flexGrow: 0 }}
+          // Each card snaps flush to the left edge with the next one peeking in, as the prototype's
+          // `.cards` scroll-snap does; the trailing gutter lets the last one end inset. The web
+          // snaps with CSS, Android with snapToInterval (react-native-web ignores it).
+          style={[{ flexGrow: 0 }, snapRail]}
+          snapToInterval={cardWidth + s.s3}
+          snapToAlignment="start"
+          decelerationRate="fast"
           onLayout={(e) => setRail(e.nativeEvent.layout.width)}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: s.s3, paddingHorizontal: s.s6, paddingTop: s.s3 }}
+          contentContainerStyle={{ gap: s.s3, paddingRight: gutter, paddingTop: s.s3 }}
         >
           {cards.map((card) => (
             <StartCard
@@ -763,12 +784,12 @@ export function GetStarted({
               minutes={card.minutes}
               done={card.done}
               onPress={card.go}
-              // Most of the rail, so the next card peeks in (`.gc` is 72%).
-              width={Math.round((rail - 2 * s.s6) * 0.72)}
+              // Most of the rail inside the gutters, so the next card peeks in (`.gc` is 72%).
+              width={cardWidth}
             />
           ))}
         </ScrollView>
-        <View style={{ paddingHorizontal: s.s6, marginTop: s.s4 }}>
+        <View style={{ paddingHorizontal: gutter, marginTop: s.s4 }}>
           <MiniLabel text="Today" />
           <DayRows d={d} today={today} />
         </View>

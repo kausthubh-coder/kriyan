@@ -47,9 +47,10 @@ const solid: Record<Scheme, Record<Solid, string>> = {
     head: "oklch(13% 0.003 286)",
     headInk: "oklch(100% 0 0)",
     headDim: "oklch(66% 0.008 286)",
-    // Raised surfaces and lines on the black header and focus screen, the same in both schemes.
-    headFill: "oklch(21% 0.004 286)",
-    headLine: "oklch(29% 0.005 286)",
+    // Raised surfaces and lines on the black header and focus screen, the same in both schemes
+    // (B2's focus card #141416 and ring track #232326).
+    headFill: "oklch(19% 0.004 286)",
+    headLine: "oklch(26% 0.005 286)",
     parse: "oklch(53% 0.18 255)",
     done: "oklch(52% 0.13 150)",
     // The desktop sidebar: a breath off white, quieter than the sunken fill (B2's --side).
@@ -58,7 +59,8 @@ const solid: Record<Scheme, Record<Solid, string>> = {
     night: "oklch(0% 0 0)",
   },
   dark: {
-    bg: "oklch(13% 0.004 286)",
+    // B2's dark canvas is pure black (`--bg:#000`); phones draw their pages on `raised`.
+    bg: "oklch(0% 0 0)",
     raised: "oklch(19.5% 0.005 286)",
     overlay: "oklch(23% 0.005 286)",
     sunken: "oklch(21.5% 0.005 286)",
@@ -71,7 +73,7 @@ const solid: Record<Scheme, Record<Solid, string>> = {
     headInk: "oklch(100% 0 0)",
     headDim: "oklch(66% 0.008 286)",
     headFill: "oklch(19% 0.004 286)",
-    headLine: "oklch(27% 0.005 286)",
+    headLine: "oklch(26% 0.005 286)",
     parse: "oklch(72% 0.14 250)",
     done: "oklch(72% 0.15 150)",
     side: "oklch(15% 0.003 286)",

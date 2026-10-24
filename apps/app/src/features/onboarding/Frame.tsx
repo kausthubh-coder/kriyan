@@ -6,9 +6,10 @@ import { createContext, useContext, type ReactNode } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { ChevronLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { c, family, r, s, shadows } from "@/theme/tokens";
+import { bold, c, family, r, s, shadows } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Press } from "@/ui/Press";
+import { ToastHost } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 
 /** Steps 2 to 9 fill the bar; 1 is the welcome. */
@@ -128,12 +129,20 @@ function TopBar({ step, onBack, onSkip }: { step: number; onBack?: () => void; o
 /** Balanced lines on the web ("What should / Kriyan help with?"), not a lonely last word. */
 const balance = Platform.OS === "web" ? ({ textWrap: "balance" } as object) : null;
 
-/** The step's question: two tones, like the Today sentence (`.q` and `.q .d`). */
-export function Question({ text, dim }: { text: string; dim?: string }) {
+/**
+ * The step's question: two tones, like the Today sentence (`.q` and `.q .d`). `maxWidth` keeps a
+ * question on the two lines the prototype gives it on the desktop card, where its 30 px type
+ * wraps and our 28 px would just fit on one.
+ */
+export function Question({ text, dim, maxWidth }: { text: string; dim?: string; maxWidth?: number }) {
   return (
-    <Txt variant="headline" heading={1} style={[{ marginTop: s.s4 }, balance]}>
+    <Txt variant="headline" heading={1} style={[bold, { marginTop: s.s4, maxWidth }, balance]}>
       {text}
-      {dim ? <Txt variant="headline" tone="ink3">{` ${dim}`}</Txt> : null}
+      {dim ? (
+        <Txt variant="headline" tone="ink3" style={bold}>
+          {` ${dim}`}
+        </Txt>
+      ) : null}
     </Txt>
   );
 }
@@ -160,6 +169,21 @@ export function MiniLabel({ text }: { text: string }) {
 }
 
 /**
+ * Onboarding is outside the app's layout, which is where toasts usually show, so each step has
+ * its own place for them ("This browser blocks notifications", a failed save): just above its
+ * buttons, inside the card on desktop.
+ */
+function Toasts({ bottom, gutter }: { bottom: number | "100%"; gutter: number }) {
+  // The host pads 16 itself; the rest lines the toast up with the buttons' edges.
+  const inset = gutter - s.s4;
+  return (
+    <View pointerEvents="box-none" style={{ position: "absolute", left: inset, right: inset, bottom }}>
+      <ToastHost bottom={s.s2} />
+    </View>
+  );
+}
+
+/**
  * One step: the bar, its content, and its buttons kept at the bottom. `dark` is the black
  * welcome; `bare` leaves out the bar (the last step draws its own header).
  */
@@ -182,8 +206,8 @@ export function StepFrame({
 }) {
   const card = useContext(DesktopCard);
   const insets = useSafeAreaInsets();
-  // The last step draws its own 24 px gutters; the button lines up with them.
-  const pad = card && !bare ? s.s8 : s.s6;
+  // 32 px gutters on the desktop card, 24 on a phone; the last step draws its own to match.
+  const pad = card ? s.s8 : s.s6;
   return (
     <View
       style={{
@@ -219,12 +243,14 @@ export function StepFrame({
             paddingTop: s.s4,
             paddingHorizontal: pad,
             paddingBottom: card ? s.s6 : insets.bottom + s.s4,
-            backgroundColor: dark ? c.head : c.raised,
           }}
         >
+          <Toasts bottom="100%" gutter={pad} />
           {foot}
         </View>
-      ) : null}
+      ) : (
+        <Toasts bottom={card ? s.s4 : insets.bottom + s.s4} gutter={pad} />
+      )}
     </View>
   );
 }

@@ -11,8 +11,8 @@
   "theme_color": "#ffffff",
   "user_preferences": {
     "color_scheme_dark": {
-      "background_color": "#070709",
-      "theme_color": "#070709"
+      "background_color": "#000000",
+      "theme_color": "#000000"
     }
   },
   "icons": [

@@ -16,7 +16,7 @@ import { type } from "@kriyan/core/tokens";
 import type { TaskView } from "@/data/views";
 import { completeTask, reopenTask, ticking } from "@/features/tasks/actions";
 import { openTask } from "@/features/tasks/TaskRow";
-import { roleStyle } from "@/theme/layout";
+import { roleStyle, useIsPhone } from "@/theme/layout";
 import { c, hex, r, s, spaceTone, sz } from "@/theme/tokens";
 import { Check } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
@@ -325,6 +325,8 @@ export function FreeGap({
 
 function NowLine({ now, note }: { now: number; note: string | null }) {
   const timeW = useTimeWidth();
+  // The label masks the line on the page's own ground: the raised sheet on phones.
+  const ground = useIsPhone() ? c.raised : c.bg;
   const label = `${formatClock(now)}${note ? ` · ${note}` : ""}`;
   return (
     <View style={{ minHeight: s.s8, justifyContent: "center" }}>
@@ -345,7 +347,7 @@ function NowLine({ now, note }: { now: number; note: string | null }) {
           tnum
           numberOfLines={1}
           aria-label={`Now, ${formatClock(now)}`}
-          style={{ alignSelf: "flex-start", paddingRight: s.s2, backgroundColor: c.bg }}
+          style={{ alignSelf: "flex-start", paddingRight: s.s2, backgroundColor: ground }}
         >
           {label}
         </Txt>

@@ -28,7 +28,7 @@ import { type } from "@kriyan/core/tokens";
 import { playSound } from "@/features/feel/sound";
 import { commitHaptic, toggleHaptic } from "@/features/tasks/haptics";
 import { roleStyle, useType } from "@/theme/layout";
-import { c, family, hex, r, s } from "@/theme/tokens";
+import { bold, c, family, hex, r, s } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
@@ -82,7 +82,7 @@ export function Welcome({ today, next, signIn }: { today: CivilDate; next: () =>
       }
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1, minHeight: 48 }}>
-        <Txt variant="subhead" tone="headInk">
+        <Txt variant="subhead" tone="headInk" style={bold}>
           Kriyan
         </Txt>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.now }} />
@@ -106,9 +106,9 @@ export function Welcome({ today, next, signIn }: { today: CivilDate; next: () =>
         </Txt>
       </View>
       <View style={{ flex: 1, minHeight: s.s12 }} />
-      <Txt variant="display" tone="headInk" heading={1}>
+      <Txt variant="display" tone="headInk" heading={1} style={bold}>
         Your whole day,{" "}
-        <Txt variant="display" tone="headDim">
+        <Txt variant="display" tone="headDim" style={bold}>
           in one sentence.
         </Txt>
       </Txt>
@@ -133,7 +133,7 @@ const HELPS: [Help, LucideIcon, string, string][] = [
 export function Helps({ d, next, back }: StepProps) {
   return (
     <StepFrame step={2} onBack={back} onSkip={next} foot={<FullButton label="Continue" onPress={next} />}>
-      <Question text="What should Kriyan help with?" />
+      <Question text="What should Kriyan help with?" maxWidth={360} />
       <Lead>Pick any. It changes what you see first, nothing else.</Lead>
       <View role="group" aria-label="What Kriyan should help with" style={{ gap: s.s3, marginTop: s.s6 }}>
         {HELPS.map(([key, icon, title, sub]) => {
@@ -271,7 +271,7 @@ function Stepper({ value, onChange }: { value: number; onChange: (v: number) => 
         onPress={() => onChange(value - 1)}
         style={round}
       />
-      <Txt variant="title" tnum aria-live="polite" style={{ minWidth: 44, textAlign: "center" }}>
+      <Txt variant="title" tnum aria-live="polite" style={[bold, { minWidth: 44, textAlign: "center" }]}>
         {`${value}h`}
       </Txt>
       <Button
@@ -332,7 +332,7 @@ export function TheMath({ d, today, next, back }: StepProps) {
     >
       <Question text="Let's do the math." />
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: s.s2, marginTop: s.s6 }}>
-        <Txt variant="figure" tnum aria-label={`About ${m.free} free hours this week`}>
+        <Txt variant="figure" tnum style={bold} aria-label={`About ${m.free} free hours this week`}>
           {m.free}
         </Txt>
         <Txt variant="title">hours</Txt>

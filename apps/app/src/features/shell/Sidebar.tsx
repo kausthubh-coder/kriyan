@@ -1,6 +1,7 @@
 // The desktop sidebar (b2.html `sideHTML`): wordmark, the New task button, four count tiles
 // (Today, Coming up, Inbox, From earlier), then Today, Week, Goals and habits, Close the day and
-// Ask Kriyan, the spaces tree with Add a space, and Search, Settings and the date at the foot.
+// Ask Kriyan (with its Ctrl K hint: the command menu asks, adds and finds from anywhere), the
+// spaces tree with Add a space, and Settings and the date at the foot.
 // It sits on its own surface with a rule, so the page leads. One click to anything.
 
 import { useState } from "react";
@@ -12,7 +13,6 @@ import {
   Moon,
   Plus,
   Columns3,
-  Search,
   Settings,
   Sparkles,
   Sun,
@@ -33,7 +33,7 @@ import { Icon } from "@/ui/Icon";
 import { Mark } from "@/ui/Mark";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
-import { openCommand, quickAddTarget } from "./context";
+import { quickAddTarget } from "./context";
 
 function NavItem({
   href,
@@ -293,7 +293,7 @@ export function Sidebar() {
       <NavItem href="/upcoming" icon={Columns3} label="Week" active={path === "/upcoming"} />
       <NavItem href="/progress" icon={Target} label="Goals and habits" active={path === "/progress"} />
       <NavItem href="/review" icon={Moon} label="Close the day" active={path === "/review"} />
-      <NavItem href="/ask" icon={Sparkles} label="Ask Kriyan" active={path === "/ask"} />
+      <NavItem href="/ask" icon={Sparkles} label="Ask Kriyan" kbd="Ctrl K" active={path === "/ask"} />
       <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 2 }}>
         <View style={{ paddingTop: s.s4, paddingHorizontal: s.s2 }}>
           <SectionLabel
@@ -317,7 +317,6 @@ export function Sidebar() {
         ) : null}
       </ScrollView>
       <View style={{ marginTop: "auto", gap: 2, paddingTop: s.s2 }}>
-        <NavItem icon={Search} label="Search" kbd="Ctrl K" onPress={() => openCommand()} />
         <NavItem href="/settings" icon={Settings} label="Settings" active={path === "/settings"} />
         <Txt variant="meta" tone="ink3" tnum style={{ paddingHorizontal: s.s2, paddingTop: s.s2 }}>
           {`${formatDate(today)}, ${formatClock(now)}`}

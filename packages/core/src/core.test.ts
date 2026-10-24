@@ -11,7 +11,7 @@ import {
 } from "./format.ts";
 import { parseTask } from "./parse.ts";
 import type { Repeat } from "./repeat.ts";
-import { freeMinutes, layoutDay } from "./layout.ts";
+import { freeMinutes, layoutDay, longestFree } from "./layout.ts";
 import { OPS } from "./ops.ts";
 import { reminderInstants } from "./reminders.ts";
 import { color } from "./tokens.ts";
@@ -164,6 +164,18 @@ describe("layout", () => {
     ];
     // From 12:20 to 22:00 is 580 min; busy: 12:20-12:30 (10) and 13:00-14:00 (60).
     expect(freeMinutes(items, 740, 1320)).toBe(510);
+  });
+
+  test("the longest free stretch skips planned blocks and stops at a no-length task's time", () => {
+    const items = [
+      { id: "shift", start: 540, length: 240 },
+      { id: "lab", start: 990 },
+      { id: "climb", start: 1110, length: 120 },
+    ];
+    // Free 13:00-16:30 (210) beats 16:30-18:30 (120); 21:00 is the end of the window.
+    expect(longestFree(items, 540, 1260)).toEqual([780, 990]);
+    expect(longestFree([{ id: "all", start: 480, length: 840 }], 540, 1260)).toBeNull();
+    expect(longestFree([], 540, 1260)).toEqual([540, 1260]);
   });
 });
 

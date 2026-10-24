@@ -8,7 +8,7 @@ import type { LucideIcon } from "lucide-react-native";
 import { formatClock } from "@kriyan/core/dates";
 import { type } from "@kriyan/core/tokens";
 import { roleStyle } from "@/theme/layout";
-import { c, family, r, s } from "@/theme/tokens";
+import { bold, c, family, r, s } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
@@ -135,7 +135,7 @@ export function Wheel({
                   variant={on ? "headline" : "title"}
                   tone={on ? "ink" : "ink3"}
                   tnum
-                  style={on ? undefined : family("500")}
+                  style={on ? bold : family("500")}
                 >
                   {formatClock(t)}
                 </Txt>

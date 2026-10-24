@@ -10,19 +10,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import Svg, { Circle, Path } from "react-native-svg";
 import {
+  ArrowRight,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
+  Clock,
   Inbox,
   Moon,
+  Sparkles,
+  Square,
   SquareCheck,
-  Sunrise,
   X,
 } from "lucide-react-native";
 import { addDays, formatClock, startOfWeek } from "@kriyan/core/dates";
 import { formatDate, formatDuration } from "@kriyan/core/format";
+import { longestFree } from "@kriyan/core/layout";
 import { useClock } from "@/data/time";
 import { useTodayView, useWeekView, type TaskView, type TodayView } from "@/data/views";
 import { useFocusSummary } from "@/features/focus/focusSummary";
@@ -31,9 +36,8 @@ import { deleteTask, moveTasks, skipTask } from "@/features/tasks/actions";
 import { armHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { SectionLabel } from "@/features/progress/SectionLabel";
-import { useIsPhone } from "@/theme/layout";
-import { bold, c, family, r, s, spaceTone } from "@/theme/tokens";
-import { Button } from "@/ui/Button";
+import { useIsPhone, useType } from "@/theme/layout";
+import { bold, c, family, hex, r, s } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
@@ -44,7 +48,14 @@ import { Txt } from "@/ui/Txt";
 
 type Step = "done" | "decide" | "tomorrow" | "feel" | "closed";
 const STEPS: Step[] = ["done", "decide", "tomorrow", "feel"];
-const FACES = ["Rough", "Meh", "Okay", "Good", "Great"] as const;
+/** B2's faces (`FACES` in b2.html): the mouth of each, from a frown to an open laugh. */
+const FACES = [
+  ["Rough", "M8.2 16.6c1-1.5 2.3-2.2 3.8-2.2s2.8.7 3.8 2.2"],
+  ["Meh", "M8.6 15.4h6.8"],
+  ["Okay", "M8.6 14.8c1 .7 2.1 1.1 3.4 1.1s2.4-.4 3.4-1.1"],
+  ["Good", "M8.2 14.2c1 1.6 2.3 2.4 3.8 2.4s2.8-.8 3.8-2.4"],
+  ["Great", "M7.8 13.4h8.4c0 2.5-1.9 4.4-4.2 4.4s-4.2-1.9-4.2-4.4z"],
+] as const;
 
 export function ReviewScreen() {
   const phone = useIsPhone();
@@ -83,7 +94,7 @@ export function ReviewScreen() {
   const index = STEPS.indexOf(step);
   return (
     <ReviewFrame day={view}>
-      <View style={{ gap: s.s3 }}>
+      <View style={{ gap: s.s4 }}>
         {/* Phones lead with "‹ Today" (b2.html `.rvpg`); desktop keeps the sidebar, so the date
             chip stands alone. */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
@@ -121,19 +132,23 @@ export function ReviewScreen() {
             </Txt>
           </View>
         </View>
-        {step !== "closed" ? (
-          <View
-            accessibilityLabel={`Step ${index + 1} of ${STEPS.length}`}
-            style={{ flexDirection: "row", gap: s.s2 }}
-          >
-            {STEPS.map((st, i) => (
-              <View
-                key={st}
-                style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= index ? c.ink : c.line }}
-              />
-            ))}
-          </View>
-        ) : null}
+        {/* Day closed keeps all four filled (b2.html `.rv-steps`). */}
+        <View
+          accessibilityLabel={step === "closed" ? "All steps done" : `Step ${index + 1} of ${STEPS.length}`}
+          style={{ flexDirection: "row", gap: s.s2 }}
+        >
+          {STEPS.map((st, i) => (
+            <View
+              key={st}
+              style={{
+                flex: 1,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: step === "closed" || i <= index ? c.ink : c.line,
+              }}
+            />
+          ))}
+        </View>
       </View>
 
       {step === "done" ? (
@@ -186,9 +201,9 @@ export function ReviewScreen() {
       ) : null}
 
       {step === "decide" ? (
-        <View style={{ gap: s.s6 }}>
-          <View style={{ gap: s.s2 }}>
-            <Txt variant="headline" heading={1}>
+        <View style={{ gap: s.s4 }}>
+          <View style={{ gap: s.s1 }}>
+            <Txt variant="headline" heading={1} style={bold}>
               Still open
             </Txt>
             <Txt variant="body" tone="ink2" tnum>
@@ -210,96 +225,106 @@ export function ReviewScreen() {
       ) : null}
 
       {step === "tomorrow" ? (
-        <View style={{ gap: s.s6 }}>
-          <Txt variant="headline" heading={1} style={bold}>
-            Tomorrow
-          </Txt>
-          {tomorrowDay ? (
-            <View style={{ gap: s.s1 }}>
-              <Txt variant="body" tone="ink2" style={{ marginBottom: s.s2 }}>
-                {tomorrowDay.scheduled.length + tomorrowDay.anytime.length
-                  ? `${tomorrowDay.scheduled.length} with a time, ${tomorrowDay.anytime.length} anytime.`
-                  : "Nothing planned yet. A clear start."}
-              </Txt>
-              {tomorrowDay.scheduled.slice(0, 8).map((t) => (
-                <View
-                  key={t._id}
-                  style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 32 }}
-                >
-                  <View
-                    style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: spaceTone(t.color).dot }}
-                  />
-                  <Txt variant="body" numberOfLines={1} style={{ flex: 1 }}>
-                    {t.title}
-                  </Txt>
-                  <Txt variant="meta" tone="ink3" tnum>
-                    {formatClock(t.time ?? 0)}
-                  </Txt>
-                </View>
-              ))}
-            </View>
-          ) : null}
+        <View>
+          <View style={{ gap: s.s1 }}>
+            <Txt variant="headline" heading={1} style={bold}>
+              Tomorrow
+            </Txt>
+            <Txt variant="body" tone="ink3" tnum>
+              {formatDate(tomorrow)}
+            </Txt>
+          </View>
+          {tomorrowDay ? <TomorrowGlance day={tomorrowDay} /> : null}
           <FullButton label="Looks good" onPress={() => setStep("feel")} />
         </View>
       ) : null}
 
       {step === "feel" ? (
-        <View style={{ gap: s.s6 }}>
-          <Txt variant="headline" heading={1} style={bold}>
-            How did today feel?
-          </Txt>
-          <View role="radiogroup" style={{ flexDirection: "row", gap: s.s2, flexWrap: "wrap" }}>
-            {FACES.map((f, i) => (
+        <View>
+          <View style={{ gap: s.s1 }}>
+            <Txt variant="headline" heading={1} style={bold}>
+              How did today feel?
+            </Txt>
+            <Txt variant="body" tone="ink3">
+              One tap, or skip it.
+            </Txt>
+          </View>
+          <View
+            role="radiogroup"
+            aria-label="How did today feel?"
+            style={{ flexDirection: "row", justifyContent: "space-between", gap: s.s2, marginTop: s.s6 }}
+          >
+            {FACES.map(([label, mouth], i) => (
               <Press
-                key={f}
+                key={label}
                 role="radio"
                 aria-checked={feel === i}
-                accessibilityLabel={f}
+                accessibilityLabel={label}
                 onPress={() => setFeel(i)}
-                style={{
-                  minHeight: 44,
-                  paddingHorizontal: s.s4,
-                  borderRadius: 22,
+                hoverBg={null}
+                style={({ hovered }: { hovered?: boolean }) => ({
+                  flex: 1,
+                  maxWidth: 64,
+                  aspectRatio: 1,
+                  minHeight: 52,
+                  borderRadius: r.pill,
+                  alignItems: "center",
                   justifyContent: "center",
-                  backgroundColor: feel === i ? c.ink : c.sunken,
-                }}
+                  backgroundColor: feel === i ? c.ink : hovered ? c.select : c.sunken,
+                })}
               >
-                <Txt variant="label" tone={feel === i ? "onInk" : "ink2"}>
-                  {f}
-                </Txt>
+                <Face mouth={mouth} color={feel === i ? hex.onInk : hex.ink2} />
               </Press>
             ))}
           </View>
-          <View style={{ gap: s.s2 }}>
-            <FullButton label="Close the day" onPress={closeDay} />
-            {feel === null ? (
-              <Button variant="quiet" label="Skip" onPress={closeDay} style={{ alignSelf: "center" }} />
-            ) : null}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: s.s2 }}>
+            <Txt variant="meta" tone="ink3">
+              Rough
+            </Txt>
+            <Txt variant="meta" tone="ink3">
+              Great
+            </Txt>
           </View>
+          <FullButton label="Close the day" onPress={closeDay} />
+          <Press
+            role="button"
+            accessibilityLabel="Skip"
+            onPress={closeDay}
+            hoverBg={null}
+            style={{ alignSelf: "center", minHeight: 44, justifyContent: "center", marginTop: s.s1 }}
+          >
+            <Txt variant="label" tone="ink2" style={{ textDecorationLine: "underline" }}>
+              Skip
+            </Txt>
+          </Press>
         </View>
       ) : null}
 
       {step === "closed" ? (
-        <View style={{ alignItems: "center", gap: s.s3, paddingVertical: s.s12 }}>
+        // B2's `.closed`: a tenth of the screen down, a 76 moon disc, then the line about tomorrow.
+        <View style={{ alignItems: "center", paddingTop: s.s16 }}>
           <View
             style={{
-              width: 64,
-              height: 64,
-              borderRadius: 32,
+              width: 76,
+              height: 76,
+              marginTop: s.s6,
+              marginBottom: s.s4,
+              borderRadius: r.pill,
               backgroundColor: c.sunken,
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Icon icon={Moon} size={28} tone="ink2" />
+            <Icon icon={Moon} size={32} tone="ink" />
           </View>
           <Txt variant="headline" heading={1} style={bold}>
             Day closed
           </Txt>
-          <Txt variant="body" tone="ink2" style={{ textAlign: "center", maxWidth: 320 }}>
+          <Txt variant="body" tone="ink3" style={{ textAlign: "center", maxWidth: 320, marginTop: s.s2 }}>
             {tomorrowDay?.scheduled[0]
-              ? `Tomorrow starts at ${formatClock(tomorrowDay.scheduled[0].time ?? 0)} with ${tomorrowDay.scheduled[0].title}. The rest of tonight is yours.`
-              : "The rest of tonight is yours."}
+              ? `Tomorrow starts at ${formatClock(tomorrowDay.scheduled[0].time ?? 0)} with ${tomorrowDay.scheduled[0].title}.`
+              : "Nothing planned for tomorrow yet."}{" "}
+            The rest of tonight is yours.
           </Txt>
           <FullButton label="Back to Today" onPress={() => goBack("/today")} />
         </View>
@@ -312,6 +337,101 @@ export function ReviewScreen() {
 const REVIEW_WIDTH = 560;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+type WeekDay = NonNullable<ReturnType<typeof useWeekView>>["days"][number];
+
+/** The free-stretch note looks at a waking day's middle, like B2's (09:00 to 21:00). */
+const GLANCE_FROM = 9 * 60;
+const GLANCE_TO = 21 * 60;
+
+/**
+ * Tomorrow at a glance (b2.html review step 2): what's planned in one line, the longest free
+ * stretch as a filled note, then the timed things and how many are anytime.
+ */
+function TomorrowGlance({ day }: { day: WeekDay }) {
+  const roles = useType();
+  const all = [...day.scheduled, ...day.anytime].filter((t) => !t.done && !t.proposedBy);
+  const events = all.filter((t) => t.event).length;
+  const tasks = all.length - events;
+  const planned = [events ? plural(events, "event") : null, tasks ? plural(tasks, "task") : null]
+    .filter(Boolean)
+    .join(" and ");
+  const timed = day.scheduled.filter((t) => !t.done && !t.proposedBy);
+  const stretch = timed.length
+    ? longestFree(
+        timed.map((t) => ({ id: t._id, start: t.time ?? 0, length: t.length ?? undefined })),
+        GLANCE_FROM,
+        GLANCE_TO,
+      )
+    : null;
+  const note = !timed.length
+    ? "Tomorrow is open. Start with the thing you'd most like done."
+    : stretch
+      ? `Your longest free stretch tomorrow is ${formatClock(stretch[0])} to ${formatClock(stretch[1])}, good for one deep block.`
+      : "Tomorrow has no free half hour between 09:00 and 21:00.";
+  const anytime = day.anytime.filter((t) => !t.done && !t.proposedBy).length;
+  return (
+    <View>
+      <Txt variant="title" style={{ marginTop: s.s2 }}>
+        <Txt variant="title" tone="ink3">
+          You have{" "}
+        </Txt>
+        {planned || "nothing planned yet"}
+        <Txt variant="title" tone="ink3">
+          .
+        </Txt>
+      </Txt>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: s.s3,
+          marginTop: s.s3,
+          paddingVertical: s.s3,
+          paddingHorizontal: s.s4,
+          borderRadius: r.box,
+          backgroundColor: c.sunken,
+        }}
+      >
+        {/* Centred on the note's first line. */}
+        <View style={{ height: roles.body.lineHeight, justifyContent: "center" }}>
+          <Icon icon={Sparkles} size={18} tone="ink" />
+        </View>
+        <Txt variant="body" style={{ flex: 1 }}>
+          {note}
+        </Txt>
+      </View>
+      {timed.slice(0, 5).map((t) => (
+        <DoneRow
+          key={t._id}
+          icon={t.event ? CalendarDays : Square}
+          title={t.title}
+          right={formatClock(t.time ?? 0)}
+        />
+      ))}
+      {anytime ? <DoneRow icon={Clock} title={`${plural(anytime, "thing")} anytime`} right={null} /> : null}
+    </View>
+  );
+}
+
+/** One face in "How did today feel?", drawn like B2's: a ring, two eyes and the mouth. */
+function Face({ mouth, color }: { mouth: string; color: string }) {
+  return (
+    <Svg width={30} height={30} viewBox="0 0 24 24" aria-hidden focusable={false}>
+      <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={1.6} fill="none" />
+      <Circle cx={9} cy={10} r={0.9} fill={color} />
+      <Circle cx={15} cy={10} r={0.9} fill={color} />
+      <Path
+        d={mouth}
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
 
 /**
  * Phones draw the review without the large title (b2.html `.rvpg`): "‹ Today" and the date lead
@@ -330,7 +450,8 @@ function ReviewFrame({ children, day }: { children: ReactNode; day: TodayView | 
         columnWidth={REVIEW_WIDTH}
         right={width >= SPLIT_MIN_WIDTH && day ? <DayColumn view={day} today={today} now={now} /> : null}
       >
-        <View style={{ gap: s.s6 }}>{children}</View>
+        {/* B2's review header sits 40 from the top, a step below the split frame's 24. */}
+        <View style={{ gap: s.s4, paddingTop: s.s4 }}>{children}</View>
       </SplitScreen>
     );
   }
@@ -347,7 +468,7 @@ function ReviewFrame({ children, day }: { children: ReactNode; day: TodayView | 
           paddingTop: insets.top + s.s4,
           paddingHorizontal: s.s4,
           paddingBottom: insets.bottom + s.s16,
-          gap: s.s6,
+          gap: s.s4,
         }}
       >
         {children}
@@ -370,7 +491,7 @@ function DoneRow({ icon, title, right }: { icon: typeof SquareCheck; title: stri
         borderColor: c.lineStrong,
       }}
     >
-      <Icon icon={icon} size={20} tone="ink2" />
+      <Icon icon={icon} size={18} tone="ink2" />
       <Txt variant="body" numberOfLines={1} style={{ flex: 1 }}>
         {title}
       </Txt>
@@ -533,7 +654,7 @@ function DecideCard({
       </View>
       {/* Four equal places to put it, two by two (b2.html `.rv-acts`). */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s3, marginTop: s.s4 }}>
-        <Tile primary icon={Sunrise} label="Tomorrow" onPress={toTomorrow} />
+        <Tile primary icon={ArrowRight} label="Tomorrow" onPress={toTomorrow} />
         <Tile ref={pickRef} icon={CalendarDays} label="Pick a day" onPress={() => setPicking(true)} />
         <Tile
           icon={Inbox}
@@ -581,7 +702,7 @@ const CARD_HEIGHT = 236;
 /** One of the four places for an open thing: half the width, 56 tall, filled. */
 const Tile = forwardRef<
   View,
-  { icon: typeof Sunrise; label: string; onPress: () => void; primary?: boolean }
+  { icon: typeof ArrowRight; label: string; onPress: () => void; primary?: boolean }
 >(function Tile({ icon, label, onPress, primary }, ref) {
   return (
     <Press

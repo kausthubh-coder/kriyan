@@ -77,3 +77,23 @@ export function freeMinutes(items: Interval[], now: number, dayEnd: number): num
 export function plannedMinutes(items: Interval[]): number {
   return 1440 - freeMinutes(items, 0, 1440);
 }
+
+/**
+ * The longest stretch with nothing planned between `from` and `to`, at least `min` minutes long,
+ * as [start, end], or null when there's none. A block without a length still breaks the stretch
+ * at its start time, because its length is unknown, not zero.
+ */
+export function longestFree(items: Interval[], from: number, to: number, min = 30): [number, number] | null {
+  const busy = items
+    .map((i) => [i.start, i.start + (i.length ?? 0)] as const)
+    .filter(([s, e]) => e >= from && s <= to)
+    .sort((a, b) => a[0] - b[0]);
+  let best: [number, number] | null = null;
+  let cur = from;
+  for (const [s, e] of [...busy, [to, to] as const]) {
+    const gapEnd = Math.min(s, to);
+    if (gapEnd - cur >= min && (!best || gapEnd - cur > best[1] - best[0])) best = [cur, gapEnd];
+    cur = Math.max(cur, e);
+  }
+  return best;
+}
