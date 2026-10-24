@@ -2,6 +2,7 @@
 // in the Android app, reminders and sounds; in a browser with Web Push, reminders; then bringing
 // in your AI; then three small next steps and your day.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useContext, useEffect, useState, type ReactNode } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { router } from "expo-router";
@@ -228,9 +229,6 @@ function FeelSwitch({
         alignItems: "center",
         gap: s.s3,
         minHeight: 64,
-        borderBottomWidth: 1,
-        borderStyle: "dotted",
-        borderColor: c.lineStrong,
       }}
     >
       <Icon icon={icon} size={20} tone="ink2" />
@@ -253,6 +251,7 @@ function FeelSwitch({
       >
         <View style={{ width: 20, height: 20, borderRadius: r.pill, backgroundColor: c.headInk }} />
       </View>
+      <DottedRule />
     </Press>
   );
 }
@@ -421,7 +420,7 @@ function ConnectRow({
   children: ReactNode;
 }) {
   return (
-    <View style={{ borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong }}>
+    <View>
       <View
         style={{
           flexDirection: "row",
@@ -492,6 +491,7 @@ function ConnectRow({
           {children}
         </View>
       ) : null}
+      <DottedRule />
     </View>
   );
 }

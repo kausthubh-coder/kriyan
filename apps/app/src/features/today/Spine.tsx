@@ -4,6 +4,7 @@
 // next, and today's "Review today" card sits at the review time. Today's Timeline view on every
 // width; the hour grid (Timeline.tsx), with dragging, is the desktop's right column.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -130,17 +131,10 @@ export function Spine({ date, items, now, dayStart, reviewAt = null, droppable =
   return (
     <View aria-label="Schedule" style={{ position: "relative", gap: s.s1 }}>
       {/* The spine runs through the middle of the pill column, behind the pills. */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          left: timeW + s.s1 + PILL_COL / 2 - 1,
-          top: s.s2,
-          bottom: s.s2,
-          borderLeftWidth: 2,
-          borderStyle: "dotted",
-          borderColor: c.lineStrong,
-        }}
+      <DottedRule
+        edge="left"
+        width={2}
+        inset={{ left: timeW + s.s1 + PILL_COL / 2 - 1, top: s.s2, bottom: s.s2 }}
       />
       {rows}
     </View>

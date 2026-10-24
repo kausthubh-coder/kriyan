@@ -3,6 +3,7 @@
 // doesn't picture: the semester, your day, default reminders, access tokens, recently deleted,
 // and deleting your data.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { AllowReminders } from "@/features/notifications/AllowReminders";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Linking, Modal, Platform, useWindowDimensions, View } from "react-native";
@@ -63,8 +64,6 @@ const CLI_SETUP = [`git clone ${GITHUB_URL}`, "cd kriyan && bun install", CLI_LI
 
 /** The prototype's small round button on a card (b2.html `.btn-sm`). */
 const small = { borderRadius: r.pill, backgroundColor: c.hover } as const;
-/** The prototype's dotted rule between rows. */
-const rule = { borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong } as const;
 
 async function copy(text: string, what: string) {
   await Clipboard.setStringAsync(text);
@@ -253,7 +252,6 @@ function Row({
         gap: stack ? s.s2 : s.s4,
         minHeight: 48,
         paddingVertical: s.s2,
-        ...rule,
       }}
     >
       <View style={{ flex: stack ? undefined : 1 }}>
@@ -267,6 +265,7 @@ function Row({
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, alignItems: "center" }}>
         {children}
       </View>
+      <DottedRule />
     </View>
   );
 }
@@ -383,7 +382,6 @@ function SwitchRow({
         gap: s.s4,
         minHeight: 48,
         paddingVertical: s.s2,
-        ...rule,
       }}
     >
       <View style={{ flex: 1 }}>
@@ -393,6 +391,7 @@ function SwitchRow({
         </Txt>
       </View>
       <Switch on={on} />
+      <DottedRule />
     </Press>
   );
 }
@@ -669,7 +668,6 @@ function ConnRow({
         columnGap: s.s3,
         rowGap: s.s2,
         paddingVertical: s.s3,
-        ...(last ? null : rule),
       }}
     >
       <View style={{ flex: 1, minWidth: 180, flexDirection: "row", alignItems: "center", gap: s.s3 }}>
@@ -698,6 +696,7 @@ function ConnRow({
         </View>
       </View>
       {children}
+      {last ? null : <DottedRule />}
     </View>
   );
 }
@@ -928,7 +927,6 @@ function AgentAccess({ profile }: { profile: Profile }) {
                 gap: s.s3,
                 minHeight: 48,
                 paddingVertical: s.s2,
-                ...rule,
               }}
             >
               <Icon icon={KeyRound} size={16} />
@@ -948,6 +946,7 @@ function AgentAccess({ profile }: { profile: Profile }) {
                     .catch((e: unknown) => showToast(errorText(e)))
                 }
               />
+              <DottedRule />
             </View>
           ))}
         </View>

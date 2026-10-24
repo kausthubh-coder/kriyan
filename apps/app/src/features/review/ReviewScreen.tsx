@@ -3,6 +3,7 @@
 // optional "How did today feel?". It ends on "Day closed". Nothing is scored; nothing is
 // "overdue". Swipe a card right for Tomorrow, left to let it go; the buttons do the same.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { forwardRef, useRef, useState, type ReactNode } from "react";
 import { Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import Head from "expo-router/head";
@@ -486,9 +487,6 @@ function DoneRow({ icon, title, right }: { icon: typeof SquareCheck; title: stri
         alignItems: "center",
         gap: s.s3,
         minHeight: 48,
-        borderBottomWidth: 1,
-        borderStyle: "dotted",
-        borderColor: c.lineStrong,
       }}
     >
       <Icon icon={icon} size={18} tone="ink2" />
@@ -500,6 +498,7 @@ function DoneRow({ icon, title, right }: { icon: typeof SquareCheck; title: stri
           {right}
         </Txt>
       ) : null}
+      <DottedRule />
     </View>
   );
 }

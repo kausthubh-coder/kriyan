@@ -54,9 +54,13 @@ export const spaces = query({
 });
 
 export const task = query({
-  args: { id: v.id("tasks") },
-  handler: async (ctx, { id }) => {
+  // A string, not v.id: the id comes from a link, and a mistyped link should read as "not
+  // found" (null), not throw a validator error into the screen.
+  args: { id: v.string() },
+  handler: async (ctx, { id: raw }) => {
     const ownerId = await requireOwner(ctx);
+    const id = ctx.db.normalizeId("tasks", raw);
+    if (!id) return null;
     const task = await ctx.db.get(id);
     if (!task || task.ownerId !== ownerId || task.deletedAt !== undefined) return null;
     const tree = spaceTree(await listSpaces(ctx, ownerId));

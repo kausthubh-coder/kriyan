@@ -4,6 +4,7 @@
 // takes. The time spent is recorded (tasks.logFocus) when the session ends: Done, Back,
 // leaving the screen, or the app going to the background.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, View } from "react-native";
 import { router } from "expo-router";
@@ -272,20 +273,12 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
           </Txt>
         )}
         {after && after.time !== null ? (
-          <Txt
-            variant="meta"
-            tone="headDim"
-            tnum
-            style={{
-              marginTop: s.s2,
-              paddingTop: s.s3,
-              borderTopWidth: 1,
-              borderStyle: "dotted",
-              borderColor: c.headLine,
-            }}
-          >
-            After this: {after.title} at {formatClock(after.time)}
-          </Txt>
+          <View style={{ marginTop: s.s2, paddingTop: s.s3 }}>
+            <DottedRule edge="top" color={c.headLine} />
+            <Txt variant="meta" tone="headDim" tnum>
+              After this: {after.title} at {formatClock(after.time)}
+            </Txt>
+          </View>
         ) : null}
       </View>
     </View>

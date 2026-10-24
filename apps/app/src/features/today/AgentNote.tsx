@@ -2,6 +2,7 @@
 // and changed 1 at 07:00", from the newest run of agent changes. Tapping it opens Ask, which
 // lists each change with Undo. Hidden when agents did nothing today.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { View } from "react-native";
 import { router, type Href } from "expo-router";
 import { useConvexAuth, useQuery } from "convex/react";
@@ -10,7 +11,7 @@ import { api } from "@kriyan/convex/api";
 import { groupRuns, runSummary } from "@kriyan/core/activity";
 import { formatClock, zonedParts } from "@kriyan/core/dates";
 import { useClock } from "@/data/time";
-import { c, s } from "@/theme/tokens";
+import { s } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
@@ -41,9 +42,6 @@ export function AgentNote() {
         gap: s.s2,
         minHeight: 44,
         paddingVertical: s.s2,
-        borderBottomWidth: 1,
-        borderStyle: "dotted",
-        borderColor: c.lineStrong,
       }}
     >
       <Icon icon={Sparkles} size={16} />
@@ -56,6 +54,7 @@ export function AgentNote() {
         </Txt>
       </View>
       <Icon icon={ChevronRight} size={16} />
+      <DottedRule />
     </Press>
   );
 }

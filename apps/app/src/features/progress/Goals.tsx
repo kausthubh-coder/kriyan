@@ -1,5 +1,6 @@
 // Goals against pace: how much is left, when it is due, and where a steady pace would put you.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useRef, useState } from "react";
 import { View } from "react-native";
 import { useMutation } from "convex/react";
@@ -89,7 +90,7 @@ export function GoalView({
   const due = dueText(goal, today);
   const pace = paceText(goal);
   return (
-    <View style={{ borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong }}>
+    <View>
       <Press
         ref={ref}
         role="button"
@@ -227,6 +228,7 @@ export function GoalView({
           }}
         />
       </Popover>
+      <DottedRule />
     </View>
   );
 }

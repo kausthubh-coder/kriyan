@@ -1,6 +1,7 @@
 // The week under Today's header and on the phone's Week, Joi's way: the selected day outlined,
 // today's weekday in red, past days quiet. On Today another day opens the Week on that day.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { View } from "react-native";
 import { router } from "expo-router";
 import { formatDate, WEEKDAY_SHORT } from "@kriyan/core/format";
@@ -28,11 +29,9 @@ export function WeekStrip({
         flexDirection: "row",
         gap: s.s1,
         paddingBottom: s.s2,
-        borderBottomWidth: 1,
-        borderStyle: "dotted",
-        borderColor: c.lineStrong,
       }}
     >
+      <DottedRule />
       {weekOf(selected).map((date) => {
         const isToday = date === today;
         const isSelected = date === selected;

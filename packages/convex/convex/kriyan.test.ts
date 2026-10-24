@@ -1489,3 +1489,10 @@ describe("reminders in the browser", () => {
     expect((await subscriptions(t)).length).toBe(1);
   });
 });
+
+describe("links", () => {
+  test("a task link with a mistyped id reads as not found", async () => {
+    const { alice } = await setup();
+    expect(await alice.query(api.views.task, { id: "not-a-task-id" })).toBeNull();
+  });
+});

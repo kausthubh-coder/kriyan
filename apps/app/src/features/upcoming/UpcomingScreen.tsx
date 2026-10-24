@@ -5,6 +5,7 @@
 // An agent's proposed blocks wait in a banner with Accept all and Discard. A full day is never
 // red: red means now, and planning more than usual is the person's call, not a fault.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -1022,6 +1023,9 @@ function PlaceRow({ task, day, today }: { task: TaskView; day: CivilDate; today:
 /** The prototype's dotted rule under each row (b2.html `.row`, `.tray-r`). */
 function DottedRow({ children }: { children: ReactNode }) {
   return (
-    <View style={{ borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong }}>{children}</View>
+    <View>
+      {children}
+      <DottedRule />
+    </View>
   );
 }

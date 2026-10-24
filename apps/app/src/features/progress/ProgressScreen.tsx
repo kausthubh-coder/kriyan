@@ -4,6 +4,7 @@
 // streak that resets). The last 12 months of time done, split by space, open from a quiet link
 // under them: B2's page ends after the habits.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useRef, useState, type ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
@@ -613,14 +614,8 @@ function HabitRow({ habit, today }: { habit: ProgressView["habits"][number]; tod
     ? Math.min(s.s4, Math.floor((dotsWidth - s.s1 * (recent.length - 1)) / recent.length))
     : s.s2;
   return (
-    <View
-      style={{
-        paddingVertical: s.s3,
-        borderBottomWidth: 1,
-        borderStyle: "dotted",
-        borderColor: c.lineStrong,
-      }}
-    >
+    <View style={{ paddingVertical: s.s3 }}>
+      <DottedRule />
       <View style={{ flexDirection: "row", alignItems: "center", gap: s.s3 }}>
         <Press
           role="checkbox"

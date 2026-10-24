@@ -2,6 +2,7 @@
 // changed 1", when it ran), opening to each change with Undo. Agents change the plan directly,
 // so the person checks afterwards instead of approving before.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useState } from "react";
 import { View } from "react-native";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react-native";
@@ -15,7 +16,7 @@ import { Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
-import { ActionRow, rule } from "./ActionRow";
+import { ActionRow } from "./ActionRow";
 import { openAgentSettings } from "./agents";
 import { Initial } from "./Initial";
 
@@ -84,7 +85,7 @@ function RunItem({
 }) {
   const summary = runSummary(run.actions) || "everything undone";
   return (
-    <View style={rule}>
+    <View>
       <Press
         role="button"
         aria-expanded={open}
@@ -125,6 +126,7 @@ function RunItem({
           ))}
         </View>
       ) : null}
+      <DottedRule />
     </View>
   );
 }

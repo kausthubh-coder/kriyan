@@ -1,6 +1,7 @@
 // One change an agent made, with Undo (b2.html `.run-i`), and Edit on a task it added so the
 // person can fix it rather than undo it. Undone changes stay listed, struck through.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { View } from "react-native";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
@@ -16,8 +17,6 @@ import { actionLine } from "./agents";
 
 /** The prototype's small round button on a card (b2.html `.btn-sm`). */
 export const small = { borderRadius: r.pill, backgroundColor: c.hover } as const;
-/** The prototype's dotted rule between rows. */
-export const rule = { borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong } as const;
 
 export function ActionRow({
   action,
@@ -43,7 +42,6 @@ export function ActionRow({
           paddingVertical: s.s1,
           paddingLeft: indent,
         },
-        last ? null : rule,
       ]}
     >
       <Txt variant="body" tone={action.undone ? "ink3" : "ink2"} strike={action.undone} style={{ flex: 1 }}>
@@ -73,6 +71,7 @@ export function ActionRow({
           ) : null}
         </>
       )}
+      {last ? null : <DottedRule />}
     </View>
   );
 }

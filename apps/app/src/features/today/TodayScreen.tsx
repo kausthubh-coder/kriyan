@@ -4,6 +4,7 @@
 // header card heads a centred column with the ask bar at its foot; on a window wide enough,
 // the day's hours sit in a column on the right with what's next pinned at its foot.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Platform, RefreshControl, useWindowDimensions, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
@@ -444,7 +445,10 @@ function ListNow({ now, next }: { now: number; next: TaskView | null }) {
 /** The prototype's dotted rule under each row of the day's list (b2.html `.row`). */
 function Dotted({ children }: { children: ReactNode }) {
   return (
-    <View style={{ borderBottomWidth: 1, borderStyle: "dotted", borderColor: c.lineStrong }}>{children}</View>
+    <View>
+      {children}
+      <DottedRule />
+    </View>
   );
 }
 

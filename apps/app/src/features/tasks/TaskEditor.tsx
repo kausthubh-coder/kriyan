@@ -6,6 +6,7 @@
 // Each field's picker opens over the task, which stays behind it (b2.html `pickerHTML`): on
 // phones a small sheet over the task sheet, on desktop a box under the chips inside the panel.
 
+import { DottedRule } from "@/ui/DottedRule";
 import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { ScrollView, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
@@ -957,9 +958,6 @@ function PickRow({
         alignItems: "center",
         gap: s.s3,
         minHeight: 48,
-        borderBottomWidth: last ? 0 : 1,
-        borderStyle: "dotted",
-        borderColor: c.lineStrong,
       }}
     >
       {icon ? <Icon icon={icon} size={18} tone="ink2" /> : null}
@@ -972,6 +970,7 @@ function PickRow({
         </Txt>
       ) : null}
       {selected ? <Icon icon={CheckGlyph} size={16} tone="ink2" /> : null}
+      {last ? null : <DottedRule />}
     </Press>
   );
 }
