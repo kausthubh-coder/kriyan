@@ -7,6 +7,10 @@ import type { Id } from "./_generated/dataModel";
 import { validatorMessage } from "./http";
 import schema from "./schema";
 
+// web-push is replaced whole, so the suite never loads its Node-only crypto and nothing is sent.
+const webPushMock = vi.hoisted(() => ({ setVapidDetails: vi.fn(), sendNotification: vi.fn() }));
+vi.mock("web-push", () => ({ default: webPushMock }));
+
 const modules = import.meta.glob("./**/*.ts");
 const ALICE = {
   tokenIdentifier: "https://clerk.test|user_alice",
@@ -297,9 +301,11 @@ describe("reminders", () => {
     const [job] = await pending(t);
     expect(new Date(job!.fireAt).toISOString()).toBe("2026-10-15T20:00:00.000Z");
     expect(await t.query(internal.reminders.payload, job!)).toEqual({
+      ownerId: ALICE.tokenIdentifier,
       title: "Mum's birthday",
       body: "Tomorrow",
       tokens: [],
+      web: [],
     });
   });
 
@@ -816,6 +822,8 @@ describe("deleting my data", () => {
       agent: "Codex",
       title: "Read",
     });
+    await alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}alice`, ...KEYS });
+    await bob.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}bob`, ...KEYS });
     await alice.mutation(api.account.deleteMyData, {});
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     const owners = await t.run(async (ctx) => {
@@ -833,6 +841,7 @@ describe("deleting my data", () => {
             "focusSessions",
             "agentActions",
             "asks",
+            "webPushSubscriptions",
           ] as const
         ).map((table) => ctx.db.query(table).collect()),
       );
@@ -891,6 +900,43 @@ describe("months of use", () => {
     const space = await alice.query(api.views.space, { id: work, today });
     expect(space.later.map((x) => x.title)).toEqual(["Draft the launch post"]);
     expect(space.stats.open).toBe(1);
+  });
+});
+
+describe("a space's page", () => {
+  test("a parent space lists and counts what the spaces inside it hold", async () => {
+    const { alice, today } = await setup();
+    const work = await alice.mutation(api.organize.addSpace, { name: "Work" });
+    const kriyan = await alice.mutation(api.organize.addSpace, { name: "Kriyan", parentId: work });
+    const launch = await alice.mutation(api.organize.addSpace, { name: "Launch", parentId: kriyan });
+    const clients = await alice.mutation(api.organize.addSpace, { name: "Clients", parentId: work });
+    await alice.mutation(api.tasks.add, { title: "Write MCP tools", spaceId: kriyan, date: today, time: 600 });
+    await alice.mutation(api.tasks.add, { title: "Draft the post", spaceId: launch, date: "2026-10-15" });
+    await alice.mutation(api.tasks.add, { title: "Invoice Acme", spaceId: clients });
+    const done = await alice.mutation(api.tasks.add, { title: "Fix login", spaceId: kriyan, date: today });
+    await alice.mutation(api.tasks.complete, { id: done });
+    // Someone else's space with the same shape stays out of it.
+    const bob = alice.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    const bobs = await bob.mutation(api.organize.addSpace, { name: "Work" });
+    await bob.mutation(api.tasks.add, { title: "Bob's task", spaceId: bobs, date: today });
+
+    const page = await alice.query(api.views.space, { id: work, today });
+    expect(page.next.map((x) => [x.title, x.spacePath])).toEqual([
+      ["Write MCP tools", "Work / Kriyan"],
+      ["Draft the post", "Work / Kriyan / Launch"],
+    ]);
+    expect(page.later.map((x) => [x.title, x.spacePath])).toEqual([["Invoice Acme", "Work / Clients"]]);
+    expect(page.stats.open).toBe(3);
+    expect(page.stats.doneThisMonth).toBe(1);
+    expect(page.children.map((c) => [c.name, c.open])).toEqual([
+      ["Kriyan", 2],
+      ["Clients", 1],
+    ]);
+    // A leaf space shows only its own.
+    const leaf = await alice.query(api.views.space, { id: launch, today });
+    expect(leaf.next.map((x) => x.title)).toEqual(["Draft the post"]);
+    expect(leaf.stats.open).toBe(1);
   });
 });
 
@@ -1192,5 +1238,172 @@ describe("focus, steps and settings", () => {
     await alice.mutation(api.account.updateProfile, { semesterStart: null, semesterEnd: null });
     const cleared = await alice.query(api.account.profile, {});
     expect([cleared.semesterStart, cleared.semesterEnd]).toEqual([undefined, undefined]);
+  });
+});
+
+// Shaped like a real browser's subscription: an FCM endpoint, a 65-byte key and a 16-byte secret.
+const PUSH_SERVICE = "https://fcm.googleapis.com/fcm/send/";
+const KEYS = {
+  p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM",
+  auth: "tBHItJI5svbpez7KI4CCXg",
+};
+const NEW_KEYS = {
+  p256dh: "BLc4xRzKlKORKWlbdgFaBrrPK3ydWAHo4M0gs0i1oEKgPpWC5cW8OCzVrOQRv-1npXRWk8udnW3oYhIO4475rds",
+  auth: "5I2Bu2oKdyy9CwL8QVF0NQ",
+};
+const VAPID = {
+  VAPID_PUBLIC_KEY: "BDd3_hVL9fZi9Ybo2UUzA284WG5FZR30_95YeZJsiApwXKpNcF1rRPF3foIiBHXRdJI2Qhumhf6_LFTeZaNndIo",
+  VAPID_PRIVATE_KEY: "xKZKYRNdFFn8iQIF2MH54KTfUHwH105zBdzMR7SI3xI",
+  VAPID_SUBJECT: "mailto:test@kriyan.app",
+};
+
+describe("reminders in the browser", () => {
+  beforeEach(() => {
+    webPushMock.setVapidDetails.mockReset();
+    webPushMock.sendNotification.mockReset();
+    webPushMock.sendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+  });
+  afterEach(() => {
+    for (const name of Object.keys(VAPID)) delete process.env[name];
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+  const turnOnWebPush = () => Object.assign(process.env, VAPID);
+
+  const subscriptions = (t: Awaited<ReturnType<typeof setup>>["t"]) =>
+    t.run(async (ctx) =>
+      (await ctx.db.query("webPushSubscriptions").collect()).map((r) => [r.ownerId, r.endpoint, r.p256dh, r.auth]),
+    );
+
+  test("a browser subscribes once, and subscribing again replaces its keys", async () => {
+    const { t, alice } = await setup();
+    await alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}laptop`, ...KEYS });
+    expect(await subscriptions(t)).toEqual([
+      [ALICE.tokenIdentifier, `${PUSH_SERVICE}laptop`, KEYS.p256dh, KEYS.auth],
+    ]);
+    await alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}laptop`, ...NEW_KEYS });
+    expect(await subscriptions(t)).toEqual([
+      [ALICE.tokenIdentifier, `${PUSH_SERVICE}laptop`, NEW_KEYS.p256dh, NEW_KEYS.auth],
+    ]);
+    await alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}phone`, ...KEYS });
+    expect(await subscriptions(t)).toEqual([
+      [ALICE.tokenIdentifier, `${PUSH_SERVICE}laptop`, NEW_KEYS.p256dh, NEW_KEYS.auth],
+      [ALICE.tokenIdentifier, `${PUSH_SERVICE}phone`, KEYS.p256dh, KEYS.auth],
+    ]);
+  });
+
+  test("only an https push address with real-looking keys is stored", async () => {
+    const { t, alice } = await setup();
+    for (const endpoint of [
+      "http://fcm.googleapis.com/fcm/send/laptop",
+      "not a url",
+      `${PUSH_SERVICE}${"a".repeat(1000)}`,
+    ])
+      await expect(alice.mutation(api.account.registerWebPush, { endpoint, ...KEYS })).rejects.toThrow(
+        "That isn't a push address from a browser.",
+      );
+    for (const keys of [
+      { p256dh: "short", auth: KEYS.auth },
+      { p256dh: KEYS.p256dh, auth: "not base64url!" },
+    ])
+      await expect(
+        alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}laptop`, ...keys }),
+      ).rejects.toThrow("That browser's push keys don't look right.");
+    expect(await subscriptions(t)).toEqual([]);
+  });
+
+  test("the 21st browser drops the oldest", async () => {
+    const { t, alice } = await setup();
+    // Named so the oldest sorts last by endpoint: the cap must go by age, not by address.
+    for (let i = 0; i < 21; i++)
+      await alice.mutation(api.account.registerWebPush, {
+        endpoint: `${PUSH_SERVICE}${String(20 - i).padStart(2, "0")}`,
+        ...KEYS,
+      });
+    const endpoints = (await subscriptions(t)).map((row) => row[1]);
+    expect(endpoints.length).toBe(20);
+    expect(endpoints).not.toContain(`${PUSH_SERVICE}20`);
+    expect(endpoints).toContain(`${PUSH_SERVICE}00`);
+  });
+
+  test("signing out takes back only your own browser", async () => {
+    const { t, alice } = await setup();
+    await alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}laptop`, ...KEYS });
+    await t.withIdentity(BOB).mutation(api.account.unregisterWebPush, { endpoint: `${PUSH_SERVICE}laptop` });
+    expect(await subscriptions(t)).toEqual([
+      [ALICE.tokenIdentifier, `${PUSH_SERVICE}laptop`, KEYS.p256dh, KEYS.auth],
+    ]);
+    await alice.mutation(api.account.unregisterWebPush, { endpoint: `${PUSH_SERVICE}laptop` });
+    expect(await subscriptions(t)).toEqual([]);
+  });
+
+  test("the app learns the public key only when all three VAPID settings are there", async () => {
+    const { alice } = await setup();
+    expect(await alice.query(api.account.webPushKey, {})).toBeNull();
+    process.env.VAPID_PUBLIC_KEY = VAPID.VAPID_PUBLIC_KEY;
+    process.env.VAPID_PRIVATE_KEY = VAPID.VAPID_PRIVATE_KEY;
+    expect(await alice.query(api.account.webPushKey, {})).toBeNull();
+    turnOnWebPush();
+    expect(await alice.query(api.account.webPushKey, {})).toBe(VAPID.VAPID_PUBLIC_KEY);
+  });
+
+  async function remindDentist() {
+    const ctx = await setup();
+    await ctx.alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}laptop`, ...KEYS });
+    const id = await ctx.alice.mutation(api.tasks.addText, {
+      text: "Dentist tomorrow 9am remind day before at 20:00",
+    });
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    return { ...ctx, id, fetch, fireAt: Date.parse("2026-10-13T20:00:00Z") };
+  }
+  async function ring(t: Awaited<ReturnType<typeof setup>>["t"]) {
+    vi.advanceTimersToNextTimer();
+    await t.finishInProgressScheduledFunctions();
+  }
+
+  test("a browser with no phone gets the reminder, with the task and when it is", async () => {
+    turnOnWebPush();
+    const { t, id, fetch, fireAt } = await remindDentist();
+    await ring(t);
+    expect(webPushMock.setVapidDetails.mock.calls).toEqual([
+      [VAPID.VAPID_SUBJECT, VAPID.VAPID_PUBLIC_KEY, VAPID.VAPID_PRIVATE_KEY],
+    ]);
+    expect(webPushMock.sendNotification.mock.calls).toEqual([
+      [
+        { endpoint: `${PUSH_SERVICE}laptop`, keys: KEYS },
+        JSON.stringify({ title: "Dentist", body: "Tomorrow at 09:00", taskId: id, tag: `${id}:${fireAt}` }),
+        { TTL: 14400, urgency: "high" },
+      ],
+    ]);
+    // No phone is registered, so Expo is never called.
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.query("reminderJobs").collect())).toEqual([]);
+  });
+
+  test("a browser the push service says is gone is forgotten; one that failed for now is kept", async () => {
+    turnOnWebPush();
+    const { t, alice } = await remindDentist();
+    await alice.mutation(api.account.registerWebPush, { endpoint: `${PUSH_SERVICE}phone`, ...NEW_KEYS });
+    webPushMock.sendNotification.mockImplementation(async (sub: { endpoint: string }) => {
+      throw Object.assign(new Error("push failed"), {
+        statusCode: sub.endpoint.endsWith("laptop") ? 410 : 500,
+      });
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await ring(t);
+    expect(webPushMock.sendNotification).toHaveBeenCalledTimes(2);
+    expect(await subscriptions(t)).toEqual([
+      [ALICE.tokenIdentifier, `${PUSH_SERVICE}phone`, NEW_KEYS.p256dh, NEW_KEYS.auth],
+    ]);
+    expect(logged.mock.calls).toEqual([["Web push failed with 500"]]);
+  });
+
+  test("without VAPID settings nothing is sent and the reminder is still done with", async () => {
+    const { t } = await remindDentist();
+    await ring(t);
+    expect(webPushMock.sendNotification).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.query("reminderJobs").collect())).toEqual([]);
+    expect((await subscriptions(t)).length).toBe(1);
   });
 });

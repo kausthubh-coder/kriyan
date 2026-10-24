@@ -29,6 +29,7 @@ import type * as reminders from "../reminders.js";
 import type * as tasks from "../tasks.js";
 import type * as validators from "../validators.js";
 import type * as views from "../views.js";
+import type * as webPush from "../webPush.js";
 
 import type {
   ApiFromModules,
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   tasks: typeof tasks;
   validators: typeof validators;
   views: typeof views;
+  webPush: typeof webPush;
 }>;
 
 /**

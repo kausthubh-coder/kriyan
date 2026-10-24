@@ -167,6 +167,72 @@ export const unregisterPush = mutation({
   },
 });
 
+/** The VAPID public key a browser subscribes with, or null when this deployment can't send Web Push. */
+export const webPushKey = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireOwner(ctx);
+    const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env;
+    // A public key alone would let a browser subscribe to pushes that never come.
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) return null;
+    return VAPID_PUBLIC_KEY;
+  },
+});
+
+/** PushSubscription.toJSON() gives keys as unpadded base64url: p256dh is 65 bytes, auth 16. */
+const P256DH = /^[A-Za-z0-9_-]{80,100}$/;
+const AUTH = /^[A-Za-z0-9_-]{16,50}$/;
+
+function isHttpsUrl(text: string): boolean {
+  try {
+    return new URL(text).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export const registerWebPush = mutation({
+  args: { endpoint: v.string(), p256dh: v.string(), auth: v.string() },
+  handler: async (ctx, { endpoint, p256dh, auth }) => {
+    const ownerId = await requireOwner(ctx);
+    if (endpoint.length >= 1000 || !isHttpsUrl(endpoint))
+      throw new ConvexError("That isn't a push address from a browser.");
+    if (!P256DH.test(p256dh) || !AUTH.test(auth))
+      throw new ConvexError("That browser's push keys don't look right.");
+    const existing = await ctx.db
+      .query("webPushSubscriptions")
+      .withIndex("by_owner_and_endpoint", (q) => q.eq("ownerId", ownerId).eq("endpoint", endpoint))
+      .unique();
+    // A browser that subscribes again may have new keys; the old ones no longer decrypt.
+    if (existing) {
+      await ctx.db.patch(existing._id, { p256dh, auth });
+      return;
+    }
+    await ctx.db.insert("webPushSubscriptions", { ownerId, endpoint, p256dh, auth });
+    const browsers = await ctx.db
+      .query("webPushSubscriptions")
+      .withIndex("by_owner_and_endpoint", (q) => q.eq("ownerId", ownerId))
+      .take(MAX_DEVICES + 10);
+    // The index orders by endpoint, so the oldest are found by creation time.
+    browsers.sort((a, b) => a._creationTime - b._creationTime);
+    for (const old of browsers.slice(0, Math.max(0, browsers.length - MAX_DEVICES)))
+      await ctx.db.delete(old._id);
+  },
+});
+
+/** On sign-out or when reminders are turned off: this browser stops ringing for the account. */
+export const unregisterWebPush = mutation({
+  args: { endpoint: v.string() },
+  handler: async (ctx, { endpoint }) => {
+    const ownerId = await requireOwner(ctx);
+    const row = await ctx.db
+      .query("webPushSubscriptions")
+      .withIndex("by_owner_and_endpoint", (q) => q.eq("ownerId", ownerId).eq("endpoint", endpoint))
+      .unique();
+    if (row) await ctx.db.delete(row._id);
+  },
+});
+
 export const tokens = query({
   args: {},
   handler: async (ctx) => {
@@ -197,7 +263,7 @@ export const revokeToken = mutation({
 
 /**
  * Deletes everything the signed-in person owns: tasks (and their pending reminders), spaces,
- * habits, goals, history, devices, tokens and the profile. Runs in batches until done.
+ * habits, goals, history, phones and browsers that get reminders, tokens and the profile. Runs in batches until done.
  * The Clerk account itself is deleted by the app through Clerk.
  */
 export const deleteMyData = mutation({
@@ -254,6 +320,11 @@ export const deleteDataBatch = internalMutation({
         ctx.db
           .query("pushTokens")
           .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("webPushSubscriptions")
+          .withIndex("by_owner_and_endpoint", (q) => q.eq("ownerId", ownerId))
           .take(left),
       () =>
         ctx.db

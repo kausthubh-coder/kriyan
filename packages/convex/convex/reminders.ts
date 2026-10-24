@@ -18,17 +18,30 @@ export const payload = internalQuery({
       .query("pushTokens")
       .withIndex("by_owner", (q) => q.eq("ownerId", task.ownerId))
       .take(20);
+    const browsers = await ctx.db
+      .query("webPushSubscriptions")
+      .withIndex("by_owner_and_endpoint", (q) => q.eq("ownerId", task.ownerId))
+      .take(20);
     return {
+      ownerId: task.ownerId,
       title: task.title,
       body: reminderBody({ date: occurrence, time: task.time }, todayIn(timeZone, fireAt)),
       tokens: tokens.map((t) => t.token),
+      web: browsers.map((b) => ({ endpoint: b.endpoint, p256dh: b.p256dh, auth: b.auth })),
     };
   },
 });
 
 export const forget = internalMutation({
-  args: { taskId: v.id("tasks"), fireAt: v.number(), badTokens: v.array(v.string()) },
-  handler: async (ctx, { taskId, fireAt, badTokens }) => {
+  args: {
+    taskId: v.id("tasks"),
+    fireAt: v.number(),
+    badTokens: v.array(v.string()),
+    // Browsers the push service says are gone, for this owner only.
+    ownerId: v.optional(v.string()),
+    goneEndpoints: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { taskId, fireAt, badTokens, ownerId, goneEndpoints }) => {
     const jobs = await ctx.db
       .query("reminderJobs")
       .withIndex("by_taskId", (q) => q.eq("taskId", taskId))
@@ -43,10 +56,21 @@ export const forget = internalMutation({
         .unique();
       if (row) await ctx.db.delete(row._id);
     }
+    if (ownerId === undefined) return;
+    for (const endpoint of goneEndpoints ?? []) {
+      const row = await ctx.db
+        .query("webPushSubscriptions")
+        .withIndex("by_owner_and_endpoint", (q) => q.eq("ownerId", ownerId).eq("endpoint", endpoint))
+        .unique();
+      if (row) await ctx.db.delete(row._id);
+    }
   },
 });
 
-/** Sends one reminder through Expo's push service. Expo is best effort; a missed push is not retried. */
+/**
+ * Sends one reminder through Expo's push service to phones and through Web Push to browsers.
+ * Both are best effort; a missed push is not retried.
+ */
 export const fire = internalAction({
   // `date` is the occurrence the reminder is for. Jobs scheduled before it existed leave it
   // out and mean the task's own date.
@@ -91,6 +115,27 @@ export const fire = internalAction({
         console.error(`Expo push failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-    await ctx.runMutation(internal.reminders.forget, { taskId, fireAt, badTokens });
+    let goneEndpoints: string[] = [];
+    if (data && data.web.length) {
+      try {
+        const result = await ctx.runAction(internal.webPush.send, {
+          subscriptions: data.web,
+          title: data.title,
+          body: data.body,
+          taskId,
+          tag: `${taskId}:${fireAt}`,
+        });
+        goneEndpoints = result.gone;
+      } catch (error) {
+        // Forget the job anyway, so the next occurrence still gets its reminders.
+        console.error(`Web push failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    await ctx.runMutation(internal.reminders.forget, {
+      taskId,
+      fireAt,
+      badTokens,
+      ...(data && goneEndpoints.length ? { ownerId: data.ownerId, goneEndpoints } : {}),
+    });
   },
 });

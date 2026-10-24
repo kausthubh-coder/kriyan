@@ -197,6 +197,14 @@ export default defineSchema({
     .index("by_owner", ["ownerId"])
     .index("by_token", ["token"]),
 
+  /** A browser that asked for reminders through Web Push: its push service URL and keys. */
+  webPushSubscriptions: defineTable({
+    ownerId: v.string(),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+  }).index("by_owner_and_endpoint", ["ownerId", "endpoint"]),
+
   /** Personal access tokens for the CLI and MCP clients. Only a hash is stored. */
   accessTokens: defineTable({
     ownerId: v.string(),

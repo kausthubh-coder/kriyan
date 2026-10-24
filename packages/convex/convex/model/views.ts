@@ -348,15 +348,35 @@ export async function inboxView(ctx: QueryCtx, ownerId: string) {
   return undated.sort((a, b) => b.order - a.order).map((t) => view(t, map));
 }
 
+/** Every space inside this one, at any depth. `tree` lists parents before their children. */
+function descendants(spaceId: Id<"spaces">, tree: SpaceNode[]): Id<"spaces">[] {
+  const found = new Set<string>([spaceId]);
+  const out: Id<"spaces">[] = [];
+  for (const s of tree)
+    if (s.parentId && found.has(s.parentId)) {
+      found.add(s._id);
+      out.push(s._id);
+    }
+  return out;
+}
+
 export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spaces">, today: CivilDate) {
   civil(today, "date");
   const space = owned(await ctx.db.get(spaceId), ownerId, "space");
   const { map, tree } = await spaceMap(ctx, ownerId);
   const node = map.get(spaceId);
-  const tasks = (await openInSpace(ctx, ownerId, spaceId)).filter((t) => t.proposedBy === undefined);
+  // A parent space holds what its spaces hold: Work lists and counts Kriyan's tasks too, so a
+  // space with everything in its children never looks empty.
+  const subtree = (id: Id<"spaces">) => [id, ...descendants(id, tree)];
+  const openIn = async (ids: Id<"spaces">[]) =>
+    (await Promise.all(ids.map((id) => openInSpace(ctx, ownerId, id))))
+      .flat()
+      .filter((t) => t.proposedBy === undefined);
+  const inside = new Set<string>(subtree(spaceId));
+  const tasks = await openIn([...inside] as Id<"spaces">[]);
   const children = tree.filter((s) => s.parentId === spaceId);
   const childCounts = await Promise.all(
-    children.map(async (c) => ({ ...c, open: (await openInSpace(ctx, ownerId, c._id)).length })),
+    children.map(async (c) => ({ ...c, open: (await openIn(subtree(c._id))).length })),
   );
   const monthStart = `${today.slice(0, 8)}01`;
   const weekStart = addDays(today, -weekday(today));
@@ -369,7 +389,7 @@ export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spa
         .lte("doneOn", today),
     )
     .take(2000);
-  const mine = completions.filter((c) => c.spaceId === spaceId);
+  const mine = completions.filter((c) => c.spaceId !== undefined && inside.has(c.spaceId));
   const goals = (
     await ctx.db
       .query("goals")
