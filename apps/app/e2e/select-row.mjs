@@ -44,7 +44,7 @@ await step("the command menu lists the selected task's commands with their keys"
   await menu.getByText("Selected task").waitFor();
   await page.screenshot({ path: artifact("select-command-1440.png") });
   await menu.getByText("Move to tomorrow").click();
-  const toast = status.filter({ hasText: "Moved to Tomorrow: Run" });
+  const toast = status.filter({ hasText: "Moved to tomorrow: Run" });
   await toast.waitFor();
   await toast.getByRole("button", { name: "Undo" }).click();
   await page.getByRole("button", { name: "Open Run" }).waitFor();

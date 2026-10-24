@@ -3,7 +3,7 @@
 // optional "How did today feel?". It ends on "Day closed". Nothing is scored; nothing is
 // "overdue". Swipe a card right for Tomorrow, left to let it go; the buttons do the same.
 
-import { Fragment, useRef, useState, type ReactNode } from "react";
+import { forwardRef, useRef, useState, type ReactNode } from "react";
 import { Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import Head from "expo-router/head";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import {
   CalendarDays,
   ChevronLeft,
+  ChevronRight,
   CircleCheck,
   Inbox,
   Moon,
@@ -31,14 +32,14 @@ import { armHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { SectionLabel } from "@/features/progress/SectionLabel";
 import { useIsPhone } from "@/theme/layout";
-import { c, family, r, s, spaceTone, sz } from "@/theme/tokens";
+import { bold, c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
-import { goBack, Screen, SectionHead } from "@/ui/Screen";
+import { goBack, SplitScreen } from "@/ui/Screen";
 import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
-import { Timeline } from "@/features/today/Timeline";
+import { DayColumn } from "@/features/today/DayColumn";
 import { Txt } from "@/ui/Txt";
 
 type Step = "done" | "decide" | "tomorrow" | "feel" | "closed";
@@ -46,6 +47,7 @@ const STEPS: Step[] = ["done", "decide", "tomorrow", "feel"];
 const FACES = ["Rough", "Meh", "Okay", "Good", "Great"] as const;
 
 export function ReviewScreen() {
+  const phone = useIsPhone();
   const view = useTodayView();
   const { today } = useClock();
   const tomorrow = addDays(today, 1);
@@ -82,26 +84,30 @@ export function ReviewScreen() {
   return (
     <ReviewFrame day={view}>
       <View style={{ gap: s.s3 }}>
+        {/* Phones lead with "‹ Today" (b2.html `.rvpg`); desktop keeps the sidebar, so the date
+            chip stands alone. */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
-          <Press
-            role="link"
-            accessibilityLabel="Back to Today"
-            onPress={() => goBack("/today")}
-            hoverBg={null}
-            scale={false}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              minHeight: 44,
-              marginLeft: -s.s1,
-              paddingRight: s.s1,
-            }}
-          >
-            <Icon icon={ChevronLeft} size={20} tone="ink2" />
-            <Txt variant="label" tone="ink2">
-              Today
-            </Txt>
-          </Press>
+          {phone ? (
+            <Press
+              role="link"
+              accessibilityLabel="Back to Today"
+              onPress={() => goBack("/today")}
+              hoverBg={null}
+              scale={false}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                minHeight: 44,
+                marginLeft: -s.s1,
+                paddingRight: s.s1,
+              }}
+            >
+              <Icon icon={ChevronLeft} size={20} tone="ink2" />
+              <Txt variant="label" tone="ink2">
+                Today
+              </Txt>
+            </Press>
+          ) : null}
           <View
             style={{
               paddingHorizontal: s.s3,
@@ -133,7 +139,7 @@ export function ReviewScreen() {
       {step === "done" ? (
         <View>
           {/* What got done and the time focused, from Focus sessions: no score, no percentage. */}
-          <Txt variant="headline" heading={1} tone="ink3" style={{ lineHeight: 36 }}>
+          <Txt variant="headline" heading={1} tone="ink3" style={[bold, { lineHeight: 36 }]}>
             Today you finished{" "}
             <Txt variant="headline" tnum>
               {plural(done.length, "task")}
@@ -191,15 +197,21 @@ export function ReviewScreen() {
             </Txt>
           </View>
           {open[0] ? (
-            <DecideCard key={open[0]._id} task={open[0]} today={today} tomorrow={tomorrow} onDone={handle} />
+            <DecideCard
+              key={open[0]._id}
+              task={open[0]}
+              next={open[1]}
+              today={today}
+              tomorrow={tomorrow}
+              onDone={handle}
+            />
           ) : null}
-          <Button variant="quiet" label="Keep the rest on today" onPress={() => setStep("tomorrow")} />
         </View>
       ) : null}
 
       {step === "tomorrow" ? (
         <View style={{ gap: s.s6 }}>
-          <Txt variant="headline" heading={1}>
+          <Txt variant="headline" heading={1} style={bold}>
             Tomorrow
           </Txt>
           {tomorrowDay ? (
@@ -233,7 +245,7 @@ export function ReviewScreen() {
 
       {step === "feel" ? (
         <View style={{ gap: s.s6 }}>
-          <Txt variant="headline" heading={1}>
+          <Txt variant="headline" heading={1} style={bold}>
             How did today feel?
           </Txt>
           <View role="radiogroup" style={{ flexDirection: "row", gap: s.s2, flexWrap: "wrap" }}>
@@ -281,7 +293,7 @@ export function ReviewScreen() {
           >
             <Icon icon={Moon} size={28} tone="ink2" />
           </View>
-          <Txt variant="headline" heading={1}>
+          <Txt variant="headline" heading={1} style={bold}>
             Day closed
           </Txt>
           <Txt variant="body" tone="ink2" style={{ textAlign: "center", maxWidth: 320 }}>
@@ -296,6 +308,9 @@ export function ReviewScreen() {
   );
 }
 
+/** B2's review column (`.col-in` at 560). */
+const REVIEW_WIDTH = 560;
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
@@ -307,31 +322,20 @@ function ReviewFrame({ children, day }: { children: ReactNode; day: TodayView | 
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { today, now } = useClock();
-  if (!phone && width < SPLIT_MIN_WIDTH) return <Screen title="Close the day">{children}</Screen>;
   if (!phone) {
-    // Wide enough: the day's hour grid stays beside the review, as in B2.
+    // B2: a 560 column centred beside the day, whose hours and what's next stay in view.
     return (
-      <Screen title="Close the day" width={sz.column + s.s12 + sz.schedule}>
-        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s12 }}>
-          <View style={{ flex: 1, minWidth: 0, maxWidth: 560, gap: s.s6 }}>{children}</View>
-          <View style={{ width: sz.schedule, gap: s.s2 }}>
-            <SectionHead title={formatDate(today)} />
-            {day ? (
-              <Timeline
-                date={today}
-                items={day.scheduled}
-                now={now}
-                dayStart={day.profile.dayStart}
-                dayEnd={day.profile.dayEnd}
-              />
-            ) : null}
-          </View>
-        </View>
-      </Screen>
+      <SplitScreen
+        title="Close the day"
+        columnWidth={REVIEW_WIDTH}
+        right={width >= SPLIT_MIN_WIDTH && day ? <DayColumn view={day} today={today} now={now} /> : null}
+      >
+        <View style={{ gap: s.s6 }}>{children}</View>
+      </SplitScreen>
     );
   }
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1, backgroundColor: c.raised }}>
       {Platform.OS === "web" ? (
         <Head>
           <title>Close the day | Kriyan</title>
@@ -411,11 +415,14 @@ const COMMIT = 110;
 /** One open thing, with four places to put it. Swipe right for Tomorrow, left to let it go. */
 function DecideCard({
   task,
+  next,
   today,
   tomorrow,
   onDone,
 }: {
   task: TaskView;
+  /** The one after it, which peeks out under the card. */
+  next?: TaskView;
   today: string;
   tomorrow: string;
   onDone: (t: TaskView) => void;
@@ -468,45 +475,67 @@ function DecideCard({
         ? formatClock(task.time)
         : "Anytime";
   return (
-    <View style={{ gap: s.s3 }}>
-      <GestureDetector gesture={pan}>
-        <Animated.View
-          accessibilityLabel={`${task.title}. Swipe right for tomorrow, left to let it go.`}
-          style={[
-            {
-              padding: s.s4,
-              gap: s.s1,
-              minHeight: 120,
-              borderRadius: r.card + 4,
-              backgroundColor: c.raised,
-              boxShadow: "var(--shadow-raised)",
-              borderWidth: 1,
-              borderColor: c.line,
-            },
-            style,
-          ]}
-        >
-          <Txt variant="meta" tone="ink3" tnum>
-            {[when, task.length ? formatDuration(task.length) : null, task.repeatText]
-              .filter(Boolean)
-              .join(" · ")}
-          </Txt>
-          <Txt variant="title">{task.title}</Txt>
-          <View style={{ flex: 1 }} />
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Txt variant="caption" tone="ink3">
-              ← Let it go
+    <View>
+      {/* B2's card stack: the open thing on a tall filled card, the next one peeking under it. */}
+      <View style={{ height: CARD_HEIGHT }}>
+        {next ? (
+          <View
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: r.sheet,
+              backgroundColor: c.select,
+              transform: [{ translateY: 14 }, { scale: 0.94 }],
+            }}
+          />
+        ) : null}
+        <GestureDetector gesture={pan}>
+          <Animated.View
+            accessibilityLabel={`${task.title}. Swipe right for tomorrow, left to let it go.`}
+            style={[
+              {
+                position: "absolute",
+                inset: 0,
+                padding: s.s6,
+                gap: s.s2,
+                borderRadius: r.sheet,
+                backgroundColor: c.sunken,
+              },
+              style,
+            ]}
+          >
+            <Txt variant="body" tone="ink3" tnum>
+              {[when, task.length ? formatDuration(task.length) : null, task.repeatText]
+                .filter(Boolean)
+                .join(" · ")}
             </Txt>
-            <Txt variant="caption" tone="ink3">
-              Tomorrow →
+            <Txt variant="title" style={bold} numberOfLines={3}>
+              {task.title}
             </Txt>
-          </View>
-        </Animated.View>
-      </GestureDetector>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-        <Button variant="primary" icon={Sunrise} label="Tomorrow" onPress={toTomorrow} />
-        <Button ref={pickRef} icon={CalendarDays} label="Pick a day" onPress={() => setPicking(true)} />
-        <Button
+            <View style={{ flex: 1 }} />
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                <Icon icon={ChevronLeft} size={16} />
+                <Txt variant="meta" tone="ink3">
+                  Let it go
+                </Txt>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                <Txt variant="meta" tone="ink3">
+                  Tomorrow
+                </Txt>
+                <Icon icon={ChevronRight} size={16} />
+              </View>
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      </View>
+      {/* Four equal places to put it, two by two (b2.html `.rv-acts`). */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s3, marginTop: s.s4 }}>
+        <Tile primary icon={Sunrise} label="Tomorrow" onPress={toTomorrow} />
+        <Tile ref={pickRef} icon={CalendarDays} label="Pick a day" onPress={() => setPicking(true)} />
+        <Tile
           icon={Inbox}
           label="Inbox"
           onPress={() => {
@@ -514,8 +543,20 @@ function DecideCard({
             onDone(task);
           }}
         />
-        <Button icon={X} label={task.repeat ? "Skip this one" : "Let it go"} onPress={letGo} />
+        <Tile icon={X} label={task.repeat ? "Skip this one" : "Let it go"} onPress={letGo} />
       </View>
+      {/* Leaves this one where it is and moves on to the next. */}
+      <Press
+        role="button"
+        accessibilityLabel="Keep it on today"
+        onPress={() => onDone(task)}
+        hoverBg={null}
+        style={{ alignSelf: "center", minHeight: 44, justifyContent: "center", marginTop: s.s2 }}
+      >
+        <Txt variant="label" tone="ink2" style={{ textDecorationLine: "underline" }}>
+          Keep it on today
+        </Txt>
+      </Press>
       <Popover open={picking} onClose={() => setPicking(false)} anchor={pickRef} title="Move to a day">
         <DayPicker
           value={task.date}
@@ -533,3 +574,41 @@ function DecideCard({
     </View>
   );
 }
+
+/** B2's tall stack (`.rv-stack`). */
+const CARD_HEIGHT = 236;
+
+/** One of the four places for an open thing: half the width, 56 tall, filled. */
+const Tile = forwardRef<
+  View,
+  { icon: typeof Sunrise; label: string; onPress: () => void; primary?: boolean }
+>(function Tile({ icon, label, onPress, primary }, ref) {
+  return (
+    <Press
+      ref={ref}
+      role="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hoverBg={null}
+      style={({ hovered }) => ({
+        // Two to a row: half the row less half the gap.
+        flexBasis: "45%",
+        flexGrow: 1,
+        minHeight: 56,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: s.s2,
+        paddingHorizontal: s.s3,
+        borderRadius: r.box,
+        backgroundColor: primary ? c.ink : hovered ? c.select : c.sunken,
+        opacity: primary && hovered ? 0.92 : 1,
+      })}
+    >
+      <Icon icon={icon} size={18} tone={primary ? "onInk" : "ink2"} />
+      <Txt variant="subhead" tone={primary ? "onInk" : "ink"} numberOfLines={1}>
+        {label}
+      </Txt>
+    </Press>
+  );
+});

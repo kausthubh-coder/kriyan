@@ -11,11 +11,11 @@ import {
   LayoutGrid,
   Moon,
   Plus,
+  Columns3,
   Search,
-  SlidersHorizontal,
+  Settings,
   Sparkles,
   Sun,
-  Table2,
   Target,
   Undo2,
   type LucideIcon,
@@ -26,7 +26,7 @@ import { useClock } from "@/data/time";
 import { useInboxView, useSpaces, useTodayView, useWeekView, type SpaceNode } from "@/data/views";
 import { SectionLabel } from "@/features/progress/SectionLabel";
 import { AddSpace } from "@/features/space/AddSpace";
-import { c, r, s, spaceTone, sz } from "@/theme/tokens";
+import { bold, c, family, hex, r, s, spaceTone, sz } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Dot } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
@@ -74,7 +74,7 @@ function NavItem({
           <Txt
             variant="label"
             tone={active || hovered ? "ink" : "ink2"}
-            style={{ flex: 1 }}
+            style={[{ flex: 1 }, active ? family("600") : null]}
             numberOfLines={1}
           >
             {label}
@@ -106,12 +106,15 @@ function NavItem({
 function Tile({
   href,
   icon,
+  color,
   count,
   label,
   active,
 }: {
   href: Href;
   icon: LucideIcon;
+  /** Each tile's icon has its own colour (B2's tiles), as a hex for the SVG. */
+  color: string;
   count: number | undefined;
   label: string;
   active: boolean;
@@ -133,7 +136,7 @@ function Tile({
               gap: s.s1,
               padding: s.s3,
               borderRadius: r.card,
-              backgroundColor: c.overlay,
+              backgroundColor: c.raised,
               borderWidth: 1,
               borderColor: active ? c.ink : hovered ? c.lineStrong : c.line,
             }}
@@ -149,13 +152,13 @@ function Tile({
                   backgroundColor: c.hover,
                 }}
               >
-                <Icon icon={icon} size={14} tone="ink2" />
+                <Icon icon={icon} size={14} color={color} />
               </View>
-              <Txt variant="subhead" tnum>
+              <Txt variant="title" tnum style={bold}>
                 {count ?? ""}
               </Txt>
             </View>
-            <Txt variant="meta" tone="ink3" numberOfLines={1}>
+            <Txt variant="meta" tone="ink3" numberOfLines={1} style={family("600")}>
               {label}
             </Txt>
           </View>
@@ -201,7 +204,8 @@ export function Sidebar() {
         height: "100%",
         padding: s.s3,
         gap: 2,
-        backgroundColor: c.sunken,
+        // B2's --side: a breath off the page, so the page leads.
+        backgroundColor: c.side,
         borderRightWidth: 1,
         borderRightColor: c.line,
       }}
@@ -249,14 +253,36 @@ export function Sidebar() {
       </Press>
       <View style={{ gap: s.s2, marginVertical: s.s3 }}>
         <View style={{ flexDirection: "row", gap: s.s2 }}>
-          <Tile href="/today" icon={Sun} count={todayCount} label="Today" active={false} />
-          <Tile href="/upcoming" icon={Table2} count={comingUp} label="Coming up" active={false} />
+          <Tile
+            href="/today"
+            icon={Sun}
+            color={spaceTone("blue").dotHex}
+            count={todayCount}
+            label="Today"
+            active={false}
+          />
+          <Tile
+            href="/upcoming"
+            icon={Columns3}
+            color={spaceTone("orange").dotHex}
+            count={comingUp}
+            label="Coming up"
+            active={false}
+          />
         </View>
         <View style={{ flexDirection: "row", gap: s.s2 }}>
-          <Tile href="/inbox" icon={Inbox} count={inbox?.length} label="Inbox" active={path === "/inbox"} />
+          <Tile
+            href="/inbox"
+            icon={Inbox}
+            color={spaceTone("purple").dotHex}
+            count={inbox?.length}
+            label="Inbox"
+            active={path === "/inbox"}
+          />
           <Tile
             href="/today"
             icon={Undo2}
+            color={hex.ink3}
             count={todayView?.earlier.length}
             label="From earlier"
             active={false}
@@ -264,7 +290,7 @@ export function Sidebar() {
         </View>
       </View>
       <NavItem href="/today" icon={Sun} label="Today" active={path === "/today" || path === "/"} />
-      <NavItem href="/upcoming" icon={Table2} label="Week" active={path === "/upcoming"} />
+      <NavItem href="/upcoming" icon={Columns3} label="Week" active={path === "/upcoming"} />
       <NavItem href="/progress" icon={Target} label="Goals and habits" active={path === "/progress"} />
       <NavItem href="/review" icon={Moon} label="Close the day" active={path === "/review"} />
       <NavItem href="/ask" icon={Sparkles} label="Ask Kriyan" active={path === "/ask"} />
@@ -292,7 +318,7 @@ export function Sidebar() {
       </ScrollView>
       <View style={{ marginTop: "auto", gap: 2, paddingTop: s.s2 }}>
         <NavItem icon={Search} label="Search" kbd="Ctrl K" onPress={() => openCommand()} />
-        <NavItem href="/settings" icon={SlidersHorizontal} label="Settings" active={path === "/settings"} />
+        <NavItem href="/settings" icon={Settings} label="Settings" active={path === "/settings"} />
         <Txt variant="meta" tone="ink3" tnum style={{ paddingHorizontal: s.s2, paddingTop: s.s2 }}>
           {`${formatDate(today)}, ${formatClock(now)}`}
         </Txt>

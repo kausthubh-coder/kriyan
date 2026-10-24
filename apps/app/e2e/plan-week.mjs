@@ -92,7 +92,9 @@ await step("drop on the grid: the task lands on that day at the time under the p
   await drag("Problem set 4", { x: head.x + 30, y: hour.y + hour.height / 2 + 2 });
   await page.screenshot({ path: artifact("plan-drop-time-1440.png") });
   await page.mouse.up();
-  await status.filter({ hasText: `Moved to ${formatDay(target, today)}: Problem set 4` }).waitFor();
+  // Mid-sentence "Tomorrow" is lower case.
+  const day = formatDay(target, today).replace(/^(Today|Tomorrow)$/, (w) => w.toLowerCase());
+  await status.filter({ hasText: `Moved to ${day}: Problem set 4` }).waitFor();
   const after = await op("get_week", {});
   const t = after.days.find((d) => d.date === target).scheduled.find((x) => x.title === "Problem set 4");
   if (!t) throw new Error(`not scheduled on ${target}`);
@@ -100,11 +102,9 @@ await step("drop on the grid: the task lands on that day at the time under the p
   await page.screenshot({ path: artifact("plan-after-1440.png") });
 });
 
-await step("the tray hides and comes back from the page head", async () => {
-  await page.getByRole("button", { name: "Hide tasks to plan" }).click();
-  await tray.waitFor({ state: "detached" });
-  await page.getByRole("button", { name: "Show tasks to plan" }).click();
-  await tray.waitFor();
+await step("Undo puts it back in the tray, which stays beside the week", async () => {
+  await status.filter({ hasText: "Problem set 4" }).getByRole("button", { name: "Undo" }).click();
+  await tray.getByRole("button", { name: "Open Problem set 4" }).waitFor();
 });
 
 if (taskOn(target, "Problem set 4"))

@@ -1,4 +1,4 @@
-// On the web, Inter is one family with three weights, so `font-weight` picks the face and
+// On the web, Inter is one family with four weights, so `font-weight` picks the face and
 // the browser and the Critly check both read "Inter". The stylesheet with the tokens is
 // injected here too, before the first frame.
 
@@ -7,12 +7,14 @@ import { Asset } from "expo-asset";
 import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
 import { Inter_500Medium } from "@expo-google-fonts/inter/500Medium";
 import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
+import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
 import { webCss } from "./tokens";
 
 const faces: [number, number][] = [
   [400, Inter_400Regular],
   [500, Inter_500Medium],
   [600, Inter_600SemiBold],
+  [700, Inter_700Bold],
 ];
 
 function inject() {

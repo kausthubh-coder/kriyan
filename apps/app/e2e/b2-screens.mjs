@@ -69,10 +69,13 @@ for (const [name, viewport] of [
       .first()
       .textContent();
     check(`${name}: Tomorrow moves on to the next card (${before} → ${after})`, before !== after);
-    await page
-      .getByRole("button", { name: "Keep the rest on today" })
-      .click()
-      .catch(() => undefined);
+    // Keep each one left where it is, one card at a time, until tomorrow's step.
+    for (let i = 0; i < 20; i++) {
+      const keep = page.getByRole("button", { name: "Keep it on today" });
+      if (!(await keep.isVisible().catch(() => false))) break;
+      await keep.click();
+      await page.waitForTimeout(200);
+    }
   }
   await page.getByRole("button", { name: "Looks good" }).click();
   await page.getByRole("radio", { name: "Good" }).click();

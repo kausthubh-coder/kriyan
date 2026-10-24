@@ -17,6 +17,7 @@ import { c, r, s, shadows, sz } from "@/theme/tokens";
 import { useInertOutside } from "@/ui/inert";
 import { Press } from "@/ui/Press";
 import { panelOpenedByKeyboard } from "./panelState";
+import { Grabber } from "@/ui/bits";
 
 const slideIn = new Keyframe({
   0: { opacity: 0, transform: [{ translateX: 24 }] },
@@ -73,7 +74,9 @@ export function TaskPanel({
           width: sz.panel,
           zIndex: 5,
           backgroundColor: c.raised,
-          boxShadow: shadows.overlay,
+          // B2's right column: a rule down its edge, not a floating layer's shadow.
+          borderLeftWidth: 1,
+          borderLeftColor: c.line,
           pointerEvents: "auto",
         }}
       >
@@ -163,7 +166,7 @@ function Sheet({
               justifyContent: "center",
             }}
           >
-            <View style={{ width: 32, height: 4, borderRadius: 2, backgroundColor: c.lineStrong }} />
+            <Grabber />
           </Press>
         </View>
       </GestureDetector>

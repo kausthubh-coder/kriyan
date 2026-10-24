@@ -38,6 +38,7 @@ function useTimeWidth(): number {
 /** A duration that never breaks across lines ("1h 30m"). */
 const unbroken = (minutes: number) => formatDuration(minutes).replace(/ /g, "\u00a0");
 const PILL_COL = 56;
+// B2's pill is 42; 44 keeps a short block a full touch target.
 const PILL_W = 44;
 // The prototype's small type (12 and 14) on phones, where the meta and body roles grow.
 const small = roleStyle(type.meta);
@@ -278,6 +279,9 @@ export function FreeGap({
         collapsable={false}
         style={{
           flexDirection: "row",
+          // At large text the button goes to the next line rather than squeezing "3h 30m free"
+          // into broken pieces.
+          flexWrap: "wrap",
           alignItems: "center",
           gap: s.s2,
           borderRadius: r.ctl,
@@ -285,7 +289,7 @@ export function FreeGap({
         }}
       >
         <Icon icon={Sun} size={16} />
-        <Txt tone="ink3" tnum style={[body14, { flex: 1 }]}>
+        <Txt tone="ink3" tnum style={[body14, { flexGrow: 1, flexShrink: 0 }]}>
           {`${unbroken(minutes)} free`}
         </Txt>
         <Press

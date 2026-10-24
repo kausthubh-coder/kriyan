@@ -6,10 +6,12 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { Modal, Platform, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import Animated, { FadeIn, FadeOut, SlideInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useIsPhone } from "@/theme/layout";
-import { c, r, s, shadows } from "@/theme/tokens";
+import { type } from "@kriyan/core/tokens";
+import { roleStyle, useIsPhone } from "@/theme/layout";
+import { bold, c, family, r, s, shadows } from "@/theme/tokens";
 import { useInertOutside } from "./inert";
 import { Txt } from "./Txt";
+import { Grabber } from "./bits";
 
 interface Props {
   open: boolean;
@@ -21,6 +23,8 @@ interface Props {
   side?: "below" | "left" | "above";
   title: string;
   width?: number;
+  /** A "Done" button in the phone sheet's head (B2's field pickers), which closes it. */
+  done?: boolean;
   children: ReactNode;
 }
 
@@ -31,7 +35,16 @@ interface Box {
   height: number;
 }
 
-export function Popover({ open, onClose, anchor, side = "below", title, width = 320, children }: Props) {
+export function Popover({
+  open,
+  onClose,
+  anchor,
+  side = "below",
+  title,
+  width = 320,
+  done,
+  children,
+}: Props) {
   const phone = useIsPhone();
   const win = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -74,6 +87,8 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
           style={{ flex: 1, backgroundColor: c.scrim }}
         >
           <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
+          {/* Pinned to the bottom edge by position, not by the flex column above it: on Android
+              the column came out short and the sheet ended ~200px above the bottom (D15). */}
           <Animated.View
             ref={layer}
             entering={SlideInDown.duration(220)}
@@ -81,6 +96,10 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
             aria-label={title}
             aria-modal
             style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
               maxHeight: win.height * 0.85,
               backgroundColor: c.overlay,
               borderTopLeftRadius: r.sheet,
@@ -88,12 +107,23 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
               paddingBottom: insets.bottom + s.s4,
             }}
           >
-            <View style={{ alignItems: "center", paddingTop: s.s3, paddingBottom: s.s2 }}>
-              <View style={{ width: 32, height: 4, borderRadius: 2, backgroundColor: c.lineStrong }} />
+            <View style={{ alignItems: "center", paddingTop: s.s2 }}>
+              <Grabber />
             </View>
-            <Txt variant="subhead" heading={2} style={{ paddingHorizontal: s.s4, paddingBottom: s.s2 }}>
-              {title}
-            </Txt>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: s.s2,
+                minHeight: 52,
+                paddingHorizontal: s.s4,
+              }}
+            >
+              <Txt variant="subhead" heading={2} style={[bold, { flex: 1 }]}>
+                {title}
+              </Txt>
+              {done ? <DoneButton onPress={onClose} /> : null}
+            </View>
             <ScrollView
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingHorizontal: s.s4, gap: s.s3 }}
@@ -131,6 +161,7 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
         onPress={onClose}
         style={{ position: "absolute", inset: 0 } as object}
         focusable={false}
+        {...({ tabIndex: -1 } as object)}
       />
       <Animated.View
         ref={layer}
@@ -157,6 +188,32 @@ export function Popover({ open, onClose, anchor, side = "below", title, width = 
     </Modal>
   );
 }
+
+/** B2's small dark "Done" (`.btn-sm.dark`) in a picker's head. */
+export function DoneButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      role="button"
+      accessibilityLabel="Done"
+      onPress={onPress}
+      style={{
+        minHeight: 34,
+        justifyContent: "center",
+        paddingHorizontal: s.s3,
+        borderRadius: r.pill,
+        backgroundColor: c.ink,
+      }}
+      hitSlop={5}
+    >
+      <Txt tone="onInk" style={doneText}>
+        Done
+      </Txt>
+    </Pressable>
+  );
+}
+
+/** 14 on both layouts, like B2's small buttons. */
+const doneText = { ...roleStyle(type.label), ...family("600") };
 
 /** A row in a popover list. */
 export function PopRow({ children }: { children: ReactNode }) {

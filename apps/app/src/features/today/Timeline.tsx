@@ -19,7 +19,7 @@ import { Txt } from "@/ui/Txt";
 import { BlockDrag } from "./BlockDrag";
 import { externalDrag, registerDropZone, type Drop } from "./drag";
 
-const GUTTER = 56;
+const GUTTER = 48;
 const PAD = 8;
 
 interface Props {
@@ -56,8 +56,9 @@ function Hoverable({ style, children }: { style: ViewStyle; children: ReactNode 
 export function Timeline({ date, items, now, dayStart, dayEnd, foldBefore }: Props) {
   const phone = useIsPhone();
   const roles = useType();
-  // On touch a 30-minute block must be a 44px target, so an hour is 96px.
-  const hourPx = phone ? 96 : 56;
+  // On touch a 30-minute block must be a 44px target, so an hour is 96px. Desktop: near B2's
+  // 46, at the size that keeps a 30-minute block a 24px target.
+  const hourPx = phone ? 96 : 52;
   // A block shows its time under the title only when both lines fit inside its padding.
   const twoLines = Number(roles.label.lineHeight) + Number(roles.meta.lineHeight) + 2 * s.s2;
   const ref = useRef<View>(null);

@@ -1234,6 +1234,21 @@ describe("focus, steps and settings", () => {
     expect(focus.byDay.map((d) => d.minutes)).toEqual([40, 25, 0, 0, 0, 0, 0]);
   });
 
+  test("a task's screen reads every minute focused on it, across days, and nobody else's", async () => {
+    const { t, alice, today } = await setup();
+    const id = await alice.mutation(api.tasks.add, { title: "Lab report", date: today, length: 90 });
+    const other = await alice.mutation(api.tasks.add, { title: "Something else", date: today });
+    expect((await alice.query(api.views.task, { id }))?.tracked).toBe(0);
+    await alice.mutation(api.tasks.logFocus, { taskId: id, minutes: 15, date: "2026-10-12" });
+    await alice.mutation(api.tasks.logFocus, { taskId: id, minutes: 10, date: today });
+    await alice.mutation(api.tasks.logFocus, { taskId: other, minutes: 40, date: today });
+    await alice.mutation(api.tasks.logFocus, { minutes: 30, date: today });
+    expect((await alice.query(api.views.task, { id }))?.tracked).toBe(25);
+    expect((await alice.query(api.views.task, { id: other }))?.tracked).toBe(40);
+    // Bob can't read Alice's task, so he can't read its time either.
+    expect(await t.withIdentity(BOB).query(api.views.task, { id })).toBeNull();
+  });
+
   test("steps are saved in order, checked, and cleared with null", async () => {
     const { alice } = await setup();
     const id = await alice.mutation(api.tasks.add, {

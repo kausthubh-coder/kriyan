@@ -74,7 +74,17 @@ describe("format", () => {
     expect(describeRepeat({ freq: "year", interval: 1 }, "2026-10-16")).toBe("Every year on 16 Oct");
     expect(describeRepeat({ freq: "day", interval: 2, fromCompletion: true }, "2026-10-13")).toBe(
       "Every 2 days after done",
-    );
+    ); // Chips list the days with spaces: quick add's "Every Mon Wed Fri".
+    const gym = { freq: "week", interval: 1, weekdays: [0, 2, 4] } satisfies Parameters<
+      typeof describeRepeat
+    >[0];
+    expect(describeRepeat(gym, "2026-10-13", undefined, { compact: true })).toBe("Every Mon Wed Fri");
+    expect(describeRepeat(gym, "2026-10-13")).toBe("Every Mon, Wed and Fri");
+    expect(
+      describeRepeat({ freq: "week", interval: 2, weekdays: [1, 3] }, "2026-10-13", undefined, {
+        compact: true,
+      }),
+    ).toBe("Every 2 weeks on Tue Thu");
   });
 
   test("reminders in words", () => {

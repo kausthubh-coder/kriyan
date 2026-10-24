@@ -6,10 +6,11 @@
 // red: red means now, and planning more than usual is the person's call, not a fault.
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import Head from "expo-router/head";
 import { useMutation } from "convex/react";
-import { Bot, Cake, ChevronLeft, ChevronRight, Flag, PanelLeft } from "lucide-react-native";
+import { Bot, Cake, ChevronLeft, ChevronRight, Flag } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import {
   addDays,
@@ -45,7 +46,7 @@ import { Button } from "@/ui/Button";
 import { Check, Dot, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
-import { PageHead, Screen, SectionHead } from "@/ui/Screen";
+import { PageTitle, Screen, usePanelOpen } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 
@@ -114,120 +115,181 @@ export function UpcomingScreen() {
   const proposals = week
     ? week.days.flatMap((d) => [...d.scheduled, ...d.anytime]).filter((t) => t.proposedBy)
     : [];
-  const toPlan = week ? week.inbox.length + week.unscheduled.length : 0;
-  const [trayOpen, setTrayOpen] = useState(true);
-  const tray = !phone && trayOpen && toPlan > 0;
   const banner = proposals.length ? <ProposalBanner proposals={proposals} phone={phone} /> : null;
+  const hours = {
+    start: profile?.dayStart ?? DEFAULT_DAY_START,
+    end: profile?.dayEnd ?? DEFAULT_DAY_END,
+  };
+
+  if (!phone) {
+    return (
+      <DesktopWeek
+        week={week}
+        start={start}
+        today={today}
+        thisWeek={thisWeek}
+        free={free}
+        hours={hours}
+        banner={banner}
+        onWeek={setStart}
+      />
+    );
+  }
 
   return (
-    <View style={{ flex: 1 }}>
-      <Screen
-        title="Week"
-        sub={free !== null ? `${weekRange(start)} · ${formatDuration(free)} free` : weekRange(start)}
-        actions={
-          phone ? (
-            <>
-              <Button
-                icon={ChevronLeft}
-                accessibilityLabel="Previous week"
-                onPress={() => pickDay(addDays(day, -7))}
-              />
-              <Button
-                icon={ChevronRight}
-                accessibilityLabel="Next week"
-                onPress={() => pickDay(addDays(day, 7))}
-              />
-            </>
-          ) : null
-        }
-        width={phone ? "column" : "wide"}
-        // Phones: in the list's flow, so it never covers a row (it floated over the spine).
-        footer={phone ? null : banner}
-      >
-        {phone ? banner : null}
-        {phone ? null : (
-          <PageHead
-            title="Week"
-            right={
-              <>
-                <Txt variant="body" tone="ink3" tnum style={{ marginRight: s.s2 }}>
-                  {weekRange(start)}
-                </Txt>
-                {toPlan ? (
-                  <Button
-                    icon={PanelLeft}
-                    label={`To plan ${toPlan}`}
-                    accessibilityLabel={trayOpen ? "Hide tasks to plan" : "Show tasks to plan"}
-                    expanded={trayOpen}
-                    onPress={() => setTrayOpen(!trayOpen)}
-                  />
-                ) : null}
-                <Button
-                  icon={ChevronLeft}
-                  accessibilityLabel="Previous week"
-                  onPress={() => setStart(addDays(start, -7))}
-                />
-                <Button label="This week" onPress={() => setStart(startOfWeek(today))} disabled={thisWeek} />
-                <Button
-                  icon={ChevronRight}
-                  accessibilityLabel="Next week"
-                  onPress={() => setStart(addDays(start, 7))}
-                />
-              </>
-            }
+    <Screen
+      title="Week"
+      sub={free !== null ? `${weekRange(start)} · ${hoursFree(free)} free` : weekRange(start)}
+      actions={
+        // The strip shows one week; these are the only way to another on a phone.
+        <>
+          <Button
+            icon={ChevronLeft}
+            accessibilityLabel="Previous week"
+            onPress={() => pickDay(addDays(day, -7))}
           />
-        )}
+          <Button
+            icon={ChevronRight}
+            accessibilityLabel="Next week"
+            onPress={() => pickDay(addDays(day, 7))}
+          />
+        </>
+      }
+    >
+      {/* b2.html `.pg-head` is 18 above the strip; the screen's gap between sections is 32. */}
+      <View style={{ marginTop: -s.s4, gap: s.s8 }}>
+        {/* In the list's flow, so it never covers a row (it floated over the spine). */}
+        {banner}
         {week === undefined ? (
-          <View testID="skeleton" style={{ gap: s.s6 }}>
-            {[0, 1, 2].map((i) => (
-              <View key={i} style={{ gap: s.s2 }}>
-                <Skeleton width={120} height={16} />
-                <Skeleton width="100%" height={2} />
-                <Skeleton width="60%" />
-              </View>
-            ))}
-          </View>
-        ) : phone ? (
-          <PhoneWeek
-            week={week}
-            day={day}
-            today={today}
-            now={now}
-            onPick={pickDay}
-            hours={{
-              start: profile?.dayStart ?? DEFAULT_DAY_START,
-              end: profile?.dayEnd ?? DEFAULT_DAY_END,
-            }}
-          />
+          <WeekSkeleton />
         ) : (
-          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s6 }}>
-            {tray ? (
-              <PlanTray
-                tasks={[...week.inbox, ...week.unscheduled]}
-                today={today}
-                free={free ? { minutes: free, from: thisWeek ? today : start } : null}
-              />
-            ) : null}
-            <View style={{ flex: 1, minWidth: 0, gap: s.s4 }}>
-              {weekIsEmpty(week) ? (
-                <Txt variant="body" tone="ink3">
-                  {tray
-                    ? "Nothing planned this week yet. Drag a task onto a day, or press N to add one."
-                    : "Nothing planned this week yet. Press N to add a task."}
-                </Txt>
-              ) : null}
-              <WeekGrid
-                week={week}
-                today={today}
-                dayStart={profile?.dayStart ?? DEFAULT_DAY_START}
-                dayEnd={profile?.dayEnd ?? DEFAULT_DAY_END}
-              />
-            </View>
-          </View>
+          <PhoneWeek week={week} day={day} today={today} now={now} onPick={pickDay} hours={hours} />
         )}
-      </Screen>
-      {/* Outside the screen: inside, its offset would move the "fixed" ghost away from the pointer. */}
-      {phone ? null : <DragGhost />}
+      </View>
+    </Screen>
+  );
+}
+
+/** b2.html's "14.5h free": whole and half hours, so the subtitle stays short. */
+export function hoursFree(minutes: number): string {
+  const half = Math.round(minutes / 30) / 2;
+  return `${half}h`;
+}
+
+function WeekSkeleton() {
+  return (
+    <View testID="skeleton" style={{ gap: s.s6 }}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={{ gap: s.s2 }}>
+          <Skeleton width={120} height={16} />
+          <Skeleton width="100%" height={2} />
+          <Skeleton width="60%" />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Desktop (b2.html `weekDesk`): the tray of tasks to plan runs the window's height beside the
+ * sidebar; the title, the day headers and the hour grid fill the rest, and only the grid scrolls,
+ * under headers that stay put. An open task's panel takes the right of the window and the week
+ * narrows beside it.
+ */
+function DesktopWeek({
+  week,
+  start,
+  today,
+  thisWeek,
+  free,
+  hours,
+  banner,
+  onWeek,
+}: {
+  week: WeekView | undefined;
+  start: CivilDate;
+  today: CivilDate;
+  thisWeek: boolean;
+  free: number | null;
+  hours: { start: number; end: number };
+  banner: ReactNode;
+  onWeek: (start: CivilDate) => void;
+}) {
+  const panelOpen = usePanelOpen();
+  const tasks = week ? [...week.inbox, ...week.unscheduled] : [];
+  return (
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg }}>
+      {Platform.OS === "web" ? (
+        <Head>
+          <title>Week | Kriyan</title>
+        </Head>
+      ) : null}
+      <ScrollView
+        style={{ width: sz.tray, flexGrow: 0, flexShrink: 0, borderRightWidth: 1, borderRightColor: c.line }}
+        contentContainerStyle={{ paddingVertical: s.s6, paddingHorizontal: s.s4 }}
+      >
+        {week === undefined ? (
+          <WeekSkeleton />
+        ) : (
+          <PlanTray
+            tasks={tasks}
+            today={today}
+            free={free ? { minutes: free, from: thisWeek ? today : start } : null}
+          />
+        )}
+      </ScrollView>
+      <View style={{ flex: 1, minWidth: 0, paddingRight: panelOpen ? sz.panel : 0 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: s.s2,
+            paddingTop: s.s6,
+            paddingHorizontal: s.s6,
+            paddingBottom: s.s2,
+          }}
+        >
+          <PageTitle title="Week" style={{ flex: 1 }} />
+          <Txt variant="body" tone="ink3" tnum>
+            {weekRange(start)}
+          </Txt>
+          {/* Quiet, after the dates they change; "This week" only once you've left it. */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginRight: -s.s2 }}>
+            {thisWeek ? null : (
+              <Button variant="quiet" label="This week" onPress={() => onWeek(startOfWeek(today))} />
+            )}
+            <Button
+              icon={ChevronLeft}
+              accessibilityLabel="Previous week"
+              onPress={() => onWeek(addDays(start, -7))}
+            />
+            <Button
+              icon={ChevronRight}
+              accessibilityLabel="Next week"
+              onPress={() => onWeek(addDays(start, 7))}
+            />
+          </View>
+        </View>
+        {week === undefined ? (
+          <View style={{ paddingHorizontal: s.s6 }}>
+            <WeekSkeleton />
+          </View>
+        ) : (
+          <>
+            {weekIsEmpty(week) ? (
+              <Txt variant="meta" tone="ink3" style={{ paddingHorizontal: s.s6, paddingBottom: s.s2 }}>
+                {tasks.length
+                  ? "Nothing planned this week yet. Drag a task onto a day, or press N to add one."
+                  : "Nothing planned this week yet. Press N to add a task."}
+              </Txt>
+            ) : null}
+            <WeekGrid week={week} today={today} dayStart={hours.start} dayEnd={hours.end} />
+          </>
+        )}
+        {banner}
+      </View>
+      {/* Outside the scroll views: inside, their offset would move the "fixed" ghost away from the pointer. */}
+      <DragGhost />
     </View>
   );
 }
@@ -255,21 +317,13 @@ function PlanTray({
   free: { minutes: number; from: CivilDate } | null;
 }) {
   return (
-    <View
-      aria-label="Not scheduled yet"
-      style={{
-        width: sz.tray,
-        gap: s.s2,
-        paddingRight: s.s6,
-        borderRightWidth: 1,
-        borderRightColor: c.line,
-        alignSelf: "stretch",
-      }}
-    >
+    <View aria-label="Not scheduled yet" style={{ gap: s.s2 }}>
       <View style={{ gap: s.s1, paddingBottom: s.s1 }}>
         <SectionLabel title="Not scheduled yet" count={String(tasks.length)} />
         <Txt variant="meta" tone="ink3">
-          Drag a task onto the week to give it a time.
+          {tasks.length
+            ? "Drag a task onto the week to timebox it."
+            : "Nothing waiting. Every task has a day."}
         </Txt>
       </View>
       {tasks.map((t) => (
@@ -277,14 +331,14 @@ function PlanTray({
       ))}
       {free && free.minutes > 0 ? (
         <Txt variant="meta" tone="ink3" style={{ paddingTop: s.s2 }}>
-          Free this week: {formatDuration(free.minutes)} between {WEEKDAY_SHORT[weekday(free.from)]} and Sun.
+          Free this week: {hoursFree(free.minutes)} between {WEEKDAY_SHORT[weekday(free.from)]} and Sun.
         </Txt>
       ) : null}
     </View>
   );
 }
 
-/** One task to plan: its title, then its length (or "No length") and its due date. */
+/** One task to plan (b2.html `.ib`): its title, then its length (or "No length") and its due date. */
 function TrayCard({ task, today }: { task: TaskView; today: CivilDate }) {
   const tone = spaceTone(task.color);
   const meta = [
@@ -311,11 +365,11 @@ function TrayCard({ task, today }: { task: TaskView; today: CivilDate }) {
         }}
       >
         {/* Level with the title's first line. */}
-        <View style={{ marginTop: 6 }}>
-          <Dot color={task.color ? tone.dot : c.ink3} />
+        <View style={{ marginTop: s.s2 }}>
+          <Dot color={task.color ? tone.dot : c.ink3} size={7} />
         </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt variant="label" numberOfLines={2}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Txt variant="label" numberOfLines={2} style={family("600")}>
             {task.title}
           </Txt>
           <Txt variant="meta" tone="ink3" numberOfLines={2}>
@@ -374,11 +428,14 @@ function ProposalBanner({ proposals, phone }: { proposals: TaskView[]; phone: bo
   );
 }
 
-/** Planned against the day's capacity. A day past it fills to the end, in ink like any other. */
+/**
+ * Planned against the day's capacity, drawn as the day header's bottom edge so it costs no
+ * height. A day past it fills to the end, in ink like any other.
+ */
 function LoadLine({ day }: { day: WeekView["days"][number] }) {
   const p = day.capacity > 0 ? Math.min(1, day.plannedMinutes / day.capacity) : 0;
   return (
-    <View style={{ height: 2, borderRadius: 1, backgroundColor: c.lineStrong, overflow: "hidden" }}>
+    <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: -1, height: 2 }}>
       <View style={{ width: `${Math.round(p * 100)}%`, height: "100%", backgroundColor: c.ink3 }} />
     </View>
   );
@@ -439,11 +496,15 @@ function Due({ task }: { task: TaskView }) {
   );
 }
 
-/** A day's header shows this many deadlines, birthdays and anytime tasks before "N more". */
-const HEADER_ITEMS = 3;
+/** A day's all-day row shows this many deadlines, birthdays and anytime tasks before "N more". */
+const HEADER_ITEMS = 2;
 
-/** The hour labels' column, left of the day columns. */
-const GUTTER = 56;
+/** The hour labels' column, left of the day columns (b2.html `.wk-grid`). */
+const GUTTER = 52;
+/** An hour's height. b2.html's is 50; 48 keeps the grid on the 4px rhythm. */
+const H = 48;
+/** Room above the first hour line for its label. */
+const GRID_TOP = s.s3;
 
 function WeekGrid({
   week,
@@ -456,8 +517,7 @@ function WeekGrid({
   dayStart: number;
   dayEnd: number;
 }) {
-  const H = 44;
-  // One switch for the whole week, so the day columns' headers stay the same height.
+  // One switch for the whole week, so the day columns' all-day rows stay the same height.
   const [allShown, setAllShown] = useState(false);
   const allTimed = week.days.flatMap((d) => d.scheduled);
   // The person's day from Settings, stretched to fit anything planned outside it.
@@ -470,9 +530,20 @@ function WeekGrid({
     ...allTimed.map((t) => Math.ceil(((t.time ?? 0) + Math.max(t.length ?? 0, 30)) / 60)),
   );
   const y = (m: number) => ((m - from * 60) / 60) * H;
+  const dayItems = week.days.map((d) => [
+    ...[...d.deadlines, ...d.anytime.filter((t) => t.repeat?.freq === "year")].map((t) => ({
+      t,
+      anytime: false,
+    })),
+    ...d.anytime.filter((t) => t.repeat?.freq !== "year").map((t) => ({ t, anytime: true })),
+  ]);
+  const anyAllDay = dayItems.some((items) => items.length > 0);
+  const longest = Math.max(0, ...dayItems.map((items) => items.length));
 
-  // The week is a drop zone: over a day's header a task lands on that day, over the grid at a time.
-  const grid = useRef<View>(null);
+  // The week is a drop zone: over a day's header a task lands on that day, over the grid at a
+  // time. The headers stick to the top of the scroll view, so the grid's offset is the scroll.
+  const view = useRef<View>(null);
+  const scrollY = useRef(0);
   const [headH, setHeadH] = useState(0);
   const drag = externalDrag.useValue((d) => d);
   const tasks = useMemo(
@@ -490,18 +561,19 @@ function WeekGrid({
         registerDropZone({
           measure: () =>
             new Promise((resolve) => {
-              if (!grid.current) return resolve(null);
-              grid.current.measureInWindow((x, top, width, height) => resolve({ x, y: top, width, height }));
+              if (!view.current) return resolve(null);
+              view.current.measureInWindow((x, top, width, height) => resolve({ x, y: top, width, height }));
             }),
           startMinutes: from * 60,
           hourPx: H,
-          topPad: headH,
+          topPad: headH + GRID_TOP,
           hit: (rect, x, py) => {
             const colW = (rect.width - GUTTER) / 7;
             const day = week.days[Math.floor((x - rect.x - GUTTER) / colW)];
             if (!day || py < rect.y || py > rect.y + rect.height + 24) return null;
             if (py < rect.y + headH) return { date: day.date, minutes: null };
-            return { date: day.date, minutes: clampDay(snap(from * 60 + ((py - rect.y - headH) / H) * 60)) };
+            const inGrid = py - rect.y - headH - GRID_TOP + scrollY.current;
+            return { date: day.date, minutes: clampDay(snap(from * 60 + (inGrid / H) * 60)) };
           },
           onDrop: (taskId, drop) => {
             const task = tasks.get(taskId);
@@ -513,84 +585,103 @@ function WeekGrid({
   );
 
   return (
-    <View ref={grid}>
-      <View style={{ flexDirection: "row" }} onLayout={(e) => setHeadH(e.nativeEvent.layout.height)}>
-        <View style={{ width: GUTTER }} />
-        {week.days.map((d, i) => {
-          const past = pastUsual(d);
-          const allDay = [...d.deadlines, ...d.anytime.filter((t) => t.repeat?.freq === "year")];
-          const anytime = d.anytime.filter((t) => t.repeat?.freq !== "year");
-          const items = [
-            ...allDay.map((t) => ({ t, anytime: false })),
-            ...anytime.map((t) => ({ t, anytime: true })),
-          ];
-          const shown = allShown ? items : items.slice(0, HEADER_ITEMS);
-          const more = items.length - shown.length;
-          const target = drag?.over?.date === d.date && drag.over.minutes === null;
-          return (
-            <View
-              key={d.date}
-              style={{
-                flex: 1,
-                paddingHorizontal: s.s2,
-                paddingBottom: s.s3,
-                gap: s.s2,
-                borderRadius: r.ctl,
-                backgroundColor: target ? c.hover : "transparent",
-              }}
-            >
-              {/* b2.html `.wk-head`: the weekday in small capitals over the date; today's in red. */}
-              <View>
-                <Txt
-                  variant="caption"
-                  tone={d.isToday ? "now" : "ink3"}
-                  accessibilityLabel={WEEKDAY_LONG[i]}
-                  style={{ ...family("600"), textTransform: "uppercase", letterSpacing: 0.6 }}
+    <View ref={view} style={{ flex: 1, minHeight: 0 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        stickyHeaderIndices={[0]}
+        scrollEventThrottle={32}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y;
+        }}
+        contentContainerStyle={{ paddingBottom: s.s6 }}
+      >
+        {/* b2.html `.wk-head`: the weekday in small capitals over the date, centred; today's in red. */}
+        <View
+          onLayout={(e) => setHeadH(e.nativeEvent.layout.height)}
+          style={{ backgroundColor: c.bg, borderBottomWidth: 1, borderBottomColor: c.line, zIndex: 2 }}
+        >
+          <View style={{ flexDirection: "row" }}>
+            <View style={{ width: GUTTER }} />
+            {week.days.map((d, i) => {
+              const past = pastUsual(d);
+              const target = drag?.over?.date === d.date && drag.over.minutes === null;
+              return (
+                <View
+                  key={d.date}
+                  accessibilityLabel={`${WEEKDAY_LONG[i]} ${parts(d.date)[2]}, ${loadText(d)}${past ? `, ${past}` : ""}`}
+                  style={{
+                    flex: 1,
+                    alignItems: "center",
+                    paddingBottom: s.s2,
+                    borderRadius: r.ctl,
+                    backgroundColor: target ? c.hover : "transparent",
+                  }}
                 >
-                  {WEEKDAY_SHORT[i]}
-                </Txt>
-                <Txt variant="title" tone={d.isToday ? "now" : "ink"} tnum>
-                  {parts(d.date)[2]}
-                </Txt>
-              </View>
-              <LoadLine day={d} />
-              <View>
-                <Txt variant="meta" tone="ink3" tnum>
-                  {loadText(d)}
-                </Txt>
-                {past ? (
-                  <Txt variant="meta" tone="ink3" tnum>
-                    {past}
-                  </Txt>
-                ) : null}
-              </View>
-              <View style={{ minHeight: 16, gap: 2 }}>
-                {shown.map(({ t, anytime }) =>
-                  anytime ? <Anytime key={t._id} task={t} /> : <Due key={t._id} task={t} />,
-                )}
-                {more > 0 || (allShown && items.length > HEADER_ITEMS) ? (
-                  <Press
-                    role="button"
-                    accessibilityLabel={more > 0 ? `Show ${more} more on ${WEEKDAY_LONG[i]}` : "Show fewer"}
-                    onPress={() => setAllShown(!allShown)}
-                    hoverBg={null}
-                    scale={false}
-                    style={{ minHeight: 24, justifyContent: "center" }}
+                  <Txt
+                    variant="caption"
+                    tone={d.isToday ? "now" : "ink3"}
+                    accessibilityLabel={WEEKDAY_LONG[i]}
+                    style={{ ...family("600"), textTransform: "uppercase", letterSpacing: 0.6 }}
                   >
-                    <Txt variant="meta" tone="ink3">
-                      {more > 0 ? `${more} more` : "Show fewer"}
-                    </Txt>
-                  </Press>
-                ) : null}
-              </View>
+                    {WEEKDAY_SHORT[i]}
+                  </Txt>
+                  <Txt variant="title" tone={d.isToday ? "now" : "ink"} tnum>
+                    {parts(d.date)[2]}
+                  </Txt>
+                  <LoadLine day={d} />
+                </View>
+              );
+            })}
+          </View>
+          {/* Deadlines, birthdays and tasks for the day with no time; only when there are any. */}
+          {anyAllDay ? (
+            <View style={{ flexDirection: "row", paddingBottom: s.s2 }}>
+              <View style={{ width: GUTTER }} />
+              {week.days.map((d, i) => {
+                const items = dayItems[i] ?? [];
+                const shown = allShown ? items : items.slice(0, HEADER_ITEMS);
+                const more = items.length - shown.length;
+                const target = drag?.over?.date === d.date && drag.over.minutes === null;
+                return (
+                  <View
+                    key={d.date}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      paddingHorizontal: s.s1,
+                      gap: 2,
+                      borderRadius: r.ctl,
+                      backgroundColor: target ? c.hover : "transparent",
+                    }}
+                  >
+                    {shown.map(({ t, anytime }) =>
+                      anytime ? <Anytime key={t._id} task={t} /> : <Due key={t._id} task={t} />,
+                    )}
+                    {more > 0 || (allShown && longest > HEADER_ITEMS && i === 0) ? (
+                      <Press
+                        role="button"
+                        accessibilityLabel={
+                          more > 0 ? `Show ${more} more on ${WEEKDAY_LONG[i]}` : "Show fewer"
+                        }
+                        onPress={() => setAllShown(!allShown)}
+                        hoverBg={null}
+                        scale={false}
+                        style={{ minHeight: 24, justifyContent: "center" }}
+                      >
+                        <Txt variant="meta" tone="ink3">
+                          {more > 0 ? `${more} more` : "Show fewer"}
+                        </Txt>
+                      </Press>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
-          );
-        })}
-      </View>
-      <View style={{ flexDirection: "row", height: y(to * 60) }}>
-        {/* Hairlines at each hour, behind the blocks, so a time reads across the week. */}
-        {Array.from({ length: to - from }, (_, k) =>
-          k ? (
+          ) : null}
+        </View>
+        <View style={{ flexDirection: "row", height: y(to * 60) + GRID_TOP, paddingTop: GRID_TOP }}>
+          {/* Hairlines at each hour, behind the blocks, so a time reads across the week. */}
+          {Array.from({ length: to - from + 1 }, (_, k) => (
             <View
               key={`line-${k}`}
               pointerEvents="none"
@@ -598,140 +689,145 @@ function WeekGrid({
                 position: "absolute",
                 left: GUTTER,
                 right: 0,
-                top: k * H,
+                top: GRID_TOP + k * H,
                 height: 1,
                 backgroundColor: c.line,
               }}
             />
-          ) : null,
-        )}
-        <View style={{ width: GUTTER }}>
-          {Array.from({ length: to - from }, (_, k) =>
-            k ? (
+          ))}
+          <View style={{ width: GUTTER }}>
+            {Array.from({ length: to - from }, (_, k) => (
               <Txt
                 key={k}
                 variant="meta"
                 tone="ink3"
                 tnum
-                style={{ position: "absolute", top: k * H, transform: [{ translateY: -8 }] }}
+                style={{ position: "absolute", top: k * H, right: s.s2, transform: [{ translateY: -8 }] }}
               >
                 {String(from + k).padStart(2, "0")}:00
               </Txt>
-            ) : null,
-          )}
-        </View>
-        {week.days.map((d) => (
-          <View
-            key={d.date}
-            style={{ flex: 1, position: "relative", borderLeftWidth: 1, borderLeftColor: c.line }}
-          >
-            {(() => {
-              // Blocks that start together sit side by side; a later one sits on top, indented.
-              const placed = new Map(
-                layoutDay(
-                  d.scheduled.map((t) => ({
-                    id: `${t._id}:${t.date}`,
-                    start: t.time ?? 0,
-                    length: t.length ?? undefined,
-                  })),
-                ).map((p) => [p.id, p]),
-              );
-              return d.scheduled.map((t) => {
-                const p = placed.get(`${t._id}:${t.date}`);
-                const cols = p?.columns ?? 1;
-                const col = p?.column ?? 0;
-                const depth = Math.min(p?.depth ?? 0, 3);
-                const tone = spaceTone(t.color);
-                const top = y(t.time ?? 0) + 1;
-                const h = Math.max(24, (Math.max(t.length ?? 0, 30) / 60) * H - 2);
-                const proposed = Boolean(t.proposedBy);
-                return (
-                  <View
-                    key={`${t._id}:${t.date}`}
-                    style={{
-                      position: "absolute",
-                      top,
-                      height: h,
-                      left: `${(col / cols) * 100}%`,
-                      width: `${100 / cols}%`,
-                      // The first block's edge lines up with the day's name above it; a block on
-                      // top of another starts further in, so the one below keeps its title.
-                      paddingLeft: (col ? 0 : s.s2) + depth * s.s2,
-                      paddingRight: s.s1,
-                    }}
-                  >
-                    <Press
-                      role="button"
-                      accessibilityLabel={`Open ${t.title}, ${formatDay(d.date, today)} ${formatClock(t.time ?? 0)}${proposed ? `, proposed by ${t.proposedBy}` : ""}`}
-                      onPress={() => openTask(t._id)}
-                      hoverBg={null}
-                      scale={false}
-                      // b2.html `.ev`: the space's colour as a bar down the left edge over its
-                      // surface; done blocks go grey, proposed ones are dashed until accepted.
-                      style={({ hovered }) => ({
-                        flex: 1,
-                        paddingVertical: s.s1,
-                        // Narrow columns: room for "09:00 → 10:30" beside the colour bar.
-                        paddingLeft: s.s2,
-                        paddingRight: s.s1,
-                        borderRadius: r.ctl,
-                        overflow: "hidden",
-                        backgroundColor: proposed ? c.bg : t.done ? c.sunken : tone.surface,
-                        borderLeftWidth: 3,
-                        borderLeftColor: t.done ? c.lineStrong : tone.dot,
-                        ...(proposed
-                          ? { borderWidth: 1, borderStyle: "dashed" as const, borderColor: tone.dot }
-                          : {}),
-                        // A block on top of another keeps an edge, so the one below stays readable.
-                        ...(depth && !proposed ? { borderWidth: 1, borderColor: c.bg } : {}),
-                        boxShadow: hovered ? `inset 0 0 0 999px ${c.hover}` : undefined,
-                      })}
-                    >
-                      <Txt
-                        variant="caption"
-                        tone={t.done ? "ink3" : "ink"}
-                        strike={t.done}
-                        numberOfLines={1}
-                        style={family("600")}
-                      >
-                        {t.title}
-                      </Txt>
-                      {h >= 40 ? (
-                        <Txt variant="meta" tone={t.done ? "ink3" : "ink2"} tnum numberOfLines={1}>
-                          {span(t.time ?? 0, t.length)}
-                        </Txt>
-                      ) : null}
-                    </Press>
-                  </View>
-                );
-              });
-            })()}
-            {drag?.over?.date === d.date && drag.over.minutes !== null ? (
-              <View
-                pointerEvents="none"
-                style={{
-                  position: "absolute",
-                  left: s.s2,
-                  right: s.s1,
-                  top: y(drag.over.minutes) + 1,
-                  height: Math.max(24, (Math.max(drag.length ?? 0, 30) / 60) * H - 2),
-                  borderRadius: r.ctl,
-                  borderWidth: 1,
-                  borderColor: c.lineStrong,
-                  backgroundColor: c.hover,
-                  paddingHorizontal: s.s2,
-                  paddingVertical: s.s1,
-                }}
-              >
-                <Txt variant="meta" tone="ink2" tnum numberOfLines={1}>
-                  {formatTimeRange(drag.over.minutes, drag.length ?? undefined)}
-                </Txt>
-              </View>
-            ) : null}
-            {d.isToday ? <NowLine y={y} from={from} to={to} /> : null}
+            ))}
           </View>
-        ))}
-      </View>
+          {week.days.map((d) => (
+            <View
+              key={d.date}
+              style={{
+                flex: 1,
+                position: "relative",
+                borderLeftWidth: 1,
+                borderLeftColor: c.line,
+                // b2.html `.wcol.today`: a faint tint down today's whole column.
+                backgroundColor: d.isToday ? c.hover : "transparent",
+              }}
+            >
+              {(() => {
+                // Blocks that start together sit side by side; a later one sits on top, indented.
+                const placed = new Map(
+                  layoutDay(
+                    d.scheduled.map((t) => ({
+                      id: `${t._id}:${t.date}`,
+                      start: t.time ?? 0,
+                      length: t.length ?? undefined,
+                    })),
+                  ).map((p) => [p.id, p]),
+                );
+                return d.scheduled.map((t) => {
+                  const p = placed.get(`${t._id}:${t.date}`);
+                  const cols = p?.columns ?? 1;
+                  const col = p?.column ?? 0;
+                  const depth = Math.min(p?.depth ?? 0, 3);
+                  const tone = spaceTone(t.color);
+                  const top = y(t.time ?? 0) + 1;
+                  const h = Math.max(24, (Math.max(t.length ?? 0, 30) / 60) * H - 2);
+                  const proposed = Boolean(t.proposedBy);
+                  return (
+                    <View
+                      key={`${t._id}:${t.date}`}
+                      style={{
+                        position: "absolute",
+                        top,
+                        height: h,
+                        left: `${(col / cols) * 100}%`,
+                        width: `${100 / cols}%`,
+                        // The first block's edge lines up with the day's name above it; a block on
+                        // top of another starts further in, so the one below keeps its title.
+                        paddingLeft: (col ? 0 : s.s2) + depth * s.s2,
+                        paddingRight: s.s1,
+                      }}
+                    >
+                      <Press
+                        role="button"
+                        accessibilityLabel={`Open ${t.title}, ${formatDay(d.date, today)} ${formatClock(t.time ?? 0)}${proposed ? `, proposed by ${t.proposedBy}` : ""}`}
+                        onPress={() => openTask(t._id)}
+                        hoverBg={null}
+                        scale={false}
+                        // b2.html `.ev`: the space's colour as a bar down the left edge over its
+                        // surface; done blocks go grey, proposed ones are dashed until accepted.
+                        style={({ hovered }) => ({
+                          flex: 1,
+                          paddingVertical: s.s1,
+                          // Narrow columns: room for "09:00 → 10:30" beside the colour bar.
+                          paddingLeft: s.s2,
+                          paddingRight: s.s1,
+                          borderRadius: r.ctl,
+                          overflow: "hidden",
+                          backgroundColor: proposed ? c.bg : t.done ? c.sunken : tone.surface,
+                          borderLeftWidth: 3,
+                          borderLeftColor: t.done ? c.lineStrong : tone.dot,
+                          ...(proposed
+                            ? { borderWidth: 1, borderStyle: "dashed" as const, borderColor: tone.dot }
+                            : {}),
+                          // A block on top of another keeps an edge, so the one below stays readable.
+                          ...(depth && !proposed ? { borderWidth: 1, borderColor: c.bg } : {}),
+                          boxShadow: hovered ? `inset 0 0 0 999px ${c.hover}` : undefined,
+                        })}
+                      >
+                        <Txt
+                          variant="caption"
+                          tone={t.done ? "ink3" : "ink"}
+                          strike={t.done}
+                          numberOfLines={1}
+                          style={family("600")}
+                        >
+                          {t.title}
+                        </Txt>
+                        {h >= 40 ? (
+                          <Txt variant="meta" tone={t.done ? "ink3" : "ink2"} tnum numberOfLines={1}>
+                            {span(t.time ?? 0, t.length)}
+                          </Txt>
+                        ) : null}
+                      </Press>
+                    </View>
+                  );
+                });
+              })()}
+              {drag?.over?.date === d.date && drag.over.minutes !== null ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: s.s2,
+                    right: s.s1,
+                    top: y(drag.over.minutes) + 1,
+                    height: Math.max(24, (Math.max(drag.length ?? 0, 30) / 60) * H - 2),
+                    borderRadius: r.ctl,
+                    borderWidth: 1,
+                    borderColor: c.lineStrong,
+                    backgroundColor: c.hover,
+                    paddingHorizontal: s.s2,
+                    paddingVertical: s.s1,
+                  }}
+                >
+                  <Txt variant="meta" tone="ink2" tnum numberOfLines={1}>
+                    {formatTimeRange(drag.over.minutes, drag.length ?? undefined)}
+                  </Txt>
+                </View>
+              ) : null}
+              {d.isToday ? <NowLine y={y} from={from} to={to} /> : null}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -788,7 +884,7 @@ function PhoneWeek({
       </View>
       {anytime.length ? (
         <View style={{ gap: s.s1 }}>
-          <SectionHead title="Anytime" meta={String(anytime.length)} />
+          <SectionLabel title="Anytime" count={String(anytime.length)} />
           {anytime.map((t) => (
             <DottedRow key={`${t._id}:${t.date}`}>
               <TaskRow task={t} today={today} />
@@ -798,7 +894,7 @@ function PhoneWeek({
       ) : null}
       {toPlan.length ? (
         <View style={{ gap: s.s1 }}>
-          <SectionHead title="Not scheduled yet" meta={String(toPlan.length)} />
+          <SectionLabel title="Not scheduled yet" count={String(toPlan.length)} />
           {toPlan.map((t) => (
             <DottedRow key={t._id}>
               <PlaceRow task={t} day={day} today={today} />

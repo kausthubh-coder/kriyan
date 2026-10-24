@@ -7,6 +7,7 @@ import { useNavigation } from "expo-router";
 import { NoteToolbarHost } from "@/features/notes/NoteEditor";
 import { c, s } from "@/theme/tokens";
 import { LightStatusBar } from "@/ui/statusBar";
+import { Grabber } from "@/ui/bits";
 
 /** The task sheet's heights, as parts of the screen: it opens at the first. */
 export const TASK_SHEET_DETENTS = [0.6, 1];
@@ -40,7 +41,7 @@ export function TaskPanel({ children, label }: { children: ReactNode; onClose: (
       {/* At either height the status bar sits over the dimmed screen behind the sheet. */}
       <LightStatusBar />
       <View style={{ alignItems: "center", paddingTop: s.s3 }}>
-        <View style={{ width: 32, height: 4, borderRadius: 2, backgroundColor: c.lineStrong }} />
+        <Grabber />
       </View>
       {children}
       <NoteToolbarHost />

@@ -5,7 +5,7 @@
 
 import { View } from "react-native";
 import { router, usePathname, type Href } from "expo-router";
-import { Plus, Sparkles, Sun, Target, Table2, type LucideIcon } from "lucide-react-native";
+import { Columns3, Plus, Sparkles, Sun, Target, type LucideIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { c, s, shadows } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
@@ -25,7 +25,7 @@ const MAX_WIDTH = 528;
 // spaces, Settings, Recently deleted) keep it lit, so the dock still says where you are.
 const TABS: { href: Href; match: (p: string) => boolean; icon: LucideIcon; label: string }[] = [
   { href: "/today", match: (p) => p === "/today" || p === "/", icon: Sun, label: "Today" },
-  { href: "/upcoming", match: (p) => p === "/upcoming", icon: Table2, label: "Week" },
+  { href: "/upcoming", match: (p) => p === "/upcoming", icon: Columns3, label: "Week" },
   { href: "/progress", match: (p) => p === "/progress", icon: Target, label: "Goals" },
   {
     href: "/ask",
@@ -75,7 +75,8 @@ export function Dock() {
             borderRadius: DOCK_HEIGHT / 2,
             borderWidth: 1,
             borderColor: c.line,
-            backgroundColor: c.raised,
+            // B2's --bar: white in light, a step above the sheet in dark.
+            backgroundColor: c.overlay,
             boxShadow: shadows.overlay,
           }}
         >
@@ -103,7 +104,7 @@ export function Dock() {
                   backgroundColor: active ? c.sunken : "transparent",
                 }}
               >
-                <Icon icon={tab.icon} size={20} tone={active ? "ink" : "ink3"} />
+                <Icon icon={tab.icon} size={18} tone={active ? "ink" : "ink3"} />
                 <Txt variant="caption" tone={active ? "ink" : "ink3"} style={{ fontWeight: "600" }}>
                   {tab.label}
                 </Txt>

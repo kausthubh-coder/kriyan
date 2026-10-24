@@ -3,7 +3,7 @@
 
 import { useState, type ReactNode } from "react";
 import { View } from "react-native";
-import { ChevronLeft, ChevronRight, Inbox } from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, Inbox } from "lucide-react-native";
 import {
   addDays,
   addMonths,
@@ -17,7 +17,7 @@ import { formatDay, MONTH_SHORT } from "@kriyan/core/format";
 import { parseClock } from "@kriyan/core/parse";
 import { useSpaces } from "@/data/views";
 import { useControl, useIsPhone } from "@/theme/layout";
-import { c, r, s, spaceTone } from "@/theme/tokens";
+import { c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Chip, Dot, Field } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
@@ -55,11 +55,16 @@ export function Option({
         paddingLeft: s.s2 + indent * s.s4,
         paddingRight: s.s2,
         borderRadius: r.ctl,
-        backgroundColor: selected ? c.select : "transparent",
       }}
     >
       {leading}
-      <Txt variant="body" tone={selected ? "ink" : "ink2"} numberOfLines={1} style={{ flex: 1 }}>
+      {/* B2's lists mark the current choice with weight and a tick, not a fill (`.plist`). */}
+      <Txt
+        variant="body"
+        tone={selected ? "ink" : "ink2"}
+        numberOfLines={1}
+        style={[{ flex: 1 }, selected ? family("600") : null]}
+      >
         {label}
       </Txt>
       {hint ? (
@@ -67,6 +72,7 @@ export function Option({
           {hint}
         </Txt>
       ) : null}
+      {selected ? <Icon icon={Check} size={16} tone="ink2" /> : null}
     </Press>
   );
 }
@@ -111,11 +117,12 @@ export function DayPicker({
   return (
     <View style={{ gap: s.s3 }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-        {quick.map(([label, date]) => (
+        {quick.map(([label, date], i) => (
           <Chip
             key={label}
             label={label}
-            on={value === date}
+            // On a Saturday "Today" and "This weekend" are the same day: the first one says so.
+            on={value === date && quick.findIndex(([, d]) => d === date) === i}
             onPress={() => onPick(date)}
             accessibilityLabel={`${label}, ${formatDay(date, today)}`}
           />

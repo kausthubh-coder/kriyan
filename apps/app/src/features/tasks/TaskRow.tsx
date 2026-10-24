@@ -73,8 +73,8 @@ function Fact({ icon, text }: { icon?: Parameters<typeof Icon>[0]["icon"]; text:
 /** The prototype's small "from Codex" tag (b2.html `.src`) on a task an agent added. */
 export function Source({ agent }: { agent: string }) {
   return (
-    <View style={{ paddingHorizontal: s.s1, borderRadius: r.sm, backgroundColor: c.sunken }}>
-      <Txt variant="caption" tone="ink3" numberOfLines={1} style={family("600")}>
+    <View style={{ paddingHorizontal: s.s2, borderRadius: r.sm, backgroundColor: c.select }}>
+      <Txt variant="caption" tone="ink2" numberOfLines={1} style={family("600")}>
         {/* An agent that gave no name is "An agent"; mid-sentence it's lower case. */}
         {`from ${agent === "An agent" ? "an agent" : agent}`}
       </Txt>
@@ -158,12 +158,13 @@ export const TaskRow = memo(function TaskRow({
 
   const body = (
     <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
-      <View style={{ marginTop: phone ? 11 : 1 }}>
+      {/* The 16px box centred on the title's first line. */}
+      <View style={{ marginTop: phone ? 14 : 2 }}>
         {task.event ? (
           <View
             style={{
-              width: phone ? 22 : 18,
-              height: phone ? 22 : 18,
+              width: 16,
+              height: 16,
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -200,7 +201,7 @@ export const TaskRow = memo(function TaskRow({
         scale={false}
         style={{ flex: 1, minWidth: 0, minHeight: phone ? 44 : 24, justifyContent: "center", gap: 2 }}
       >
-        <Txt variant="body" tone={done ? "ink3" : "ink"} strike={done}>
+        <Txt variant="label" tone={done ? "ink3" : "ink"} strike={done}>
           {task.title}
         </Txt>
         {info.length || source ? (

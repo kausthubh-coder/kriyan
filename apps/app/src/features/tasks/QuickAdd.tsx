@@ -113,7 +113,7 @@ function chipsFor(parsed: ParsedTask, today: string, spaces: SpaceNode[] | undef
   if (parsed.repeat)
     out.push({
       key: "repeat",
-      label: describeRepeat(parsed.repeat, parsed.date ?? today, today),
+      label: describeRepeat(parsed.repeat, parsed.date ?? today, today, { compact: true }),
       icon: Repeat2,
       kinds: ["repeat"],
     });
@@ -208,6 +208,9 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
   const [text, setText] = useState(initialText ?? "");
   const [kind, setKind] = useState<Kind>("task");
   const [busy, setBusy] = useState(false);
+  // A hardware Enter fires both the key handler and onSubmitEditing in the same frame, before
+  // `busy` re-renders: the ref stops the second from adding the task again.
+  const submitting = useRef(false);
   const sheet = variant === "sheet";
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
 
@@ -234,7 +237,8 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
 
   const submit = async () => {
     const value = text.trim();
-    if (!value || busy) return;
+    if (!value || submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     try {
       if (kind === "habit") {
@@ -269,6 +273,7 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
     } catch (e) {
       showToast(errorText(e));
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   };
@@ -294,8 +299,8 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
       autoFocus={autoFocus}
       placeholder={sheet ? PLACEHOLDER[kind] : placeholder}
       textStyle={fieldText}
-      // At least 24 tall, so the one-line field is a full target (Hit Areas).
-      minHeight={Math.max(24, (fieldText.lineHeight ?? 20) * minLines)}
+      // At least 24 tall (44 on touch), so the one-line field is a full target (Hit Areas).
+      minHeight={Math.max(phone ? 44 : 24, (fieldText.lineHeight ?? 20) * minLines)}
     />
   );
 
@@ -464,7 +469,8 @@ const ParsedField = forwardRef<
     );
   }
   return (
-    <View style={{ position: "relative", minHeight }}>
+    // B2's sentence has no box around it, even while typing: the caret is the focus (W-add-2).
+    <View style={{ position: "relative", minHeight }} {...({ dataSet: { focus: "caret" } } as object)}>
       {/* In the flow, so it sets the height; the zero-width space keeps a trailing line open. */}
       <Text
         aria-hidden
@@ -527,18 +533,17 @@ function ParsedChip({
       accessibilityLabel={`Remove ${label}`}
       onPress={onPress}
       hoverBg={null}
-      style={{ minHeight: phone ? 44 : 32, justifyContent: "center", marginVertical: phone ? -s.s1 : 0 }}
+      style={{ minHeight: phone ? 44 : CHIP, justifyContent: "center", marginVertical: phone ? -s.s1 : 0 }}
     >
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: s.s2,
-          height: phone ? 36 : 32,
+          height: CHIP,
           paddingHorizontal: s.s3,
           borderRadius: r.card,
-          // The blue space's surface is the prototype's --blue-bg: the parser's blue, lightly.
-          backgroundColor: spaceTone("blue").surface,
+          backgroundColor: c.parseFill,
         }}
       >
         <Icon icon={icon} size={16} tone="parse" />
@@ -552,14 +557,13 @@ function ParsedChip({
 }
 
 function QuietChip({ label, icon, dashed }: { label: string; icon: LucideIcon; dashed?: boolean }) {
-  const phone = useIsPhone();
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
         gap: s.s2,
-        height: phone ? 36 : 32,
+        height: CHIP,
         paddingHorizontal: s.s3,
         borderRadius: r.card,
         borderWidth: 1,
@@ -574,6 +578,9 @@ function QuietChip({ label, icon, dashed }: { label: string; icon: LucideIcon; d
     </View>
   );
 }
+
+/** B2's chip height (`.chip`), on both layouts; on touch the target still reaches 44. */
+const CHIP = 34;
 
 /** "Today" and "Tomorrow" are labels; inside a sentence they're words. */
 function inSentence(day: string): string {

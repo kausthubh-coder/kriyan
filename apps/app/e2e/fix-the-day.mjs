@@ -41,7 +41,7 @@ const tomorrow = addDays(today, 1);
     await page.getByRole("button", { name: "Open Book the dentist" }).hover();
     await page.screenshot({ path: artifact("fix-hover-1440.png") });
     await page.getByRole("button", { name: "Tomorrow", exact: true }).click();
-    await status.filter({ hasText: "Moved to Tomorrow: Book the dentist" }).waitFor();
+    await status.filter({ hasText: "Moved to tomorrow: Book the dentist" }).waitFor();
     await page.getByRole("button", { name: "Open Book the dentist" }).waitFor({ state: "detached" });
     expectEq((await anytimeTitles()).includes("Book the dentist"), false, "after the move");
     await status.filter({ hasText: "Book the dentist" }).getByRole("button", { name: "Undo" }).click();
@@ -61,7 +61,9 @@ const tomorrow = addDays(today, 1);
       .getByRole("button", { name: formatDay(target, today), exact: true })
       .first()
       .click();
-    await status.filter({ hasText: `Moved to ${formatDay(target, today)}: Run` }).waitFor();
+    // Mid-sentence "Tomorrow" is lower case in the toast.
+    const day = formatDay(target, today).replace(/^(Today|Tomorrow)$/, (w) => w.toLowerCase());
+    await status.filter({ hasText: `Moved to ${day}: Run` }).waitFor();
     await status.filter({ hasText: "Run" }).getByRole("button", { name: "Undo" }).click();
     await page.getByRole("button", { name: "Open Run" }).waitFor();
   });
@@ -74,7 +76,7 @@ const tomorrow = addDays(today, 1);
     await page.keyboard.press("Control+k");
     await page.keyboard.type("close the day");
     await page.getByRole("dialog", { name: "Command menu" }).getByText("Close the day").click();
-    const moved = status.filter({ hasText: /^Moved \d+ to Tomorrow/ });
+    const moved = status.filter({ hasText: /^Moved \d+ to tomorrow/ });
     await moved.waitFor();
     await page.screenshot({ path: artifact("fix-close-day-after-1440.png") });
     const week = await op("get_week", { start: today });
@@ -148,7 +150,7 @@ const tomorrow = addDays(today, 1);
     const release = await swipe("Book the dentist", -260);
     await page.screenshot({ path: artifact("fix-swipe-armed-390.png") });
     await release();
-    await status.filter({ hasText: "Moved to Tomorrow: Book the dentist" }).waitFor();
+    await status.filter({ hasText: "Moved to tomorrow: Book the dentist" }).waitFor();
     await status.filter({ hasText: "Book the dentist" }).getByRole("button", { name: "Undo" }).click();
     await page.getByRole("button", { name: "Open Book the dentist" }).waitFor();
   });

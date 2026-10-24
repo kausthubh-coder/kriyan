@@ -13,6 +13,8 @@ type Variant = "default" | "primary" | "quiet" | "outline";
 interface Props {
   label?: string;
   icon?: LucideIcon;
+  /** A solid icon, like B2's play mark. */
+  filled?: boolean;
   /** A mark before the label that isn't one of our icons, like a provider's logo. */
   leading?: ReactNode;
   /** Icon after the label (a chevron on a select). */
@@ -34,6 +36,7 @@ export const Button = forwardRef<View, Props>(function Button(
   {
     label,
     icon,
+    filled,
     leading,
     trailing,
     onPress,
@@ -86,6 +89,7 @@ export const Button = forwardRef<View, Props>(function Button(
           {icon ? (
             <Icon
               icon={icon}
+              filled={filled}
               tone={
                 primary
                   ? "onInk"

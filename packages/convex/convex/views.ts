@@ -61,6 +61,7 @@ export const task = query({
     if (!task || task.ownerId !== ownerId || task.deletedAt !== undefined) return null;
     const tree = spaceTree(await listSpaces(ctx, ownerId));
     const space = tree.find((s) => s._id === task.spaceId);
-    return { ...task, spacePath: space?.path ?? null, color: space?.color ?? null };
+    const tracked = await Focus.trackedMinutes(ctx, ownerId, task._id);
+    return { ...task, spacePath: space?.path ?? null, color: space?.color ?? null, tracked };
   },
 });

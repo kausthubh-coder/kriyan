@@ -25,8 +25,8 @@ for (const [w, h] of [
   await page.getByRole("button", { name: /^When:/ }).click();
   await page.waitForTimeout(500);
   await shot("when-editor");
-  if (w === 390) await page.getByRole("button", { name: "Back to the task" }).click();
-  else await page.keyboard.press("Escape");
+  // The picker sits over the task on both layouts; Done closes it.
+  await page.getByRole("button", { name: "Done", exact: true }).click();
   await page
     .getByRole("button", { name: /^Reminders|^Add reminder|^Reminder:/ })
     .first()

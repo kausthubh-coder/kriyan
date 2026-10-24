@@ -31,13 +31,14 @@ export default function AppLayout() {
   useNotifications();
   const phone = useIsPhone();
   const path = usePathname();
-  // Focus takes the whole window: no sidebar, no navigation bar, one task.
+  // Focus takes the phone's whole screen: no navigation bar, one task. Desktop keeps the sidebar
+  // and centres Focus in the rest of the window, as B2 does.
   const immersive = path.startsWith("/focus/");
   // Like the prototype, the dock leaves for a sheet (a task, quick add) and the evening review.
   const dock = phone && !immersive && !path.startsWith("/task/") && path !== "/add" && path !== "/review";
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg, height: "100%" }}>
-      {phone || immersive ? null : <Sidebar />}
+      {phone ? null : <Sidebar />}
       <View style={{ flex: 1, minWidth: 0 }}>
         <OfflineNotice />
         <Stack

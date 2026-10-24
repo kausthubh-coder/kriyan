@@ -32,7 +32,8 @@ export function Check({
   round?: boolean;
 }) {
   const phone = useIsPhone();
-  const d = size ?? (phone ? 22 : 18);
+  // B2's list box is a 16px square on both layouts; a round ring on a block is a little larger.
+  const d = size ?? (round ? (phone ? 22 : 18) : 16);
   const ring = round ? color : done ? c.ink3 : c.ink2;
   // The visible ring stays small; the target grows to 44 on touch (Hit Areas).
   const target = phone ? 44 : 32;
@@ -60,7 +61,8 @@ export function Check({
             width: d,
             height: d,
             borderRadius: round ? d / 2 : d * 0.28,
-            borderWidth: round && done ? 0 : 1.75,
+            // B2's rings on the timeline are a firmer 2.
+            borderWidth: round && done ? 0 : round ? 2 : 1.75,
             borderColor: ring,
             backgroundColor: round && done ? color : "transparent",
             alignItems: "center",
@@ -129,23 +131,22 @@ export function Chip({
             height: phone ? 36 : 28,
             paddingHorizontal: s.s3,
             borderRadius: phone ? 18 : 14,
-            // Selected is a raised tone with an edge, not solid ink: a chosen setting is a
-            // state, and solid ink belongs to the one action on the screen.
-            backgroundColor: on ? c.overlay : hovered ? c.select : c.hover,
-            ...(on ? { boxShadow: `inset 0 0 0 1px ${c.lineStrong}` } : null),
+            // Picked is solid ink, like the calendar's picked day: one selected look in every
+            // picker (B2's `.chip.on`, `.pgrid .on`).
+            backgroundColor: on ? c.ink : hovered ? c.select : c.hover,
           }}
         >
           {leading}
-          {icon ? <Icon icon={icon} size={14} tone={on ? "ink" : "ink3"} /> : null}
+          {icon ? <Icon icon={icon} size={14} tone={on ? "onInk" : "ink3"} /> : null}
           <Txt
             style={[roles.label, { fontSize: 12, lineHeight: 16 }]}
-            tone={on ? "ink" : "ink2"}
+            tone={on ? "onInk" : "ink2"}
             numberOfLines={1}
           >
             {label}
           </Txt>
           {onRemove ? (
-            <Txt variant="caption" tone="ink3">
+            <Txt variant="caption" tone={on ? "onInk" : "ink3"}>
               ×
             </Txt>
           ) : null}
@@ -244,7 +245,18 @@ export function PickBox({ on, size = 18 }: { on: boolean; size?: number }) {
   );
 }
 
-export function Ring({ color, done, size = 16 }: { color: string; done: boolean; size?: number }) {
+/** A habit's ring. Dashed while it waits for today's check-in (B2's habit mark). */
+export function Ring({
+  color,
+  done,
+  size = 16,
+  dashed,
+}: {
+  color: string;
+  done: boolean;
+  size?: number;
+  dashed?: boolean;
+}) {
   return (
     <View
       style={{
@@ -252,6 +264,7 @@ export function Ring({ color, done, size = 16 }: { color: string; done: boolean;
         height: size,
         borderRadius: size / 2,
         borderWidth: done ? 0 : 1.5,
+        borderStyle: dashed && !done ? "dashed" : "solid",
         borderColor: color,
         backgroundColor: done ? color : "transparent",
         alignItems: "center",
@@ -261,4 +274,9 @@ export function Ring({ color, done, size = 16 }: { color: string; done: boolean;
       {done ? <CheckGlyph size={size * 0.62} color={hex.bg} strokeWidth={3} /> : null}
     </View>
   );
+}
+
+/** A sheet's handle (B2's `.grab`, 38 by 5): it says the sheet drags. */
+export function Grabber() {
+  return <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.lineStrong }} />;
 }

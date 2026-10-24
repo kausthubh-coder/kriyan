@@ -9,7 +9,7 @@ import { addDays, diffDays, weekday, type CivilDate } from "@kriyan/core/dates";
 import { formatDuration, MONTH_LONG, WEEKDAY_SHORT } from "@kriyan/core/format";
 import { daySummary, summaryText, type SummaryPart } from "@kriyan/core/summary";
 import { useIsPhone } from "@/theme/layout";
-import { c, family, r, s, spaceTone } from "@/theme/tokens";
+import { bold, c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Txt } from "@/ui/Txt";
 import type { TodayView } from "@/data/views";
@@ -52,10 +52,10 @@ export function TodayHeader({
     <View
       style={{
         backgroundColor: c.head,
-        paddingHorizontal: phone ? s.s4 : s.s8,
-        paddingTop: phone ? s.s4 : s.s8,
-        // On the phone the sheet below overlaps the header's bottom edge by its radius.
-        paddingBottom: phone ? s.s6 + r.sheet : s.s8,
+        // B2's 22 and 26/28, on the 4px scale.
+        paddingHorizontal: phone ? s.s6 : s.s8,
+        paddingTop: s.s6,
+        paddingBottom: phone ? s.s8 : s.s6,
         borderRadius: phone ? 0 : r.sheet,
         gap: s.s4,
       }}
@@ -65,7 +65,7 @@ export function TodayHeader({
           style={{ flexDirection: "row", alignItems: "flex-end" }}
           accessibilityLabel={WEEKDAY_SHORT[weekday(today)]}
         >
-          <Txt variant="display" tone="headInk" heading={1}>
+          <Txt variant="display" tone="headInk" heading={1} style={bold}>
             {WEEKDAY_SHORT[weekday(today)]}
           </Txt>
           {/* The one red: now. */}
@@ -89,8 +89,9 @@ export function TodayHeader({
         variant="title"
         tone="headDim"
         accessibilityLabel={summaryText(parts)}
-        // 20 on phones and 28 on desktop: the type scale's steps either side of B2's 23.
-        style={{ fontSize: phone ? 20 : 28, lineHeight: phone ? 28 : 36 }}
+        style={{ marginTop: s.s2 }}
+        // B2's 22 is between the scale's 20 and 28; 20 keeps the sentence under the day, as B2
+        // means it, on both layouts.
       >
         {parts.map((part, i) => (
           <SentencePart key={i} part={part} />
@@ -105,13 +106,16 @@ export function TodayHeader({
         ) : null}
         <Stat icon={Hourglass} color={spaceTone("purple").dot} text={`${daysLeft} days left in ${year}`} />
       </View>
+      {/* On the phone the sheet below overlaps the header's bottom edge by its radius. */}
+      {phone ? <View style={{ height: r.sheet - s.s4 }} /> : null}
     </View>
   );
 }
 
 /** A run inside the sentence: only its colour changes, so it keeps the sentence's size. */
 function SentencePart({ part }: { part: SummaryPart }) {
-  const style = part.strong ? { color: c.headInk, ...family("600") } : { color: c.headDim, ...family("500") };
+  // One weight throughout, as B2's sentence: only the colour says what's strong.
+  const style = { color: part.strong ? c.headInk : c.headDim, ...family("600") };
   if ("kind" in part) {
     return (
       <Text style={style}>
@@ -136,7 +140,7 @@ function Stat({
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1 }}>
       <Icon icon={icon} size={14} color={color} strokeWidth={2} />
-      <Txt variant="caption" tone="headInk" tnum>
+      <Txt variant="caption" tone="headInk" tnum style={family("600")}>
         {text}
       </Txt>
     </View>

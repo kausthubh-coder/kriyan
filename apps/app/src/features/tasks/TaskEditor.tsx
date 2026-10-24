@@ -3,8 +3,8 @@
 // 10:00–11:30", "3 reminders") and quiet for what isn't ("+ Repeat"); each opens its own small
 // picker. A thumb bar holds Start focus, When, Move and More. Every change saves at once.
 //
-// Desktop: sub-editors open beside the panel. Phones: they replace the sheet's content
-// (never a sheet on a sheet), with Back to return.
+// Each field's picker opens over the task, which stays behind it (b2.html `pickerHTML`): on
+// phones a small sheet over the task sheet, on desktop a box under the chips inside the panel.
 
 import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { ScrollView, useWindowDimensions, View } from "react-native";
@@ -12,18 +12,16 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "convex/react";
 import {
-  ArrowLeft,
   ArrowRight,
   Bell,
   Calendar,
   Play,
   Plus,
-  CalendarClock,
   CircleDot,
   Ellipsis,
   Flag,
   Hourglass,
-  Layers,
+  Inbox,
   Repeat2,
   Target,
   Trash2,
@@ -51,12 +49,12 @@ import { ensureNotifications } from "@/features/notifications/register";
 import { NoteEditor } from "@/features/notes/NoteEditor";
 import { type } from "@kriyan/core/tokens";
 import { roleStyle, useIsPhone, useType } from "@/theme/layout";
-import { c, family, hex, r, s, shadows, spaceTone } from "@/theme/tokens";
+import { bold, c, family, hex, r, s, shadows, spaceTone } from "@/theme/tokens";
 import { AutoInput } from "@/ui/AutoInput";
 import { Button } from "@/ui/Button";
 import { Check, Chip, Dot, Field } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
-import { Popover } from "@/ui/Popover";
+import { DoneButton, Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
 import { completeTask, deleteTask, errorText, reopenTask, ticking } from "./actions";
@@ -127,7 +125,10 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
       : `${formatDay(task.date, today)}, anytime`
     : null;
 
-  const subEditor = (which: Sub): { title: string; body: ReactNode; width?: number } | null => {
+  /** `saves`: the editor has its own Save and Cancel, so the picker's head has no Done. */
+  const subEditor = (
+    which: Sub,
+  ): { title: string; body: ReactNode; width?: number; saves?: boolean } | null => {
     switch (which) {
       case "space":
         return {
@@ -145,13 +146,14 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
       case "when":
         return {
           title: "When",
-          body: <WhenEditor task={task} today={today} save={save} onDone={() => setSub(null)} />,
+          body: <WhenEditor task={task} today={today} save={save} />,
           width: 340,
         };
       case "repeat":
         return {
           title: "Repeat",
           width: 384,
+          saves: true,
           body: (
             <RepeatEditor
               rule={(task.repeat as Repeat | undefined) ?? null}
@@ -246,44 +248,49 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
     />
   );
 
-  // Phones: a sub-editor takes over the sheet.
   const open = sub ? subEditor(sub) : null;
-  if (phone && open && sub !== "more") {
-    return (
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: s.s4, paddingTop: s.s2, gap: s.s4 }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: s.s1, marginLeft: -s.s3 }}>
-          <Button icon={ArrowLeft} accessibilityLabel="Back to the task" onPress={() => setSub(null)} />
-          <Txt variant="subhead" heading={2} style={{ flex: 1 }}>
-            {open.title}
-          </Txt>
-        </View>
-        {open.body}
-      </ScrollView>
-    );
-  }
+  // Desktop draws the picker inside the panel, under the chips; "More" is a menu over the bar.
+  const inline = !phone && open && sub !== "more";
 
   return (
     <>
-      {/* A small label over the title, like the prototype's "Task": here the space it lives in. */}
+      {/* Over the title: phones say what it is, like the prototype's sheet ("Task"); the panel
+          says where it lives, in a small filled pill (b2.html `.spc`). */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: s.s1,
-          minHeight: phone ? 48 : 56,
+          minHeight: phone ? 44 : 52,
+          marginTop: phone ? 0 : s.s3,
           paddingLeft: phone ? s.s4 : s.s6,
-          paddingRight: phone ? s.s2 : s.s3,
+          paddingRight: phone ? s.s2 : s.s4,
         }}
       >
-        {/* Phones say what it is, like the prototype's sheet; the panel says where it lives. */}
-        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: s.s2, minWidth: 0 }}>
-          {space && !phone ? <Dot color={tone.dot} /> : null}
-          <Txt variant="caption" tone="ink3" numberOfLines={1} style={family("600")}>
-            {phone ? (task.event ? "Event" : "Task") : space ? space.path : "Inbox"}
-          </Txt>
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", minWidth: 0 }}>
+          {phone ? (
+            <Txt variant="caption" tone="ink3" numberOfLines={1} style={family("600")}>
+              {task.event ? "Event" : "Task"}
+            </Txt>
+          ) : (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: s.s2,
+                maxWidth: "100%",
+                paddingHorizontal: s.s3,
+                paddingVertical: s.s1,
+                borderRadius: r.pill,
+                backgroundColor: c.sunken,
+              }}
+            >
+              <Dot color={space ? tone.dot : c.ink3} size={7} />
+              <Txt variant="label" tone="ink2" numberOfLines={1}>
+                {space ? space.path : "No space"}
+              </Txt>
+            </View>
+          )}
         </View>
         <Button icon={X} accessibilityLabel="Close" onPress={onClose} />
       </View>
@@ -298,9 +305,15 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
       >
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3 }}>
           {/* Centres the box on the first line of the title. */}
-          <View style={{ paddingTop: (roles.headline.lineHeight ?? 32) / 2 - TICK / 2 + (phone ? s.s2 : 0) }}>
+          <View
+            style={{
+              paddingTop: (roles.headline.lineHeight ?? 32) / 2 - TICK_BOX / 2 + (phone ? s.s2 : 0),
+              width: TICK_BOX,
+              alignItems: "center",
+            }}
+          >
             {task.event ? (
-              <View style={{ width: TICK, height: TICK, alignItems: "center", justifyContent: "center" }}>
+              <View style={{ width: TICK, height: TICK_BOX, alignItems: "center", justifyContent: "center" }}>
                 <Dot color={tone.dot} size={10} />
               </View>
             ) : (
@@ -326,7 +339,7 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             lineHeight={roles.headline.lineHeight ?? 32}
             // 32 of text in 8 above and below: a target past 44 on touch.
             padY={phone ? s.s2 : 0}
-            style={[roles.headline, { flex: 1, color: done ? c.ink3 : c.ink }]}
+            style={[roles.headline, bold, { flex: 1, color: done ? c.ink3 : c.ink }]}
           />
         </View>
 
@@ -404,7 +417,7 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           />
           <PropChip
             anchor={spaceRef}
-            icon={Layers}
+            icon={Inbox}
             text={space?.name ?? null}
             empty="Space"
             label="Space"
@@ -422,7 +435,14 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
           )}
         </View>
 
+        {inline && open ? (
+          <InlinePicker title={open.title} onDone={open.saves ? undefined : () => setSub(null)}>
+            {open.body}
+          </InlinePicker>
+        ) : null}
+
         {task.event ? null : <StepList task={task} />}
+        {task.event ? null : <Tracked minutes={task.tracked} length={task.length} />}
         {task.addedBy ? (
           <Txt variant="meta" tone="ink3" tnum style={{ marginTop: s.s4 }}>
             {addedLine(task.addedBy, task._creationTime, timeZone, today)}
@@ -435,19 +455,64 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
 
       {phone ? thumbBar : null}
 
-      {!phone || sub === "more" ? (
+      {inline ? null : (
         <Popover
           open={Boolean(open)}
           onClose={() => setSub(null)}
           anchor={anchor}
-          side={sub === "more" ? "above" : "left"}
+          side="above"
           title={open?.title ?? ""}
           width={open?.width ?? 320}
+          done={sub !== "more" && !open?.saves}
         >
           {open?.body}
         </Popover>
-      ) : null}
+      )}
     </>
+  );
+}
+
+/** B2's `.psheet.inl`: the open field's picker inside the panel, under the chips. */
+function InlinePicker({
+  title,
+  onDone,
+  children,
+}: {
+  title: string;
+  onDone?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      role="group"
+      aria-label={title}
+      style={{
+        marginTop: s.s2,
+        paddingHorizontal: s.s3,
+        paddingBottom: s.s3,
+        borderRadius: r.box,
+        borderWidth: 1,
+        borderColor: c.line,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, minHeight: 52 }}>
+        <Txt variant="subhead" heading={2} style={[bold, { flex: 1 }]}>
+          {title}
+        </Txt>
+        {onDone ? <DoneButton onPress={onDone} /> : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/** "Tracked 25m of 1h 30m": Focus time on this task against its length, when there's either. */
+function Tracked({ minutes, length }: { minutes: number; length?: number }) {
+  if (!minutes && !length) return null;
+  return (
+    <Txt variant="meta" tone="ink3" tnum style={{ marginTop: s.s4 }}>
+      {`Tracked ${formatDuration(minutes) || "0m"}${length ? ` of ${formatDuration(length)}` : ""}`}
+    </Txt>
   );
 }
 
@@ -491,7 +556,7 @@ function PropChip({
         hoverBg={null}
         // The chips wrap 8 apart like the prototype's; the target still reaches 44 on touch.
         style={{
-          minHeight: phone ? 44 : 32,
+          minHeight: phone ? 44 : 36,
           marginVertical: phone ? -s.s1 : 0,
           justifyContent: "center",
           maxWidth: "100%",
@@ -503,12 +568,12 @@ function PropChip({
               flexDirection: "row",
               alignItems: "center",
               gap: s.s2,
-              height: phone ? 36 : 32,
+              height: 36,
               paddingHorizontal: s.s3,
               borderRadius: r.card,
-              // Set chips are filled; an unset one is only an outline, so the set ones read first.
+              // Set chips are filled; an unset one is only a faint outline, so the set ones read first.
               borderWidth: 1,
-              borderColor: set ? "transparent" : c.lineStrong,
+              borderColor: set ? "transparent" : c.line,
               backgroundColor: expanded ? c.select : set ? c.sunken : hovered ? c.hover : "transparent",
             }}
           >
@@ -557,8 +622,10 @@ function GoalChip({
   );
 }
 
-/** Size of the box beside the title. */
-const TICK = 24;
+/** Size of the box beside the title (B2's 26px mark paints about 20). */
+const TICK = 20;
+/** The row the box sits in, so it centres on the title's first line in whole spacing steps. */
+const TICK_BOX = 24;
 /** The thumb bar's pill: 44 buttons in 4 padding and a 1 border. */
 const BAR_HEIGHT = 44 + 2 * s.s1 + 2;
 /** Its gap above the sheet's bottom edge and the sides, like the dock's. */
@@ -732,12 +799,10 @@ function WhenEditor({
   task,
   today,
   save,
-  onDone,
 }: {
   task: TaskDoc;
   today: string;
   save: (patch: { date?: string | null; time?: number | null; length?: number | null }) => Promise<unknown>;
-  onDone: () => void;
 }) {
   const [timeText, setTimeText] = useState("");
   const [lengthText, setLengthText] = useState("");
@@ -835,9 +900,6 @@ function WhenEditor({
             ) : null
           }
         />
-      </View>
-      <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-        <Button variant="primary" label="Done" icon={CalendarClock} onPress={onDone} />
       </View>
     </View>
   );

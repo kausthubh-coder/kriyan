@@ -59,11 +59,16 @@ export const Press = forwardRef<View, Props>(function Press(
           },
         }
       : {};
+  // react-native-web's Pressable makes itself a tab stop and ignores `focusable`; a press
+  // target that isn't a control (a row's surface, a swipe action out of sight) asks for -1, so
+  // a row is two tab stops (its checkbox and its title), not four (A35).
+  const unfocusable = Platform.OS === "web" && rest.focusable === false ? { tabIndex: -1 } : {};
   return (
     <Pressable
       ref={ref}
       disabled={disabled}
       {...(space as object)}
+      {...(unfocusable as object)}
       android_ripple={
         ripple
           ? {

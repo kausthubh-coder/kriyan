@@ -2,7 +2,7 @@
 // screens) and room for the floating dock. On desktop every page sits in one frame, so every
 // page starts at the same left edge: a reading column (680px) or the frame's full width.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode, type Ref } from "react";
 import { Platform, ScrollView, View, type ScrollViewProps, type TextStyle } from "react-native";
 import { router, usePathname } from "expo-router";
 import Head from "expo-router/head";
@@ -10,7 +10,7 @@ import { ChevronLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { useIsPhone } from "@/theme/layout";
-import { c, r, s, sz } from "@/theme/tokens";
+import { bold, c, r, s, sz } from "@/theme/tokens";
 import { Icon } from "./Icon";
 import { Press } from "./Press";
 import { Txt } from "./Txt";
@@ -41,6 +41,11 @@ interface Props {
    * with the page; the content sits on a sheet that overlaps its bottom edge.
    */
   hero?: ReactNode;
+  /**
+   * The hero has scrolled away: the status bar's cap turns to the page's ground, matching the
+   * icons, which follow the scheme again (Today's LightStatusBar).
+   */
+  pastHero?: boolean;
 }
 
 /** The widest page: Today's list and schedule side by side (b2.html `.dpg.wide`). */
@@ -119,6 +124,7 @@ export function Screen({
   footer,
   panelCovers,
   hero,
+  pastHero,
 }: Props) {
   const phone = useIsPhone();
   const insets = useSafeAreaInsets();
@@ -128,8 +134,10 @@ export function Screen({
   // While the panel is open the page keeps clear of it (desktop), unless the panel is meant to
   // cover this layout's right column.
   const shift = !phone && panelOpen && width !== "wide" && !panelCovers;
+  // Phones draw pages on the sheet tone (B2's --sheet: white in light, a lifted grey in dark).
+  const ground = phone ? c.raised : c.bg;
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <View style={{ flex: 1, backgroundColor: ground }}>
       {/* The browser's tab and history name the page, like the site's "%s | Kriyan". */}
       {Platform.OS === "web" ? (
         <Head>
@@ -155,7 +163,7 @@ export function Screen({
           style={
             heroed
               ? {
-                  backgroundColor: c.bg,
+                  backgroundColor: ground,
                   borderTopLeftRadius: r.sheet,
                   borderTopRightRadius: r.sheet,
                   marginTop: -r.sheet,
@@ -202,7 +210,7 @@ export function Screen({
             left: 0,
             right: 0,
             height: insets.top,
-            backgroundColor: heroed ? c.head : c.bg,
+            backgroundColor: heroed && !pastHero ? c.head : ground,
           }}
         />
       ) : null}
@@ -211,10 +219,93 @@ export function Screen({
   );
 }
 
+/**
+ * Desktop pages with a day beside them (b2.html `.td`): a column centred in what's left of the
+ * window, scrolling on its own, and a 400px column on the right with a rule down its edge. An
+ * open task's panel covers the right column exactly; without one, the column keeps clear of it.
+ * `footer` is pinned to the foot of the column (Today's ask bar), over a fade of the page.
+ */
+export function SplitScreen({
+  title,
+  columnWidth = sz.column,
+  right,
+  footer,
+  children,
+  scrollRef,
+}: {
+  title: string;
+  columnWidth?: number;
+  /** The right column's content, or null when the window is too narrow for it. */
+  right: ReactNode | null;
+  footer?: ReactNode;
+  children: ReactNode;
+  scrollRef?: Ref<ScrollView>;
+}) {
+  const panelOpen = usePanelOpen();
+  const [footerHeight, setFooterHeight] = useState(0);
+  const hasRight = right !== null;
+  return (
+    <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg }}>
+      {Platform.OS === "web" ? (
+        <Head>
+          <title>{`${title} | Kriyan`}</title>
+        </Head>
+      ) : null}
+      <View style={{ flex: 1, minWidth: 0, paddingRight: !hasRight && panelOpen ? sz.panel : 0 }}>
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          // Keyboard focus scrolls a row clear of the footer instead of leaving it underneath.
+          style={[
+            { flex: 1 },
+            Platform.OS === "web" && footer ? ({ scrollPaddingBottom: footerHeight + s.s4 } as object) : null,
+          ]}
+          contentContainerStyle={{ paddingTop: s.s6, paddingHorizontal: s.s12 }}
+        >
+          <View style={{ width: "100%", maxWidth: columnWidth, alignSelf: "center" }}>{children}</View>
+          {/* Room to scroll the last row clear of the footer. */}
+          <View style={{ height: footer ? footerHeight + s.s6 : s.s16 }} />
+        </ScrollView>
+        {footer ? (
+          <View
+            onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
+            pointerEvents="box-none"
+            style={{ position: "absolute", left: 0, right: !hasRight && panelOpen ? sz.panel : 0, bottom: 0 }}
+          >
+            {/* The list fades out under the bar rather than ending at a hard edge. */}
+            <View pointerEvents="none" style={[{ height: s.s6 }, fadeToBg]} />
+            <View style={{ paddingHorizontal: s.s12, paddingBottom: s.s4, backgroundColor: c.bg }}>
+              <View style={{ width: "100%", maxWidth: columnWidth, alignSelf: "center" }}>{footer}</View>
+            </View>
+          </View>
+        ) : null}
+      </View>
+      {hasRight ? (
+        <View
+          style={{
+            width: sz.panel,
+            borderLeftWidth: 1,
+            borderLeftColor: c.line,
+            backgroundColor: c.raised,
+          }}
+        >
+          {panelOpen ? null : right}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** A fade from clear to the page's ground (web; Android draws the bar on the ground alone). */
+const fadeToBg =
+  Platform.OS === "web"
+    ? ({ backgroundImage: `linear-gradient(to bottom, transparent, ${c.bg})` } as object)
+    : null;
+
 /** Every page's title, on phones and desktop: one role, so no page's title is smaller than another's. */
 export function PageTitle({ title, style }: { title: string; style?: TextStyle }) {
   return (
-    <Txt variant="headline" heading={1} style={style}>
+    <Txt variant="headline" heading={1} style={[bold, style]}>
       {title}
     </Txt>
   );

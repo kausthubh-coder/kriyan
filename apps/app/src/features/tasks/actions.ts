@@ -157,7 +157,10 @@ export function moveTasks(tasks: Placement[], date: string | null, time?: number
   if (!tasks.length) return Promise.resolve();
   commitHaptic();
   playSound("swoosh");
-  const where = date ? formatDay(date, todayIn(deviceTimeZone())) : "no date";
+  // Mid-sentence, "Today" and "Tomorrow" are words, not labels (D14): "Moved to tomorrow: Gym".
+  const where = date
+    ? formatDay(date, todayIn(deviceTimeZone())).replace(/^(Today|Tomorrow)$/, (w) => w.toLowerCase())
+    : "no date";
   const [only] = tasks;
   const text =
     tasks.length === 1 && only ? `Moved to ${where}: ${only.title}` : `Moved ${tasks.length} to ${where}`;
@@ -178,7 +181,7 @@ export function closeDay(today: string) {
     .then((moved) => {
       if (!moved.length) showToast("Nothing left to move");
       else
-        showToast(`Moved ${moved.length} to Tomorrow`, {
+        showToast(`Moved ${moved.length} to tomorrow`, {
           label: "Undo",
           run: () => void undoMove(moved),
         });

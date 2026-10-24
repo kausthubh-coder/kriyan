@@ -24,7 +24,7 @@ export function ReviewCard({ at }: { at: number }) {
         paddingVertical: s.s2,
         paddingLeft: s.s4,
         paddingRight: s.s3,
-        borderRadius: r.card + 4,
+        borderRadius: r.box,
         backgroundColor: c.sunken,
       }}
     >

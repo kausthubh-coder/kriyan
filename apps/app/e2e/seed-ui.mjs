@@ -1,4 +1,4 @@
-// Adds the brief's sample sentences through the desktop quick add, the way a person would.
+// Adds the brief's sample sentences through the desktop quick add dialog, the way a person would.
 import { BASE, launch, artifact, signedInContext, settle } from "./lib.mjs";
 const sentences = process.argv.slice(2).length
   ? process.argv.slice(2)
@@ -14,8 +14,10 @@ page.setDefaultTimeout(60000);
 page.on("pageerror", (e) => console.log(`[pageerror] ${e}`));
 await page.goto(`${BASE}/today`);
 await settle(page);
-const field = page.getByRole("textbox", { name: "Add a task" });
 for (const text of sentences) {
+  // N opens the dialog over Today; Enter adds and closes it.
+  await page.keyboard.press("n");
+  const field = page.getByRole("textbox", { name: "What do you want to do?" });
   await field.fill(text);
   await page.waitForTimeout(400);
   if (text === sentences[0]) await page.screenshot({ path: artifact("quickadd-parsing-1440.png") });

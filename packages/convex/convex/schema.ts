@@ -148,7 +148,10 @@ export default defineSchema({
     /** The person's today when the session ended. */
     date: v.string(),
     minutes: v.number(),
-  }).index("by_owner_and_date", ["ownerId", "date"]),
+  })
+    .index("by_owner_and_date", ["ownerId", "date"])
+    // A task's tracked time, on its screen.
+    .index("by_owner_and_task", ["ownerId", "taskId"]),
 
   /** One row per change an agent made through the API, so the app can list it and undo it. */
   agentActions: defineTable({

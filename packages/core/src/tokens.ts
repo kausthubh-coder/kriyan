@@ -24,8 +24,10 @@ type Solid =
   | "headFill"
   | "headLine"
   | "parse"
-  | "done";
-type Alpha = "hover" | "select" | "line" | "lineStrong" | "scrim";
+  | "done"
+  | "side"
+  | "night";
+type Alpha = "hover" | "select" | "line" | "lineStrong" | "scrim" | "parseFill";
 type ColorName = Solid | Alpha;
 
 // Every text colour holds 4.5:1 on bg, raised and sunken in its scheme; ink3 is the faintest
@@ -50,6 +52,10 @@ const solid: Record<Scheme, Record<Solid, string>> = {
     headLine: "oklch(29% 0.005 286)",
     parse: "oklch(53% 0.18 255)",
     done: "oklch(52% 0.13 150)",
+    // The desktop sidebar: a breath off white, quieter than the sunken fill (B2's --side).
+    side: "oklch(98.5% 0 0)",
+    // Focus is pure black in both schemes (B2's `.focus`), a step past the header's black.
+    night: "oklch(0% 0 0)",
   },
   dark: {
     bg: "oklch(13% 0.004 286)",
@@ -68,6 +74,8 @@ const solid: Record<Scheme, Record<Solid, string>> = {
     headLine: "oklch(27% 0.005 286)",
     parse: "oklch(72% 0.14 250)",
     done: "oklch(72% 0.15 150)",
+    side: "oklch(15% 0.003 286)",
+    night: "oklch(0% 0 0)",
   },
 };
 
@@ -79,6 +87,8 @@ const alpha: Record<Scheme, Record<Alpha, string>> = {
     line: "oklch(0% 0 0 / 0.09)",
     lineStrong: "oklch(0% 0 0 / 0.16)",
     scrim: "oklch(0% 0 0 / 0.32)",
+    // Quick add's understood details: the parser's blue, lightly (B2's --blue-bg).
+    parseFill: "oklch(53% 0.18 255 / 0.1)",
   },
   dark: {
     hover: "oklch(100% 0 0 / 0.05)",
@@ -86,6 +96,7 @@ const alpha: Record<Scheme, Record<Alpha, string>> = {
     line: "oklch(100% 0 0 / 0.08)",
     lineStrong: "oklch(100% 0 0 / 0.15)",
     scrim: "oklch(0% 0 0 / 0.55)",
+    parseFill: "oklch(72% 0.14 250 / 0.16)",
   },
 };
 
@@ -158,10 +169,17 @@ export const css = schemes.light.css;
 export const color = schemes.light.color;
 export const spaceColor = schemes.light.space;
 
+/**
+ * Inter 400, 500 and 600 for text. Bold (700) is for the app's large headings only (page
+ * titles, the day on Today, a task's title), as in B2; the type roles stay 600 so the site's
+ * headings don't change with it.
+ */
 export const font = {
   family: "Inter",
-  weights: { regular: "400", medium: "500", semibold: "600" },
+  weights: { regular: "400", medium: "500", semibold: "600", bold: "700" },
 } as const;
+
+export type FontWeight = (typeof font.weights)[keyof typeof font.weights];
 
 export interface TypeRole {
   size: number;
@@ -204,7 +222,11 @@ export const TYPE_SCALE = [12, 14, 16, 20, 28, 40] as const;
 export const space = { s1: 4, s2: 8, s3: 12, s4: 16, s6: 24, s8: 32, s12: 48, s16: 64 } as const;
 export const SPACE_SCALE = Object.values(space);
 
-export const radius = { sm: 6, ctl: 8, card: 12, sheet: 24, pill: 999 } as const;
+/**
+ * `box` is B2's content card (Upcoming, the year cards, Focus's next step, review's card stack):
+ * rounder than a control's card, which B2 draws at 18 on every screen.
+ */
+export const radius = { sm: 6, ctl: 8, card: 12, box: 18, sheet: 24, pill: 999 } as const;
 
 export const size = {
   ctl: 32,
@@ -213,13 +235,11 @@ export const size = {
   phoneRow: 48,
   column: 680,
   sidebar: 248,
-  panel: 440,
+  /** The right column on desktop (b2.html `.rp`): a task's panel, Today's day, Ask's automations. */
+  panel: 400,
   /** Upcoming's tray of tasks still to plan, beside the week. */
-  tray: 224,
-  /**
-   * Today's schedule beside the list. With the 48 gap and the page's 32 padding it is wider
-   * than the task panel (440), so an open panel covers the schedule and never the list.
-   */
+  tray: 260,
+  /** Today's day column beside the list: the panel's width, so an open task covers it exactly. */
   schedule: 400,
 } as const;
 

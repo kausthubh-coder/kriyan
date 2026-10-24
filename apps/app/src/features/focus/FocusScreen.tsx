@@ -9,7 +9,7 @@ import { AppState, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
 import { api } from "@kriyan/convex/api";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
 import { formatDuration } from "@kriyan/core/format";
@@ -18,17 +18,18 @@ import { useTaskDoc, useTodayView } from "@/data/views";
 import { completeTask } from "@/features/tasks/actions";
 import { commitHaptic } from "@/features/tasks/haptics";
 import { nextStep, useSaveSteps } from "@/features/tasks/steps";
-import { c, family, hex, r, s } from "@/theme/tokens";
+import { bold, c, family, hex, r, s } from "@/theme/tokens";
 import { Press } from "@/ui/Press";
 import { LightStatusBar } from "@/ui/statusBar";
 import { Txt } from "@/ui/Txt";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, Pause, Play } from "lucide-react-native";
+import { ChevronLeft, Play } from "lucide-react-native";
 import { Icon } from "@/ui/Icon";
 
 const RING = 280;
 const STROKE = 14;
-const RADIUS = (RING - STROKE) / 2;
+/** B2 paints the ring a little inside its 280 box (radius 126, 266 across). */
+const RADIUS = 126;
 const PLAY = 76;
 
 export function FocusScreen({ id }: { id: Id<"tasks"> }) {
@@ -56,7 +57,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
     [day, id, endsAt],
   );
 
-  if (!task) return <View style={{ flex: 1, backgroundColor: c.head }} />;
+  if (!task) return <View style={{ flex: 1, backgroundColor: c.night }} />;
   const circumference = 2 * Math.PI * RADIUS;
   // The dot rides the head of the arc, which starts at 12 o'clock.
   const angle = progress * 2 * Math.PI - Math.PI / 2;
@@ -67,7 +68,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
     <View
       style={{
         flex: 1,
-        backgroundColor: c.head,
+        backgroundColor: c.night,
         paddingTop: insets.top + s.s2,
         paddingBottom: insets.bottom + s.s8,
         paddingHorizontal: s.s6,
@@ -108,7 +109,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
       </View>
 
       <View style={{ alignItems: "center", gap: s.s1, marginTop: s.s2, maxWidth: 480 }}>
-        <Txt variant="headline" tone="headInk" heading={1} style={{ textAlign: "center" }}>
+        <Txt variant="headline" tone="headInk" heading={1} style={[bold, { textAlign: "center" }]}>
           {task.title}
         </Txt>
         {task.time != null ? (
@@ -135,7 +136,7 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
             cx={RING / 2}
             cy={RING / 2}
             r={RADIUS}
-            stroke={hex.headFill}
+            stroke={hex.headLine}
             strokeWidth={STROKE}
             fill="none"
           />
@@ -205,11 +206,19 @@ export function FocusScreen({ id }: { id: Id<"tasks"> }) {
             backgroundColor: c.headInk,
           }}
         >
-          {/* Filled marks, like the prototype's play button. */}
+          {/* B2's marks: a solid play, a pause of two plain strokes. */}
           {running ? (
-            <Pause size={28} color={hex.head} fill={hex.head} aria-hidden focusable={false} />
+            <Svg width={28} height={28} viewBox="0 0 24 24" aria-hidden focusable={false}>
+              <Path
+                d="M8.5 5.5v13M15.5 5.5v13"
+                stroke={hex.night}
+                strokeWidth={3}
+                strokeLinecap="round"
+                fill="none"
+              />
+            </Svg>
           ) : (
-            <Play size={28} color={hex.head} fill={hex.head} aria-hidden focusable={false} />
+            <Play size={28} color={hex.night} fill={hex.night} aria-hidden focusable={false} />
           )}
         </Press>
         <Press
@@ -383,7 +392,7 @@ const card = {
   marginHorizontal: "auto" as const,
   paddingVertical: s.s3,
   paddingHorizontal: s.s4,
-  borderRadius: r.card + 4,
+  borderRadius: r.box,
   backgroundColor: c.headFill,
   gap: s.s1,
 };

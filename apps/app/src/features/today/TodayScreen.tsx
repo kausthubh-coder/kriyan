@@ -1,24 +1,28 @@
 // Today (docs/design/v4, b2.html?screen=today): the black header with the day in one sentence,
-// the week, what agents did, what's next with Start focus, habits, then the day as a list
-// grouped by part of the day or as the spine timeline. On a desktop wide enough, the day's hour
-// grid sits beside the list with what's next pinned at its foot.
+// the week, what agents did, what's next with Start focus, then the day as a list grouped by
+// part of the day (habits among the anytime things) or as the spine timeline. Desktop: the
+// header card heads a centred column with the ask bar at its foot; on a window wide enough,
+// the day's hours sit in a column on the right with what's next pinned at its foot.
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Platform, RefreshControl, useWindowDimensions, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { useMutation } from "convex/react";
 import {
-  Cake,
   Check as CheckIcon,
   ChevronDown,
   ChevronRight,
+  Clock,
   ListChecks,
-  Play,
+  Moon,
   Plus,
+  Sun,
+  Sunset,
+  type LucideIcon,
 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import { formatClock } from "@kriyan/core/dates";
-import { formatDate, formatDuration } from "@kriyan/core/format";
+import { formatDuration } from "@kriyan/core/format";
 import { freeMinutes } from "@kriyan/core/layout";
 import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
 import { useClock } from "@/data/time";
@@ -27,21 +31,20 @@ import { closedDay } from "@/features/review/closedDay";
 import { moveTasks, placeTasks } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
-import { QuickAdd, type QuickAddHandle } from "@/features/tasks/QuickAdd";
 import { Segmented } from "@/features/tasks/Segmented";
-import { openTask, TaskRow } from "@/features/tasks/TaskRow";
-import { quickAddTarget } from "@/features/shell/context";
-import { useIsPhone } from "@/theme/layout";
-import { c, r, s, spaceTone, sz } from "@/theme/tokens";
+import { TaskRow } from "@/features/tasks/TaskRow";
+import { useControl, useIsPhone } from "@/theme/layout";
+import { c, family, r, s, spaceTone } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Ring, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
-import { Notice, Screen, SectionHead, usePanelOpen } from "@/ui/Screen";
+import { Notice, Screen, SplitScreen } from "@/ui/Screen";
 import { LightStatusBar } from "@/ui/statusBar";
 import { Txt } from "@/ui/Txt";
 import { AgentNote } from "./AgentNote";
+import { DayColumn } from "./DayColumn";
 import { dayRows, type DayRow } from "./dayRows";
 import { measureSlots, registerDropZone } from "./drag";
 import { DragGhost } from "./DragGhost";
@@ -49,8 +52,9 @@ import { DragSource } from "./DragSource";
 import { PlanToday } from "./PlanToday";
 import { ReviewCard } from "./ReviewCard";
 import { FreeGap, Spine } from "./Spine";
-import { Timeline } from "./Timeline";
+import { TodayAsk } from "./TodayAsk";
 import { TodayHeader } from "./TodayHeader";
+import { UpNext, upNextOf } from "./UpNext";
 import { WeekStrip } from "./WeekStrip";
 
 export function TodayScreen() {
@@ -58,20 +62,11 @@ export function TodayScreen() {
   const { today, now } = useClock();
   const phone = useIsPhone();
   const { width } = useWindowDimensions();
-  const panelOpen = usePanelOpen();
-  const quickAdd = useRef<QuickAddHandle>(null);
   const inbox = useInboxView();
   const [planning, setPlanning] = useState(false);
   const planRef = useRef<View>(null);
-  // The schedule moves beside the list when both fit. An open task's panel replaces the
-  // schedule column, so the list stays exactly where it was.
+  // The day's hours get their own column when the list still has room beside it.
   const split = !phone && width >= SPLIT_MIN_WIDTH;
-
-  useEffect(() => {
-    if (phone) return;
-    quickAddTarget.set({ focus: () => quickAdd.current?.focus() });
-    return () => quickAddTarget.set(null);
-  }, [phone]);
 
   const free = view ? freeTime(view, now) : null;
   // Planning is offered when there's something to bring in, and never required.
@@ -86,7 +81,6 @@ export function TodayScreen() {
       onPress={() => setPlanning(true)}
     />
   ) : null;
-  const add = phone ? null : <QuickAdd ref={quickAdd} variant="inline" defaultDate={today} />;
   const header = view ? <TodayHeader view={view} today={today} now={now} free={free} /> : null;
   // The status bar's icons are light over the black header and follow the scheme once it has
   // scrolled away; otherwise they'd be white on the white page.
@@ -117,54 +111,66 @@ export function TodayScreen() {
             }),
       }
     : undefined;
-  // Desktop: the header card heads the column (or the list, when the timeline sits beside it).
-  const head = phone ? null : header;
+
+  const body =
+    view === undefined ? (
+      <TodaySkeleton />
+    ) : (
+      <TodayBody
+        view={view}
+        today={today}
+        now={now}
+        split={split}
+        planButton={planButton}
+        onAdd={() => router.push("/add")}
+      />
+    );
+
+  const plan = view ? (
+    <PlanToday
+      open={planning}
+      onClose={() => setPlanning(false)}
+      anchor={planRef}
+      today={today}
+      earlier={view.earlier}
+      inbox={inbox ?? []}
+      free={free ?? 0}
+    />
+  ) : null;
+
+  if (!phone) {
+    return (
+      <View style={{ flex: 1 }}>
+        <SplitScreen
+          title="Today"
+          right={split && view ? <DayColumn view={view} today={today} now={now} /> : null}
+          footer={<TodayAsk />}
+        >
+          {header}
+          {/* B2's `.sheet-d`: the list sits a little in from the header card's edges. */}
+          <View style={{ paddingTop: s.s4, paddingHorizontal: s.s1 }}>{body}</View>
+        </SplitScreen>
+        <DragGhost />
+        {plan}
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
-      <LightStatusBar enabled={phone && !pastHead} />
+      <LightStatusBar enabled={!pastHead} />
       <Screen
         title="Today"
         hero={
           header ? <View onLayout={(e) => setHeadHeight(e.nativeEvent.layout.height)}>{header}</View> : null
         }
         scrollProps={scrollProps}
-        width={split ? sz.column + s.s12 + sz.schedule : "column"}
-        panelCovers={split}
+        pastHero={pastHead}
       >
-        {split ? null : head}
-        {view === undefined ? (
-          <>
-            {split ? head : null}
-            {add}
-            <TodaySkeleton />
-          </>
-        ) : (
-          <TodayBody
-            view={view}
-            today={today}
-            now={now}
-            split={split}
-            panelOpen={panelOpen}
-            head={split ? head : null}
-            add={add}
-            planButton={planButton}
-            onAdd={() => (phone ? router.push("/add") : quickAdd.current?.focus())}
-          />
-        )}
+        {body}
       </Screen>
       <DragGhost />
-      {view ? (
-        <PlanToday
-          open={planning}
-          onClose={() => setPlanning(false)}
-          anchor={planRef}
-          today={today}
-          earlier={view.earlier}
-          inbox={inbox ?? []}
-          free={free ?? 0}
-        />
-      ) : null}
+      {plan}
     </View>
   );
 }
@@ -178,12 +184,12 @@ function freeTime(view: TodayView, now: number): number {
 
 /** The parts of the day the list is grouped by, as Tiimo does: by when, not by type. */
 const PARTS = [
-  { title: "Morning", to: 12 * 60 },
-  { title: "Afternoon", to: 17 * 60 },
-  { title: "Evening", to: 24 * 60 },
+  { title: "Morning", to: 12 * 60, icon: Sun },
+  { title: "Afternoon", to: 17 * 60, icon: Sunset },
+  { title: "Evening", to: 24 * 60, icon: Moon },
 ] as const;
 
-const partOf = (minutes: number) => (PARTS.find((p) => minutes < p.to) ?? PARTS[2]).title;
+const partOf = (minutes: number) => PARTS.find((p) => minutes < p.to) ?? PARTS[2];
 
 /** "Review today" shows at this time when the person hasn't picked one (Settings). */
 const DEFAULT_REVIEW = 20 * 60;
@@ -193,28 +199,20 @@ function TodayBody({
   today,
   now,
   split,
-  panelOpen,
-  head,
-  add,
   planButton,
   onAdd,
 }: {
   view: TodayView;
   today: string;
   now: number;
+  /** Desktop with the day column beside the list: what's next is pinned there instead. */
   split: boolean;
-  panelOpen: boolean;
-  /** The header, when it heads the list column rather than the page (split). */
-  head: ReactNode;
-  /** The inline quick add (desktop), at the top of the list. */
-  add: ReactNode;
   planButton: ReactNode;
   onAdd: () => void;
 }) {
   const phone = useIsPhone();
   const profile = useProfile();
   const closed = closedDay.useValue((d) => d) === today;
-  const [showEarlierHours, setShowEarlierHours] = useState(false);
   // Phones have no hour grid on Today: a task held in the list drops on a free stretch.
   useFocusEffect(
     useCallback(() => {
@@ -242,30 +240,20 @@ function TodayBody({
     view.habits.length === 0;
   if (nothing) {
     return (
-      <>
-        {head}
+      <View>
         <WeekStrip today={today} />
-        {add}
         <AgentNote />
         <Notice
           title="Nothing planned for today"
           body="Add what's on your mind, like “call the bank tomorrow 10am”. Anything without a date waits in your Inbox."
           action={<Button icon={Plus} label="Add your first task" onPress={onAdd} />}
         />
-      </>
+      </View>
     );
   }
 
   const live = view.scheduled.filter((t) => !t.done && !t.proposedBy);
-  const current = live.find((t) => t.time !== null && t.length && t.time <= now && now < t.time + t.length);
-  // Next is the first other block that isn't over: one still running beside the current one
-  // comes before one that starts later.
-  const next = live.find(
-    (t) =>
-      t.time !== null &&
-      t._id !== current?._id &&
-      (t.time > now || (t.length !== null && now < t.time + t.length)),
-  );
+  const { current, next } = upNextOf(view, now);
   const left = view.due.length + view.anytime.length;
   const cleared =
     left === 0 &&
@@ -273,15 +261,7 @@ function TodayBody({
     (view.done.length > 0 || view.scheduled.some((t) => t.done));
   // The card waits at the review time until the day is closed (b2.html `rvcardtoday`).
   const reviewAt = closed ? null : (profile?.reviewTime ?? DEFAULT_REVIEW);
-  // Hours before an hour ago fold away, but never over a block that slipped: it stays in
-  // sight until it's ticked off or moved.
-  const slipped = view.scheduled.filter(
-    (t) => !t.done && !t.event && !t.proposedBy && !t.projected && t.time !== null && t.time < now - 60,
-  );
-  const foldAt = Math.min(now - 60, ...slipped.map((t) => t.time ?? now));
-  const fold = !showEarlierHours && foldAt > view.profile.dayStart ? foldAt : null;
-  const doneEarlier = view.scheduled.filter((t) => t.done && (t.time ?? 0) < (fold ?? 0)).length;
-  const upNext = current || next ? <UpNext current={current} next={next} now={now} /> : null;
+  const anytimeCount = left + view.done.length + view.habits.length;
 
   const anytimeRows = (
     <View>
@@ -299,6 +279,7 @@ function TodayBody({
           />
         </Dotted>
       ))}
+      {view.habits.length ? <HabitRows habits={view.habits} today={today} /> : null}
       {view.done.map((t) => (
         <Dotted key={`${t._id}:${t.date}:done`}>
           <TaskRow task={t} today={today} />
@@ -309,7 +290,7 @@ function TodayBody({
 
   // The timed rows, grouped into parts of the day, with free stretches, the now line and the
   // review card between them.
-  const groups: { part: string; rows: DayRow[] }[] = [];
+  const groups: { part: (typeof PARTS)[number]; rows: DayRow[] }[] = [];
   for (const row of dayRows(view.scheduled, { now, dayStart: view.profile.dayStart, reviewAt })) {
     const part = partOf(row.kind === "now" ? (row.next?.time ?? row.at) : row.at);
     const last = groups.at(-1);
@@ -318,28 +299,29 @@ function TodayBody({
   }
 
   const grouped = (
-    <View style={{ gap: s.s6 }}>
+    <View>
       {view.earlier.length ? <Earlier tasks={view.earlier} today={today} /> : null}
-      <View style={{ gap: s.s1 }}>
-        <SectionHead title="Anytime" meta={left ? `${left} left` : undefined} />
-        {cleared && view.earlier.length === 0 ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingVertical: s.s2 }}>
-            <Icon icon={CheckIcon} tone="ink2" />
-            <Txt variant="body" tone="ink2">
-              Nothing left today.
-            </Txt>
-          </View>
-        ) : null}
-        {anytimeRows}
-        {!cleared && left === 0 && view.done.length === 0 ? (
-          <Txt variant="body" tone="ink3">
-            Everything today has a time.
-          </Txt>
-        ) : null}
-      </View>
+      {anytimeCount || cleared ? (
+        <View>
+          <GroupLabel icon={Clock} title="Anytime" count={anytimeCount} />
+          {cleared && view.earlier.length === 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingVertical: s.s2 }}>
+              <Icon icon={CheckIcon} tone="ink2" />
+              <Txt variant="body" tone="ink2">
+                Nothing left today.
+              </Txt>
+            </View>
+          ) : null}
+          {anytimeRows}
+        </View>
+      ) : null}
       {groups.map((g) => (
-        <View key={g.part} style={{ gap: s.s1 }}>
-          <SectionHead title={g.part} meta={`${g.rows.filter((row) => row.kind === "task").length}`} />
+        <View key={g.part.title}>
+          <GroupLabel
+            icon={g.part.icon}
+            title={g.part.title}
+            count={g.rows.filter((row) => row.kind === "task").length}
+          />
           <View>
             {g.rows.map((row) =>
               row.kind === "task" ? (
@@ -363,18 +345,22 @@ function TodayBody({
   );
 
   const spine = (
-    <Spine
-      droppable={phone}
-      date={today}
-      items={view.scheduled}
-      now={now}
-      dayStart={view.profile.dayStart}
-      reviewAt={reviewAt}
-    />
+    <View style={{ marginTop: s.s3 }}>
+      <Spine
+        droppable={phone}
+        date={today}
+        items={view.scheduled}
+        now={now}
+        dayStart={view.profile.dayStart}
+        reviewAt={reviewAt}
+      />
+    </View>
   );
 
   const tools = (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, flexWrap: "wrap" }}>
+    <View
+      style={{ flexDirection: "row", alignItems: "center", gap: s.s2, flexWrap: "wrap", marginTop: s.s4 }}
+    >
       <Segmented
         label="View"
         value={mode}
@@ -387,77 +373,51 @@ function TodayBody({
       <View style={{ flex: 1 }} />
       {planButton}
       {closed ? null : (
-        <Button variant="quiet" label="Close the day" onPress={() => router.push("/review")} />
+        // B2's quiet link; its label, not its padding, lines up with the column's edge.
+        <Button
+          variant="quiet"
+          label="Close the day"
+          onPress={() => router.push("/review")}
+          style={{ marginRight: -s.s3 }}
+        />
       )}
     </View>
   );
 
-  const list = (
-    <>
-      {head}
+  return (
+    // One sequence with B2's short steps between its parts, not the page's section gaps.
+    <View>
       <WeekStrip today={today} />
-      {add}
       <AgentNote />
-      {/* Desktop pins what's next at the foot of the day column instead. */}
-      {split ? null : upNext}
-      {view.habits.length ? <Habits habits={view.habits} today={today} /> : null}
+      {/* Desktop with the day column pins what's next at the column's foot instead. */}
+      {split || !(current || next) ? null : (
+        <View style={{ marginTop: s.s3 }}>
+          <UpNext current={current} next={next} now={now} />
+        </View>
+      )}
       {tools}
       {mode === "list" ? grouped : spine}
-    </>
-  );
-
-  if (!split) return list;
-  const yearly = view.anytime.filter((t) => t.repeat?.freq === "year");
-  return (
-    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s12 }}>
-      <View style={{ flex: 1, minWidth: 0, gap: s.s8 }}>{list}</View>
-      {/* The day column (b2.html `dayCal`): the date, all-day items, the hour grid and, pinned at
-          its foot, what's next. An open task's panel takes its place. */}
-      <View style={{ width: sz.schedule, alignSelf: "stretch" }}>
-        {panelOpen ? null : (
-          <View style={{ gap: s.s2, flex: 1 }}>
-            <SectionHead
-              title={formatDate(today)}
-              right={
-                fold !== null || showEarlierHours ? (
-                  <Button
-                    variant="quiet"
-                    label={
-                      showEarlierHours
-                        ? "Hide earlier hours"
-                        : doneEarlier
-                          ? `Earlier today, ${doneEarlier} done`
-                          : "Earlier today"
-                    }
-                    onPress={() => setShowEarlierHours(!showEarlierHours)}
-                  />
-                ) : null
-              }
-            />
-            {yearly.length ? (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-                {yearly.map((t) => (
-                  <AllDayPill key={t._id} task={t} />
-                ))}
-              </View>
-            ) : null}
-            <Timeline
-              date={today}
-              items={view.scheduled}
-              now={now}
-              dayStart={view.profile.dayStart}
-              dayEnd={view.profile.dayEnd}
-              foldBefore={fold}
-            />
-            {upNext ? (
-              <View style={{ position: "sticky", bottom: s.s4, marginTop: s.s2 } as object}>{upNext}</View>
-            ) : null}
-          </View>
-        )}
-      </View>
     </View>
   );
 }
+
+/** B2's group label (`.gh`): a small icon, then "ANYTIME (6)" in quiet small capitals. */
+function GroupLabel({ icon, title, count }: { icon: LucideIcon; title: string; count: number }) {
+  return (
+    <View
+      style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 28, marginTop: s.s4 }}
+      accessibilityLabel={`${title}, ${count}`}
+    >
+      <Icon icon={icon} size={16} />
+      <Txt variant="caption" tone="ink3" heading={2} tnum style={groupText}>
+        {`${title} (${count})`}
+      </Txt>
+    </View>
+  );
+}
+
+/** 0.05em at 12px: small capitals crowd together without it. */
+const groupText = { ...family("600"), textTransform: "uppercase" as const, letterSpacing: 0.6 };
 
 /** The list's now line (b2.html `.now`): the time in red, and the next task when it's close. */
 function ListNow({ now, next }: { now: number; next: TaskView | null }) {
@@ -480,32 +440,6 @@ function ListNow({ now, next }: { now: number; next: TaskView | null }) {
   );
 }
 
-/** A birthday or another yearly day, heading the day column (b2.html `.allday`). */
-function AllDayPill({ task }: { task: TaskView }) {
-  return (
-    <Press
-      role="button"
-      accessibilityLabel={`Open ${task.title}`}
-      onPress={() => openTask(task._id)}
-      hoverBg={c.hover}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: s.s2,
-        minHeight: 32,
-        paddingHorizontal: s.s3,
-        borderRadius: r.ctl,
-        backgroundColor: c.sunken,
-      }}
-    >
-      <Icon icon={Cake} size={16} tone="ink2" />
-      <Txt variant="label" numberOfLines={1}>
-        {task.title}
-      </Txt>
-    </Press>
-  );
-}
-
 /** The prototype's dotted rule under each row of the day's list (b2.html `.row`). */
 function Dotted({ children }: { children: ReactNode }) {
   return (
@@ -513,67 +447,11 @@ function Dotted({ children }: { children: ReactNode }) {
   );
 }
 
-/** Notion Calendar's "Upcoming in 19 min" with Start focus; while it runs, how long is left. */
-function UpNext({ current, next, now }: { current?: TaskView; next?: TaskView; now: number }) {
-  // At large text the button goes under the title, so neither is cut short.
-  const stacked = useWindowDimensions().fontScale >= 1.3;
-  const lead = current ?? next;
-  if (!lead || lead.time === null) return null;
-  const end = lead.length ? lead.time + lead.length : null;
-  const label = current
-    ? end !== null
-      ? `Now, ${formatDuration(Math.max(1, end - now))} left`
-      : "Now"
-    : lead.time - now <= 60
-      ? `Upcoming in ${formatDuration(Math.max(1, lead.time - now))}`
-      : `Next at ${formatClock(lead.time)}`;
-  return (
-    <View
-      aria-label={current ? "Now" : "Up next"}
-      style={{
-        flexDirection: stacked ? "column" : "row",
-        alignItems: stacked ? "flex-start" : "center",
-        gap: s.s3,
-        padding: s.s4,
-        borderRadius: r.card + 4,
-        backgroundColor: c.sunken,
-      }}
-    >
-      <View style={stacked ? { alignSelf: "stretch", gap: 2 } : { flex: 1, minWidth: 0, gap: 2 }}>
-        <Txt variant="caption" tone={current ? "now" : "ink3"}>
-          {label}
-        </Txt>
-        <Txt variant="subhead" numberOfLines={2}>
-          {lead.title}
-        </Txt>
-        <Txt variant="meta" tone="ink2" tnum>
-          {end !== null
-            ? `${formatClock(lead.time)} → ${formatClock(end)}  ${formatDuration(lead.length ?? 0)}`
-            : formatClock(lead.time)}
-        </Txt>
-        {/* With blocks overlapping, the next one may already be running: say until when. */}
-        {current && next && next.time !== null ? (
-          <Txt variant="meta" tone="ink3" numberOfLines={1} tnum>
-            {next.time <= now && next.length !== null
-              ? `Then ${next.title}, until ${formatClock(next.time + next.length)}`
-              : `Then ${next.title} at ${formatClock(next.time)}`}
-          </Txt>
-        ) : null}
-      </View>
-      {lead.event ? null : (
-        <Button
-          variant="primary"
-          icon={Play}
-          label={current ? "Focus" : "Start focus"}
-          onPress={() => router.push(`/focus/${lead._id}`)}
-          style={{ borderRadius: r.pill, paddingHorizontal: s.s4 }}
-        />
-      )}
-    </View>
-  );
-}
-
-function Habits({ habits, today }: { habits: TodayView["habits"]; today: string }) {
+/**
+ * Habits due today, as rows among the anytime things (B2 lists them with the day, not in a
+ * strip of their own). The dashed ring fills once today's check-in is in.
+ */
+function HabitRows({ habits, today }: { habits: TodayView["habits"]; today: string }) {
   const check = useMutation(api.organize.checkHabit).withOptimisticUpdate((store, { id, done }) => {
     const current = store.getQuery(api.views.today, { today });
     if (!current) return;
@@ -589,38 +467,49 @@ function Habits({ habits, today }: { habits: TodayView["habits"]; today: string 
     );
   });
   const phone = useIsPhone();
+  const { row } = useControl();
   return (
-    <View aria-label="Habits today" style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s4 }}>
+    <>
       {habits.map((h) => {
         const tone = spaceTone(h.color ?? "green");
         return (
-          <Press
-            key={h._id}
-            role="switch"
-            aria-checked={h.doneToday}
-            accessibilityLabel={`${h.title}, ${h.thisWeek} of ${h.target} this week`}
-            onPress={() => {
-              toggleHaptic(!h.doneToday);
-              void check({ id: h._id, done: !h.doneToday, date: today });
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: s.s2,
-              height: phone ? 44 : 32,
-              paddingHorizontal: s.s2,
-              marginHorizontal: -s.s2,
-              borderRadius: 8,
-            }}
-          >
-            <Ring color={tone.dot} done={h.doneToday} size={phone ? 20 : 16} />
-            <Txt variant="label" tone="ink2">
-              {h.title}
-            </Txt>
-          </Press>
+          <Dotted key={h._id}>
+            <Press
+              role="switch"
+              aria-checked={h.doneToday}
+              accessibilityLabel={`${h.title}, ${h.thisWeek} of ${h.target} this week`}
+              onPress={() => {
+                toggleHaptic(!h.doneToday);
+                void check({ id: h._id, done: !h.doneToday, date: today });
+              }}
+              hoverBg={c.hover}
+              scale={false}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: s.s3,
+                minHeight: row,
+                paddingVertical: phone ? s.s1 : s.s2,
+                paddingHorizontal: s.s2,
+                marginHorizontal: -s.s2,
+                borderRadius: r.ctl,
+              }}
+            >
+              {/* The same width as a task's checkbox, so the titles line up. */}
+              <View style={{ width: 16, alignItems: "center" }}>
+                <Ring color={tone.dot} done={h.doneToday} size={16} dashed />
+              </View>
+              <Txt variant="body" tone={h.doneToday ? "ink3" : "ink"} style={{ flex: 1 }} numberOfLines={1}>
+                {h.title}
+              </Txt>
+              <Txt variant="meta" tone="ink3" tnum>
+                {`${h.thisWeek} of ${h.target} this week`}
+              </Txt>
+            </Press>
+          </Dotted>
         );
       })}
-    </View>
+    </>
   );
 }
 
@@ -631,7 +520,7 @@ function Earlier({ tasks, today }: { tasks: TaskView[]; today: string }) {
   return (
     // B2's disclosure: "2 from earlier ⌄" opens the rows, each with its own move, and the two
     // moves for all of them on one line under it.
-    <View style={{ gap: s.s1 }}>
+    <View style={{ gap: s.s1, marginTop: s.s4 }}>
       <View style={{ flexDirection: "row" }}>
         <Button
           variant="quiet"

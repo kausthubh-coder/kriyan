@@ -14,6 +14,7 @@ import {
   size,
   space,
   SPACE_COLORS,
+  type FontWeight,
   type Scheme,
   type SpaceColor,
 } from "@kriyan/core/tokens";
@@ -79,17 +80,25 @@ export const shadows = {
   overlay: isWeb ? "var(--shadow-overlay)" : toNativeShadow(schemeShadows[scheme].overlay),
 } as const;
 
-/** Font family per weight. The web registers one "Inter" family with three weights. */
-export function family(weight: "400" | "500" | "600"): {
+/** Font family per weight. The web registers one "Inter" family with four weights. */
+export function family(weight: FontWeight): {
   fontFamily: string;
-  fontWeight?: "400" | "500" | "600";
+  fontWeight?: FontWeight;
 } {
   if (isWeb)
     return { fontFamily: `${font.family}, ui-sans-serif, system-ui, sans-serif`, fontWeight: weight };
   return {
-    fontFamily: { "400": "Inter_400Regular", "500": "Inter_500Medium", "600": "Inter_600SemiBold" }[weight],
+    fontFamily: {
+      "400": "Inter_400Regular",
+      "500": "Inter_500Medium",
+      "600": "Inter_600SemiBold",
+      "700": "Inter_700Bold",
+    }[weight],
   };
 }
+
+/** The large headings' weight (B2's 700): page titles, the day on Today, a task's title. */
+export const bold = family(font.weights.bold);
 
 const schemeVars = (name: Scheme) =>
   [
@@ -113,7 +122,7 @@ html, body { background: var(--bg); margin: 0; height: 100%; -webkit-font-smooth
 :focus-visible { outline: 2px solid var(--ink-2) !important; outline-offset: 2px; }
 input:focus-visible, textarea:focus-visible { outline: none !important; }
 :has(> input:focus-visible), :has(> textarea:focus-visible) { outline: 2px solid var(--ink-2); outline-offset: 2px; }
-[data-focus="caret"]:has(> input:focus-visible) { outline: none; }
+[data-focus="caret"]:has(> input:focus-visible), [data-focus="caret"]:has(> textarea:focus-visible) { outline: none; }
 input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
 ::selection { background: var(--line-strong); }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0ms !important; animation-duration: 0ms !important; } }`;

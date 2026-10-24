@@ -92,7 +92,16 @@ function sameDays(a: Weekday[], b: Weekday[]): boolean {
 }
 
 /** "Every Tue and Thu, until Fri 11 Dec", "Every month on the last day", "Every 2 days after done". */
-export function describeRepeat(rule: Repeat, first: CivilDate, today?: CivilDate): string {
+/**
+ * `compact` lists weekdays with spaces ("Every Mon Wed Fri"), for chips where the sentence form
+ * ("Every Mon, Wed and Fri") would be twice as wide.
+ */
+export function describeRepeat(
+  rule: Repeat,
+  first: CivilDate,
+  today?: CivilDate,
+  { compact = false }: { compact?: boolean } = {},
+): string {
   const n = rule.interval;
   const unit = { day: "day", week: "week", month: "month", year: "year" }[rule.freq];
   const every = n === 1 ? `Every ${unit}` : `Every ${n} ${unit}s`;
@@ -105,8 +114,11 @@ export function describeRepeat(rule: Repeat, first: CivilDate, today?: CivilDate
       const days = [...new Set(rule.weekdays ?? [weekday(first)])].sort((a, b) => a - b);
       if (n === 1 && sameDays(days, [0, 1, 2, 3, 4])) text = "Every weekday";
       else if (n === 1 && days.length === 7) text = "Every day";
-      else if (n === 1) text = `Every ${joinAnd(days.map((d) => WEEKDAY_SHORT[d]))}`;
-      else text = `${every} on ${joinAnd(days.map((d) => WEEKDAY_SHORT[d]))}`;
+      else {
+        const names = days.map((d) => WEEKDAY_SHORT[d]);
+        const list = compact ? names.join(" ") : joinAnd(names);
+        text = n === 1 ? `Every ${list}` : `${every} on ${list}`;
+      }
       break;
     }
     case "month": {

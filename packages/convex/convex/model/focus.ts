@@ -31,6 +31,15 @@ export async function logFocus(
   });
 }
 
+/** Every minute focused on one task, across all its sessions ("Tracked 25m of 1h 30m"). */
+export async function trackedMinutes(ctx: QueryCtx, ownerId: string, taskId: Id<"tasks">): Promise<number> {
+  const rows = await ctx.db
+    .query("focusSessions")
+    .withIndex("by_owner_and_task", (q) => q.eq("ownerId", ownerId).eq("taskId", taskId))
+    .take(2000);
+  return rows.reduce((sum, r) => sum + r.minutes, 0);
+}
+
 export interface FocusSummary {
   today: number;
   week: number;

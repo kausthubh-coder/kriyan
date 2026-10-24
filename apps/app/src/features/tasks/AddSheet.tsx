@@ -7,6 +7,7 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { c, s } from "@/theme/tokens";
 import { QuickAdd } from "./QuickAdd";
+import { Grabber } from "@/ui/bits";
 
 export function AddSheet({ onClose, initialText }: { onClose: () => void; initialText?: string }) {
   // `height` runs from 0 to minus the keyboard's height as it opens.
@@ -15,7 +16,7 @@ export function AddSheet({ onClose, initialText }: { onClose: () => void; initia
   return (
     <Animated.View style={[{ padding: s.s4, paddingTop: s.s3, gap: s.s3, backgroundColor: c.raised }, lift]}>
       <View style={{ alignItems: "center" }}>
-        <View style={{ width: 32, height: 4, borderRadius: 2, backgroundColor: c.lineStrong }} />
+        <Grabber />
       </View>
       <QuickAdd variant="sheet" autoFocus initialText={initialText} onAdded={onClose} onClose={onClose} />
     </Animated.View>
