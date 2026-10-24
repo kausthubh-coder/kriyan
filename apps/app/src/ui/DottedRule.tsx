@@ -33,6 +33,8 @@ export function DottedRule({ edge = "bottom", color = c.lineStrong, width = 1, i
       <View
         style={{
           borderWidth: width,
+          // Android also ignores a dotted style on a box with square corners.
+          borderRadius: 1,
           borderStyle: "dotted",
           borderColor: color,
           ...(vertical
