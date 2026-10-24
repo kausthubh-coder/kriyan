@@ -42,7 +42,8 @@ export function dayRows(
     if (!ahead && now !== null && t.time > now) {
       rows.push({ kind: "now", key: "now", at: now, next: t });
       ahead = true;
-      prevEnd = Math.max(prevEnd ?? 0, now, dayStart);
+      // Free time is offered from the next quarter hour ("+ 05:45"), not the current minute.
+      prevEnd = Math.max(prevEnd ?? 0, Math.ceil(now / 15) * 15, dayStart);
     }
     if (!reviewDone && reviewAt !== null && t.time >= reviewAt) {
       if (ahead && prevEnd !== null && prevEnd < reviewAt) {

@@ -259,7 +259,7 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
             : defaultSpaceId
               ? (spaces?.find((sp) => sp._id === defaultSpaceId)?.name ?? "this space")
               : "Inbox";
-        showToast(`Added to ${where}: ${parsed.title || value}`);
+        showToast(`Added to ${inSentence(where)}: ${parsed.title || value}`);
         if (parsed.reminders.length || parsed.time !== undefined) void ensureNotifications();
       }
       setText("");
@@ -441,6 +441,9 @@ const ParsedField = forwardRef<
     placeholderTextColor: hex.ink3,
     accessibilityLabel: "What do you want to do?",
     autoCapitalize: "sentences" as const,
+    // The grammar ("9am", "20m", "#life") isn't misspelt English; the keyboard mustn't fix it.
+    autoCorrect: false,
+    spellCheck: false,
     multiline: true,
     returnKeyType: "done" as const,
     submitBehavior: "submit" as const,
@@ -568,6 +571,11 @@ function QuietChip({ label, icon, dashed }: { label: string; icon: LucideIcon; d
       </Txt>
     </View>
   );
+}
+
+/** "Today" and "Tomorrow" are labels; inside a sentence they're words. */
+function inSentence(day: string): string {
+  return day === "Today" || day === "Tomorrow" ? day.toLowerCase() : day;
 }
 
 function segments(text: string, parsed: ParsedTask): { text: string; kind?: SpanKind }[] {

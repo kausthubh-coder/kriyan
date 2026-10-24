@@ -7,7 +7,7 @@
 // (never a sheet on a sheet), with Back to return.
 
 import { useRef, useState, type ReactNode, type RefObject } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "convex/react";
@@ -587,6 +587,8 @@ function ThumbBar({
 }) {
   const phone = useIsPhone();
   const insets = useSafeAreaInsets();
+  // At large text the bar's labels shorten, so "Start focus" isn't cut to "Start fo…".
+  const short = useWindowDimensions().fontScale >= 1.3;
   const done = task.doneAt !== undefined;
   return (
     <View
@@ -622,7 +624,8 @@ function ThumbBar({
           <BarButton
             primary
             icon={Play}
-            label="Start focus"
+            label={short ? "Focus" : "Start focus"}
+            accessibilityLabel="Start focus"
             onPress={() => router.push(`/focus/${task._id}`)}
           />
         )}

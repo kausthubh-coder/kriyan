@@ -3,9 +3,9 @@
 // grouped by part of the day or as the spine timeline. On a desktop wide enough, the day's hour
 // grid sits beside the list with what's next pinned at its foot.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useWindowDimensions, View } from "react-native";
-import { router } from "expo-router";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Platform, RefreshControl, useWindowDimensions, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
 import { useMutation } from "convex/react";
 import {
   Cake,
@@ -24,7 +24,7 @@ import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
 import { useClock } from "@/data/time";
 import { useInboxView, useProfile, useTodayView, type TaskView, type TodayView } from "@/data/views";
 import { closedDay } from "@/features/review/closedDay";
-import { moveTasks } from "@/features/tasks/actions";
+import { moveTasks, placeTasks } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { QuickAdd, type QuickAddHandle } from "@/features/tasks/QuickAdd";
@@ -43,6 +43,7 @@ import { LightStatusBar } from "@/ui/statusBar";
 import { Txt } from "@/ui/Txt";
 import { AgentNote } from "./AgentNote";
 import { dayRows, type DayRow } from "./dayRows";
+import { measureSlots, registerDropZone } from "./drag";
 import { DragGhost } from "./DragGhost";
 import { DragSource } from "./DragSource";
 import { PlanToday } from "./PlanToday";
@@ -87,15 +88,47 @@ export function TodayScreen() {
   ) : null;
   const add = phone ? null : <QuickAdd ref={quickAdd} variant="inline" defaultDate={today} />;
   const header = view ? <TodayHeader view={view} today={today} now={now} free={free} /> : null;
+  // The status bar's icons are light over the black header and follow the scheme once it has
+  // scrolled away; otherwise they'd be white on the white page.
+  const [headHeight, setHeadHeight] = useState(0);
+  const [pastHead, setPastHead] = useState(false);
+  // Pull down at the top to add (B2's gestures); the + button does the same.
+  const [pulling, setPulling] = useState(false);
+  const scrollProps = phone
+    ? {
+        scrollEventThrottle: 32,
+        onScroll: (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+          const past = headHeight > 0 && e.nativeEvent.contentOffset.y > headHeight;
+          if (past !== pastHead) setPastHead(past);
+        },
+        ...(Platform.OS === "web"
+          ? {}
+          : {
+              refreshControl: (
+                <RefreshControl
+                  refreshing={pulling}
+                  onRefresh={() => {
+                    setPulling(true);
+                    router.push("/add");
+                    setTimeout(() => setPulling(false), 300);
+                  }}
+                />
+              ),
+            }),
+      }
+    : undefined;
   // Desktop: the header card heads the column (or the list, when the timeline sits beside it).
   const head = phone ? null : header;
 
   return (
     <View style={{ flex: 1 }}>
-      <LightStatusBar enabled={phone} />
+      <LightStatusBar enabled={phone && !pastHead} />
       <Screen
         title="Today"
-        hero={header}
+        hero={
+          header ? <View onLayout={(e) => setHeadHeight(e.nativeEvent.layout.height)}>{header}</View> : null
+        }
+        scrollProps={scrollProps}
         width={split ? sz.column + s.s12 + sz.schedule : "column"}
         panelCovers={split}
       >
@@ -178,9 +211,27 @@ function TodayBody({
   planButton: ReactNode;
   onAdd: () => void;
 }) {
+  const phone = useIsPhone();
   const profile = useProfile();
   const closed = closedDay.useValue((d) => d) === today;
   const [showEarlierHours, setShowEarlierHours] = useState(false);
+  // Phones have no hour grid on Today: a task held in the list drops on a free stretch.
+  useFocusEffect(
+    useCallback(() => {
+      if (!phone) return;
+      return registerDropZone({
+        // No grid to measure; the free stretches say where they are.
+        measure: () => Promise.resolve(null),
+        startMinutes: 0,
+        hourPx: 60,
+        topPad: 0,
+        slots: measureSlots,
+        onDrop: (taskId, drop) => {
+          if (drop.minutes !== null) void placeTasks([taskId as TaskView["_id"]], today, drop.minutes);
+        },
+      });
+    }, [phone, today]),
+  );
   const [mode, setMode] = useState<"list" | "timeline">("list");
   const nothing =
     view.scheduled.length === 0 &&
@@ -297,7 +348,7 @@ function TodayBody({
                 </Dotted>
               ) : row.kind === "gap" ? (
                 <View key={row.key} style={{ paddingVertical: s.s1 }}>
-                  <FreeGap start={row.at} minutes={row.minutes} date={today} />
+                  <FreeGap start={row.at} minutes={row.minutes} date={today} droppable={phone} />
                 </View>
               ) : row.kind === "now" ? (
                 <ListNow key={row.key} now={row.at} next={row.next} />
@@ -313,6 +364,7 @@ function TodayBody({
 
   const spine = (
     <Spine
+      droppable={phone}
       date={today}
       items={view.scheduled}
       now={now}
@@ -463,6 +515,8 @@ function Dotted({ children }: { children: ReactNode }) {
 
 /** Notion Calendar's "Upcoming in 19 min" with Start focus; while it runs, how long is left. */
 function UpNext({ current, next, now }: { current?: TaskView; next?: TaskView; now: number }) {
+  // At large text the button goes under the title, so neither is cut short.
+  const stacked = useWindowDimensions().fontScale >= 1.3;
   const lead = current ?? next;
   if (!lead || lead.time === null) return null;
   const end = lead.length ? lead.time + lead.length : null;
@@ -477,15 +531,15 @@ function UpNext({ current, next, now }: { current?: TaskView; next?: TaskView; n
     <View
       aria-label={current ? "Now" : "Up next"}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
+        flexDirection: stacked ? "column" : "row",
+        alignItems: stacked ? "flex-start" : "center",
         gap: s.s3,
         padding: s.s4,
         borderRadius: r.card + 4,
         backgroundColor: c.sunken,
       }}
     >
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <View style={stacked ? { alignSelf: "stretch", gap: 2 } : { flex: 1, minWidth: 0, gap: 2 }}>
         <Txt variant="caption" tone={current ? "now" : "ink3"}>
           {label}
         </Txt>

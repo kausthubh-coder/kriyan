@@ -62,12 +62,22 @@ export function WeekStrip({
               borderColor: isSelected ? c.lineStrong : "transparent",
             }}
           >
-            <Txt variant="subhead" tone={isSelected ? "ink" : past ? "ink3" : "ink2"} tnum>
+            {/* One line each at any text size; past 1.5x they'd break mid-word in a seventh of
+                the width. */}
+            <Txt
+              variant="subhead"
+              tone={isSelected ? "ink" : past ? "ink3" : "ink2"}
+              tnum
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.5}
+            >
               {String(Number(date.slice(8)))}
             </Txt>
             <Txt
               variant="caption"
               tone={isToday ? "now" : "ink3"}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
               style={{ textTransform: "uppercase", letterSpacing: 0.6 }}
             >
               {WEEKDAY_SHORT[weekday(date)]}

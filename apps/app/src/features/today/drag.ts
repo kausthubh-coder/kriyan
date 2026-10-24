@@ -25,6 +25,11 @@ export interface DropZone {
   topPad: number;
   /** A zone with more than one day (the week) says where a point lands; the timeline's is its minutes. */
   hit?: (rect: { x: number; y: number; width: number; height: number }, x: number, y: number) => Drop | null;
+  /**
+   * A zone without an hour grid (the phone's Today list and spine) takes drops on its free
+   * stretches instead: each one's window rectangle and the time it starts.
+   */
+  slots?: () => Promise<SlotRect[]>;
   onDrop: (taskId: string, drop: Drop) => void;
 }
 
@@ -64,4 +69,42 @@ export function minutesAt(
   if (x < rect.x || x > rect.x + rect.width || y < rect.y - 24 || y > rect.y + rect.height + 24) return null;
   const minutes = z.startMinutes + ((y - rect.y - z.topPad) / z.hourPx) * 60;
   return clampDay(snap(minutes));
+}
+
+/** A free stretch a dragged task can be dropped on: where it is on screen, and its start. */
+export interface SlotRect {
+  y: number;
+  height: number;
+  minutes: number;
+}
+
+const slots = new Map<
+  string,
+  { minutes: number; measure: () => Promise<{ y: number; height: number } | null> }
+>();
+
+/** A free-stretch row offers itself as a drop target while it's on screen. */
+export function registerSlot(
+  key: string,
+  slot: { minutes: number; measure: () => Promise<{ y: number; height: number } | null> },
+): () => void {
+  slots.set(key, slot);
+  return () => {
+    if (slots.get(key) === slot) slots.delete(key);
+  };
+}
+
+export async function measureSlots(): Promise<SlotRect[]> {
+  const out = await Promise.all(
+    [...slots.values()].map(async (sl) => {
+      const box = await sl.measure();
+      return box && box.height > 0 ? { y: box.y, height: box.height, minutes: sl.minutes } : null;
+    }),
+  );
+  return out.filter((sl): sl is SlotRect => sl !== null);
+}
+
+/** The slot under a window y, with a little slack above and below. */
+export function slotAt(list: SlotRect[], y: number): SlotRect | null {
+  return list.find((sl) => y >= sl.y - 8 && y <= sl.y + sl.height + 8) ?? null;
 }

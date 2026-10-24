@@ -115,7 +115,9 @@ function SentencePart({ part }: { part: SummaryPart }) {
   if ("kind" in part) {
     return (
       <Text style={style}>
-        <Icon icon={KIND_ICON[part.kind]} size={18} tone="headInk" strokeWidth={2} /> {part.text}
+        {/* Icon, count and noun stay on one line: "3 events" never splits. */}
+        <Icon icon={KIND_ICON[part.kind]} size={18} tone="headInk" strokeWidth={2} />
+        {`\u00a0${part.text.replace(/ /g, "\u00a0")}`}
       </Text>
     );
   }

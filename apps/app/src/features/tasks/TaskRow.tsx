@@ -4,7 +4,20 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
-import { Bell, Bot, Cake, CalendarDays, Flag, NotebookText, Repeat2, Sunrise } from "lucide-react-native";
+import {
+  Bell,
+  Bot,
+  Cake,
+  CalendarDays,
+  Check as CheckIcon,
+  Flag,
+  NotebookText,
+  Repeat2,
+  Sunrise,
+  Timer,
+  Trash2,
+} from "lucide-react-native";
+import { createStore } from "@/data/store";
 import { addDays } from "@kriyan/core/dates";
 import { formatDay, formatDuration, formatTimeRange } from "@kriyan/core/format";
 import type { TaskView } from "@/data/views";
@@ -18,14 +31,18 @@ import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
-import { completeTask, moveTasks, reopenTask, ticking } from "./actions";
-import { DayPicker } from "./pickers";
+import { completeTask, deleteTask, moveTasks, reopenTask, ticking } from "./actions";
+import { liftHaptic } from "./haptics";
+import { DayPicker, Option } from "./pickers";
 import { stepsText } from "./steps";
 import { SwipeRow } from "./SwipeRow";
 
 export function openTask(id: string) {
   router.push(`/task/${id}`);
 }
+
+/** The row whose menu is open: a long-press on the phone (B2's "hold for the row's menu"). */
+export const rowMenu = createStore<string | null>(null);
 
 interface Props {
   task: TaskView;
@@ -58,7 +75,8 @@ export function Source({ agent }: { agent: string }) {
   return (
     <View style={{ paddingHorizontal: s.s1, borderRadius: r.sm, backgroundColor: c.sunken }}>
       <Txt variant="caption" tone="ink3" numberOfLines={1} style={family("600")}>
-        {`from ${agent}`}
+        {/* An agent that gave no name is "An agent"; mid-sentence it's lower case. */}
+        {`from ${agent === "An agent" ? "an agent" : agent}`}
       </Txt>
     </View>
   );
@@ -112,6 +130,8 @@ export const TaskRow = memo(function TaskRow({
   // A proposal already says who proposed it.
   const source = task.proposedBy ? null : task.addedBy;
   const [picking, setPicking] = useState(false);
+  const menuOpen = rowMenu.useValue((id) => id === task._id);
+  const rowRef = useRef<View>(null);
   // A Pressable's hover ends over the controls inside it (the title is one), so the row tracks
   // the mouse itself.
   const [hovered, setHovered] = useState(false);
@@ -168,6 +188,14 @@ export const TaskRow = memo(function TaskRow({
           selection.set({ taskId: task._id });
           openTask(task._id);
         }}
+        onLongPress={
+          phone
+            ? () => {
+                liftHaptic();
+                rowMenu.set(task._id);
+              }
+            : undefined
+        }
         hoverBg={null}
         scale={false}
         style={{ flex: 1, minWidth: 0, minHeight: phone ? 44 : 24, justifyContent: "center", gap: 2 }}
@@ -205,6 +233,70 @@ export const TaskRow = memo(function TaskRow({
       {trailing}
     </View>
   );
+
+  const close = () => rowMenu.set(null);
+  const menu = phone ? (
+    <Popover open={menuOpen} onClose={close} anchor={rowRef} title={task.title}>
+      <View style={{ gap: 2 }}>
+        {task.event ? null : (
+          <Option
+            label={done ? "Mark not done" : "Done"}
+            leading={<Icon icon={CheckIcon} size={16} />}
+            onPress={() => {
+              close();
+              onTick();
+            }}
+          />
+        )}
+        {canMove ? (
+          <Option
+            label={target === today ? "Move to today" : "Move to tomorrow"}
+            leading={<Icon icon={Sunrise} size={16} />}
+            onPress={() => {
+              close();
+              void moveTasks([task], target);
+            }}
+          />
+        ) : null}
+        {canMove ? (
+          <Option
+            label="Pick a day"
+            leading={<Icon icon={CalendarDays} size={16} />}
+            onPress={() => {
+              close();
+              setPicking(true);
+            }}
+          />
+        ) : null}
+        {task.event || task.done ? null : (
+          <Option
+            label="Start focus"
+            leading={<Icon icon={Timer} size={16} />}
+            onPress={() => {
+              close();
+              router.push(`/focus/${task._id}`);
+            }}
+          />
+        )}
+        <Option
+          label="Open"
+          leading={<Icon icon={NotebookText} size={16} />}
+          onPress={() => {
+            close();
+            openTask(task._id);
+          }}
+        />
+        <Option
+          label="Delete"
+          leading={<Icon icon={Trash2} size={16} />}
+          onPress={() => {
+            close();
+            deleteTask(task);
+          }}
+        />
+      </View>
+    </Popover>
+  ) : null;
 
   const picker = canMove ? (
     <Popover open={picking} onClose={() => setPicking(false)} anchor={pickRef} title="Move to a day">
@@ -273,9 +365,16 @@ export const TaskRow = memo(function TaskRow({
     </Press>
   );
 
-  if (!canMove) return rowPress;
+  if (!canMove)
+    return (
+      <View ref={rowRef} collapsable={false}>
+        {rowPress}
+        {menu}
+      </View>
+    );
   return (
-    <>
+    <View ref={rowRef} collapsable={false}>
+      {menu}
       {phone ? (
         <SwipeRow
           color={task.color ? tone.dot : c.ink3}
@@ -290,6 +389,6 @@ export const TaskRow = memo(function TaskRow({
         rowPress
       )}
       {picker}
-    </>
+    </View>
   );
 });
