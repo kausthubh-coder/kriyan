@@ -100,7 +100,8 @@ const light = schemes.light.color;
 const dark = schemes.dark.color;
 app.expo.userInterfaceStyle = "automatic";
 app.expo.backgroundColor = light.bg;
-app.expo.android.adaptiveIcon.backgroundColor = light.bg;
+// The launcher icon's ground is the Today header's black, like docs/design/brand/build.mjs draws it.
+app.expo.android.adaptiveIcon.backgroundColor = light.head;
 app.expo.plugins = app.expo.plugins.map((p: unknown) =>
   Array.isArray(p) && p[0] === "expo-splash-screen"
     ? [
@@ -111,11 +112,48 @@ app.expo.plugins = app.expo.plugins.map((p: unknown) =>
 );
 write(appJsonPath, `${JSON.stringify(app, null, 2)}\n`);
 
-// The web app's page background before React draws, so there is no white flash.
+// The web app's page before React draws, so there is no white flash: the background, the
+// boot skeleton's colours, and the browser bar's colour in each scheme.
 const indexPath = "apps/app/public/index.html";
 const index = readFileSync(new URL(indexPath, root), "utf8");
-const firstPaint = `/* FIRST-PAINT */ html, body { background: ${light.bg}; color-scheme: light; } @media (prefers-color-scheme: dark) { html, body { background: ${dark.bg}; color-scheme: dark; } } /* /FIRST-PAINT */`;
-write(indexPath, index.replace(/\/\* FIRST-PAINT \*\/[\s\S]*?\/\* \/FIRST-PAINT \*\//, firstPaint));
+const boot = (t: typeof light) => `--boot-bg: ${t.bg}; --boot-bar: ${t.hover}; --boot-head: ${t.head};`;
+const firstPaint = `/* FIRST-PAINT */ html, body { background: ${light.bg}; color-scheme: light; ${boot(light)} } @media (prefers-color-scheme: dark) { html, body { background: ${dark.bg}; color-scheme: dark; ${boot(dark)} } } /* /FIRST-PAINT */`;
+const themeColor = `<!-- THEME-COLOR --><meta name="theme-color" media="(prefers-color-scheme: light)" content="${light.bg}" /><meta name="theme-color" media="(prefers-color-scheme: dark)" content="${dark.bg}" /><!-- /THEME-COLOR -->`;
+write(
+  indexPath,
+  index
+    .replace(/\/\* FIRST-PAINT \*\/[\s\S]*?\/\* \/FIRST-PAINT \*\//, firstPaint)
+    .replace(/<!-- THEME-COLOR -->[\s\S]*?<!-- \/THEME-COLOR -->/, themeColor),
+);
+
+// The installed web app (Add to Home Screen, Install app). The splash and title bar take the
+// light scheme's background; Chromium reads the dark one from user_preferences, and the
+// theme-color tags above override both while the app runs.
+write(
+  "apps/app/public/manifest.webmanifest",
+  `${JSON.stringify(
+    {
+      name: "Kriyan",
+      short_name: "Kriyan",
+      description: "A calm planner that turns everything you have to do into a plan for your time.",
+      id: "/today",
+      start_url: "/today",
+      scope: "/",
+      display: "standalone",
+      orientation: "any",
+      background_color: light.bg,
+      theme_color: light.bg,
+      user_preferences: { color_scheme_dark: { background_color: dark.bg, theme_color: dark.bg } },
+      icons: [
+        { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      ],
+    },
+    null,
+    2,
+  )}\n`,
+);
 
 if (stale.length) {
   console.error(`Generated token files are out of date: ${stale.join(", ")}. Run \`bun run tokens\`.`);

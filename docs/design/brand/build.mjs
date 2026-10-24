@@ -1,5 +1,6 @@
 // Writes every logo file for each direction from one definition each, then the app's icons
-// (launcher, adaptive, themed, favicon, splash) as PNGs for the mark in use.
+// (launcher, adaptive, themed, favicon, splash) and the web app's install icons (manifest,
+// maskable, Apple touch) as PNGs for the mark in use.
 // Keep these paths and colours in step with apps/site/src/lib/brand.tsx.
 // Run from the repo root: node docs/design/brand/build.mjs
 import { writeFileSync } from "node:fs";
@@ -9,6 +10,8 @@ import { launchBrowser } from "../../../scripts/browser.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const icons = join(here, "..", "..", "..", "apps", "app", "assets", "icons");
+// Served as-is at app.kriyan.app/<file>, named in public/manifest.webmanifest and index.html.
+const web = join(here, "..", "..", "..", "apps", "app", "public");
 // The light and dark `now` tokens, the Today header's black, and the light ink.
 const RED = "#c93126",
   RED_ON_DARK = "#f75e54",
@@ -53,14 +56,12 @@ console.log("wrote", Object.keys(marks).length * 4, "SVG files");
 // The app's PNGs for the mark in use. Android masks the adaptive foreground to a circle or
 // squircle and crops to the middle 66%, so the mark stays inside 40 of its 108 units.
 const draw = marks[CURRENT];
+const appIcon = svg(
+  "0 0 1024 1024",
+  `<rect width="1024" height="1024" fill="${BG}"/><g transform="translate(225.3 225.3) scale(23.89)">${draw(INK, RED_ON_DARK)}</g>`,
+);
 const png = {
-  "icon.png": [
-    1024,
-    svg(
-      "0 0 1024 1024",
-      `<rect width="1024" height="1024" fill="${BG}"/><g transform="translate(225.3 225.3) scale(23.89)">${draw(INK, RED_ON_DARK)}</g>`,
-    ),
-  ],
+  "icon.png": [1024, appIcon],
   "adaptive-foreground.png": [
     1024,
     svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw(INK, RED_ON_DARK)}</g>`),
@@ -81,14 +82,41 @@ const png = {
   "splash.png": [1024, svg("-6 -6 36 36", draw(INK_LIGHT, RED))],
   "splash-dark.png": [1024, svg("-6 -6 36 36", draw(INK, RED_ON_DARK))],
 };
+// The web app's install icons, all on the black ground with no transparency (iOS fills it
+// black anyway). Maskable: launchers may crop to the middle 80% circle; the mark at the app
+// icon's 56% keeps its farthest point (the dot) 26 of 108 units from the middle, inside 43.
+const webPng = {
+  "icon-192.png": [192, appIcon],
+  "icon-512.png": [512, appIcon],
+  "icon-maskable-512.png": [
+    512,
+    svg(
+      "0 0 108 108",
+      `<rect width="108" height="108" fill="${BG}"/><g transform="translate(24 24) scale(2.5)">${draw(INK, RED_ON_DARK)}</g>`,
+    ),
+  ],
+  "apple-touch-icon.png": [180, appIcon],
+};
 const browser = await launchBrowser();
 const page = await browser.newPage();
-for (const [file, [size, markup]] of Object.entries(png)) {
-  await page.setViewportSize({ width: size, height: size });
-  await page.setContent(
-    `<style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${markup}`,
-  );
-  await page.screenshot({ path: join(icons, file), omitBackground: true });
+for (const [dir, files] of [
+  [icons, png],
+  [web, webPng],
+]) {
+  for (const [file, [size, markup]] of Object.entries(files)) {
+    await page.setViewportSize({ width: size, height: size });
+    await page.setContent(
+      `<style>html,body{margin:0;background:transparent}svg{display:block;width:${size}px;height:${size}px}</style>${markup}`,
+    );
+    await page.screenshot({ path: join(dir, file), omitBackground: true });
+  }
 }
 await browser.close();
-console.log("wrote", Object.keys(png).length, "app icons for", CURRENT);
+console.log(
+  "wrote",
+  Object.keys(png).length,
+  "app icons and",
+  Object.keys(webPng).length,
+  "web icons for",
+  CURRENT,
+);

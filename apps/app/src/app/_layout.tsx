@@ -13,12 +13,15 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { convex } from "@/data/convex";
 import { SoundSetting } from "@/features/feel/setting";
 import { inProgress, rememberSignedInHere, signedInHere } from "@/features/onboarding/draft";
+import { registerServiceWorker } from "@/features/notifications/register";
 import { useAppFonts } from "@/theme/fonts";
 import { c, scheme } from "@/theme/tokens";
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 // On the web, Google sign-in returns to this page in a popup; this hands the result back.
 WebBrowser.maybeCompleteAuthSession();
+// The web app's offline shell and Web Push reminders (production builds only; nothing on Android).
+registerServiceWorker();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!publishableKey) throw new Error("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is missing. Run `bun run setup`.");

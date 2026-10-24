@@ -2,9 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>%WEB_TITLE%</title>
+    <meta name="description" content="A calm planner that turns everything you have to do into a plan for your time." />
+    <!-- Installing: the manifest for Chrome and Android, the touch icon and the apple-* tags for an iPhone's Home Screen, where Web Push reminders work. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Kriyan" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- THEME-COLOR --><meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" /><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#070709" /><!-- /THEME-COLOR -->
     <style id="expo-reset">
       html,
       body {
@@ -19,11 +28,35 @@
         flex: 1;
       }
       /* The page background before the app draws, so there is no flash. Written by `bun run tokens`. */
-      /* FIRST-PAINT */ html, body { background: #ffffff; color-scheme: light; } @media (prefers-color-scheme: dark) { html, body { background: #070709; color-scheme: dark; } } /* /FIRST-PAINT */
+      /* FIRST-PAINT */ html, body { background: #ffffff; color-scheme: light; --boot-bg: #ffffff; --boot-bar: #0000000a; --boot-head: #070708; } @media (prefers-color-scheme: dark) { html, body { background: #070709; color-scheme: dark; --boot-bg: #070709; --boot-bar: #ffffff0d; --boot-head: #000000; } } /* /FIRST-PAINT */
+    </style>
+    <style id="boot-skeleton">
+      /* The app's layout in grey while the script loads (ux.md §7): the sidebar and a column of
+         rows on desktop, Today's black header and rows on a phone. React replaces it on first
+         render. Colours come from the FIRST-PAINT variables above. */
+      body { margin: 0; }
+      .boot, .boot * { box-sizing: border-box; }
+      .boot { display: flex; flex: 1; min-width: 0; }
+      .boot i { display: block; border-radius: 6px; background: var(--boot-bar); }
+      .boot-side { width: 248px; padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; }
+      .boot-main { flex: 1; min-width: 0; padding: 48px 32px; display: flex; flex-direction: column; gap: 16px; }
+      .boot-head { display: none; }
+      @media (max-width: 759px) {
+        .boot { flex-direction: column; }
+        .boot-side { display: none; }
+        .boot-head { display: block; height: 180px; background: var(--boot-head); }
+        .boot-main { margin-top: -24px; border-radius: 24px 24px 0 0; background: var(--boot-bg); padding: 24px 16px; }
+      }
     </style>
   </head>
   <body>
     <noscript>Kriyan needs JavaScript to run.</noscript>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" aria-hidden="true">
+        <div class="boot-side"><i style="width: 96px; height: 20px"></i><i style="width: 160px; height: 14px"></i><i style="width: 140px; height: 14px"></i><i style="width: 150px; height: 14px"></i></div>
+        <div class="boot-head"></div>
+        <div class="boot-main"><i style="width: 200px; height: 28px"></i><i style="width: min(560px, 90%); height: 14px; margin-top: 24px"></i><i style="width: min(480px, 75%); height: 14px"></i><i style="width: min(520px, 82%); height: 14px"></i><i style="width: min(400px, 64%); height: 14px"></i></div>
+      </div>
+    </div>
   </body>
 </html>

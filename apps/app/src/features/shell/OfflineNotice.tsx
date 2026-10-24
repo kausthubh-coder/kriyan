@@ -10,7 +10,10 @@ import { Txt } from "@/ui/Txt";
 
 export function OfflineNotice() {
   const state = useConvexConnectionState();
-  const down = state.hasEverConnected && !state.isWebSocketConnected;
+  // A web app reloaded with no network (the service worker's cached copy) has never connected,
+  // but it's down all the same once its first tries have failed.
+  const tried = state.hasEverConnected || state.connectionRetries > 0;
+  const down = tried && !state.isWebSocketConnected;
   // Brief reconnects shouldn't flash a banner.
   const [show, setShow] = useState(false);
   useEffect(() => {
