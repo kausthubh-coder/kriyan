@@ -14,6 +14,10 @@
         "foregroundImage": "./assets/icons/adaptive-foreground.png",
         "monochromeImage": "./assets/icons/adaptive-monochrome.png"
       },
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM"
+      ],
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
       "versionCode": 6

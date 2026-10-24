@@ -3,7 +3,10 @@
 // time a person adds a reminder, never at launch. Tapping a reminder opens its task.
 //
 // When this build can't get a push token (no Firebase config), the app schedules the next
-// week's reminders on the device instead, so reminders still arrive.
+// week's reminders on the device instead, so reminders still arrive. They ring on the minute:
+// app.json asks for USE_EXACT_ALARM (Android 13+, granted with the app) and SCHEDULE_EXACT_ALARM
+// (Android 12, on unless the person turns it off), and expo-notifications sets exact alarms
+// whenever the system allows them. Without either, Android may hold an alarm up to an hour.
 
 import { useEffect } from "react";
 import { Platform } from "react-native";
@@ -55,6 +58,9 @@ async function registerToken(): Promise<boolean> {
     return false;
   }
 }
+
+/** The web caches its shell in a service worker (register.web.ts); a phone has none to register. */
+export function registerServiceWorker() {}
 
 /** Asks for permission (once) and registers this device. Call when a reminder is added. */
 export async function ensureNotifications(): Promise<boolean> {
