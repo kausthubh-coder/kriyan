@@ -215,6 +215,7 @@ export function progress(): ProgressResult {
       {
         _id: "k97run000000000000000000000001",
         title: "Run 100 km",
+        why: null,
         kind: "number",
         target: 100,
         current: 42.5,
@@ -223,10 +224,12 @@ export function progress(): ProgressResult {
         spaceId: ids.life,
         progress: 0.425,
         pace: 0.6,
+        next: null,
       },
       {
         _id: "k97books0000000000000000000002",
         title: "Finish the reading list",
+        why: null,
         kind: "tasks",
         target: 12,
         current: 9,
@@ -235,6 +238,7 @@ export function progress(): ProgressResult {
         spaceId: null,
         progress: 0.75,
         pace: null,
+        next: null,
       },
     ],
     habits: habits.map((h) => ({ ...h, days: days(30, (i) => i % 3 === 0) })),
