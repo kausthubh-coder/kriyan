@@ -56,7 +56,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "test": "echo no app unit tests yet",
-    "icons": "node scripts/render-icons.mts"
+    "icons": "node ../../docs/design/brand/build.mjs"
   },
   "private": true
 }
