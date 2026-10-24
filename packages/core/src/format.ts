@@ -67,12 +67,12 @@ export function formatTimeRange(start: number, length: number | undefined): stri
   return length ? `${formatClock(start)}–${formatClock(start + length)}` : formatClock(start);
 }
 
-/** "15 min", "1 h", "1 h 30 min". */
+/** "15m", "1h", "1h 30m", as B2 writes them. */
 export function formatDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 function ordinal(n: number): string {
@@ -140,7 +140,10 @@ export function describeReminder(reminder: Reminder): string {
       const days = reminder.minutes / 1440;
       return days === 1 ? "1 day before" : `${days} days before`;
     }
-    return `${formatDuration(reminder.minutes)} before`;
+    // A reminder is read as a sentence, so short ones say "min" as B2 does ("10 min before").
+    return reminder.minutes < 60
+      ? `${reminder.minutes} min before`
+      : `${formatDuration(reminder.minutes)} before`;
   }
   const at = formatClock(reminder.time);
   if (reminder.offset === 0) return `On the day at ${at}`;

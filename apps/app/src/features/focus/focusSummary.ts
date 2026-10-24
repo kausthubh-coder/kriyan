@@ -1,4 +1,4 @@
-// Focused minutes today and this week (views.focus), for Review's "and focused for 1 h 20 min".
+// Focused minutes today and this week (views.focus), for Review's "and focused for 1h 20m".
 
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@kriyan/convex/api";

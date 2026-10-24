@@ -160,7 +160,7 @@ describe("what add understood", () => {
 
   test("a length and a deadline, never an invented length", () => {
     expect(describeParsed(parseTask("problem set for 45m due thu", TODAY), TODAY)).toEqual([
-      "  Length  45 min",
+      "  Length  45m",
       "  Due     Thu 15 Oct",
     ]);
     expect(describeParsed(parseTask("dentist tomorrow 9am", TODAY), TODAY)).toEqual([

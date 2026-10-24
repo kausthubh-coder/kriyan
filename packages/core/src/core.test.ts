@@ -50,7 +50,7 @@ describe("format", () => {
   });
 
   test("lengths", () => {
-    expect([15, 60, 90].map(formatDuration)).toEqual(["15 min", "1 h", "1 h 30 min"]);
+    expect([15, 60, 90].map(formatDuration)).toEqual(["15m", "1h", "1h 30m"]);
   });
 
   test("repeat rules in words", () => {

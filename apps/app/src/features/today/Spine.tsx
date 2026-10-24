@@ -35,7 +35,7 @@ function useTimeWidth(): number {
   return Math.round(TIME_BASE * Math.min(useWindowDimensions().fontScale || 1, TIME_MAX_SCALE));
 }
 
-/** A duration that never breaks across lines ("1 h 30 min"). */
+/** A duration that never breaks across lines ("1h 30m"). */
 const unbroken = (minutes: number) => formatDuration(minutes).replace(/ /g, "\u00a0");
 const PILL_COL = 56;
 const PILL_W = 44;

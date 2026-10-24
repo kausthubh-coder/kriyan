@@ -1020,7 +1020,7 @@ describe("the Ask tab", () => {
     await alice.mutation(api.tasks.addText, { text: "Lab today 14:00 for 2h" });
     await alice.mutation(api.assistant.send, { text: "How much free time do I have?" });
     const [ask] = await alice.query(api.assistant.asks, {});
-    expect(ask?.reply).toBe("8 h free until 22:00. The longest stretch is 16:00 to 22:00.");
+    expect(ask?.reply).toBe("8h free until 22:00. The longest stretch is 16:00 to 22:00.");
   });
 
   test("anything else waits for an agent, which reads it, acts and replies with its changes listed", async () => {

@@ -41,7 +41,7 @@ beforeEach(() => {
 const TODAY = `Today, Tue 13 Oct
 
 Now   Calculus lecture, until 11:30
-Next  Essay draft at 14:00, in 3 h 20 min
+Next  Essay draft at 14:00, in 3h 20m
 
 Schedule
   1  07:30–08:30  Gym               Life               done
@@ -63,7 +63,7 @@ Habits
   Read     1 of 5 this week
   Stretch  2 of 3 this week  done today
 
-Free time left: 9 h until 22:00
+Free time left: 9h until 22:00
 
 1 proposed block is waiting for you in the app.
 `;
@@ -81,7 +81,7 @@ describe("reading", () => {
     expect(r.code).toBe(0);
     expect(r.stdout.split("\n")[0]).toBe("Tomorrow, Wed 14 Oct");
     expect(r.stdout).not.toContain("Now ");
-    expect(r.stdout).toContain("\nFree time: 11 h between 08:00 and 22:00\n");
+    expect(r.stdout).toContain("\nFree time: 11h between 08:00 and 22:00\n");
   });
 
   test("today --json prints the API's result untouched", async () => {
@@ -108,7 +108,7 @@ describe("reading", () => {
 Mon 12 Oct
    1               Problem set 3     School / Calculus
 
-Tue 13 Oct, today  3 h 30 min of 7 h planned
+Tue 13 Oct, today  3h 30m of 7h planned
    2  07:30–08:30  Gym               Life               done
    3  10:00–11:30  Calculus lecture  School / Calculus
    4  14:00–15:30  Essay draft       School
@@ -124,7 +124,7 @@ Thu 15 Oct
    3  10:00–11:30  Calculus lecture  School / Calculus
    4  due          Essay draft       School
 
-Fri 16 Oct         8 h planned, 1 h over your 7 h
+Fri 16 Oct         8h planned, 1h over your 7h
    9  09:00–17:00  Revision          School
 
 Sat 17 Oct
@@ -152,12 +152,12 @@ No date yet
     expect((await run("inbox")).stdout).toBe("Inbox\n  1  Book the dentist\n  2  Renew passport\n");
     expect((await run("spaces")).stdout).toBe("School\n  Calculus\nLife\n");
     expect((await run("progress")).stdout).toBe(`Time done
-  This week       4 h 30 min
-  Last 12 months  120 h 15 min
+  This week       4h 30m
+  Last 12 months  120h 15m
 
 By space
-  School  80 h
-  Life    40 h 15 min
+  School  80h
+  Life    40h 15m
 
 Goals
   Run 100 km               42.5 of 100 km  43%  behind pace, by Thu 31 Dec
@@ -194,7 +194,7 @@ describe("adding", () => {
   Time      17:00
   Space     school
   Repeats   Every Fri
-  Reminder  1 h before
+  Reminder  1h before
 `,
     });
   });
