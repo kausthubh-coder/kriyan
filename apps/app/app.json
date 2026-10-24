@@ -2,7 +2,7 @@
   "expo": {
     "name": "Kriyan",
     "slug": "kriyan",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "orientation": "portrait",
     "icon": "./assets/icons/icon.png",
     "scheme": "kriyan",
@@ -20,7 +20,7 @@
       ],
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
-      "versionCode": 6
+      "versionCode": 7
     },
     "web": {
       "output": "single",
