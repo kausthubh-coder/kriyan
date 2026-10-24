@@ -1,5 +1,6 @@
 // A few small strings kept on this device across launches (the haptics switch, the
-// onboarding draft, whether someone has signed in here). Android keeps them in the secure store Clerk already uses.
+// onboarding draft, whether someone has signed in here). Android keeps them in the secure
+// store Clerk already uses.
 
 import * as SecureStore from "expo-secure-store";
 
