@@ -910,7 +910,12 @@ describe("a space's page", () => {
     const kriyan = await alice.mutation(api.organize.addSpace, { name: "Kriyan", parentId: work });
     const launch = await alice.mutation(api.organize.addSpace, { name: "Launch", parentId: kriyan });
     const clients = await alice.mutation(api.organize.addSpace, { name: "Clients", parentId: work });
-    await alice.mutation(api.tasks.add, { title: "Write MCP tools", spaceId: kriyan, date: today, time: 600 });
+    await alice.mutation(api.tasks.add, {
+      title: "Write MCP tools",
+      spaceId: kriyan,
+      date: today,
+      time: 600,
+    });
     await alice.mutation(api.tasks.add, { title: "Draft the post", spaceId: launch, date: "2026-10-15" });
     await alice.mutation(api.tasks.add, { title: "Invoice Acme", spaceId: clients });
     const done = await alice.mutation(api.tasks.add, { title: "Fix login", spaceId: kriyan, date: today });
@@ -1211,7 +1216,9 @@ describe("focus, steps and settings", () => {
       date: today,
     });
     const day = await alice.query(api.views.today, { today });
-    expect(day.anytime.map((t) => [t.title, t.steps.length, t.steps.filter((s) => s.done).length, t.addedBy])).toEqual([
+    expect(
+      day.anytime.map((t) => [t.title, t.steps.length, t.steps.filter((s) => s.done).length, t.addedBy]),
+    ).toEqual([
       ["Essay", 2, 1, null],
       ["Reply to Dr. Okafor", 0, 0, "Codex"],
     ]);
@@ -1272,7 +1279,12 @@ describe("reminders in the browser", () => {
 
   const subscriptions = (t: Awaited<ReturnType<typeof setup>>["t"]) =>
     t.run(async (ctx) =>
-      (await ctx.db.query("webPushSubscriptions").collect()).map((r) => [r.ownerId, r.endpoint, r.p256dh, r.auth]),
+      (await ctx.db.query("webPushSubscriptions").collect()).map((r) => [
+        r.ownerId,
+        r.endpoint,
+        r.p256dh,
+        r.auth,
+      ]),
     );
 
   test("a browser subscribes once, and subscribing again replaces its keys", async () => {
