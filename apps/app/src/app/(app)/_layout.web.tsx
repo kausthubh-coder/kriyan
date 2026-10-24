@@ -6,6 +6,7 @@ import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
 import { CommandMenu } from "@/features/shell/CommandMenu";
 import { Dock, DOCK_CLEARANCE } from "@/features/shell/Dock";
+import { useOnboardingGate } from "@/features/onboarding/gate";
 import { useSession } from "@/features/shell/session";
 import { useShortcuts } from "@/features/shell/shortcuts";
 import { Sidebar } from "@/features/shell/Sidebar";
@@ -24,6 +25,7 @@ const overlay = {
 
 export default function AppLayout() {
   useSession();
+  useOnboardingGate();
   useShortcuts();
   const phone = useIsPhone();
   const path = usePathname();

@@ -14,6 +14,34 @@ export const profile = query({
   handler: async (ctx) => getProfile(ctx, await requireOwner(ctx)),
 });
 
+/**
+ * Whether to show onboarding: only to someone who has never finished it and has nothing yet
+ * (no task, no space). People who used Kriyan before onboarding existed have no onboardedAt,
+ * but they have tasks, so they never see it.
+ */
+export const onboarding = query({
+  args: {},
+  returns: v.object({ needed: v.boolean() }),
+  handler: async (ctx) => {
+    const ownerId = await requireOwner(ctx);
+    const row = await ctx.db
+      .query("profiles")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .unique();
+    if (row?.onboardedAt !== undefined) return { needed: false };
+    const task = await ctx.db
+      .query("tasks")
+      .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId))
+      .first();
+    if (task) return { needed: false };
+    const space = await ctx.db
+      .query("spaces")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .first();
+    return { needed: space === null };
+  },
+});
+
 /** Creates the profile on first sign-in and keeps the time zone current. */
 export const ensureProfile = mutation({
   args: { timeZone: v.string(), name: v.optional(v.string()) },

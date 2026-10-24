@@ -9,6 +9,7 @@ import { CommandMenu } from "@/features/shell/CommandMenu";
 import { DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { TASK_SHEET_DETENTS } from "@/features/tasks/TaskPanel";
 import { OfflineNotice } from "@/features/shell/OfflineNotice";
+import { useOnboardingGate } from "@/features/onboarding/gate";
 import { useSession } from "@/features/shell/session";
 import { c, r } from "@/theme/tokens";
 import { ToastHost } from "@/ui/toast";
@@ -17,6 +18,7 @@ export const unstable_settings = { anchor: "(tabs)" };
 
 export default function AppLayout() {
   useSession();
+  useOnboardingGate();
   useNotifications();
   const insets = useSafeAreaInsets();
   return (

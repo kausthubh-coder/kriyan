@@ -63,6 +63,8 @@ function Gate() {
       <Stack.Protected guard={Boolean(isSignedIn)}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
+      {/* Signed out, this is where the app opens; signed in, a new account comes back to it once. */}
+      <Stack.Screen name="welcome" />
       <Stack.Protected guard={!isSignedIn}>
         <Stack.Screen name="sign-in" />
       </Stack.Protected>

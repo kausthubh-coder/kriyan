@@ -98,6 +98,23 @@ describe("quick add and today", () => {
   });
 });
 
+describe("onboarding", () => {
+  test("a new account needs onboarding until it's done or has anything in it", async () => {
+    const { alice } = await setup();
+    expect(await alice.query(api.account.onboarding, {})).toEqual({ needed: true });
+    await alice.mutation(api.account.updateProfile, { dayStart: 420, dayEnd: 1350, onboarded: true });
+    expect(await alice.query(api.account.onboarding, {})).toEqual({ needed: false });
+    const profile = await alice.query(api.account.profile, {});
+    expect([profile.dayStart, profile.dayEnd]).toEqual([420, 1350]);
+  });
+
+  test("someone who used Kriyan before onboarding existed never sees it", async () => {
+    const { alice } = await setup();
+    await alice.mutation(api.tasks.addText, { text: "Book the dentist" });
+    expect(await alice.query(api.account.onboarding, {})).toEqual({ needed: false });
+  });
+});
+
 describe("completing", () => {
   test("a repeating task moves to its next date, and undo puts it back", async () => {
     const { alice } = await setup();
