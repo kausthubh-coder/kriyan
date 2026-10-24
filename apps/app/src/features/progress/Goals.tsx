@@ -49,8 +49,8 @@ function dueText(goal: Goal, today: string): string | null {
 
 /** "45 min", "2 h", "6.5 h". */
 function timeText(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.round(minutes / 6) / 10} h`;
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.round(minutes / 6) / 10}h`;
 }
 
 /** Up to this many steps, a count goal draws one segment per step, like the prototype. */

@@ -2,6 +2,7 @@
 // the semester, your day, default reminders, agents and the command line, access tokens,
 // installing it, recently deleted, and deleting your data.
 
+import { AllowReminders } from "@/features/notifications/AllowReminders";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Linking, Modal, Platform, useWindowDimensions, View } from "react-native";
 import { useClerk, useUser } from "@clerk/expo";
@@ -506,7 +507,7 @@ function YourDay({ profile }: { profile: Profile }) {
             {[4, 5, 6, 7, 8].map((h) => (
               <Choice
                 key={h}
-                label={`${h} h`}
+                label={`${h}h`}
                 on={hours === h}
                 onPress={() => void update({ dailyCapacity: h * 60 })}
               />
@@ -522,6 +523,7 @@ function DefaultReminders({ profile }: { profile: Profile }) {
   const update = useUpdateProfile();
   return (
     <Section title="Default reminders">
+      <AllowReminders />
       <Txt variant="body" tone="ink3">
         Added to new tasks that have a time. You can change them on any task.
       </Txt>

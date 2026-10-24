@@ -40,7 +40,7 @@ import { SectionLabel } from "./SectionLabel";
 const TITLE = "Goals and habits";
 const SUB = "What you're working towards, and the time you still have.";
 
-const hoursText = (m: number) => (m < 60 ? `${m} min` : `${Math.round(m / 60)} h`);
+const hoursText = (m: number) => (m < 60 ? `${m}m` : `${Math.round(m / 60)}h`);
 
 /**
  * From this window width goals and habits sit side by side under the cards, like B2's desktop.
@@ -303,7 +303,7 @@ function TimeLeft({ today }: { today: CivilDate }) {
       </Card>
       <Card flex={1}>
         <Txt variant="headline" tnum>
-          {free === null ? "–" : `${Math.round(free.minutes / 6) / 10} h`}
+          {free === null ? "–" : `${Math.round(free.minutes / 6) / 10}h`}
         </Txt>
         <Txt variant="meta" tone="ink3">
           {free === null ? "free this week" : `free this week, ${free.range}`}

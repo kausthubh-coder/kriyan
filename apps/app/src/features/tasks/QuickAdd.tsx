@@ -3,6 +3,7 @@
 // turn blue inside the field, and each detail shows as a blue chip under it. Tapping a chip
 // takes its words out. Saves with tasks.addText (or organize.addHabit).
 
+import { playSound } from "@/features/feel/sound";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Platform, Text, TextInput, View, type TextStyle } from "react-native";
 import { useMutation } from "convex/react";
@@ -262,6 +263,7 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
         showToast(`Added to ${inSentence(where)}: ${parsed.title || value}`);
         if (parsed.reminders.length || parsed.time !== undefined) void ensureNotifications();
       }
+      playSound("tick");
       setText("");
       onAdded?.();
     } catch (e) {

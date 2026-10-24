@@ -5,6 +5,7 @@
 import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
 import { ASK_BAR_HEIGHT } from "@/features/ask/AskBar";
+import { useNotifications } from "@/features/notifications/register";
 import { CommandMenu } from "@/features/shell/CommandMenu";
 import { Dock, DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { useSession } from "@/features/shell/session";
@@ -26,6 +27,8 @@ const overlay = {
 export default function AppLayout() {
   useSession();
   useShortcuts();
+  // Subscribes this browser again if it allowed reminders before (after signing back in, say).
+  useNotifications();
   const phone = useIsPhone();
   const path = usePathname();
   // Focus takes the whole window: no sidebar, no navigation bar, one task.
