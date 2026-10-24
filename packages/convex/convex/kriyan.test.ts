@@ -61,6 +61,7 @@ describe("quick add and today", () => {
     await alice.mutation(api.tasks.addText, { text: "Water the plants 6pm" });
     await t.mutation(internal.agent.add_task, {
       ownerId: ALICE.tokenIdentifier,
+      agent: "Claude",
       title: "Call Mum",
       time: 1020,
     });
@@ -368,6 +369,7 @@ describe("reminders", () => {
     // No profile yet, so the server places it on UTC's clock.
     await t.mutation(internal.agent.add_task, {
       ownerId: ALICE.tokenIdentifier,
+      agent: "Claude",
       text: "Call Mum today 18:00 remind 10m before",
     });
     expect((await pending(t)).map((j) => new Date(j.fireAt).toISOString())).toEqual([
@@ -774,6 +776,9 @@ describe("deleting my data", () => {
     const habit = await alice.mutation(api.organize.addHabit, { title: "Read", target: 3 });
     await alice.mutation(api.organize.checkHabit, { id: habit, done: true });
     await alice.mutation(api.account.createToken, { name: "CLI" });
+    await alice.mutation(api.tasks.logFocus, { taskId: id, minutes: 25, date: "2026-10-13" });
+    await alice.mutation(api.assistant.send, { text: "Plan my week around the exam" });
+    await t.mutation(internal.agent.add_task, { ownerId: ALICE.tokenIdentifier, agent: "Codex", title: "Read" });
     await alice.mutation(api.account.deleteMyData, {});
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     const owners = await t.run(async (ctx) => {
@@ -788,6 +793,9 @@ describe("deleting my data", () => {
             "habitChecks",
             "accessTokens",
             "reminderJobs",
+            "focusSessions",
+            "agentActions",
+            "asks",
           ] as const
         ).map((table) => ctx.db.query(table).collect()),
       );
@@ -894,5 +902,212 @@ describe("the trash", () => {
     expect((await alice.query(api.views.trash, {})).map((x) => x.title)).toEqual(["Old idea"]);
     const week = await alice.query(api.views.week, { start: "2026-10-12", today: "2026-10-13" });
     expect(week.days.find((d) => d.date === "2026-10-16")?.scheduled.map((x) => x.title)).toEqual(["Essay"]);
+  });
+});
+
+describe("what agents did", () => {
+  async function withToken(name = "Codex") {
+    const ctx = await setup();
+    const { token } = await ctx.alice.mutation(api.account.createToken, { name });
+    const call = async (op: string, body: unknown) => {
+      const res = await ctx.t.fetch(`/api/v1/${op}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, body: (await res.json()) as { result?: any; error?: string } };
+    };
+    return { ...ctx, call };
+  }
+
+  test("each change is listed under the token's name, newest first, and the task says who added it", async () => {
+    const { alice, call, today } = await withToken();
+    const added = await call("add_task", { text: "Read chapter 4 tomorrow 9am" });
+    const taskId = added.body.result.taskId;
+    await call("update_task", { taskId, title: "Read chapter 4 and 5" });
+    await call("move_tasks", { taskIds: [taskId], date: "2026-10-15" });
+    const actions = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(actions.map((a) => [a.agent, a.kind, a.title])).toEqual([
+      ["Codex", "move", "Read chapter 4 and 5"],
+      ["Codex", "change", "Read chapter 4"],
+      ["Codex", "add", "Read chapter 4"],
+    ]);
+    const task = await alice.query(api.views.task, { id: taskId });
+    expect(task?.addedBy).toBe("Codex");
+  });
+
+  test("a name the agent gives wins over the token's", async () => {
+    const { alice, call, today } = await withToken("Laptop");
+    await call("add_task", { title: "Water plants", agent: "Claude" });
+    const [action] = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(action?.agent).toBe("Claude");
+  });
+
+  test("Undo puts back exactly what each change overwrote, and a second Undo does nothing", async () => {
+    const { alice, call, today } = await withToken();
+    const { taskId } = (await call("add_task", { text: "Lab report fri 14:00 #uni" })).body.result;
+    await call("update_task", { taskId, time: 600, note: "Bring data" });
+    const [change] = await alice.query(api.assistant.activity, { today, days: 1 });
+    await alice.mutation(api.assistant.undoAction, { id: change!._id });
+    await alice.mutation(api.assistant.undoAction, { id: change!._id });
+    const task = await alice.query(api.views.task, { id: taskId });
+    expect([task?.time, task?.note, task?.date]).toEqual([840, undefined, "2026-10-16"]);
+    const after = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(after.map((a) => [a.kind, a.undone, a.undoable])).toEqual([
+      ["change", true, false],
+      ["add", false, true],
+    ]);
+    // Undoing the add takes the task away.
+    await alice.mutation(api.assistant.undoAction, { id: after[1]!._id });
+    expect(await alice.query(api.views.task, { id: taskId })).toBeNull();
+  });
+
+  test("undoing an agent's tick puts the task back on its day", async () => {
+    const { alice, call, today } = await withToken();
+    const { taskId } = (await call("add_task", { text: "Pay rent today" })).body.result;
+    await call("complete_task", { taskId });
+    const [tick] = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(tick?.kind).toBe("done");
+    await alice.mutation(api.assistant.undoAction, { id: tick!._id });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.anytime.map((t) => [t.title, t.done])).toEqual([["Pay rent", false]]);
+  });
+
+  test("nobody else can see or undo the person's activity", async () => {
+    const { t, call, today } = await withToken();
+    await call("add_task", { title: "Secret" });
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    expect(await bob.query(api.assistant.activity, { today, days: 1 })).toEqual([]);
+    const [mine] = await t.withIdentity(ALICE).query(api.assistant.activity, { today, days: 1 });
+    await expect(bob.mutation(api.assistant.undoAction, { id: mine!._id })).rejects.toThrow(/isn't yours/);
+  });
+});
+
+describe("the Ask tab", () => {
+  test("what Kriyan understands is done at once, answered as Kriyan, and can be undone", async () => {
+    const { alice, today } = await setup();
+    await alice.mutation(api.assistant.send, { text: "Add call mum tomorrow 18:00" });
+    let [ask] = await alice.query(api.assistant.asks, {});
+    expect([ask?.agent, ask?.reply, ask?.undoable]).toEqual([
+      "Kriyan",
+      'Added "call mum" to tomorrow at 18:00.',
+      true,
+    ]);
+    await alice.mutation(api.assistant.undoAsk, { id: ask!._id });
+    [ask] = await alice.query(api.assistant.asks, {});
+    expect([ask?.undoable, ask?.undone]).toEqual([false, true]);
+    const week = await alice.query(api.views.week, { start: today, today });
+    expect(week.days.flatMap((d) => [...d.scheduled, ...d.anytime].map((t) => t.title))).toEqual([]);
+  });
+
+  test("moving what's left to tomorrow says what moved", async () => {
+    const { alice } = await setup();
+    await alice.mutation(api.tasks.addText, { text: "Essay today" });
+    await alice.mutation(api.tasks.addText, { text: "Gym today 18:00" });
+    await alice.mutation(api.assistant.send, { text: "Move everything left to tomorrow" });
+    const [ask] = await alice.query(api.assistant.asks, {});
+    expect(ask?.reply).toBe('Moved 2 to tomorrow: "Essay" and "Gym".');
+  });
+
+  test("free time counts what's planned between now and the end of the day", async () => {
+    const { alice } = await setup();
+    // 12:00 now; the day ends at 22:00 by default.
+    await alice.mutation(api.tasks.addText, { text: "Lab today 14:00 for 2h" });
+    await alice.mutation(api.assistant.send, { text: "How much free time do I have?" });
+    const [ask] = await alice.query(api.assistant.asks, {});
+    expect(ask?.reply).toBe("8 h free until 22:00. The longest stretch is 16:00 to 22:00.");
+  });
+
+  test("anything else waits for an agent, which reads it, acts and replies with its changes listed", async () => {
+    const { t, alice } = await setup();
+    const { token } = await alice.mutation(api.account.createToken, { name: "Mac mini" });
+    const call = async (op: string, body: unknown) =>
+      (await (
+        await t.fetch(`/api/v1/${op}`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify(body),
+        })
+      ).json()) as { result?: any; error?: string };
+    await alice.mutation(api.assistant.send, { text: "Plan my study for the exam on Friday" });
+    const waiting = (await call("get_asks", {})).result;
+    expect(waiting.map((w: { text: string }) => w.text)).toEqual(["Plan my study for the exam on Friday"]);
+    vi.advanceTimersByTime(1000);
+    await call("add_task", { title: "Revise chapter 1", date: "2026-10-14", time: 600, agent: "Claude" });
+    vi.advanceTimersByTime(1000);
+    await call("answer_ask", { askId: waiting[0].askId, reply: "Added a revision block tomorrow at 10:00.", agent: "Claude" });
+    const [ask] = await alice.query(api.assistant.asks, {});
+    expect([ask?.agent, ask?.reply, ask?.changes.map((c) => [c.kind, c.title])]).toEqual([
+      "Claude",
+      "Added a revision block tomorrow at 10:00.",
+      [["add", "Revise chapter 1"]],
+    ]);
+    expect((await call("get_asks", {})).result).toEqual([]);
+  });
+
+  test("an agent can't answer for Kriyan or for someone else", async () => {
+    const { t, alice } = await setup();
+    const own = await alice.mutation(api.assistant.send, { text: "What's next?" });
+    await expect(
+      t.mutation(internal.agent.answer_ask, { ownerId: ALICE.tokenIdentifier, agent: "X", askId: own, reply: "Hi" }),
+    ).rejects.toThrow(/already answered/);
+    const waiting = await alice.mutation(api.assistant.send, { text: "Plan my week" });
+    await expect(
+      t.mutation(internal.agent.answer_ask, { ownerId: BOB.tokenIdentifier, agent: "X", askId: waiting, reply: "Hi" }),
+    ).rejects.toThrow(/isn't yours/);
+  });
+});
+
+describe("focus, steps and settings", () => {
+  test("focus sessions add up for today, the week and each goal", async () => {
+    const { alice, today } = await setup();
+    const goal = await alice.mutation(api.organize.addGoal, { title: "Distinction", kind: "tasks", target: 10 });
+    const id = await alice.mutation(api.tasks.add, { title: "Revise", goalId: goal, date: today });
+    await alice.mutation(api.tasks.logFocus, { taskId: id, minutes: 25.4, date: today });
+    await alice.mutation(api.tasks.logFocus, { minutes: 40, date: "2026-10-12" });
+    // Under a minute isn't a session.
+    expect(await alice.mutation(api.tasks.logFocus, { minutes: 0.4, date: today })).toBeNull();
+    const focus = await alice.query(api.views.focus, { today });
+    expect([focus.today, focus.week, focus.byGoal]).toEqual([25, 65, [{ goalId: goal, minutes: 25 }]]);
+    expect(focus.byDay.map((d) => d.minutes)).toEqual([40, 25, 0, 0, 0, 0, 0]);
+  });
+
+  test("steps are saved in order, checked, and cleared with null", async () => {
+    const { alice } = await setup();
+    const id = await alice.mutation(api.tasks.add, {
+      title: "Essay",
+      steps: [
+        { title: " Outline ", done: true },
+        { title: "Draft", done: false },
+      ],
+    });
+    expect((await alice.query(api.views.task, { id }))?.steps).toEqual([
+      { title: "Outline", done: true },
+      { title: "Draft", done: false },
+    ]);
+    await expect(
+      alice.mutation(api.tasks.update, { id, steps: [{ title: "  ", done: false }] }),
+    ).rejects.toThrow(/each step a title/);
+    await alice.mutation(api.tasks.update, { id, steps: null });
+    expect((await alice.query(api.views.task, { id }))?.steps).toBeUndefined();
+  });
+
+  test("review time, sounds and the semester are saved and checked", async () => {
+    const { alice } = await setup();
+    await alice.mutation(api.account.updateProfile, {
+      reviewTime: 21 * 60,
+      sounds: true,
+      semesterStart: "2026-08-17",
+      semesterEnd: "2026-11-20",
+    });
+    const p = await alice.query(api.account.profile, {});
+    expect([p.reviewTime, p.sounds, p.semesterStart, p.semesterEnd]).toEqual([1260, true, "2026-08-17", "2026-11-20"]);
+    await expect(alice.mutation(api.account.updateProfile, { semesterEnd: "2026-08-01" })).rejects.toThrow(
+      /end after it starts/,
+    );
+    await alice.mutation(api.account.updateProfile, { semesterStart: null, semesterEnd: null });
+    const cleared = await alice.query(api.account.profile, {});
+    expect([cleared.semesterStart, cleared.semesterEnd]).toEqual([undefined, undefined]);
   });
 });

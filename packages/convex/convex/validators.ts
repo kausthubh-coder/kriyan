@@ -46,6 +46,39 @@ export const colorV = v.union(...SPACE_COLORS.map((c) => v.literal(c)));
 
 export const sourceV = v.union(v.literal("app"), v.literal("agent"));
 
+export const stepV = v.object({ title: v.string(), done: v.boolean() });
+
+/** What an agent did, for the activity list: "added", "changed", "ticked off"... */
+export const actionKindV = v.union(
+  v.literal("add"),
+  v.literal("change"),
+  v.literal("move"),
+  v.literal("done"),
+  v.literal("reopen"),
+  v.literal("delete"),
+  v.literal("restore"),
+  v.literal("other"),
+);
+
+const was = <T extends Parameters<typeof v.optional>[0]>(validator: T) =>
+  v.optional(v.union(validator, v.null()));
+
+/** A task's fields before an agent changed them; null means the field was empty. */
+export const taskBeforeV = v.object({
+  title: v.optional(v.string()),
+  spaceId: was(v.id("spaces")),
+  date: was(v.string()),
+  time: was(v.number()),
+  length: was(v.number()),
+  deadline: was(v.string()),
+  repeat: was(repeatV),
+  reminders: was(v.array(reminderV)),
+  note: was(v.string()),
+  steps: was(v.array(stepV)),
+  event: was(v.boolean()),
+  goalId: was(v.id("goals")),
+});
+
 // The validators and the shared types in @kriyan/core must describe the same shapes.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const assertRepeat: Same<Infer<typeof repeatV>, Repeat> = true;

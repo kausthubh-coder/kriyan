@@ -205,6 +205,7 @@ describe("agent operations", () => {
       "add_habit",
       "add_goal",
       "propose_plan",
+      "answer_ask",
     ]);
   });
 });

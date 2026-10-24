@@ -9,6 +9,7 @@ import { findOp, OPS } from "@kriyan/core/ops";
 import { internal } from "./_generated/api";
 import type { FunctionReference } from "convex/server";
 import { env, httpAction, internalMutation, internalQuery } from "./_generated/server";
+import { agentName } from "./model/activity";
 import { ownerForToken } from "./model/tokens";
 
 export const tokenOwner = internalQuery({
@@ -60,10 +61,11 @@ export function validatorMessage(message: string): string | null {
   return lines.slice(0, 3).join(" ").slice(0, 500);
 }
 
+/** Who is calling: the owner, and the name their changes are listed under. */
 async function authenticate(
   ctx: Parameters<Parameters<typeof httpAction>[0]>[0],
   req: Request,
-): Promise<string | null> {
+): Promise<{ ownerId: string; agent: string } | null> {
   const bearer = req.headers
     .get("authorization")
     ?.replace(/^Bearer\s+/i, "")
@@ -73,11 +75,12 @@ async function authenticate(
   const user = req.headers.get("x-kriyan-user");
   const issuer = env.CLERK_JWT_ISSUER_DOMAIN;
   if (secret && issuer && user && (await sameSecret(bearer, secret)))
-    return CLERK_USER.test(user) ? `${issuer}|${user}` : null;
+    // A connector signed in through the site has no name of its own; agents name themselves.
+    return CLERK_USER.test(user) ? { ownerId: `${issuer}|${user}`, agent: "" } : null;
   const found = await ctx.runQuery(internal.http.tokenOwner, { token: bearer });
   if (!found) return null;
   await ctx.runMutation(internal.http.touchToken, { id: found.id });
-  return found.ownerId;
+  return { ownerId: found.ownerId, agent: found.name };
 }
 
 type AnyRef = FunctionReference<"query" | "mutation", "internal">;
@@ -100,8 +103,8 @@ http.route({
     const ref = refs[name];
     if (!op || !ref)
       return json(404, { error: `There's no operation called "${name}". GET /api/v1 lists them.` });
-    const ownerId = await authenticate(ctx, req);
-    if (!ownerId)
+    const caller = await authenticate(ctx, req);
+    if (!caller)
       return json(401, {
         // A token that was sent and failed is most often a revoked one, not a missing one.
         error: req.headers.get("authorization")
@@ -119,8 +122,13 @@ http.route({
     }
     if (typeof input !== "object" || input === null || Array.isArray(input))
       return json(400, { error: "The body must be a JSON object." });
+    const { ownerId } = caller;
+    // A write is listed under the name the agent gave, else the token's or client's name.
+    const { agent: given, ...body } = input as Record<string, unknown>;
+    const agent = agentName(typeof given === "string" && given.trim() ? given : caller.agent);
     try {
-      const args: Record<string, unknown> = { ...(input as Record<string, unknown>), ownerId };
+      const args: Record<string, unknown> =
+        op.kind === "write" ? { ...body, ownerId, agent } : { ...body, ownerId };
       let result: unknown;
       if (op.kind === "read") {
         const zone = await ctx.runQuery(internal.agent.timeZone, { ownerId });

@@ -10,9 +10,13 @@
 
 import type * as account from "../account.js";
 import type * as agent from "../agent.js";
+import type * as assistant from "../assistant.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as maintenance from "../maintenance.js";
+import type * as model_activity from "../model/activity.js";
+import type * as model_asks from "../model/asks.js";
+import type * as model_focus from "../model/focus.js";
 import type * as model_owner from "../model/owner.js";
 import type * as model_progress from "../model/progress.js";
 import type * as model_reminders from "../model/reminders.js";
@@ -35,9 +39,13 @@ import type {
 declare const fullApi: ApiFromModules<{
   account: typeof account;
   agent: typeof agent;
+  assistant: typeof assistant;
   crons: typeof crons;
   http: typeof http;
   maintenance: typeof maintenance;
+  "model/activity": typeof model_activity;
+  "model/asks": typeof model_asks;
+  "model/focus": typeof model_focus;
   "model/owner": typeof model_owner;
   "model/progress": typeof model_progress;
   "model/reminders": typeof model_reminders;

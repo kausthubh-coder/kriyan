@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { colorV, reminderV, repeatV, sourceV } from "./validators";
+import { actionKindV, colorV, reminderV, repeatV, sourceV, stepV, taskBeforeV } from "./validators";
 
 // Every row belongs to one person: `ownerId` is their identity's tokenIdentifier.
 // Every query reads through an index that starts with ownerId.
@@ -20,6 +20,13 @@ export default defineSchema({
     onboardedAt: v.optional(v.number()),
     /** Let agents change the plan directly instead of proposing. */
     agentsEditDirectly: v.boolean(),
+    /** Minutes after midnight when "Review today" shows on Today. Unset means 20:00. */
+    reviewTime: v.optional(v.number()),
+    /** A soft sound when you finish or move something. Off unless turned on. */
+    sounds: v.optional(v.boolean()),
+    /** The semester's first and last days, for the time-left card on Goals. */
+    semesterStart: v.optional(v.string()),
+    semesterEnd: v.optional(v.string()),
   }).index("by_owner", ["ownerId"]),
 
   spaces: defineTable({
@@ -52,6 +59,8 @@ export default defineSchema({
     reminders: v.array(reminderV),
     /** Markdown. */
     note: v.optional(v.string()),
+    /** A short checklist inside the task, in order. */
+    steps: v.optional(v.array(stepV)),
     /** Something you attend (a class, a meeting) rather than tick off. */
     event: v.boolean(),
     goalId: v.optional(v.id("goals")),
@@ -61,6 +70,8 @@ export default defineSchema({
     source: sourceV,
     /** Set while an agent's change waits for the person to accept it. */
     proposedBy: v.optional(v.string()),
+    /** The agent that added it ("Codex"), shown as "from Codex". */
+    addedBy: v.optional(v.string()),
   })
     .index("by_owner_and_date", ["ownerId", "date"])
     // Lists of open tasks read through these, so done and deleted rows, which pile up with
@@ -125,6 +136,51 @@ export default defineSchema({
     dueDate: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
   }).index("by_owner", ["ownerId"]),
+
+  /** Time spent in Focus, one row per session; Review and Goals add these up. */
+  focusSessions: defineTable({
+    ownerId: v.string(),
+    taskId: v.optional(v.id("tasks")),
+    spaceId: v.optional(v.id("spaces")),
+    goalId: v.optional(v.id("goals")),
+    /** The person's today when the session ended. */
+    date: v.string(),
+    minutes: v.number(),
+  }).index("by_owner_and_date", ["ownerId", "date"]),
+
+  /** One row per change an agent made through the API, so the app can list it and undo it. */
+  agentActions: defineTable({
+    ownerId: v.string(),
+    /** The token's name, or the MCP client's ("Codex", "Claude"). */
+    agent: v.string(),
+    kind: actionKindV,
+    taskId: v.optional(v.id("tasks")),
+    /** What it was about, as the person would say it: the task's title, a space's name. */
+    title: v.string(),
+    /** What Undo puts back: the fields a change or move overwrote. */
+    before: v.optional(taskBeforeV),
+    /** For a tick: the completion Undo removes. */
+    completion: v.optional(
+      v.object({ completionId: v.id("completions"), date: v.union(v.string(), v.null()) }),
+    ),
+    undoneAt: v.optional(v.number()),
+  }).index("by_owner", ["ownerId"]),
+
+  /** A plain-language request from the Ask tab that Kriyan couldn't do itself, for an agent to answer. */
+  asks: defineTable({
+    ownerId: v.string(),
+    text: v.string(),
+    reply: v.optional(v.string()),
+    /** Who replied: "Kriyan" when it did the request itself, else the agent's name. */
+    agent: v.optional(v.string()),
+    answeredAt: v.optional(v.number()),
+    /** What Kriyan did itself, so Undo can take it back. */
+    taskIds: v.optional(v.array(v.id("tasks"))),
+    moved: v.optional(v.array(v.object({ taskId: v.id("tasks"), date: v.union(v.string(), v.null()) }))),
+    undoneAt: v.optional(v.number()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_and_answeredAt", ["ownerId", "answeredAt"]),
 
   reminderJobs: defineTable({
     ownerId: v.string(),

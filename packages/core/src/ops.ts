@@ -93,6 +93,18 @@ const taskFields: Record<string, Schema> = {
   repeat: repeatSchema,
   reminders: remindersSchema,
   note: { type: "string", description: "Markdown." },
+  steps: {
+    type: "array",
+    maxItems: 50,
+    description:
+      "A short checklist inside the task, in order, like [{title:'Outline',done:true},{title:'Draft',done:false}]. Send the whole list; it replaces the old one.",
+    items: {
+      type: "object",
+      properties: { title: { type: "string", maxLength: 200 }, done: { type: "boolean" } },
+      required: ["title", "done"],
+      additionalProperties: false,
+    },
+  },
   event: {
     type: "boolean",
     description: "True for something attended (a class, a meeting) rather than ticked off.",
@@ -126,7 +138,26 @@ const obj = (properties: Record<string, Schema>, required: string[] = []): Schem
   additionalProperties: false,
 });
 
-export const OPS: OpSpec[] = [
+const agentField: Schema = {
+  type: "string",
+  maxLength: 40,
+  description:
+    "Your name as the person should see it, like 'Claude' or 'Codex'. Kriyan lists what each agent changed, with Undo. Defaults to the access token's name.",
+};
+
+/** Every write takes the caller's name, so the person can see who changed what. */
+const named = (op: OpSpec): OpSpec =>
+  op.kind === "write"
+    ? {
+        ...op,
+        input: {
+          ...op.input,
+          properties: { ...(op.input.properties as Record<string, Schema>), agent: agentField },
+        },
+      }
+    : op;
+
+const BASE_OPS: OpSpec[] = [
   {
     name: "get_today",
     title: "Get today",
@@ -384,7 +415,6 @@ export const OPS: OpSpec[] = [
       "Propose new time blocks. They appear in the app as proposals the person accepts or discards, so use this for plans rather than add_task. Each block is a new task with a date, a time and a length.",
     input: obj(
       {
-        agent: { type: "string", description: "Your name, shown to the person, like 'Claude'." },
         blocks: {
           type: "array",
           items: obj(
@@ -400,10 +430,35 @@ export const OPS: OpSpec[] = [
           ),
         },
       },
-      ["agent", "blocks"],
+      ["blocks"],
+    ),
+  },
+  {
+    name: "get_asks",
+    title: "Get waiting requests",
+    kind: "read",
+    description:
+      "Read what the person typed in Kriyan's Ask tab that Kriyan couldn't do on its own and is waiting for an agent, oldest first. Kriyan has no AI of its own: you are the one who answers. Do what each asks with the other tools, then call answer_ask.",
+    input: obj({}),
+  },
+  {
+    name: "answer_ask",
+    title: "Answer a request",
+    kind: "write",
+    idempotent: true,
+    description:
+      "Reply to one request from get_asks. The reply shows in the Ask tab under the request, with Undo on every change you made since it was asked, so say briefly what you did ('Moved the lab report to 14:00 and added 2 reading blocks') or answer the question. Plain sentences, no Markdown headings.",
+    input: obj(
+      {
+        askId: id("request"),
+        reply: { type: "string", maxLength: 2000 },
+      },
+      ["askId", "reply"],
     ),
   },
 ];
+
+export const OPS: OpSpec[] = BASE_OPS.map(named);
 
 export function findOp(name: string): OpSpec | undefined {
   return OPS.find((op) => op.name === name);

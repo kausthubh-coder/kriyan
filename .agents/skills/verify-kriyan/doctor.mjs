@@ -43,7 +43,9 @@ report(lastError < lastPush || lastError === -1 ? true : null, "no convex error 
 report(existsSync(new URL(".artifacts/app/auth-state.json", root)) || null, "saved web sign-in", "the first e2e script signs in");
 report(existsSync(new URL(".artifacts/app/user.json", root)) || null, "seeded test user", "run `node apps/app/e2e/seed.mjs`");
 
-const adb = `${process.env.ANDROID_HOME ?? "C:/Users/kaust/scoop/apps/android-clt/current"}/platform-tools/adb.exe`;
+const sdk = process.env.ANDROID_HOME ?? "C:/Users/kaust/scoop/apps/android-clt/current";
+// Windows ships adb.exe; macOS and Linux ship adb.
+const adb = `${sdk}/platform-tools/${process.platform === "win32" ? "adb.exe" : "adb"}`;
 try {
   const devices = execFileSync(adb, ["devices"], { encoding: "utf8" });
   const online = /emulator-\d+\s+device/.test(devices);

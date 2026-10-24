@@ -1,6 +1,7 @@
 // Profile, push tokens and access tokens for the signed-in person.
 
 import { ConvexError, v } from "convex/values";
+import { isCivilDate } from "@kriyan/core/dates";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { cancelReminders, scheduleReminders } from "./model/reminders";
@@ -74,6 +75,11 @@ export const updateProfile = mutation({
     defaultReminders: v.optional(v.array(reminderV)),
     agentsEditDirectly: v.optional(v.boolean()),
     onboarded: v.optional(v.boolean()),
+    reviewTime: v.optional(v.number()),
+    sounds: v.optional(v.boolean()),
+    /** null clears the semester. */
+    semesterStart: v.optional(v.union(v.string(), v.null())),
+    semesterEnd: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, patch) => {
     const ownerId = await requireOwner(ctx);
@@ -99,8 +105,25 @@ export const updateProfile = mutation({
       throw new ConvexError("A day can hold from 0 to 24 hours of planned work.");
     // Every new timed task copies these, so they get the same checks as a task's own.
     if (patch.defaultReminders) checkReminders(patch.defaultReminders);
-    const { onboarded, ...rest } = patch;
-    await ctx.db.patch(row._id, { ...rest, ...(onboarded ? { onboardedAt: Date.now() } : {}) });
+    if (
+      patch.reviewTime !== undefined &&
+      (!Number.isInteger(patch.reviewTime) || patch.reviewTime < 0 || patch.reviewTime > 1439)
+    )
+      throw new ConvexError("The review time must be within the day.");
+    for (const key of ["semesterStart", "semesterEnd"] as const) {
+      const value = patch[key];
+      if (value && !isCivilDate(value)) throw new ConvexError("Semester dates look like 2026-10-13.");
+    }
+    const start = patch.semesterStart === undefined ? row.semesterStart : (patch.semesterStart ?? undefined);
+    const end = patch.semesterEnd === undefined ? row.semesterEnd : (patch.semesterEnd ?? undefined);
+    if (start && end && end <= start) throw new ConvexError("The semester must end after it starts.");
+    const { onboarded, semesterStart, semesterEnd, ...rest } = patch;
+    await ctx.db.patch(row._id, {
+      ...rest,
+      ...(semesterStart !== undefined ? { semesterStart: semesterStart ?? undefined } : {}),
+      ...(semesterEnd !== undefined ? { semesterEnd: semesterEnd ?? undefined } : {}),
+      ...(onboarded ? { onboardedAt: Date.now() } : {}),
+    });
   },
 });
 
@@ -235,6 +258,21 @@ export const deleteDataBatch = internalMutation({
       () =>
         ctx.db
           .query("accessTokens")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("focusSessions")
+          .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("agentActions")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("asks")
           .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
           .take(left),
       () =>

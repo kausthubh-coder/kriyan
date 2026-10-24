@@ -23,9 +23,17 @@ export interface TaskFields {
   repeat?: Repeat;
   reminders?: Reminder[];
   note?: string;
+  steps?: Step[];
   event?: boolean;
   goalId?: Id<"goals">;
 }
+
+export interface Step {
+  title: string;
+  done: boolean;
+}
+
+const MAX_STEPS = 50;
 
 /** A patch: `null` clears a field, `undefined` leaves it alone. */
 export type TaskPatch = { [K in keyof TaskFields]?: TaskFields[K] | null };
@@ -74,6 +82,13 @@ function check(fields: Partial<TaskFields>) {
   if (fields.reminders) checkReminders(fields.reminders);
   if (fields.note !== undefined && fields.note.length > 50_000)
     throw new ConvexError("Notes can be up to 50,000 characters.");
+  if (fields.steps) {
+    if (fields.steps.length > MAX_STEPS) throw new ConvexError(`A task can have up to ${MAX_STEPS} steps.`);
+    for (const step of fields.steps) {
+      if (!step.title.trim()) throw new ConvexError("Give each step a title.");
+      if (step.title.length > 200) throw new ConvexError("Keep each step under 200 characters.");
+    }
+  }
 }
 
 async function checkRefs(
@@ -89,7 +104,7 @@ export async function createTask(
   ctx: MutationCtx,
   ownerId: string,
   fields: TaskFields,
-  options: { source: "app" | "agent"; proposedBy?: string } = { source: "app" },
+  options: { source: "app" | "agent"; proposedBy?: string; addedBy?: string } = { source: "app" },
 ): Promise<Id<"tasks">> {
   check(fields);
   await checkRefs(ctx, ownerId, fields);
@@ -110,11 +125,13 @@ export async function createTask(
     ...(fields.repeat ? { repeat: fields.repeat, repeatFirst: date } : {}),
     reminders,
     ...(fields.note ? { note: fields.note } : {}),
+    ...(fields.steps?.length ? { steps: fields.steps.map((st) => ({ ...st, title: st.title.trim() })) } : {}),
     event: fields.event ?? false,
     ...(fields.goalId ? { goalId: fields.goalId } : {}),
     order: Date.now(),
     source: options.source,
     ...(options.proposedBy ? { proposedBy: options.proposedBy } : {}),
+    ...(options.addedBy ? { addedBy: options.addedBy } : {}),
   });
   await scheduleReminders(ctx, id);
   return id;
@@ -125,7 +142,9 @@ export async function addFromText(
   ctx: MutationCtx,
   ownerId: string,
   text: string,
-  options: { source: "app" | "agent"; defaults?: Partial<TaskFields> } = { source: "app" },
+  options: { source: "app" | "agent"; defaults?: Partial<TaskFields>; addedBy?: string } = {
+    source: "app",
+  },
 ): Promise<Id<"tasks">> {
   const profile = await getProfile(ctx, ownerId);
   const parsed = parseTask(text, todayIn(profile.timeZone));
@@ -146,7 +165,7 @@ export async function addFromText(
       ...(parsed.repeat ? { repeat: parsed.repeat } : {}),
       ...(parsed.reminders.length ? { reminders: parsed.reminders } : {}),
     },
-    { source: options.source },
+    { source: options.source, ...(options.addedBy ? { addedBy: options.addedBy } : {}) },
   );
 }
 

@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { requireOwner } from "./model/owner";
 import { listSpaces, spaceTree } from "./model/spaces";
+import * as Focus from "./model/focus";
 import * as Views from "./model/views";
 
 export const today = query({
@@ -39,6 +40,12 @@ export const space = query({
 export const progress = query({
   args: { today: v.string() },
   handler: async (ctx, { today }) => Views.progressView(ctx, await requireOwner(ctx), today),
+});
+
+/** Focused minutes today and this week, by day and by goal. */
+export const focus = query({
+  args: { today: v.string() },
+  handler: async (ctx, { today }) => Focus.focusSummary(ctx, await requireOwner(ctx), today),
 });
 
 export const spaces = query({

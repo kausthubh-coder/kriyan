@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Small adb helpers for driving the emulator: shot <name>, tap x y, text "...", key CODE, ui (visible labels).
 export MSYS_NO_PATHCONV=1
-ADB="${ANDROID_HOME:-C:/Users/kaust/scoop/apps/android-clt/current}/platform-tools/adb.exe"
+SDK="${ANDROID_HOME:-C:/Users/kaust/scoop/apps/android-clt/current}"
+# Windows ships adb.exe; macOS and Linux ship adb.
+ADB="$SDK/platform-tools/adb.exe"
+[ -x "$ADB" ] || ADB="$SDK/platform-tools/adb"
 ART="$(dirname "$0")/../../../.artifacts/app"
 case "$1" in
   shot) "$ADB" exec-out screencap -p > "$ART/$2.png" ;;

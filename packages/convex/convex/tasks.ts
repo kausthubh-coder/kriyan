@@ -4,7 +4,8 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { requireOwner } from "./model/owner";
 import * as Tasks from "./model/tasks";
-import { reminderV, repeatV } from "./validators";
+import * as Focus from "./model/focus";
+import { reminderV, repeatV, stepV } from "./validators";
 
 const fields = {
   title: v.string(),
@@ -16,6 +17,7 @@ const fields = {
   repeat: v.optional(repeatV),
   reminders: v.optional(v.array(reminderV)),
   note: v.optional(v.string()),
+  steps: v.optional(v.array(stepV)),
   event: v.optional(v.boolean()),
   goalId: v.optional(v.id("goals")),
 };
@@ -50,10 +52,17 @@ export const update = mutation({
     repeat: nullable(repeatV),
     reminders: nullable(v.array(reminderV)),
     note: nullable(v.string()),
+    steps: nullable(v.array(stepV)),
     event: nullable(v.boolean()),
     goalId: nullable(v.id("goals")),
   },
   handler: async (ctx, { id, ...patch }) => Tasks.updateTask(ctx, await requireOwner(ctx), id, patch),
+});
+
+/** Records a Focus session when it ends; `date` is the person's today. */
+export const logFocus = mutation({
+  args: { taskId: v.optional(v.id("tasks")), minutes: v.number(), date: v.string() },
+  handler: async (ctx, args) => Focus.logFocus(ctx, await requireOwner(ctx), args),
 });
 
 const completionV = v.object({
