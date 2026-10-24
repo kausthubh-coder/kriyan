@@ -156,7 +156,7 @@ export function Helps({ d, next, back }: StepProps) {
                 minHeight: 60,
                 paddingVertical: s.s2,
                 paddingHorizontal: s.s3,
-                borderRadius: r.card,
+                borderRadius: r.box,
                 backgroundColor: on ? c.raised : c.sunken,
                 boxShadow: `inset 0 0 0 1.5px ${on ? c.ink : "transparent"}`,
               }}
@@ -241,7 +241,7 @@ export function Hours({ d, next, back }: StepProps) {
           marginTop: s.s3,
           padding: s.s3,
           paddingLeft: s.s4,
-          borderRadius: r.sheet,
+          borderRadius: r.box,
           backgroundColor: c.sunken,
         }}
       >
@@ -354,7 +354,7 @@ export function TheMath({ d, today, next, back }: StepProps) {
           marginTop: s.s6,
           paddingVertical: s.s3,
           paddingHorizontal: s.s4,
-          borderRadius: r.card,
+          borderRadius: r.box,
           backgroundColor: c.sunken,
         }}
       >
@@ -514,7 +514,7 @@ export function FirstTask({ d, today, next, back }: StepProps) {
                 marginTop: s.s6,
                 paddingHorizontal: s.s4,
                 paddingVertical: s.s3,
-                borderRadius: r.sheet,
+                borderRadius: r.box,
                 backgroundColor: c.sunken,
                 boxShadow: focused ? `inset 0 0 0 1.5px ${c.ink}` : undefined,
               },

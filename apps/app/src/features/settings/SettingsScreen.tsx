@@ -196,7 +196,7 @@ function AccountCard({ profile }: { profile: Profile }) {
         gap: s.s3,
         padding: s.s3,
         paddingLeft: s.s4,
-        borderRadius: r.sheet,
+        borderRadius: r.box,
         backgroundColor: c.sunken,
       }}
     >
@@ -710,7 +710,7 @@ function ConnectAI({ profile }: { profile: Profile }) {
         style={{
           paddingHorizontal: s.s4,
           paddingVertical: s.s1,
-          borderRadius: r.sheet,
+          borderRadius: r.box,
           backgroundColor: c.sunken,
         }}
       >
@@ -769,7 +769,7 @@ function TerminalBlock({ lines, label }: { lines: string[]; label: string }) {
     <View
       style={{
         padding: s.s4,
-        borderRadius: r.sheet,
+        borderRadius: r.box,
         backgroundColor: c.head,
         gap: s.s1,
       }}
@@ -792,7 +792,7 @@ function Install() {
   return (
     <Section title="Install">
       <View style={{ gap: s.s2 }}>
-        <View style={{ gap: s.s2, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
+        <View style={{ gap: s.s2, padding: s.s4, borderRadius: r.box, backgroundColor: c.sunken }}>
           <Txt variant="label" style={family("600")}>
             On iPhone
           </Txt>
@@ -806,7 +806,7 @@ function Install() {
             </Txt>
           ))}
         </View>
-        <View style={{ gap: s.s1, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
+        <View style={{ gap: s.s1, padding: s.s4, borderRadius: r.box, backgroundColor: c.sunken }}>
           <Txt variant="label" style={family("600")}>
             On Android
           </Txt>
@@ -880,7 +880,7 @@ function Tokens() {
           style={{
             gap: s.s2,
             padding: s.s4,
-            borderRadius: r.sheet,
+            borderRadius: r.box,
             backgroundColor: c.sunken,
           }}
         >

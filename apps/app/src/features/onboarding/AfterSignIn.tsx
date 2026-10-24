@@ -51,7 +51,7 @@ function Instruction({ n, children, glyph }: { n: number; children: ReactNode; g
         alignItems: "center",
         gap: s.s3,
         padding: s.s4,
-        borderRadius: r.card,
+        borderRadius: r.box,
         backgroundColor: c.sunken,
       }}
     >
@@ -137,7 +137,7 @@ function ReminderPreview({ d, today }: { d: Draft; today: CivilDate }) {
   const at = f?.parsed.time ?? 21 * 60 + 30;
   const length = f?.parsed.length;
   return (
-    <View style={{ marginTop: s.s6, padding: s.s4, borderRadius: r.sheet, backgroundColor: c.sunken }}>
+    <View style={{ marginTop: s.s6, padding: s.s4, borderRadius: r.box, backgroundColor: c.sunken }}>
       <View
         style={{
           flexDirection: "row",
@@ -616,7 +616,7 @@ function StartCard({
         minHeight: 150,
         gap: s.s1,
         padding: s.s4,
-        borderRadius: r.sheet,
+        borderRadius: r.box,
         backgroundColor: done ? "transparent" : c.sunken,
         boxShadow: done ? `inset 0 0 0 1px ${c.line}` : undefined,
       }}

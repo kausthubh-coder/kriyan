@@ -318,7 +318,7 @@ function Card({ children, flex, wide }: { children: ReactNode; flex?: number; wi
         minWidth: 0,
         gap: 2,
         padding: s.s4,
-        borderRadius: r.sheet,
+        borderRadius: r.box,
         backgroundColor: c.sunken,
       }}
     >

@@ -146,7 +146,13 @@ export function Screen({
       ) : null}
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        style={{ flex: 1 }}
+        // Keyboard focus scrolls a row clear of the floating dock instead of leaving it under it.
+        style={[
+          { flex: 1 },
+          phone && Platform.OS === "web"
+            ? ({ scrollPaddingBottom: DOCK_CLEARANCE + insets.bottom } as object)
+            : null,
+        ]}
         contentContainerStyle={
           heroed
             ? { paddingBottom: s.s16 }

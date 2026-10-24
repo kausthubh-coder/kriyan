@@ -27,6 +27,7 @@ import { freeMinutes } from "@kriyan/core/layout";
 import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
 import { useClock } from "@/data/time";
 import { useInboxView, useProfile, useTodayView, type TaskView, type TodayView } from "@/data/views";
+import { AskBox } from "@/features/ask/AskBar";
 import { closedDay } from "@/features/review/closedDay";
 import { moveTasks, placeTasks } from "@/features/tasks/actions";
 import { toggleHaptic } from "@/features/tasks/haptics";
@@ -52,7 +53,7 @@ import { DragSource } from "./DragSource";
 import { PlanToday } from "./PlanToday";
 import { ReviewCard } from "./ReviewCard";
 import { FreeGap, Spine } from "./Spine";
-import { TodayAsk } from "./TodayAsk";
+
 import { TodayHeader } from "./TodayHeader";
 import { UpNext, upNextOf } from "./UpNext";
 import { WeekStrip } from "./WeekStrip";
@@ -144,7 +145,7 @@ export function TodayScreen() {
         <SplitScreen
           title="Today"
           right={split && view ? <DayColumn view={view} today={today} now={now} /> : null}
-          footer={<TodayAsk />}
+          footer={<AskBox />}
         >
           {header}
           {/* B2's `.sheet-d`: the list sits a little in from the header card's edges. */}

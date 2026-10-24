@@ -72,7 +72,7 @@ export function Wheel({
         flex: 1,
         minWidth: 0,
         backgroundColor: c.sunken,
-        borderRadius: r.sheet,
+        borderRadius: r.box,
         padding: s.s3,
         paddingBottom: s.s2,
       }}

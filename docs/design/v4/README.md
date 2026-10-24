@@ -15,7 +15,7 @@ bunx serve docs/design/v4        # then /b2.html?screen=today and /onboarding.ht
 
 ## Decisions
 
-- **Look:** Joi-calm monochrome. Inter 400/500/600. One red, `--now`, means the current time and nothing else. `--parse` (blue) marks words quick add understood. Space colours appear only as a dot, a checkbox ring or a timeline surface.
+- **Look:** Joi-calm monochrome. Inter 400/500/600, and 700 for the large headings only (page titles, the day on Today, a task's title). One red, `--now`, means the current time and nothing else. `--parse` (blue) marks words quick add understood. Space colours appear only as a dot, a checkbox ring or a timeline surface.
 - **Schemes:** light and dark, from the system. The Today header (`--head`) is black in both, with the day ("Thu" and the red dot) and one sentence that summarises the day. On Android the scheme is read at launch.
 - **Contrast:** every text colour holds 4.5:1. `--ink-3` is the faintest text allowed; Joi's lighter grey failed, so don't bring it back.
 - **Today:** header sentence, week strip, "Upcoming in N min" card with Start focus, List or Timeline, groups Anytime / Morning / Afternoon / Evening, "2 from earlier" (never "overdue"), and a "Review today" card at the review time.

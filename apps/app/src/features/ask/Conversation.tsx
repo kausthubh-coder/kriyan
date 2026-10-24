@@ -73,7 +73,7 @@ function Exchange({ ask, explain }: { ask: AskView; explain: boolean }) {
               style={{
                 marginTop: s.s1,
                 paddingHorizontal: s.s4,
-                borderRadius: r.card,
+                borderRadius: r.box,
                 backgroundColor: c.sunken,
               }}
             >
@@ -106,7 +106,7 @@ function Exchange({ ask, explain }: { ask: AskView; explain: boolean }) {
 /** Said plainly, once, to someone who hasn't connected an agent yet. */
 export function NoAgentNote({ intro }: { intro?: boolean }) {
   return (
-    <View style={{ gap: s.s1, padding: s.s4, borderRadius: r.card, backgroundColor: c.sunken }}>
+    <View style={{ gap: s.s1, padding: s.s4, borderRadius: r.box, backgroundColor: c.sunken }}>
       <Txt variant="label">Kriyan has no AI of its own</Txt>
       <Txt variant="body" tone="ink2">
         {intro
