@@ -5,7 +5,7 @@
 // Convex backend, point the app and site at it, then run the doctor.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { createHash, randomBytes } from "node:crypto";
+import { createECDH, createHash, randomBytes } from "node:crypto";
 import { createConnection, createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -239,9 +239,24 @@ const issuer = clerkKey
   : undefined;
 // Without a Clerk key the auth config still needs an issuer before functions push; a placeholder
 // keeps the backend, the agent API and the CLI working with sign-in off. A real key replaces it.
+// Web Push keys for this checkout's backend only, so reminders reach the web app in a browser.
+// A VAPID pair is a P-256 key: the public key uncompressed, both base64url. Never printed.
+if (!readEnv(CONVEX_ENV)?.VAPID_PRIVATE_KEY) {
+  const ecdh = createECDH("prime256v1");
+  ecdh.generateKeys();
+  setEnv(CONVEX_ENV, {
+    VAPID_PUBLIC_KEY: ecdh.getPublicKey("base64url"),
+    VAPID_PRIVATE_KEY: ecdh.getPrivateKey("base64url"),
+  });
+  log("generated", `a Web Push (VAPID) key pair in ${CONVEX_ENV}, for this checkout's backend only`);
+}
+const vapid = readEnv(CONVEX_ENV) ?? {};
 const wanted = {
   CLERK_JWT_ISSUER_DOMAIN: issuer ?? PLACEHOLDER_ISSUER,
   KRIYAN_SERVICE_SECRET: site.KRIYAN_SERVICE_SECRET,
+  VAPID_PUBLIC_KEY: vapid.VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY: vapid.VAPID_PRIVATE_KEY,
+  VAPID_SUBJECT: "mailto:hello@kriyan.app",
 };
 const names = backendEnvNames();
 if (!names) stop("couldn't read the local backend's env vars (`bunx convex env list` in packages/convex)");

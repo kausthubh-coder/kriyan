@@ -7,7 +7,17 @@ import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import { BookOpen, KeyRound, Link, RotateCcw, Terminal, Trash2 } from "lucide-react-native";
+import {
+  BellRing,
+  BookOpen,
+  KeyRound,
+  Link,
+  RotateCcw,
+  Share,
+  SquarePlus,
+  Terminal,
+  Trash2,
+} from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
@@ -16,7 +26,8 @@ import { parseClock } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import { useClock } from "@/data/time";
 import { useAccessTokens, useProfile, type Profile } from "@/data/views";
-import { forgetDevice } from "@/features/notifications/register";
+import { ensureNotifications, forgetDevice } from "@/features/notifications/register";
+import { canWebPush, currentEndpoint, needsInstall, sendTestReminder } from "@/features/pwa/install";
 import { SectionLabel } from "@/features/progress/SectionLabel";
 import { errorText } from "@/features/tasks/actions";
 import { ReminderEditor } from "@/features/tasks/ReminderEditor";
@@ -66,6 +77,7 @@ export function SettingsScreen() {
           <AccountCard profile={profile} />
           <YourDay profile={profile} />
           <DefaultReminders profile={profile} />
+          {Platform.OS === "web" ? <ThisDevice /> : null}
           <ConnectAI profile={profile} />
           <Tokens />
           <Deleted />
@@ -266,6 +278,91 @@ function DefaultReminders({ profile }: { profile: Profile }) {
         timed
         onChange={(defaultReminders) => void update({ defaultReminders })}
       />
+    </Section>
+  );
+}
+
+/**
+ * The web app's reminders on this device. An iPhone gets them only from the Home Screen web app
+ * (iOS 16.4 and later), so Safari shows how to add it there first; other browsers turn them on
+ * here and can send themselves a test.
+ */
+function ThisDevice() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const install = needsInstall();
+  const able = canWebPush();
+  useEffect(() => {
+    if (!able) return;
+    void currentEndpoint().then((endpoint) =>
+      setOn(
+        Boolean(endpoint) && typeof Notification !== "undefined" && Notification.permission === "granted",
+      ),
+    );
+  }, [able]);
+  const denied = typeof Notification !== "undefined" && Notification.permission === "denied";
+  return (
+    <Section title="Reminders on this device">
+      {install ? (
+        <View style={{ gap: s.s2 }}>
+          <Txt variant="body" tone="ink3">
+            On iPhone, reminders come to Kriyan on your Home Screen. It opens full screen, like any app.
+          </Txt>
+          <Row label="1. Tap Share in Safari's toolbar">
+            <Icon icon={Share} />
+          </Row>
+          <Row label="2. Tap Add to Home Screen">
+            <Icon icon={SquarePlus} />
+          </Row>
+          <Row label="3. Open Kriyan from your Home Screen" hint="Then turn reminders on here.">
+            {null}
+          </Row>
+        </View>
+      ) : !able ? (
+        <Txt variant="body" tone="ink3">
+          {"This browser can't show reminders. The Android app and Chrome, Edge, Firefox or Safari can."}
+        </Txt>
+      ) : on ? (
+        <Row label="On for this browser" hint="Reminders arrive here even when Kriyan is closed.">
+          <Button
+            icon={BellRing}
+            label="Send a test reminder"
+            disabled={busy}
+            onPress={() => {
+              setBusy(true);
+              void sendTestReminder()
+                .then((sent) => showToast(sent ? "Test reminder sent" : "Turn reminders on first"))
+                .catch((e: unknown) => showToast(errorText(e)))
+                .finally(() => setBusy(false));
+            }}
+          />
+        </Row>
+      ) : (
+        <Row
+          label="Off for this browser"
+          hint={
+            denied
+              ? "Notifications are blocked for this site. Allow them in the browser's site settings."
+              : undefined
+          }
+        >
+          <Button
+            variant="primary"
+            icon={BellRing}
+            label="Turn on reminders"
+            disabled={busy || denied}
+            onPress={() => {
+              setBusy(true);
+              void ensureNotifications()
+                .then((ok) => {
+                  setOn(ok);
+                  if (!ok) showToast("Reminders stay off: notifications weren't allowed");
+                })
+                .finally(() => setBusy(false));
+            }}
+          />
+        </Row>
+      )}
     </Section>
   );
 }

@@ -126,6 +126,8 @@ else {
   if (!names) warn("couldn't read the backend's env vars");
   else {
     const unset = needed.filter((n) => !names.has(n));
+    const push = ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"].filter((n) => !names.has(n));
+    if (push.length) warn(`backend lacks ${push.join(", ")}: web reminders are off (${SETUP} adds dev keys)`);
     if (unset.length) fail(`backend lacks ${unset.join(", ")}`, SETUP);
     else if (backendEnvValue("CLERK_JWT_ISSUER_DOMAIN") === PLACEHOLDER_ISSUER)
       warn("backend has a placeholder Clerk issuer: sign-in is off; the agent API and the CLI work");

@@ -20,11 +20,14 @@ import type * as model_spaces from "../model/spaces.js";
 import type * as model_tasks from "../model/tasks.js";
 import type * as model_tokens from "../model/tokens.js";
 import type * as model_views from "../model/views.js";
+import type * as model_webPush from "../model/webPush.js";
 import type * as organize from "../organize.js";
 import type * as reminders from "../reminders.js";
 import type * as tasks from "../tasks.js";
 import type * as validators from "../validators.js";
 import type * as views from "../views.js";
+import type * as webPush from "../webPush.js";
+import type * as webPushSend from "../webPushSend.js";
 
 import type {
   ApiFromModules,
@@ -45,11 +48,14 @@ declare const fullApi: ApiFromModules<{
   "model/tasks": typeof model_tasks;
   "model/tokens": typeof model_tokens;
   "model/views": typeof model_views;
+  "model/webPush": typeof model_webPush;
   organize: typeof organize;
   reminders: typeof reminders;
   tasks: typeof tasks;
   validators: typeof validators;
   views: typeof views;
+  webPush: typeof webPush;
+  webPushSend: typeof webPushSend;
 }>;
 
 /**

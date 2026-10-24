@@ -18,10 +18,15 @@ export const payload = internalQuery({
       .query("pushTokens")
       .withIndex("by_owner", (q) => q.eq("ownerId", task.ownerId))
       .take(20);
+    const web = await ctx.db
+      .query("webPushSubscriptions")
+      .withIndex("by_owner", (q) => q.eq("ownerId", task.ownerId))
+      .take(20);
     return {
       title: task.title,
       body: reminderBody({ date: occurrence, time: task.time }, todayIn(timeZone, fireAt)),
       tokens: tokens.map((t) => t.token),
+      web: web.map(({ endpoint, p256dh, auth }) => ({ endpoint, p256dh, auth })),
     };
   },
 });
@@ -46,7 +51,11 @@ export const forget = internalMutation({
   },
 });
 
-/** Sends one reminder through Expo's push service. Expo is best effort; a missed push is not retried. */
+/**
+ * Sends one reminder through Expo's push service (the Android app) and Web Push (the web app on
+ * an iPhone Home Screen, Android Chrome, desktop browsers). Both are best effort; a missed push
+ * is not retried.
+ */
 export const fire = internalAction({
   // `date` is the occurrence the reminder is for. Jobs scheduled before it existed leave it
   // out and mean the task's own date.
@@ -89,6 +98,19 @@ export const fire = internalAction({
       } catch (error) {
         // Forget the job anyway, so the next occurrence still gets its reminders.
         console.error(`Expo push failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    if (data && data.web.length) {
+      try {
+        await ctx.runAction(internal.webPushSend.send, {
+          subscriptions: data.web,
+          title: data.title,
+          body: data.body,
+          tag: `task-${taskId}`,
+          url: `/task/${taskId}`,
+        });
+      } catch (error) {
+        console.error(`Web push failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     await ctx.runMutation(internal.reminders.forget, { taskId, fireAt, badTokens });

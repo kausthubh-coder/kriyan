@@ -32,6 +32,9 @@ type Env = {
   readonly CONVEX_SITE_URL: string;
   readonly CLERK_JWT_ISSUER_DOMAIN: string | undefined;
   readonly KRIYAN_SERVICE_SECRET: string | undefined;
+  readonly VAPID_PRIVATE_KEY: string | undefined;
+  readonly VAPID_PUBLIC_KEY: string | undefined;
+  readonly VAPID_SUBJECT: string | undefined;
 };
 
 /**

@@ -141,6 +141,21 @@ export default defineSchema({
     .index("by_owner", ["ownerId"])
     .index("by_token", ["token"]),
 
+  /**
+   * Web Push subscriptions: the web app on an iPhone Home Screen, Android Chrome or a desktop
+   * browser. Reminders go to these as well as to the Expo push tokens above.
+   */
+  webPushSubscriptions: defineTable({
+    ownerId: v.string(),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    userAgent: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_endpoint", ["endpoint"]),
+
   /** Personal access tokens for the CLI and MCP clients. Only a hash is stored. */
   accessTokens: defineTable({
     ownerId: v.string(),

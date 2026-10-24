@@ -299,6 +299,7 @@ describe("reminders", () => {
       title: "Mum's birthday",
       body: "Tomorrow",
       tokens: [],
+      web: [],
     });
   });
 
@@ -894,5 +895,48 @@ describe("the trash", () => {
     expect((await alice.query(api.views.trash, {})).map((x) => x.title)).toEqual(["Old idea"]);
     const week = await alice.query(api.views.week, { start: "2026-10-12", today: "2026-10-13" });
     expect(week.days.find((d) => d.date === "2026-10-16")?.scheduled.map((x) => x.title)).toEqual(["Essay"]);
+  });
+});
+
+describe("web push", () => {
+  const sub = {
+    endpoint: "https://web.push.apple.com/QGuQyavXutnMH9lV-iUvSs6BbSKV9i4hnkoX3w8pWg",
+    p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM",
+    auth: "tBHItJI5svbpez7KI4CCXg",
+    userAgent: "iPhone Safari",
+  };
+
+  test("a browser's subscription is saved for its owner and reaches that owner's reminders", async () => {
+    const { t, alice } = await setup();
+    await alice.mutation(api.webPush.subscribe, sub);
+    const id = await alice.mutation(api.tasks.addText, { text: "Call Mum today 18:00 remind 10m before" });
+    const payload = await t.query(internal.reminders.payload, { taskId: id, fireAt: Date.UTC(2026, 9, 13, 17, 50) });
+    expect(payload?.web).toEqual([{ endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }]);
+  });
+
+  test("someone else can't remove your subscription, and you can", async () => {
+    const { t, alice } = await setup();
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    await alice.mutation(api.webPush.subscribe, sub);
+    await bob.mutation(api.webPush.unsubscribe, { endpoint: sub.endpoint });
+    expect(await t.run((ctx) => ctx.db.query("webPushSubscriptions").collect())).toHaveLength(1);
+    await alice.mutation(api.webPush.unsubscribe, { endpoint: sub.endpoint });
+    expect(await t.run((ctx) => ctx.db.query("webPushSubscriptions").collect())).toEqual([]);
+  });
+
+  test("the same browser subscribing twice keeps one row, and a non-https endpoint is refused", async () => {
+    const { t, alice } = await setup();
+    await alice.mutation(api.webPush.subscribe, sub);
+    await alice.mutation(api.webPush.subscribe, sub);
+    expect(await t.run((ctx) => ctx.db.query("webPushSubscriptions").collect())).toHaveLength(1);
+    await expect(
+      alice.mutation(api.webPush.subscribe, { ...sub, endpoint: "http://evil.example/push" }),
+    ).rejects.toThrow("isn't a push subscription");
+  });
+
+  test("signed-out calls are refused", async () => {
+    const { t } = await setup();
+    await expect(t.mutation(api.webPush.subscribe, sub)).rejects.toThrow();
   });
 });
