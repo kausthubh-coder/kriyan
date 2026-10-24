@@ -35,7 +35,7 @@ page.setDefaultTimeout(30000);
 await page.goto(`${BASE}/upcoming`);
 await settle(page);
 const status = page.getByRole("status");
-const tray = page.getByLabel("To plan", { exact: true });
+const tray = page.getByLabel("Not scheduled yet", { exact: true });
 
 /** Drags a tray row to a point in the week, a step at a time like a hand would. */
 const drag = async (title, to) => {

@@ -1,5 +1,6 @@
 // A space: breadcrumb, then next tasks, later tasks, the spaces inside it (rows, not cards),
-// its goal, and its Markdown note.
+// its goal, and its Markdown note. Next and Later include the tasks of the spaces inside it,
+// each marked with the space it's in.
 
 import { useRef, useState } from "react";
 import { View } from "react-native";
@@ -10,7 +11,7 @@ import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatDuration } from "@kriyan/core/format";
 import { useClock } from "@/data/time";
-import { useSpaceView, type SpaceView } from "@/data/views";
+import { useSpaceView, type SpaceView, type TaskView } from "@/data/views";
 import { NoteEditor, NoteToolbarHost } from "@/features/notes/NoteEditor";
 import { errorText } from "@/features/tasks/actions";
 import { Option } from "@/features/tasks/pickers";
@@ -31,10 +32,9 @@ import { AddSpace, ColorPicker } from "./AddSpace";
 
 export function SpaceScreen({ id }: { id: Id<"spaces"> }) {
   const view = useSpaceView(id);
-  const phone = useIsPhone();
   return (
     <View style={{ flex: 1 }}>
-      <Screen title={view?.space.name ?? "Space"} back width={phone ? "column" : 1040}>
+      <Screen title={view?.space.name ?? "Space"} back width="full">
         {view === undefined ? (
           <View testID="skeleton" style={{ gap: s.s6 }}>
             <Skeleton width={200} height={28} />
@@ -47,6 +47,32 @@ export function SpaceScreen({ id }: { id: Id<"spaces"> }) {
         )}
       </Screen>
       <NoteToolbarHost />
+    </View>
+  );
+}
+
+/** Which space inside this one a task lives in; nothing for the space's own tasks. */
+function InsideSpace({ task, spaceId }: { task: TaskView; spaceId: Id<"spaces"> }) {
+  const phone = useIsPhone();
+  if (!task.spaceId || task.spaceId === spaceId || !task.spacePath) return null;
+  // The path's last part: "Work / Kriyan" is "Kriyan" on Work's page.
+  const name = task.spacePath.split(" / ").at(-1);
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s2,
+        flexShrink: 0,
+        maxWidth: 160,
+        // Level with the title's first line, like the row's length.
+        marginTop: phone ? 12 : 4,
+      }}
+    >
+      <Dot color={spaceTone(task.color).dot} />
+      <Txt variant="meta" tone="ink3" numberOfLines={1}>
+        {name}
+      </Txt>
     </View>
   );
 }
@@ -85,7 +111,15 @@ function SpaceBody({ view }: { view: SpaceView }) {
       <View style={{ gap: s.s2 }}>
         <SectionHead title="Next" meta={view.next.length ? String(view.next.length) : undefined} />
         {view.next.length ? (
-          view.next.map((t) => <TaskRow key={t._id} task={t} today={today} showWhen />)
+          view.next.map((t) => (
+            <TaskRow
+              key={t._id}
+              task={t}
+              today={today}
+              showWhen
+              trailing={<InsideSpace task={t} spaceId={view.space._id} />}
+            />
+          ))
         ) : (
           <Txt variant="body" tone="ink3">
             Nothing here has a day yet.
@@ -96,7 +130,12 @@ function SpaceBody({ view }: { view: SpaceView }) {
         <View style={{ gap: s.s2 }}>
           <SectionHead title="Later" meta={String(view.later.length)} />
           {view.later.map((t) => (
-            <TaskRow key={t._id} task={t} today={today} />
+            <TaskRow
+              key={t._id}
+              task={t}
+              today={today}
+              trailing={<InsideSpace task={t} spaceId={view.space._id} />}
+            />
           ))}
         </View>
       ) : null}

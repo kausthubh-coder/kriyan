@@ -1,9 +1,9 @@
 // The frame every screen sits in. Phones get the prototype's large title (with "Back" on pushed
-// screens) and room for the floating dock; desktop gets the calm 680px column, shifted left
-// while a task panel is open.
+// screens) and room for the floating dock. On desktop every page sits in one frame, so every
+// page starts at the same left edge: a reading column (680px) or the frame's full width.
 
 import type { ReactNode } from "react";
-import { Platform, ScrollView, View, type ScrollViewProps } from "react-native";
+import { Platform, ScrollView, View, type ScrollViewProps, type TextStyle } from "react-native";
 import { router, usePathname } from "expo-router";
 import Head from "expo-router/head";
 import { ChevronLeft } from "lucide-react-native";
@@ -24,8 +24,12 @@ interface Props {
   back?: boolean;
   /** Extra controls in the phone app bar, before search. */
   actions?: ReactNode;
-  /** "wide" is for the week; everything else is the 680px column. */
-  width?: "column" | "wide" | number;
+  /**
+   * "column" is the 680px reading column, "full" the frame's whole width (two columns side by
+   * side), "wide" the week's grid, which uses the whole window. A number caps the width inside
+   * the frame. All of them start at the same left edge.
+   */
+  width?: "column" | "full" | "wide" | number;
   children: ReactNode;
   scrollProps?: ScrollViewProps;
   /** Below the scroll view, pinned (the proposals banner). */
@@ -38,6 +42,9 @@ interface Props {
    */
   hero?: ReactNode;
 }
+
+/** The widest page: Today's list and schedule side by side (b2.html `.dpg.wide`). */
+const FULL = sz.column + s.s12 + sz.schedule;
 
 export function goBack(fallback: "/today" | "/browse" = "/today") {
   if (router.canGoBack()) router.back();
@@ -84,9 +91,7 @@ export function PhoneHead({
         </Press>
       ) : null}
       <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
-        <Txt variant="headline" heading={1} style={{ flex: 1 }}>
-          {title}
-        </Txt>
+        <PageTitle title={title} style={{ flex: 1 }} />
         {actions}
       </View>
       {sub ? (
@@ -119,8 +124,9 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const heroed = phone && hero;
   const panelOpen = usePanelOpen();
-  const maxWidth = width === "column" ? sz.column : width === "wide" ? undefined : width;
-  // While the panel is open the column moves left so the panel never covers it (desktop).
+  const maxWidth = width === "column" ? sz.column : width === "full" || width === "wide" ? undefined : width;
+  // While the panel is open the page keeps clear of it (desktop), unless the panel is meant to
+  // cover this layout's right column.
   const shift = !phone && panelOpen && width !== "wide" && !panelCovers;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -159,25 +165,58 @@ export function Screen({
               : undefined
           }
         >
+          {/* The frame: centred in wide windows, so its left edge is every page's left edge. */}
           <View
             style={{
               width: "100%",
-              maxWidth,
-              alignSelf: shift ? "flex-start" : "center",
-              // The panel covers the right 440px; the column moves left to stay clear of it.
-              ...(shift ? { marginRight: sz.panel } : {}),
-              gap: phone ? s.s8 : s.s12,
+              maxWidth: phone || width === "wide" ? undefined : FULL,
+              alignSelf: "center",
+              // The panel covers the right 440px; the page ends before it.
+              paddingRight: shift ? sz.panel : 0,
             }}
           >
-            {phone && !heroed ? <PhoneHead title={title} sub={sub} back={back} actions={actions} /> : null}
-            {children}
-            {/* Room to scroll the last row clear of the floating dock. */}
-            {phone ? <View style={{ height: DOCK_CLEARANCE + insets.bottom }} /> : null}
+            <View
+              style={{
+                width: "100%",
+                maxWidth,
+                alignSelf: phone ? "center" : "flex-start",
+                gap: phone ? s.s8 : s.s12,
+              }}
+            >
+              {phone && !heroed ? <PhoneHead title={title} sub={sub} back={back} actions={actions} /> : null}
+              {children}
+              {/* Room to scroll the last row clear of the floating dock. */}
+              {phone ? <View style={{ height: DOCK_CLEARANCE + insets.bottom }} /> : null}
+            </View>
           </View>
         </View>
       </ScrollView>
+      {/* The status bar is see-through on Android: without this, scrolled text runs under the
+          clock. Today's black header stays black behind it. */}
+      {insets.top ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: insets.top,
+            backgroundColor: heroed ? c.head : c.bg,
+          }}
+        />
+      ) : null}
       {footer}
     </View>
+  );
+}
+
+/** Every page's title, on phones and desktop: one role, so no page's title is smaller than another's. */
+export function PageTitle({ title, style }: { title: string; style?: TextStyle }) {
+  return (
+    <Txt variant="headline" heading={1} style={style}>
+      {title}
+    </Txt>
   );
 }
 
@@ -186,11 +225,11 @@ export function PageHead({
   title,
   sub,
   right,
-  big,
 }: {
   title: string;
   sub?: string;
   right?: ReactNode;
+  /** @deprecated Every page title is the same size now (PageTitle); this does nothing. */
   big?: boolean;
 }) {
   const phone = useIsPhone();
@@ -198,9 +237,7 @@ export function PageHead({
   return (
     <View style={{ flexDirection: "row", alignItems: "flex-end", gap: s.s4 }}>
       <View style={{ flex: 1, gap: s.s1 }}>
-        <Txt variant={big ? "headline" : "title"} heading={1}>
-          {title}
-        </Txt>
+        <PageTitle title={title} />
         {sub ? (
           <Txt variant="body" tone="ink3">
             {sub}

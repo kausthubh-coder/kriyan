@@ -1,5 +1,6 @@
 // The Inbox: everything captured without a home. Each row offers Today, Pick a day and Move
-// to space without opening the task. An empty Inbox is the one place the app celebrates.
+// to space without opening the task, with the same words on phones and desktop. An empty Inbox
+// is the one place the app celebrates.
 
 import { useRef, useState } from "react";
 import { View } from "react-native";
@@ -25,15 +26,15 @@ export function InboxScreen() {
   const inbox = useInboxView();
   const { today } = useClock();
   const phone = useIsPhone();
+  const sub = inbox
+    ? inbox.length
+      ? `${inbox.length} without a day or a space`
+      : "Everything has a home"
+    : " ";
   return (
-    <Screen title="Inbox" back>
-      <PageHead
-        title="Inbox"
-        sub={
-          inbox ? (inbox.length ? `${inbox.length} without a day or a space` : "Everything has a home") : " "
-        }
-      />
-      {phone ? null : <QuickAdd variant="inline" placeholder="Capture anything, sort it later" />}
+    <Screen title="Inbox" sub={sub} back>
+      <PageHead title="Inbox" sub={sub} />
+      <QuickAdd variant="inline" placeholder="Capture anything, sort it later" />
       {inbox === undefined ? (
         <View testID="skeleton" style={{ gap: s.s4 }}>
           {[0, 1, 2].map((i) => (
@@ -73,8 +74,9 @@ function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone
   const [open, setOpen] = useState<"day" | "space" | null>(null);
   const dayRef = useRef<View>(null);
   const spaceRef = useRef<View>(null);
-  // Phones show the three as words under the title (icons would push them off a 390px
-  // screen); desktop keeps them on the row, with icons for the two that open a picker.
+  // The same three words at both widths. Phones put them under the title (on the row they
+  // would push the title off a 390px screen); desktop keeps them on the row, centred on the
+  // title's line rather than stretching the row taller than the title.
   const actions = (
     <View
       style={{
@@ -82,22 +84,20 @@ function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone
         flexWrap: "wrap",
         alignItems: "center",
         gap: s.s1,
-        ...(phone ? { marginLeft: 34 - s.s3, marginTop: -s.s2 } : {}),
+        ...(phone ? { marginLeft: 34 - s.s3, marginTop: -s.s2 } : { marginVertical: -s.s1 }),
       }}
     >
       <Button icon={phone ? undefined : Sun} label="Today" onPress={() => void moveTasks([task], today)} />
       <Button
         ref={dayRef}
         icon={phone ? undefined : CalendarDays}
-        label={phone ? "Pick a day" : undefined}
-        accessibilityLabel="Pick a day"
+        label="Pick a day"
         onPress={() => setOpen("day")}
       />
       <Button
         ref={spaceRef}
         icon={phone ? undefined : Layers}
-        label={phone ? "Move to space" : undefined}
-        accessibilityLabel="Move to space"
+        label="Move to space"
         onPress={() => setOpen("space")}
       />
     </View>

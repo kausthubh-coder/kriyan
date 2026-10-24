@@ -22,7 +22,7 @@ import { Check } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
-import { dayRows } from "./dayRows";
+import { dayRows, MIN_GAP } from "./dayRows";
 import { externalDrag, registerSlot } from "./drag";
 import { ReviewCard } from "./ReviewCard";
 
@@ -56,6 +56,8 @@ interface Props {
   reviewAt?: number | null;
   /** Free stretches take tasks dragged from the list (the phone's Today). */
   droppable?: boolean;
+  /** The person's day (Settings). With it, a day with nothing timed offers its whole free stretch. */
+  day?: { start: number; end: number };
 }
 
 /** Opens quick add with the stretch's day and time already in, understood. */
@@ -63,7 +65,7 @@ export function addAt(date: string, minutes: number) {
   router.push(`/add?date=${date}&time=${formatClock(minutes)}`);
 }
 
-export function Spine({ date, items, now, dayStart, reviewAt = null, droppable = false }: Props) {
+export function Spine({ date, items, now, dayStart, reviewAt = null, droppable = false, day }: Props) {
   const timeW = useTimeWidth();
   const ticked = ticking.useValue((t) => t);
   const rows: ReactNode[] = dayRows(items, { now, dayStart, reviewAt }).map((row) => {
@@ -105,7 +107,14 @@ export function Spine({ date, items, now, dayStart, reviewAt = null, droppable =
         );
     }
   });
-  if (!items.some((t) => t.time !== null)) {
+  const emptyFrom = day ? Math.max(day.start, now ?? 0) : null;
+  if (!items.some((t) => t.time !== null) && day && emptyFrom !== null && day.end - emptyFrom >= MIN_GAP) {
+    rows.unshift(
+      <Indented key="gap-day">
+        <FreeGap start={emptyFrom} minutes={day.end - emptyFrom} date={date} droppable={droppable} />
+      </Indented>,
+    );
+  } else if (!items.some((t) => t.time !== null)) {
     rows.unshift(
       <Indented key="empty">
         <View style={{ minHeight: sz.touch, justifyContent: "center" }}>

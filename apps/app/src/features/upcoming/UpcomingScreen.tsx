@@ -1,8 +1,9 @@
-// Upcoming: plan the week. Desktop: a tray of tasks still to plan (Inbox, no date) beside seven
-// day columns with a load line per day (planned against capacity), deadlines and birthdays,
-// and the time grid; drag from the tray onto a day or a time. Phones: the Week (b2.html
-// `weekPhone`), the week strip over the picked day's spine, then what's still to plan.
-// An agent's proposed blocks wait in a banner with Accept all and Discard.
+// Week: plan the week (b2.html `weekDesk`, `weekPhone`). Desktop: a tray of tasks not scheduled
+// yet (Inbox, no date) beside seven day columns with a load line per day (planned against
+// capacity), deadlines and birthdays, and the time grid; drag from the tray onto a day or a
+// time. Phones: the week strip over the picked day's spine, then what's still to plan.
+// An agent's proposed blocks wait in a banner with Accept all and Discard. A full day is never
+// red: red means now, and planning more than usual is the person's call, not a fault.
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
@@ -38,34 +39,30 @@ import { DragGhost } from "@/features/today/DragGhost";
 import { DragSource } from "@/features/today/DragSource";
 import { Spine } from "@/features/today/Spine";
 import { WeekStrip } from "@/features/today/WeekStrip";
-import { c, r, s, shadows, spaceTone, sz } from "@/theme/tokens";
+import { SectionLabel } from "@/features/progress/SectionLabel";
+import { c, family, r, s, shadows, spaceTone, sz } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
-import { Check, Ring, Skeleton } from "@/ui/bits";
+import { Check, Dot, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { PageHead, Screen, SectionHead } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 
-const hours = (m: number) => {
-  const h = Math.round((m / 60) * 10) / 10;
-  return Number.isInteger(h) ? `${h}` : h.toFixed(1);
-};
-
+/** "2 h planned", or "Nothing planned". */
 function loadText(day: WeekView["days"][number]) {
-  const over = day.plannedMinutes - day.capacity;
-  return over > 0
-    ? `${hours(day.plannedMinutes)} h, ${hours(over)} h over`
-    : `${hours(day.plannedMinutes)} of ${hours(day.capacity)} h`;
+  return day.plannedMinutes ? `${formatDuration(day.plannedMinutes)} planned` : "Nothing planned";
 }
 
-function rangeTitle(start: string) {
-  const end = addDays(start, 6);
-  const [, sm, sd] = parts(start);
-  const [, em, ed] = parts(end);
-  return sm === em
-    ? `${sd} to ${ed} ${MONTH_SHORT[em - 1]}`
-    : `${sd} ${MONTH_SHORT[sm - 1]} to ${ed} ${MONTH_SHORT[em - 1]}`;
+/** "15 min past your usual" when the day holds more than the daily capacity in Settings. */
+function pastUsual(day: WeekView["days"][number]) {
+  const past = day.plannedMinutes - day.capacity;
+  return day.capacity > 0 && past > 0 ? `${formatDuration(past)} past your usual` : null;
+}
+
+/** "09:00 → 10:30", as Today's timeline writes a block's span. */
+function span(time: number, length: number | null) {
+  return length ? `${formatClock(time)} → ${formatClock(time + length)}` : formatClock(time);
 }
 
 /** "Mon 19 to Sun 25 Oct", the month once when the week stays in one. */
@@ -113,26 +110,20 @@ export function UpcomingScreen() {
   const week = useWeekView(start);
   const profile = useTodayView()?.profile;
   const thisWeek = start === startOfWeek(today);
-  const planned = week ? week.days.reduce((sum, d) => sum + d.plannedMinutes, 0) : 0;
-  const capacity = week ? week.days.reduce((sum, d) => sum + d.capacity, 0) : 0;
+  const free = week && profile ? weekFree(week, today, now, profile.dayStart, profile.dayEnd) : null;
   const proposals = week
     ? week.days.flatMap((d) => [...d.scheduled, ...d.anytime]).filter((t) => t.proposedBy)
     : [];
   const toPlan = week ? week.inbox.length + week.unscheduled.length : 0;
   const [trayOpen, setTrayOpen] = useState(true);
   const tray = !phone && trayOpen && toPlan > 0;
+  const banner = proposals.length ? <ProposalBanner proposals={proposals} phone={phone} /> : null;
 
   return (
     <View style={{ flex: 1 }}>
       <Screen
-        title={phone ? "Week" : "Upcoming"}
-        sub={
-          phone
-            ? week && profile
-              ? `${weekRange(start)} · ${hours(weekFree(week, today, now, profile.dayStart, profile.dayEnd))} h free`
-              : weekRange(start)
-            : undefined
-        }
+        title="Week"
+        sub={free !== null ? `${weekRange(start)} · ${formatDuration(free)} free` : weekRange(start)}
         actions={
           phone ? (
             <>
@@ -150,16 +141,19 @@ export function UpcomingScreen() {
           ) : null
         }
         width={phone ? "column" : "wide"}
-        footer={proposals.length ? <ProposalBanner proposals={proposals} phone={phone} /> : null}
+        // Phones: in the list's flow, so it never covers a row (it floated over the spine).
+        footer={phone ? null : banner}
       >
+        {phone ? banner : null}
         {phone ? null : (
           <PageHead
-            big
-            title={rangeTitle(start)}
-            sub={week ? `${hours(planned)} h planned of ${hours(capacity)} h` : " "}
+            title="Week"
             right={
               <>
-                {!phone && toPlan ? (
+                <Txt variant="body" tone="ink3" tnum style={{ marginRight: s.s2 }}>
+                  {weekRange(start)}
+                </Txt>
+                {toPlan ? (
                   <Button
                     icon={PanelLeft}
                     label={`To plan ${toPlan}`}
@@ -194,12 +188,40 @@ export function UpcomingScreen() {
             ))}
           </View>
         ) : phone ? (
-          <PhoneWeek week={week} day={day} today={today} now={now} onPick={pickDay} />
+          <PhoneWeek
+            week={week}
+            day={day}
+            today={today}
+            now={now}
+            onPick={pickDay}
+            hours={{
+              start: profile?.dayStart ?? DEFAULT_DAY_START,
+              end: profile?.dayEnd ?? DEFAULT_DAY_END,
+            }}
+          />
         ) : (
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s6 }}>
-            {tray ? <PlanTray inbox={week.inbox} undated={week.unscheduled} /> : null}
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <WeekGrid week={week} today={today} />
+            {tray ? (
+              <PlanTray
+                tasks={[...week.inbox, ...week.unscheduled]}
+                today={today}
+                free={free ? { minutes: free, from: thisWeek ? today : start } : null}
+              />
+            ) : null}
+            <View style={{ flex: 1, minWidth: 0, gap: s.s4 }}>
+              {weekIsEmpty(week) ? (
+                <Txt variant="body" tone="ink3">
+                  {tray
+                    ? "Nothing planned this week yet. Drag a task onto a day, or press N to add one."
+                    : "Nothing planned this week yet. Press N to add a task."}
+                </Txt>
+              ) : null}
+              <WeekGrid
+                week={week}
+                today={today}
+                dayStart={profile?.dayStart ?? DEFAULT_DAY_START}
+                dayEnd={profile?.dayEnd ?? DEFAULT_DAY_END}
+              />
             </View>
           </View>
         )}
@@ -210,35 +232,65 @@ export function UpcomingScreen() {
   );
 }
 
-/** Tasks with no day yet: drag one onto a day (no time) or into the grid (at a time). */
-function PlanTray({ inbox, undated }: { inbox: TaskView[]; undated: TaskView[] }) {
+/** Nothing on any day: no blocks, no anytime tasks, no deadlines. */
+function weekIsEmpty(week: WeekView) {
+  return week.days.every((d) => !d.scheduled.length && !d.anytime.length && !d.deadlines.length);
+}
+
+/** The profile's defaults (convex/model/owner.ts), for the moment before Today's view loads. */
+const DEFAULT_DAY_START = 8 * 60;
+const DEFAULT_DAY_END = 22 * 60;
+
+/**
+ * Tasks not scheduled yet (b2.html `.wk-inbox`): drag one onto a day (no time) or into the
+ * grid (at a time). Then how much free time the rest of the week holds.
+ */
+function PlanTray({
+  tasks,
+  today,
+  free,
+}: {
+  tasks: TaskView[];
+  today: CivilDate;
+  free: { minutes: number; from: CivilDate } | null;
+}) {
   return (
-    <View aria-label="To plan" style={{ width: sz.tray, gap: s.s6, paddingTop: s.s1 }}>
-      <Txt variant="meta" tone="ink3">
-        Drag a task onto a day, or onto a time.
-      </Txt>
-      {inbox.length ? (
-        <View>
-          <SectionHead title="Inbox" meta={String(inbox.length)} />
-          {inbox.map((t) => (
-            <TrayRow key={t._id} task={t} />
-          ))}
-        </View>
-      ) : null}
-      {undated.length ? (
-        <View>
-          <SectionHead title="No date" meta={String(undated.length)} />
-          {undated.map((t) => (
-            <TrayRow key={t._id} task={t} />
-          ))}
-        </View>
+    <View
+      aria-label="Not scheduled yet"
+      style={{
+        width: sz.tray,
+        gap: s.s2,
+        paddingRight: s.s6,
+        borderRightWidth: 1,
+        borderRightColor: c.line,
+        alignSelf: "stretch",
+      }}
+    >
+      <View style={{ gap: s.s1, paddingBottom: s.s1 }}>
+        <SectionLabel title="Not scheduled yet" count={String(tasks.length)} />
+        <Txt variant="meta" tone="ink3">
+          Drag a task onto the week to give it a time.
+        </Txt>
+      </View>
+      {tasks.map((t) => (
+        <TrayCard key={t._id} task={t} today={today} />
+      ))}
+      {free && free.minutes > 0 ? (
+        <Txt variant="meta" tone="ink3" style={{ paddingTop: s.s2 }}>
+          Free this week: {formatDuration(free.minutes)} between {WEEKDAY_SHORT[weekday(free.from)]} and Sun.
+        </Txt>
       ) : null}
     </View>
   );
 }
 
-function TrayRow({ task }: { task: TaskView }) {
+/** One task to plan: its title, then its length (or "No length") and its due date. */
+function TrayCard({ task, today }: { task: TaskView; today: CivilDate }) {
   const tone = spaceTone(task.color);
+  const meta = [
+    task.length ? formatDuration(task.length) : "No length",
+    ...(task.deadline ? [`due ${formatDay(task.deadline, today)}`] : []),
+  ].join(" · ");
   return (
     <DragSource taskId={task._id} title={task.title} color={tone.dot} length={task.length}>
       <Press
@@ -248,31 +300,28 @@ function TrayRow({ task }: { task: TaskView }) {
         scale={false}
         style={{
           flexDirection: "row",
-          alignItems: "center",
+          alignItems: "flex-start",
           gap: s.s2,
-          minHeight: sz.ctl,
-          paddingVertical: s.s1,
-          paddingHorizontal: s.s2,
-          marginHorizontal: -s.s2,
-          borderRadius: r.ctl,
+          paddingVertical: s.s2,
+          paddingHorizontal: s.s3,
+          borderRadius: r.card,
+          borderWidth: 1,
+          borderColor: c.line,
+          backgroundColor: c.raised,
         }}
       >
-        <Ring color={task.color ? tone.dot : c.ink3} done={false} size={14} />
+        {/* Level with the title's first line. */}
+        <View style={{ marginTop: 6 }}>
+          <Dot color={task.color ? tone.dot : c.ink3} />
+        </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt variant="label" numberOfLines={1}>
+          <Txt variant="label" numberOfLines={2}>
             {task.title}
           </Txt>
-          {task.spacePath ? (
-            <Txt variant="meta" tone="ink3" numberOfLines={1}>
-              {task.spacePath}
-            </Txt>
-          ) : null}
-        </View>
-        {task.length ? (
-          <Txt variant="meta" tone="ink3" tnum>
-            {formatDuration(task.length)}
+          <Txt variant="meta" tone="ink3" numberOfLines={2}>
+            {meta}
           </Txt>
-        ) : null}
+        </View>
       </Press>
     </DragSource>
   );
@@ -291,14 +340,11 @@ function ProposalBanner({ proposals, phone }: { proposals: TaskView[]; phone: bo
   return (
     <View
       role="status"
-      style={{
-        position: "absolute",
-        bottom: phone ? 168 : s.s6,
-        left: phone ? s.s4 : 0,
-        right: phone ? s.s4 : 0,
-        alignItems: "center",
-        zIndex: 6,
-      }}
+      style={
+        phone
+          ? undefined
+          : { position: "absolute", bottom: s.s6, left: 0, right: 0, alignItems: "center", zIndex: 6 }
+      }
       pointerEvents="box-none"
     >
       <View
@@ -311,8 +357,8 @@ function ProposalBanner({ proposals, phone }: { proposals: TaskView[]; phone: bo
           paddingLeft: s.s4,
           paddingRight: s.s2,
           borderRadius: r.card,
-          backgroundColor: c.overlay,
-          boxShadow: shadows.overlay,
+          backgroundColor: phone ? c.raised : c.overlay,
+          boxShadow: phone ? shadows.raised : shadows.overlay,
         }}
       >
         <Icon icon={Bot} />
@@ -328,14 +374,12 @@ function ProposalBanner({ proposals, phone }: { proposals: TaskView[]; phone: bo
   );
 }
 
+/** Planned against the day's capacity. A day past it fills to the end, in ink like any other. */
 function LoadLine({ day }: { day: WeekView["days"][number] }) {
-  const over = day.plannedMinutes > day.capacity;
   const p = day.capacity > 0 ? Math.min(1, day.plannedMinutes / day.capacity) : 0;
   return (
     <View style={{ height: 2, borderRadius: 1, backgroundColor: c.lineStrong, overflow: "hidden" }}>
-      <View
-        style={{ width: `${Math.round(p * 100)}%`, height: "100%", backgroundColor: over ? c.now : c.ink3 }}
-      />
+      <View style={{ width: `${Math.round(p * 100)}%`, height: "100%", backgroundColor: c.ink3 }} />
     </View>
   );
 }
@@ -367,7 +411,7 @@ function Anytime({ task }: { task: TaskView }) {
           variant="meta"
           tone={task.done || ticked ? "ink3" : "ink2"}
           strike={task.done || ticked}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {task.title}
         </Txt>
@@ -385,10 +429,10 @@ function Due({ task }: { task: TaskView }) {
       onPress={() => openTask(task._id)}
       hoverBg={null}
       scale={false}
-      style={{ flexDirection: "row", alignItems: "center", gap: s.s1, minHeight: 24 }}
+      style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s1, minHeight: 24, paddingTop: s.s1 }}
     >
       <Icon icon={birthday ? Cake : Flag} size={14} />
-      <Txt variant="meta" tone="ink2" numberOfLines={1} style={{ flexShrink: 1 }}>
+      <Txt variant="meta" tone="ink2" numberOfLines={2} style={{ flexShrink: 1 }}>
         {birthday ? task.title : `${task.title} due`}
       </Txt>
     </Press>
@@ -401,14 +445,28 @@ const HEADER_ITEMS = 3;
 /** The hour labels' column, left of the day columns. */
 const GUTTER = 56;
 
-function WeekGrid({ week, today }: { week: WeekView; today: string }) {
+function WeekGrid({
+  week,
+  today,
+  dayStart,
+  dayEnd,
+}: {
+  week: WeekView;
+  today: string;
+  dayStart: number;
+  dayEnd: number;
+}) {
   const H = 44;
   // One switch for the whole week, so the day columns' headers stay the same height.
   const [allShown, setAllShown] = useState(false);
   const allTimed = week.days.flatMap((d) => d.scheduled);
-  const from = Math.min(8, ...allTimed.map((t) => Math.floor((t.time ?? 480) / 60)));
+  // The person's day from Settings, stretched to fit anything planned outside it.
+  const from = Math.min(
+    Math.floor(dayStart / 60),
+    ...allTimed.map((t) => Math.floor((t.time ?? dayStart) / 60)),
+  );
   const to = Math.max(
-    20,
+    Math.ceil(dayEnd / 60),
     ...allTimed.map((t) => Math.ceil(((t.time ?? 0) + Math.max(t.length ?? 0, 30)) / 60)),
   );
   const y = (m: number) => ((m - from * 60) / 60) * H;
@@ -459,7 +517,7 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
       <View style={{ flexDirection: "row" }} onLayout={(e) => setHeadH(e.nativeEvent.layout.height)}>
         <View style={{ width: GUTTER }} />
         {week.days.map((d, i) => {
-          const over = d.plannedMinutes > d.capacity;
+          const past = pastUsual(d);
           const allDay = [...d.deadlines, ...d.anytime.filter((t) => t.repeat?.freq === "year")];
           const anytime = d.anytime.filter((t) => t.repeat?.freq !== "year");
           const items = [
@@ -481,18 +539,31 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
                 backgroundColor: target ? c.hover : "transparent",
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "baseline", gap: s.s2 }}>
-                <Txt variant="label" tone={d.isToday ? "ink" : "ink2"} accessibilityLabel={WEEKDAY_LONG[i]}>
+              {/* b2.html `.wk-head`: the weekday in small capitals over the date; today's in red. */}
+              <View>
+                <Txt
+                  variant="caption"
+                  tone={d.isToday ? "now" : "ink3"}
+                  accessibilityLabel={WEEKDAY_LONG[i]}
+                  style={{ ...family("600"), textTransform: "uppercase", letterSpacing: 0.6 }}
+                >
                   {WEEKDAY_SHORT[i]}
                 </Txt>
-                <Txt variant="meta" tone={d.isToday ? "now" : "ink3"} tnum>
+                <Txt variant="title" tone={d.isToday ? "now" : "ink"} tnum>
                   {parts(d.date)[2]}
                 </Txt>
               </View>
               <LoadLine day={d} />
-              <Txt variant="meta" tone={over ? "now" : "ink3"} tnum numberOfLines={1}>
-                {loadText(d)}
-              </Txt>
+              <View>
+                <Txt variant="meta" tone="ink3" tnum>
+                  {loadText(d)}
+                </Txt>
+                {past ? (
+                  <Txt variant="meta" tone="ink3" tnum>
+                    {past}
+                  </Txt>
+                ) : null}
+              </View>
               <View style={{ minHeight: 16, gap: 2 }}>
                 {shown.map(({ t, anytime }) =>
                   anytime ? <Anytime key={t._id} task={t} /> : <Due key={t._id} task={t} />,
@@ -595,45 +666,41 @@ function WeekGrid({ week, today }: { week: WeekView; today: string }) {
                       onPress={() => openTask(t._id)}
                       hoverBg={null}
                       scale={false}
+                      // b2.html `.ev`: the space's colour as a bar down the left edge over its
+                      // surface; done blocks go grey, proposed ones are dashed until accepted.
                       style={({ hovered }) => ({
                         flex: 1,
-                        flexDirection: "row",
-                        gap: s.s1,
                         paddingVertical: s.s1,
-                        paddingHorizontal: s.s2,
+                        // Narrow columns: room for "09:00 → 10:30" beside the colour bar.
+                        paddingLeft: s.s2,
+                        paddingRight: s.s1,
                         borderRadius: r.ctl,
                         overflow: "hidden",
-                        backgroundColor: proposed ? c.bg : t.done ? "transparent" : tone.surface,
-                        borderWidth: proposed || t.done || hovered || depth ? 1 : 0,
-                        borderColor: proposed ? tone.dot : t.done || hovered ? c.lineStrong : c.bg,
+                        backgroundColor: proposed ? c.bg : t.done ? c.sunken : tone.surface,
+                        borderLeftWidth: 3,
+                        borderLeftColor: t.done ? c.lineStrong : tone.dot,
+                        ...(proposed
+                          ? { borderWidth: 1, borderStyle: "dashed" as const, borderColor: tone.dot }
+                          : {}),
+                        // A block on top of another keeps an edge, so the one below stays readable.
+                        ...(depth && !proposed ? { borderWidth: 1, borderColor: c.bg } : {}),
+                        boxShadow: hovered ? `inset 0 0 0 999px ${c.hover}` : undefined,
                       })}
                     >
-                      {t.event ? (
-                        <View
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: tone.dot,
-                            marginTop: 5,
-                          }}
-                        />
-                      ) : null}
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Txt
-                          variant="caption"
-                          tone={t.done ? "ink3" : "ink"}
-                          strike={t.done}
-                          numberOfLines={1}
-                        >
-                          {t.title}
+                      <Txt
+                        variant="caption"
+                        tone={t.done ? "ink3" : "ink"}
+                        strike={t.done}
+                        numberOfLines={1}
+                        style={family("600")}
+                      >
+                        {t.title}
+                      </Txt>
+                      {h >= 40 ? (
+                        <Txt variant="meta" tone={t.done ? "ink3" : "ink2"} tnum numberOfLines={1}>
+                          {span(t.time ?? 0, t.length)}
                         </Txt>
-                        {h >= 40 ? (
-                          <Txt variant="meta" tone="ink2" tnum numberOfLines={1}>
-                            {formatClock(t.time ?? 0)}
-                          </Txt>
-                        ) : null}
-                      </View>
+                      ) : null}
                     </Press>
                   </View>
                 );
@@ -701,12 +768,14 @@ function PhoneWeek({
   today,
   now,
   onPick,
+  hours,
 }: {
   week: WeekView;
   day: CivilDate;
   today: CivilDate;
   now: number;
   onPick: (date: CivilDate) => void;
+  hours: { start: number; end: number };
 }) {
   const sel = week.days.find((d) => d.date === day);
   const anytime = sel ? [...sel.deadlines, ...sel.anytime] : [];
@@ -715,7 +784,7 @@ function PhoneWeek({
     <>
       <View style={{ gap: s.s3 }}>
         <WeekStrip today={today} selected={day} onSelect={onPick} />
-        <Spine date={day} items={sel?.scheduled ?? []} now={day === today ? now : null} />
+        <Spine date={day} items={sel?.scheduled ?? []} now={day === today ? now : null} day={hours} />
       </View>
       {anytime.length ? (
         <View style={{ gap: s.s1 }}>
@@ -732,12 +801,60 @@ function PhoneWeek({
           <SectionHead title="Not scheduled yet" meta={String(toPlan.length)} />
           {toPlan.map((t) => (
             <DottedRow key={t._id}>
-              <TaskRow task={t} today={today} />
+              <PlaceRow task={t} day={day} today={today} />
             </DottedRow>
           ))}
         </View>
       ) : null}
     </>
+  );
+}
+
+/**
+ * A task with no day yet (b2.html `.tray-r`): its space's dot, its length and due date, and
+ * Place, which puts it on the day picked in the strip above. Its time is then a tap away in
+ * the task, or a drag on desktop.
+ */
+function PlaceRow({ task, day, today }: { task: TaskView; day: CivilDate; today: CivilDate }) {
+  const tone = spaceTone(task.color);
+  const meta = [
+    task.length ? formatDuration(task.length) : "No length",
+    ...(task.deadline ? [`due ${formatDay(task.deadline, today)}`] : []),
+  ].join(" · ");
+  const where = formatDay(day, today);
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s3,
+        minHeight: sz.touch,
+        paddingVertical: s.s2,
+      }}
+    >
+      <Dot color={task.color ? tone.dot : c.ink3} />
+      <Press
+        role="button"
+        accessibilityLabel={`Open ${task.title}`}
+        onPress={() => openTask(task._id)}
+        hoverBg={null}
+        scale={false}
+        style={{ flex: 1, minWidth: 0 }}
+      >
+        <Txt variant="label" numberOfLines={2}>
+          {task.title}
+        </Txt>
+        <Txt variant="meta" tone="ink3" numberOfLines={1}>
+          {meta}
+        </Txt>
+      </Press>
+      <Button
+        label="Place"
+        accessibilityLabel={`Place ${task.title} on ${where}`}
+        onPress={() => void moveTasks([task], day)}
+        style={{ borderRadius: r.pill, backgroundColor: c.hover }}
+      />
+    </View>
   );
 }
 

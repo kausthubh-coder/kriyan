@@ -21,7 +21,7 @@ One file per user-facing feature. Each lists every entry point a person uses, ho
 
 - [Capture](./capture.md): one sentence becomes a task, from Today's field, quick add, the command menu, the API and the CLI.
 - [Today and the timeline](./today.md): what's next, anytime tasks, the schedule, drag, resize, the "Earlier today" fold, moving a row (hover or swipe), Close the day, Plan today, row selection.
-- Planning the week: Upcoming's "To plan" tray (Inbox and undated tasks) drags onto a day's header (that day, no time) or into the grid (at a time). `node apps/app/e2e/plan-week.mjs` after `seed.mjs`.
+- Planning the week: the Week's "Not scheduled yet" tray (Inbox and undated tasks; the toolbar's "To plan" button shows or hides it) drags onto a day's header (that day, no time) or into the grid (at a time). `node apps/app/e2e/plan-week.mjs` after `seed.mjs`.
 - [Complete and repeat](./complete-repeat.md): tick off, undo, a repeating task moving to its next date.
 - Undo and Recently deleted: a toast's 5 seconds stop while the pointer or focus is on it; Ctrl+Z (outside text fields) runs the newest toast's Undo; Recently deleted (`/trash`, from Settings' "Open recently deleted" or the command menu) lists deleted tasks by the day they were deleted, each with `button "Restore <title>"`, for 30 days. `node apps/app/e2e/undo-and-trash.mjs` after `seed.mjs` (both widths).
 - Habits: check-ins on Today; on Progress each habit has its history, "Fix a day" and "Edit habit" (name, times a week, "Archive habit" with Undo). The seed has no habit; `node apps/app/e2e/habit-edit.mjs` adds one through the API and drives the editor.

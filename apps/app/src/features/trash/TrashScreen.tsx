@@ -21,6 +21,8 @@ import { Txt } from "@/ui/Txt";
 
 type Deleted = FunctionReturnType<typeof api.views.trash>[number];
 
+const SUB = "Deleted tasks wait here for 30 days";
+
 export function TrashScreen() {
   const trash = useTrashView();
   const { today, timeZone } = useClock();
@@ -30,8 +32,8 @@ export function TrashScreen() {
     days.set(day, [...(days.get(day) ?? []), task]);
   }
   return (
-    <Screen title="Recently deleted" back>
-      <PageHead title="Recently deleted" sub="Deleted tasks wait here for 30 days" />
+    <Screen title="Recently deleted" sub={SUB} back>
+      <PageHead title="Recently deleted" sub={SUB} />
       {trash === undefined ? (
         <View testID="skeleton" style={{ gap: s.s4 }}>
           {[0, 1, 2].map((i) => (
@@ -41,11 +43,9 @@ export function TrashScreen() {
       ) : trash.length === 0 ? (
         <View style={{ gap: s.s3, paddingVertical: s.s6, alignItems: "flex-start" }}>
           <Icon icon={Trash2} size={24} tone="ink2" />
+          {/* The subtitle already says how long a task waits here. */}
           <Txt variant="label" heading={2}>
             Nothing deleted
-          </Txt>
-          <Txt variant="body" tone="ink3" style={{ maxWidth: 420 }}>
-            A task you delete waits here for 30 days, so you can bring it back.
           </Txt>
         </View>
       ) : (
