@@ -136,7 +136,7 @@ export function SignIn() {
         <View style={{ gap: s.s6 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
             <Mark size={28} />
-            <Txt variant="title">kriyan</Txt>
+            <Txt variant="title">Kriyan</Txt>
           </View>
           <View style={{ gap: s.s2 }}>
             <Txt variant="headline" heading={1}>

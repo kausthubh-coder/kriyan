@@ -220,7 +220,7 @@ export function Sidebar() {
             the nav icons' column and the word on their labels' edge. */}
         <Mark size={18} />
         <Txt variant="subhead" tone="ink2">
-          kriyan
+          Kriyan
         </Txt>
       </View>
       <Press
