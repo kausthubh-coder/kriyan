@@ -53,13 +53,14 @@ console.log(`reset    ${userId}`);
 if (!process.argv.includes("--reset")) {
   const space = async (name, color, parentId) =>
     (await op("add_space", { name, color, ...(parentId ? { parentId } : {}) })).spaceId;
+  // Distinct colours, as people pick them, so a block that ignores its space's colour shows.
   const work = await space("Work", "blue");
   await space("Kriyan", "blue", work);
-  await space("Clients", "blue", work);
-  const school = await space("School", "blue");
-  await space("Calculus", "blue", school);
-  await space("Physics", "blue", school);
-  await space("Life", "blue");
+  await space("Clients", "pink", work);
+  const school = await space("School", "green");
+  await space("Calculus", "purple", school);
+  await space("Physics", "teal", school);
+  await space("Life", "orange");
 
   const sentences = [
     "Write MCP tools today 10:00 for 1h30 #work/kriyan",
