@@ -5,7 +5,7 @@ The Android app is the same Expo app as the web, with native navigation, gesture
 ## Sub-features
 
 - `android-open` the dev build opens signed in on Today with the seeded plan.
-- `android-nav` the Today, Upcoming, Inbox and Browse tabs; Back from Today leaves the app.
+- `android-nav` the Today, Week, Goals and Ask tabs in the dock (Inbox, spaces and Settings are reached from Ask); Back from Today leaves the app.
 - `android-gestures` long-press an anytime row and drag it onto the timeline; drag and resize blocks.
 - `android-sheets` the task panel opens as a native sheet (two heights, swipe down to close); quick add opens from the `Add task` button.
 

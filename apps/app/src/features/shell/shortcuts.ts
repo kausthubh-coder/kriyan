@@ -1,5 +1,5 @@
 // Keyboard shortcuts on the web: N new task, Ctrl K command menu, T Today, U Upcoming,
-// I Inbox, J and K move, Enter open, X complete, D date, R repeat, M move to space,
+// I Inbox, A Ask, J and K move, Enter open, X complete, D date, R repeat, M move to space,
 // Delete delete (with Undo), Ctrl Z the newest Undo, Escape close. Typing in a field never
 // triggers them.
 
@@ -64,6 +64,9 @@ export function useShortcuts() {
           return;
         case "i":
           router.navigate("/inbox");
+          return;
+        case "a":
+          router.navigate("/ask");
           return;
         case "j":
         case "k":

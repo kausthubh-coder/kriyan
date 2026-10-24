@@ -17,6 +17,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="today" />
       <Tabs.Screen name="upcoming" />
       <Tabs.Screen name="progress" />
+      <Tabs.Screen name="ask" />
+      {/* Only redirects old links to Ask. */}
       <Tabs.Screen name="browse" />
     </Tabs>
   );

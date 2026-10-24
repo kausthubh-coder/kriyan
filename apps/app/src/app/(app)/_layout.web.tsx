@@ -4,6 +4,7 @@
 
 import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
+import { ASK_BAR_HEIGHT } from "@/features/ask/AskBar";
 import { CommandMenu } from "@/features/shell/CommandMenu";
 import { Dock, DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { useSession } from "@/features/shell/session";
@@ -52,7 +53,8 @@ export default function AppLayout() {
         </Stack>
       </View>
       {dock ? <Dock /> : null}
-      <ToastHost bottom={phone ? DOCK_CLEARANCE : s.s6} />
+      {/* On a phone's Ask, above the ask box as well as the dock. */}
+      <ToastHost bottom={phone ? DOCK_CLEARANCE + (path === "/ask" ? ASK_BAR_HEIGHT : 0) : s.s6} />
       <CommandMenu />
     </View>
   );

@@ -1,5 +1,5 @@
-// The command menu (Ctrl K): add a task from one sentence, go anywhere, find a space or a
-// task. Opens with no animation, cursor in the field; every command shows its shortcut.
+// The command menu (Ctrl K): add a task from one sentence, go anywhere, ask Kriyan, find a
+// space or a task. Opens with no animation, cursor in the field; every command shows its shortcut.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
@@ -18,17 +18,20 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Sun,
   Target,
   type LucideIcon,
 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
+import { understand } from "@kriyan/core/ask";
 import { addDays, startOfWeek } from "@kriyan/core/dates";
 import { formatDay } from "@kriyan/core/format";
 import { parseTask } from "@kriyan/core/parse";
 import { useClock } from "@/data/time";
 import { useInboxView, useSpaces, useTodayView, useWeekView, type TaskView } from "@/data/views";
 import { closeDay, completeTask, deleteTask, errorText, moveTasks } from "@/features/tasks/actions";
+import { openAgentSettings } from "@/features/ask/agents";
 import { findSpace } from "@/features/tasks/QuickAdd";
 import { useIsPhone, useType } from "@/theme/layout";
 import { c, hex, r, s, shadows, spaceTone } from "@/theme/tokens";
@@ -43,7 +46,7 @@ import { rowRegistry } from "./rows";
 
 interface Item {
   key: string;
-  group: "Add" | "Go to" | "Selected task" | "Today" | "Spaces" | "Tasks";
+  group: "Add" | "Go to" | "Ask" | "Selected task" | "Today" | "Spaces" | "Tasks";
   label: string;
   icon?: LucideIcon;
   leading?: ReactNode;
@@ -53,14 +56,28 @@ interface Item {
   run: () => void | Promise<void>;
 }
 
-const GO: { label: string; href: Href; icon: LucideIcon; kbd?: string; keywords?: string }[] = [
+// Keywords only match; they aren't shown, so labels keep their room (a phone truncated them).
+const GO: {
+  label: string;
+  href: Href;
+  icon: LucideIcon;
+  kbd?: string;
+  keywords?: string;
+  go?: () => void;
+}[] = [
   { label: "Today", href: "/today", icon: Sun, kbd: "T" },
-  { label: "Upcoming", href: "/upcoming", icon: CalendarDays, kbd: "U", keywords: "week plan" },
+  { label: "Week", href: "/upcoming", icon: CalendarDays, kbd: "U", keywords: "upcoming plan" },
   { label: "Inbox", href: "/inbox", icon: Inbox, kbd: "I" },
-  { label: "Browse spaces", href: "/browse", icon: Layers, keywords: "spaces" },
-  { label: "Progress", href: "/progress", icon: Target, keywords: "goals habits heatmap time" },
+  { label: "Ask Kriyan", href: "/ask", icon: Sparkles, kbd: "A", keywords: "assistant agents automations" },
+  { label: "Goals and habits", href: "/progress", icon: Target, keywords: "progress heatmap time" },
   { label: "Settings", href: "/settings", icon: SlidersHorizontal, keywords: "tokens reminders day" },
-  { label: "Connect an AI", href: "/settings", icon: Bot, keywords: "mcp, claude, chatgpt" },
+  {
+    label: "Connect an agent",
+    href: "/settings",
+    icon: Bot,
+    keywords: "ai mcp claude chatgpt codex cli token",
+    go: openAgentSettings,
+  },
   { label: "Recently deleted", href: "/trash", icon: Trash2, keywords: "trash restore undo" },
 ];
 
@@ -82,6 +99,7 @@ function Menu() {
   const todayView = useTodayView();
   const week = useWeekView(startOfWeek(today));
   const addText = useMutation(api.tasks.addText);
+  const ask = useMutation(api.assistant.send);
   const selectedId = selection.useValue((st) => st.taskId);
   const selected = selectedId ? rowRegistry.get(selectedId) : undefined;
   const input = useRef<TextInput>(null);
@@ -98,6 +116,27 @@ function Menu() {
 
   const items: Item[] = useMemo(() => {
     const out: Item[] = [];
+    // Anything typed can go to Ask (b2.html: Ctrl K reaches Ask on desktop). A question or a
+    // request ("what's next", "move the lab to 3pm") leads, so Enter asks it; anything that reads
+    // as a task, even with a date, still adds on Enter, with Ask after Go to.
+    const askItem: Item | null = q
+      ? {
+          key: "ask",
+          group: "Ask",
+          label: `Ask Kriyan “${query.trim()}”`,
+          icon: Sparkles,
+          run: async () => {
+            router.navigate("/ask");
+            try {
+              await ask({ text: query.trim() });
+            } catch (e) {
+              showToast(errorText(e));
+            }
+          },
+        }
+      : null;
+    const asking = q !== "" && understand(query.trim(), () => true).kind !== "add";
+    if (askItem && asking) out.push(askItem);
     if (parsed && parsed.title) {
       const space = parsed.spaceName ? findSpace(spaces, parsed.spaceName) : undefined;
       const bits = [
@@ -159,10 +198,10 @@ function Menu() {
         label: g.label,
         icon: g.icon,
         kbd: g.kbd,
-        hint: q ? undefined : g.keywords,
-        run: () => router.navigate(g.href),
+        run: g.go ?? (() => router.navigate(g.href)),
       });
     }
+    if (askItem && !asking) out.push(askItem);
     // The selected row's commands, each with its key. After Go to, so Enter on an empty menu
     // never changes a task.
     if (selected) {
@@ -203,7 +242,6 @@ function Menu() {
         group: "Today",
         label: "Close the day",
         icon: Moon,
-        hint: q ? undefined : "move what's left to tomorrow",
         run: () => void closeDay(today),
       });
     }
@@ -242,7 +280,7 @@ function Menu() {
       }
     }
     return out;
-  }, [parsed, q, query, spaces, today, todayView, inbox, week, addText, selected]);
+  }, [parsed, q, query, spaces, today, todayView, inbox, week, addText, ask, selected]);
 
   const current = Math.min(index, Math.max(0, items.length - 1));
   const run = (item: Item | undefined) => {
@@ -300,7 +338,9 @@ function Menu() {
               setQuery(v);
               setIndex(0);
             }}
-            placeholder="Search, go to, or type a task like “call mum fri 6pm”"
+            placeholder={
+              phone ? "Search or type a task" : "Search, go to, or type a task like “call mum fri 6pm”"
+            }
             placeholderTextColor={hex.ink3}
             accessibilityLabel="Search or type a task"
             autoCapitalize="none"

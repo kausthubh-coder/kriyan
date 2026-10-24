@@ -5,7 +5,7 @@
 
 import { View } from "react-native";
 import { router, usePathname, type Href } from "expo-router";
-import { Layers, Plus, Sun, Target, Table2, type LucideIcon } from "lucide-react-native";
+import { Plus, Sparkles, Sun, Target, Table2, type LucideIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { c, s, shadows } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
@@ -14,24 +14,25 @@ import { Txt } from "@/ui/Txt";
 
 /** The pill's height, its gap above the bottom edge, and the room content leaves under it. */
 export const DOCK_HEIGHT = 60;
-export const DOCK_GAP = 14;
+// On the spacing scale: the prototype's 14, 10 and 5 round to 12, 8 and 4.
+export const DOCK_GAP = s.s3;
 export const DOCK_CLEARANCE = DOCK_HEIGHT + DOCK_GAP + s.s4;
 
 const FAB = 58;
 const MAX_WIDTH = 528;
 
-// The prototype's fourth tab is Ask, which isn't built yet; Browse holds the Inbox, spaces,
-// search and Settings until it is.
+// Ask is the fourth tab (b2.html `asknav`). The places reached from it on a phone (the Inbox,
+// spaces, Settings, Recently deleted) keep it lit, so the dock still says where you are.
 const TABS: { href: Href; match: (p: string) => boolean; icon: LucideIcon; label: string }[] = [
   { href: "/today", match: (p) => p === "/today" || p === "/", icon: Sun, label: "Today" },
   { href: "/upcoming", match: (p) => p === "/upcoming", icon: Table2, label: "Week" },
   { href: "/progress", match: (p) => p === "/progress", icon: Target, label: "Goals" },
   {
-    href: "/browse",
+    href: "/ask",
     match: (p) =>
-      p === "/browse" || p === "/inbox" || p.startsWith("/space/") || p === "/settings" || p === "/trash",
-    icon: Layers,
-    label: "Browse",
+      p === "/ask" || p === "/inbox" || p.startsWith("/space/") || p === "/settings" || p === "/trash",
+    icon: Sparkles,
+    label: "Ask",
   },
 ];
 
@@ -58,7 +59,7 @@ export function Dock() {
           paddingHorizontal: DOCK_GAP,
           flexDirection: "row",
           alignItems: "center",
-          gap: 10,
+          gap: s.s2,
         }}
       >
         <View
@@ -70,7 +71,7 @@ export function Dock() {
             flexDirection: "row",
             justifyContent: "space-around",
             alignItems: "center",
-            padding: 5,
+            padding: s.s1,
             borderRadius: DOCK_HEIGHT / 2,
             borderWidth: 1,
             borderColor: c.line,
@@ -95,7 +96,7 @@ export function Dock() {
                 style={{
                   minWidth: 58,
                   height: 48,
-                  paddingHorizontal: 10,
+                  paddingHorizontal: s.s2,
                   borderRadius: 24,
                   alignItems: "center",
                   justifyContent: "center",

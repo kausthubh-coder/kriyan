@@ -1,10 +1,11 @@
 // Android: a native stack over native tabs. The task opens as a sheet with two heights,
 // quick add as a sheet that fits its content above the keyboard.
 
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNotifications } from "@/features/notifications/register";
+import { ASK_BAR_HEIGHT } from "@/features/ask/AskBar";
 import { CommandMenu } from "@/features/shell/CommandMenu";
 import { DOCK_CLEARANCE } from "@/features/shell/Dock";
 import { TASK_SHEET_DETENTS } from "@/features/tasks/TaskPanel";
@@ -19,6 +20,7 @@ export default function AppLayout() {
   useSession();
   useNotifications();
   const insets = useSafeAreaInsets();
+  const path = usePathname();
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View
@@ -60,8 +62,8 @@ export default function AppLayout() {
           }}
         />
       </Stack>
-      {/* Above the floating dock. */}
-      <ToastHost bottom={insets.bottom + DOCK_CLEARANCE} />
+      {/* Above the floating dock, and on Ask above the ask box too. */}
+      <ToastHost bottom={insets.bottom + DOCK_CLEARANCE + (path === "/ask" ? ASK_BAR_HEIGHT : 0)} />
       <CommandMenu />
     </View>
   );

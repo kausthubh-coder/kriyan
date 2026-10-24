@@ -15,6 +15,8 @@ export type SpaceNode = FunctionReturnType<typeof api.views.spaces>[number];
 export type TaskDoc = NonNullable<FunctionReturnType<typeof api.views.task>>;
 export type TaskView = TodayView["anytime"][number];
 export type Profile = FunctionReturnType<typeof api.account.profile>;
+export type AskView = FunctionReturnType<typeof api.assistant.asks>[number];
+export type ActionView = FunctionReturnType<typeof api.assistant.activity>[number];
 
 function useAuthed() {
   return useConvexAuth().isAuthenticated;
@@ -67,4 +69,15 @@ export function useProfile() {
 
 export function useAccessTokens() {
   return useQuery(api.account.tokens, useAuthed() ? {} : "skip");
+}
+
+/** The Ask conversation, oldest first. */
+export function useAsks() {
+  return useQuery(api.assistant.asks, useAuthed() ? {} : "skip");
+}
+
+/** What agents did over the last `days` days, today included, newest first. */
+export function useActivity(days: number) {
+  const { today } = useClock();
+  return useQuery(api.assistant.activity, useAuthed() ? { today, days } : "skip");
 }
