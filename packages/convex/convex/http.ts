@@ -60,10 +60,25 @@ export function validatorMessage(message: string): string | null {
   return lines.slice(0, 3).join(" ").slice(0, 500);
 }
 
+/** An MCP client's self-reported name, as people know it. */
+export function clientName(raw: string | null): string {
+  const id = (raw ?? "").toLowerCase();
+  if (id.includes("claude")) return "Claude";
+  if (id.includes("openai") || id.includes("chatgpt")) return "ChatGPT";
+  if (id.includes("codex")) return "Codex";
+  if (id.includes("cursor")) return "Cursor";
+  const clean = (raw ?? "")
+    .replace(/[^\w .-]/g, "")
+    .trim()
+    .slice(0, 40);
+  return clean ? clean[0]!.toUpperCase() + clean.slice(1) : "Your AI";
+}
+
+/** Who is calling: the owner, and a name for the activity log (the token's or client's name). */
 async function authenticate(
   ctx: Parameters<Parameters<typeof httpAction>[0]>[0],
   req: Request,
-): Promise<string | null> {
+): Promise<{ ownerId: string; name: string } | null> {
   const bearer = req.headers
     .get("authorization")
     ?.replace(/^Bearer\s+/i, "")
@@ -73,11 +88,13 @@ async function authenticate(
   const user = req.headers.get("x-kriyan-user");
   const issuer = env.CLERK_JWT_ISSUER_DOMAIN;
   if (secret && issuer && user && (await sameSecret(bearer, secret)))
-    return CLERK_USER.test(user) ? `${issuer}|${user}` : null;
+    return CLERK_USER.test(user)
+      ? { ownerId: `${issuer}|${user}`, name: clientName(req.headers.get("x-kriyan-client")) }
+      : null;
   const found = await ctx.runQuery(internal.http.tokenOwner, { token: bearer });
   if (!found) return null;
   await ctx.runMutation(internal.http.touchToken, { id: found.id });
-  return found.ownerId;
+  return { ownerId: found.ownerId, name: found.name };
 }
 
 type AnyRef = FunctionReference<"query" | "mutation", "internal">;
@@ -100,8 +117,8 @@ http.route({
     const ref = refs[name];
     if (!op || !ref)
       return json(404, { error: `There's no operation called "${name}". GET /api/v1 lists them.` });
-    const ownerId = await authenticate(ctx, req);
-    if (!ownerId)
+    const caller = await authenticate(ctx, req);
+    if (!caller)
       return json(401, {
         // A token that was sent and failed is most often a revoked one, not a missing one.
         error: req.headers.get("authorization")
@@ -120,6 +137,7 @@ http.route({
     if (typeof input !== "object" || input === null || Array.isArray(input))
       return json(400, { error: "The body must be a JSON object." });
     try {
+      const { ownerId } = caller;
       const args: Record<string, unknown> = { ...(input as Record<string, unknown>), ownerId };
       let result: unknown;
       if (op.kind === "read") {
@@ -129,7 +147,16 @@ http.route({
           today: todayIn(zone),
         });
       } else {
-        result = await ctx.runMutation(ref as FunctionReference<"mutation", "internal">, args);
+        // Every change goes through the activity log, so the person sees it and can undo it.
+        const { ownerId: _owner, ...opArgs } = args;
+        void _owner;
+        const logged = await ctx.runMutation(internal.activity.run, {
+          ownerId,
+          actor: { kind: "agent", name: caller.name },
+          op: name,
+          args: opArgs,
+        });
+        result = logged.result;
       }
       return json(200, { result: result ?? null });
     } catch (error) {

@@ -53,12 +53,12 @@ export async function revokeToken(ctx: MutationCtx, ownerId: string, id: Id<"acc
 export async function ownerForToken(
   ctx: QueryCtx,
   token: string,
-): Promise<{ ownerId: string; id: Id<"accessTokens"> } | null> {
+): Promise<{ ownerId: string; id: Id<"accessTokens">; name: string } | null> {
   if (!token.startsWith(TOKEN_PREFIX)) return null;
   const hash = await hashToken(token);
   const match = await ctx.db
     .query("accessTokens")
     .withIndex("by_hash", (q) => q.eq("hash", hash))
     .unique();
-  return match ? { ownerId: match.ownerId, id: match._id } : null;
+  return match ? { ownerId: match.ownerId, id: match._id, name: match.name } : null;
 }

@@ -335,6 +335,8 @@ describe("reminders", () => {
 
   test("an accepted proposal rings like any other task", async () => {
     const { t, alice, today } = await setup();
+    // Proposals only exist when the person turned direct edits off.
+    await alice.mutation(api.account.updateProfile, { agentsEditDirectly: false });
     await t.mutation(internal.agent.propose_plan, {
       ownerId: ALICE.tokenIdentifier,
       agent: "Claude",
@@ -439,8 +441,9 @@ describe("agent API", () => {
     });
   });
 
-  test("a plan arrives as proposals until the person accepts it", async () => {
+  test("with direct edits off, a plan arrives as proposals until the person accepts it", async () => {
     const { alice, call, today } = await withToken();
+    await alice.mutation(api.account.updateProfile, { agentsEditDirectly: false });
     const res = await call("propose_plan", {
       agent: "Claude",
       blocks: [{ title: "Write launch post", date: today, time: 900, length: 60 }],
@@ -451,6 +454,74 @@ describe("agent API", () => {
     await alice.mutation(api.tasks.settleProposals, { accept: true });
     day = await alice.query(api.views.today, { today });
     expect(day.scheduled.map((t) => [t.title, t.proposedBy])).toEqual([["Write launch post", null]]);
+  });
+
+  test("by default an agent's plan lands straight on the day, and the log names it", async () => {
+    const { alice, call, today } = await withToken();
+    const res = await call("propose_plan", {
+      agent: "Claude",
+      blocks: [{ title: "Write launch post", date: today, time: 900, length: 60 }],
+    });
+    expect(((await res.json()) as { result: { proposed: boolean } }).result.proposed).toBe(false);
+    const day = await alice.query(api.views.today, { today });
+    expect(day.scheduled.map((t) => [t.title, t.proposedBy])).toEqual([["Write launch post", null]]);
+    const [entry] = await alice.query(api.activity.recent, {});
+    expect(entry).toMatchObject({
+      actor: { kind: "agent", name: "Laptop CLI" },
+      summary: "Planned 1 block",
+      canUndo: true,
+    });
+  });
+
+  test("Undo takes back what an agent added, moved and finished", async () => {
+    const { alice, call, today } = await withToken();
+    const added = (await (await call("add_task", { text: "Assignment 2 due fri" })).json()) as {
+      result: { taskId: string };
+    };
+    const id = added.result.taskId;
+    await call("add_task", { text: "Read 20 pages every day" });
+    const [readEntry] = await alice.query(api.activity.recent, {});
+    const readId = (await alice.query(api.views.today, { today })).anytime.find(
+      (t) => t.title === "Read 20 pages",
+    )!._id;
+
+    await call("move_tasks", { taskIds: [id], date: "2026-10-20", time: 600 });
+    await call("complete_task", { taskId: readId });
+    const log = await alice.query(api.activity.recent, {});
+    expect(log.map((e) => e.summary)).toEqual([
+      "Finished “Read 20 pages”",
+      "Moved “Assignment 2” to Tue 20 Oct at 10:00",
+      "Added “Read 20 pages”",
+      "Added “Assignment 2”",
+    ]);
+
+    // Finishing a repeat moved it to tomorrow and counted it; Undo brings it back to today, uncounted.
+    await alice.mutation(api.activity.undo, { id: log[0]!._id });
+    expect((await alice.query(api.views.task, { id: readId as never }))?.date).toBe(today);
+    expect((await alice.query(api.views.progress, { today })).weekMinutes).toBe(0);
+
+    // The move goes back to the task as the agent first made it: no date, due Friday.
+    await alice.mutation(api.activity.undo, { id: log[1]!._id });
+    const task = await alice.query(api.views.task, { id: id as never });
+    expect([task?.date, task?.time, task?.deadline]).toEqual([undefined, undefined, "2026-10-16"]);
+
+    // Undoing an add puts the task in Recently deleted, and the entry can't be undone twice.
+    await alice.mutation(api.activity.undo, { id: readEntry!._id });
+    expect((await alice.query(api.views.today, { today })).anytime.map((t) => t.title)).not.toContain(
+      "Read 20 pages",
+    );
+    await expect(alice.mutation(api.activity.undo, { id: readEntry!._id })).rejects.toThrow("already undone");
+    expect((await alice.query(api.activity.recent, {})).find((e) => e._id === readEntry!._id)?.undone).toBe(
+      true,
+    );
+  });
+
+  test("nobody can see or undo another person's activity", async () => {
+    const { t, call } = await withToken();
+    await call("add_task", { text: "Private thing" });
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    expect(await bob.query(api.activity.recent, {})).toEqual([]);
   });
 
   test("an agent can take back a wrong tick and bring back a task it deleted", async () => {

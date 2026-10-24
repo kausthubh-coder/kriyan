@@ -141,6 +141,29 @@ export default defineSchema({
     .index("by_owner", ["ownerId"])
     .index("by_token", ["token"]),
 
+  /**
+   * What agents (MCP, the CLI, automations) and Ask changed, with each task as it was before,
+   * so any entry can be undone. Changes apply at once; this log is how the person keeps control.
+   */
+  activity: defineTable({
+    ownerId: v.string(),
+    at: v.number(),
+    /** Who acted: "ask" is the person through Ask; "agent" is a token, named for its client. */
+    actor: v.object({ kind: v.union(v.literal("ask"), v.literal("agent")), name: v.string() }),
+    op: v.string(),
+    summary: v.string(),
+    /** One per task touched. `before` is the task document as it was, or null when this made it. */
+    changes: v.array(
+      v.object({
+        taskId: v.id("tasks"),
+        title: v.string(),
+        before: v.union(v.any(), v.null()),
+        completionId: v.optional(v.id("completions")),
+      }),
+    ),
+    undoneAt: v.optional(v.number()),
+  }).index("by_owner_and_at", ["ownerId", "at"]),
+
   /** Personal access tokens for the CLI and MCP clients. Only a hash is stored. */
   accessTokens: defineTable({
     ownerId: v.string(),

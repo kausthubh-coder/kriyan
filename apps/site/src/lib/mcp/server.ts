@@ -79,7 +79,12 @@ export function buildServer(caller: Caller | undefined): McpServer {
       },
       async (args) => {
         if (!caller) return { isError: true, content: [{ type: "text", text: "Sign in to Kriyan first." }] };
-        return toolResult(await callOp(op.name, args, caller.headers));
+        // The client's own name ("claude-ai", "openai-mcp", "codex-mcp-client") names its changes
+        // in the person's activity log. Only trusted on the service-secret path (OAuth callers).
+        const client = server.server.getClientVersion()?.name ?? "";
+        const headers =
+          caller.kind === "oauth" ? { ...caller.headers, "x-kriyan-client": client } : caller.headers;
+        return toolResult(await callOp(op.name, args, headers));
       },
     );
   }

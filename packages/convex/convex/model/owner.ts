@@ -17,7 +17,8 @@ export const DEFAULT_PROFILE: Omit<Profile, "ownerId"> = {
   dayEnd: 22 * 60,
   dailyCapacity: 7 * 60,
   defaultReminders: [{ kind: "before", minutes: 10 }],
-  agentsEditDirectly: false,
+  // B2: what agents and Ask change applies at once and lands in the activity log with Undo.
+  agentsEditDirectly: true,
 };
 
 export async function getProfile(ctx: QueryCtx | MutationCtx, ownerId: string): Promise<Profile> {
