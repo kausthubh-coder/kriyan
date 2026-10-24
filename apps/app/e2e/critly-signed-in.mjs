@@ -1,15 +1,17 @@
 // Runs the Critly check on the signed-in app: every screen at 390 and 1440, plus the open
-// states (task panel, repeat editor, command menu, quick add). Signs in first.
-//   node apps/app/e2e/critly-signed-in.mjs        (exit 1 on any finding)
+// states (task panel, repeat editor, command menu, quick add), and the sign-in screen signed
+// out. Uses the saved sign-in from seed.mjs. `bun run lint:ui` runs this.
+//   node apps/app/e2e/critly-signed-in.mjs        (exit 1 on any finding, 2 if it couldn't run)
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { expectCritly } from "@kausthubh/critly/playwright";
-import { BASE, launch, settle, signedInContext } from "./lib.mjs";
+import { artifact, BASE, launch, settle, signedInContext } from "./lib.mjs";
 
 process.chdir(new URL("../../../", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"));
 
 const screens = [
   { name: "today", go: (p) => p.goto(`${BASE}/today`) },
+  { name: "review", go: (p) => p.goto(`${BASE}/review`) },
   { name: "upcoming", go: (p) => p.goto(`${BASE}/upcoming`) },
   { name: "inbox", go: (p) => p.goto(`${BASE}/inbox`) },
   { name: "browse", go: (p) => p.goto(`${BASE}/browse`) },
@@ -88,6 +90,24 @@ async function focusPass(page, viewport) {
   return findings;
 }
 
+if (!existsSync(artifact("auth-state.json"))) {
+  console.error(
+    "No saved sign-in: run `node apps/app/e2e/seed.mjs` first. critly signed in: could not run · exit 2",
+  );
+  process.exit(2);
+}
+// A crash (the app down, a screen that never loads) is "couldn't run", not a finding.
+process.on("uncaughtException", (error) => {
+  console.error(`critly signed in: could not run: ${error.message} · exit 2`);
+  process.exit(2);
+});
+process.on("unhandledRejection", (error) => {
+  console.error(
+    `critly signed in: could not run: ${error instanceof Error ? error.message : error} · exit 2`,
+  );
+  process.exit(2);
+});
+
 const browser = await launch();
 let failures = 0;
 let checks = 0;
@@ -95,6 +115,25 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 1440, height: 900 },
 ]) {
+  // The sign-in screen, signed out.
+  const out = await browser.newContext({ viewport, reducedMotion: "reduce" });
+  const signInPage = await out.newPage();
+  signInPage.setDefaultTimeout(60000);
+  await signInPage.goto(`${BASE}/sign-in`);
+  await settle(signInPage);
+  checks++;
+  try {
+    await expectCritly(signInPage, undefined, { scheme: "dark" });
+    const focus = await focusPass(signInPage, viewport);
+    if (focus.length)
+      throw new Error(focus.map((f) => `✕ focus-ring\n  where ${f.where}\n  actual ${f.actual}`).join("\n"));
+    console.log(`ok   sign-in ${viewport.width}`);
+  } catch (error) {
+    failures++;
+    console.log(`FAIL sign-in ${viewport.width}\n${String(error.message).split("Fix the UI")[0]}`);
+  }
+  await out.close();
+
   const ctx = await signedInContext(browser, viewport);
   for (const screen of screens) {
     const page = await ctx.newPage();

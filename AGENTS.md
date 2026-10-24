@@ -31,7 +31,7 @@ Every task in a new worktree starts with `worktree-kriyan`. Ship only with `ship
 - Dev: `bun run dev` (this worktree's backend, the app on the web and the site, on the ports in `.env.ports`)
 - Tests for one package: `bun run --filter @kriyan/core test` (also `@kriyan/convex`, `@kriyan/cli`)
 - Full check, what CI runs: `bun run check`
-- UI check against the running app: `bun run lint:ui`
+- UI check against the running app, signed in: `bun run lint:ui` (every screen at 390 and 1440 with the saved sign-in from `node apps/app/e2e/seed.mjs`; without one it exits 2)
 - Design tokens changed: `bun run tokens`
 
 ## Proving a change works
