@@ -10,8 +10,7 @@ export const metadata = pageMetadata({
   path: "/docs/mcp",
   title: "MCP",
   heading: "Plan with your AI over MCP",
-  description:
-    "Connect Claude, ChatGPT, Codex, Cursor or any MCP client to your Kriyan plan.",
+  description: "Connect Claude, ChatGPT, Codex, Cursor or any MCP client to your Kriyan plan.",
 });
 
 const cursorConfig = JSON.stringify({ mcpServers: { kriyan: { url: MCP_URL } } }, null, 2);
@@ -87,8 +86,8 @@ export default function McpDocs() {
         <li>Agents never guess how long something takes. A length is only set when you said one.</li>
         <li>
           Kriyan has no AI of its own. In Ask, the app does a few things by itself, like adding a task or
-          finding free time; anything else waits for your agent. <code>get_asks</code> lists what
-          is waiting, and <code>answer_ask</code> replies under the request once the agent has done it.
+          finding free time; anything else waits for your agent. <code>get_asks</code> lists what is waiting,
+          and <code>answer_ask</code> replies under the request once the agent has done it.
         </li>
         <li>
           Every change an agent makes is listed in the app with the agent&apos;s name, and each one has Undo.

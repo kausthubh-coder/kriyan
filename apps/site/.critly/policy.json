@@ -7,7 +7,17 @@
     "light": {},
     "dark": {}
   },
-  "pages": ["/", "/docs", "/docs/quick-add", "/docs/mcp", "/docs/cli", "/docs/api", "/android", "/privacy", "/terms"],
+  "pages": [
+    "/",
+    "/docs",
+    "/docs/quick-add",
+    "/docs/mcp",
+    "/docs/cli",
+    "/docs/api",
+    "/android",
+    "/privacy",
+    "/terms"
+  ],
   "bannedPhrases": ["overdue", "garden", "Oops", "lorem"],
   "rules": {
     "spacing-scale": "error",

@@ -8,8 +8,7 @@ export const metadata = pageMetadata({
   path: "/terms",
   title: "Terms",
   heading: "Terms",
-  description:
-    "The terms for using Kriyan.",
+  description: "The terms for using Kriyan.",
 });
 
 export default function Terms() {

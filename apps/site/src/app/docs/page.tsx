@@ -24,11 +24,12 @@ export default function DocsHome() {
       <h2>Where you can use it</h2>
       <ul>
         <li>
-          <strong>On the web:</strong> <a href={APP_URL}>app.kriyan.app</a>. Sign in with Google or your email.
+          <strong>On the web:</strong> <a href={APP_URL}>app.kriyan.app</a>. Sign in with Google or your
+          email.
         </li>
         <li>
-          <strong>On Android:</strong> <Link href={ANDROID_PAGE}>get the app</Link>, with the steps to
-          install it. Every build is on <a href={RELEASES_URL}>GitHub releases</a>.
+          <strong>On Android:</strong> <Link href={ANDROID_PAGE}>get the app</Link>, with the steps to install
+          it. Every build is on <a href={RELEASES_URL}>GitHub releases</a>.
         </li>
         <li>
           <strong>With your AI:</strong> Claude, ChatGPT, Codex, Cursor and other MCP clients connect to{" "}

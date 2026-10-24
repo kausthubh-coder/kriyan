@@ -52,7 +52,9 @@ await writeFile(join(app, "favicon.ico"), ico(images));
 const svg = renderToStaticMarkup(
   <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <rect width="64" height="64" rx="14" fill={ICON_BG} />
-    <g transform="translate(14.08 14.08) scale(1.4933)">{markPaths({ ink: ICON_INK, dot: NOW_RED_ON_DARK })}</g>
+    <g transform="translate(14.08 14.08) scale(1.4933)">
+      {markPaths({ ink: ICON_INK, dot: NOW_RED_ON_DARK })}
+    </g>
   </svg>,
 );
 await writeFile(join(app, "icon.svg"), `${svg}\n`);

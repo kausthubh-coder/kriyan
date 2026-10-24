@@ -34,10 +34,12 @@ export function understand(raw: string, hasWhen: (text: string) => boolean): Ask
     const rest = text.slice(add[0].length).trim();
     return rest ? { kind: "add", text: rest } : { kind: "agent" };
   }
-  if (/\b(left|rest|unfinished|everything|what'?s open)\b.*\btomorrow\b/.test(lower)) return { kind: "tomorrow" };
+  if (/\b(left|rest|unfinished|everything|what'?s open)\b.*\btomorrow\b/.test(lower))
+    return { kind: "tomorrow" };
   if (/\b(free time|time for|how much time|what can i (do|fit)|am i free|free today)\b/.test(lower))
     return { kind: "free" };
-  if (/\b(what'?s next|whats next|next up|what now|what should i do now)\b/.test(lower)) return { kind: "next" };
+  if (/\b(what'?s next|whats next|next up|what now|what should i do now)\b/.test(lower))
+    return { kind: "next" };
   if (/\b(week go|this week so far|how did (my|the) week|how is my week|how's my week)\b/.test(lower))
     return { kind: "week" };
   if (!text.endsWith("?") && !REQUEST.test(text) && hasWhen(text)) return { kind: "add", text };

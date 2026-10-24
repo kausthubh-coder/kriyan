@@ -75,7 +75,8 @@ export async function send(ctx: MutationCtx, ownerId: string, raw: string): Prom
       const next = timed[0];
       if (next) return answered(`Next is ${next.title} at ${formatTime(next.time!)}.`);
       const anytime = day.anytime.find((t) => t.proposedBy === null);
-      if (anytime) return answered(`Nothing else has a time today. ${anytime.title} is on your list for anytime.`);
+      if (anytime)
+        return answered(`Nothing else has a time today. ${anytime.title} is on your list for anytime.`);
       return answered("Nothing else is planned today.");
     }
     case "week": {
@@ -83,7 +84,9 @@ export async function send(ctx: MutationCtx, ownerId: string, raw: string): Prom
       const weekStart = addDays(today, -weekday(today));
       const done = await ctx.db
         .query("completions")
-        .withIndex("by_owner_and_doneOn", (q) => q.eq("ownerId", ownerId).gte("doneOn", weekStart).lte("doneOn", today))
+        .withIndex("by_owner_and_doneOn", (q) =>
+          q.eq("ownerId", ownerId).gte("doneOn", weekStart).lte("doneOn", today),
+        )
         .take(1000);
       const focused = await focusedSince(ctx, ownerId, weekStart, today);
       const top = progress.bySpace[0];

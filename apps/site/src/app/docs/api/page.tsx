@@ -10,8 +10,7 @@ export const metadata = pageMetadata({
   path: "/docs/api",
   title: "API",
   heading: "Agent API",
-  description:
-    "The Kriyan agent API: one HTTP call per operation, the same operations as MCP and the CLI.",
+  description: "The Kriyan agent API: one HTTP call per operation, the same operations as MCP and the CLI.",
 });
 
 // Everything below the introduction is generated from OPS in @kriyan/core/ops, the registry the

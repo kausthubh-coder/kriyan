@@ -114,7 +114,8 @@ export async function undo(ctx: MutationCtx, ownerId: string, id: Id<"agentActio
       break;
     case "change":
     case "move":
-      if (task.deletedAt !== undefined) throw new ConvexError("That task was deleted since; restore it first.");
+      if (task.deletedAt !== undefined)
+        throw new ConvexError("That task was deleted since; restore it first.");
       if (row.before) await Tasks.updateTask(ctx, ownerId, row.taskId, row.before);
       break;
     case "done":

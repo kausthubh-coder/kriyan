@@ -778,7 +778,11 @@ describe("deleting my data", () => {
     await alice.mutation(api.account.createToken, { name: "CLI" });
     await alice.mutation(api.tasks.logFocus, { taskId: id, minutes: 25, date: "2026-10-13" });
     await alice.mutation(api.assistant.send, { text: "Plan my week around the exam" });
-    await t.mutation(internal.agent.add_task, { ownerId: ALICE.tokenIdentifier, agent: "Codex", title: "Read" });
+    await t.mutation(internal.agent.add_task, {
+      ownerId: ALICE.tokenIdentifier,
+      agent: "Codex",
+      title: "Read",
+    });
     await alice.mutation(api.account.deleteMyData, {});
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     const owners = await t.run(async (ctx) => {
@@ -1036,7 +1040,11 @@ describe("the Ask tab", () => {
     vi.advanceTimersByTime(1000);
     await call("add_task", { title: "Revise chapter 1", date: "2026-10-14", time: 600, agent: "Claude" });
     vi.advanceTimersByTime(1000);
-    await call("answer_ask", { askId: waiting[0].askId, reply: "Added a revision block tomorrow at 10:00.", agent: "Claude" });
+    await call("answer_ask", {
+      askId: waiting[0].askId,
+      reply: "Added a revision block tomorrow at 10:00.",
+      agent: "Claude",
+    });
     const [ask] = await alice.query(api.assistant.asks, {});
     expect([ask?.agent, ask?.reply, ask?.changes.map((c) => [c.kind, c.title])]).toEqual([
       "Claude",
@@ -1050,11 +1058,21 @@ describe("the Ask tab", () => {
     const { t, alice } = await setup();
     const own = await alice.mutation(api.assistant.send, { text: "What's next?" });
     await expect(
-      t.mutation(internal.agent.answer_ask, { ownerId: ALICE.tokenIdentifier, agent: "X", askId: own, reply: "Hi" }),
+      t.mutation(internal.agent.answer_ask, {
+        ownerId: ALICE.tokenIdentifier,
+        agent: "X",
+        askId: own,
+        reply: "Hi",
+      }),
     ).rejects.toThrow(/already answered/);
     const waiting = await alice.mutation(api.assistant.send, { text: "Plan my week" });
     await expect(
-      t.mutation(internal.agent.answer_ask, { ownerId: BOB.tokenIdentifier, agent: "X", askId: waiting, reply: "Hi" }),
+      t.mutation(internal.agent.answer_ask, {
+        ownerId: BOB.tokenIdentifier,
+        agent: "X",
+        askId: waiting,
+        reply: "Hi",
+      }),
     ).rejects.toThrow(/isn't yours/);
   });
 });
@@ -1062,7 +1080,11 @@ describe("the Ask tab", () => {
 describe("focus, steps and settings", () => {
   test("focus sessions add up for today, the week and each goal", async () => {
     const { alice, today } = await setup();
-    const goal = await alice.mutation(api.organize.addGoal, { title: "Distinction", kind: "tasks", target: 10 });
+    const goal = await alice.mutation(api.organize.addGoal, {
+      title: "Distinction",
+      kind: "tasks",
+      target: 10,
+    });
     const id = await alice.mutation(api.tasks.add, { title: "Revise", goalId: goal, date: today });
     await alice.mutation(api.tasks.logFocus, { taskId: id, minutes: 25.4, date: today });
     await alice.mutation(api.tasks.logFocus, { minutes: 40, date: "2026-10-12" });
@@ -1102,7 +1124,12 @@ describe("focus, steps and settings", () => {
       semesterEnd: "2026-11-20",
     });
     const p = await alice.query(api.account.profile, {});
-    expect([p.reviewTime, p.sounds, p.semesterStart, p.semesterEnd]).toEqual([1260, true, "2026-08-17", "2026-11-20"]);
+    expect([p.reviewTime, p.sounds, p.semesterStart, p.semesterEnd]).toEqual([
+      1260,
+      true,
+      "2026-08-17",
+      "2026-11-20",
+    ]);
     await expect(alice.mutation(api.account.updateProfile, { semesterEnd: "2026-08-01" })).rejects.toThrow(
       /end after it starts/,
     );

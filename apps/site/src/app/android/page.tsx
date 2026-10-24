@@ -20,8 +20,8 @@ export default function Android() {
     <PlainPage>
       <h1>Kriyan for Android</h1>
       <p className={css.lede}>
-        The whole planner on your phone, with swipes, haptics and reminders. It installs straight from
-        GitHub, not the Play Store, so Android asks you to allow it once.
+        The whole planner on your phone, with swipes, haptics and reminders. It installs straight from GitHub,
+        not the Play Store, so Android asks you to allow it once.
       </p>
 
       <dl className={android.facts}>
@@ -56,7 +56,9 @@ export default function Android() {
             <rect x="-2" y="-2" width={ANDROID_QR_MODULES + 4} height={ANDROID_QR_MODULES + 4} />
             <path d={ANDROID_QR_PATH} />
           </svg>
-          <figcaption>On a computer? Scan this with your phone&apos;s camera to open this page there.</figcaption>
+          <figcaption>
+            On a computer? Scan this with your phone&apos;s camera to open this page there.
+          </figcaption>
         </figure>
       </div>
 
@@ -68,12 +70,12 @@ export default function Android() {
         </li>
         <li>
           <strong>Allow the install.</strong> Open the downloaded file. The first time, Android asks you to
-          allow apps from your browser: tap Settings, turn on Allow from this source, then go back. On
-          Android 7, turn on Unknown sources under Settings, Security.
+          allow apps from your browser: tap Settings, turn on Allow from this source, then go back. On Android
+          7, turn on Unknown sources under Settings, Security.
         </li>
         <li>
-          <strong>Install.</strong> Tap Install, then Open. If Play Protect says it doesn&apos;t know the
-          app, tap More details, then Install anyway.
+          <strong>Install.</strong> Tap Install, then Open. If Play Protect says it doesn&apos;t know the app,
+          tap More details, then Install anyway.
         </li>
       </ol>
       <p>

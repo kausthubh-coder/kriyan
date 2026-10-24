@@ -15,7 +15,8 @@ export async function logFocus(
   ownerId: string,
   input: { taskId?: Id<"tasks">; minutes: number; date: CivilDate },
 ): Promise<Id<"focusSessions"> | null> {
-  if (!Number.isFinite(input.minutes) || input.minutes < 0) throw new ConvexError("Focus time can't be negative.");
+  if (!Number.isFinite(input.minutes) || input.minutes < 0)
+    throw new ConvexError("Focus time can't be negative.");
   const minutes = Math.min(MAX_MINUTES, Math.round(input.minutes));
   // Under a minute isn't worth a row: a Focus opened and closed again.
   if (minutes < 1) return null;

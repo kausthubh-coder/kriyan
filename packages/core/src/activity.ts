@@ -54,7 +54,10 @@ export function runSummary(actions: Action[]): string {
   const parts: string[] = [];
   for (const [kinds, verb] of VERBS) {
     const n = live.filter((a) => kinds.includes(a.kind)).length;
-    if (n) parts.push(kinds[0] === "other" ? `${verb} ${n} other ${n === 1 ? "change" : "changes"}` : `${verb} ${n}`);
+    if (n)
+      parts.push(
+        kinds[0] === "other" ? `${verb} ${n} other ${n === 1 ? "change" : "changes"}` : `${verb} ${n}`,
+      );
   }
   if (parts.length < 2) return parts.join("");
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;

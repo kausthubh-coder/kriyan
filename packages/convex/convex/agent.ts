@@ -183,7 +183,11 @@ export const restore_task = internalMutation({
   args: { ...writer, taskId: v.id("tasks") },
   handler: async (ctx, { ownerId, agent, taskId }) => {
     await Tasks.restoreTask(ctx, ownerId, taskId);
-    await Activity.record(ctx, ownerId, agent, { kind: "restore", taskId, title: await titleOf(ctx, taskId) });
+    await Activity.record(ctx, ownerId, agent, {
+      kind: "restore",
+      taskId,
+      title: await titleOf(ctx, taskId),
+    });
     return { taskId };
   },
 });

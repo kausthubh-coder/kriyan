@@ -54,10 +54,28 @@ console.log("wrote", Object.keys(marks).length * 4, "SVG files");
 // squircle and crops to the middle 66%, so the mark stays inside 40 of its 108 units.
 const draw = marks[CURRENT];
 const png = {
-  "icon.png": [1024, svg("0 0 1024 1024", `<rect width="1024" height="1024" fill="${BG}"/><g transform="translate(225.3 225.3) scale(23.89)">${draw(INK, RED_ON_DARK)}</g>`)],
-  "adaptive-foreground.png": [1024, svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw(INK, RED_ON_DARK)}</g>`)],
-  "adaptive-monochrome.png": [1024, svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw("#ffffff", "#ffffff")}</g>`)],
-  "favicon.png": [96, svg("0 0 96 96", `<rect width="96" height="96" rx="21" fill="${BG}"/><g transform="translate(18 18) scale(2.5)">${draw(INK, RED_ON_DARK)}</g>`)],
+  "icon.png": [
+    1024,
+    svg(
+      "0 0 1024 1024",
+      `<rect width="1024" height="1024" fill="${BG}"/><g transform="translate(225.3 225.3) scale(23.89)">${draw(INK, RED_ON_DARK)}</g>`,
+    ),
+  ],
+  "adaptive-foreground.png": [
+    1024,
+    svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw(INK, RED_ON_DARK)}</g>`),
+  ],
+  "adaptive-monochrome.png": [
+    1024,
+    svg("0 0 108 108", `<g transform="translate(34 34) scale(1.6667)">${draw("#ffffff", "#ffffff")}</g>`),
+  ],
+  "favicon.png": [
+    96,
+    svg(
+      "0 0 96 96",
+      `<rect width="96" height="96" rx="21" fill="${BG}"/><g transform="translate(18 18) scale(2.5)">${draw(INK, RED_ON_DARK)}</g>`,
+    ),
+  ],
   // The splash shows the mark alone on the scheme's own ground, so it needs both inks.
   // A margin around the mark, as the splash always had, so it doesn't fill its 96px box.
   "splash.png": [1024, svg("-6 -6 36 36", draw(INK_LIGHT, RED))],
