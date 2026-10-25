@@ -74,7 +74,7 @@ describe("quick add and today", () => {
       ["Call Mum", 1020],
       ["Water the plants", 1080],
     ]);
-    expect(await alice.query(api.views.inbox, {})).toEqual([]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks).toEqual([]);
   });
 
   test("a task without a time is an anytime task; one without a date goes to the inbox", async () => {
@@ -84,7 +84,9 @@ describe("quick add and today", () => {
     expect((await alice.query(api.views.today, { today })).anytime.map((t) => t.title)).toEqual([
       "Send invoice",
     ]);
-    expect((await alice.query(api.views.inbox, {})).map((t) => t.title)).toEqual(["Look into cron limits"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((t) => t.title)).toEqual([
+      "Look into cron limits",
+    ]);
   });
 
   test("the week projects repeats forward and sums planned hours per day", async () => {
@@ -186,7 +188,9 @@ describe("completing", () => {
     await alice.mutation(api.tasks.undoComplete, { id, completion: done });
     await alice.mutation(api.tasks.undoComplete, { id, completion: done });
     expect((await t.run((ctx) => ctx.db.get(goal)))?.current).toBe(1);
-    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Ship the CLI"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((x) => x.title)).toEqual([
+      "Ship the CLI",
+    ]);
   });
 
   test("the editor's goal list has the person's open goals, as Progress shows them", async () => {
@@ -415,7 +419,7 @@ describe("ownership", () => {
 
   test("signed-out calls are refused", async () => {
     const t = convexTest(schema, modules);
-    await expect(t.query(api.views.inbox, {})).rejects.toThrow("Sign in to continue.");
+    await expect(t.query(api.views.inbox, { today: "2026-10-13" })).rejects.toThrow("Sign in to continue.");
   });
 });
 
@@ -637,9 +641,8 @@ describe("agent API", () => {
     try {
       const res = await inbox(secret, ALICE.subject);
       expect(res.status).toBe(200);
-      expect(((await res.json()) as { result: { title: string }[] }).result.map((x) => x.title)).toEqual([
-        "Book the dentist",
-      ]);
+      const body = (await res.json()) as { result: { tasks: { title: string }[] } };
+      expect(body.result.tasks.map((x) => x.title)).toEqual(["Book the dentist"]);
       expect((await inbox(`${secret.slice(1)}t`, ALICE.subject)).status).toBe(401);
       expect((await inbox(secret, `${ALICE.subject}|other`)).status).toBe(401);
     } finally {
@@ -942,7 +945,9 @@ describe("months of use", () => {
     const { t, alice, today } = await setup();
     await history(t, 520, {});
     await alice.mutation(api.tasks.addText, { text: "New idea" });
-    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["New idea"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((x) => x.title)).toEqual([
+      "New idea",
+    ]);
     expect(
       (await alice.query(api.views.week, { start: "2026-10-12", today })).inbox.map((x) => x.title),
     ).toEqual(["New idea"]);
@@ -1023,7 +1028,9 @@ describe("the trash", () => {
     const left = await t.run((ctx) => ctx.db.query("tasks").collect());
     expect(left.map((x) => x.title)).toEqual(["Recent idea"]);
     await alice.mutation(api.tasks.restore, { id: recent });
-    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Recent idea"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((x) => x.title)).toEqual([
+      "Recent idea",
+    ]);
   });
 
   test("recently deleted lists what's in the trash, newest first, and only the person's own", async () => {
@@ -1882,6 +1889,11 @@ describe("agents working in bulk", () => {
       sounds: false,
       semesterStart: null,
       semesterEnd: null,
+      todayLayout: "blocks",
+      earlierWindow: "week",
+      showSpace: true,
+      hideDone: false,
+      nowBadge: true,
     });
     const { settings } = await ok("update_settings", {
       dayStart: 420,
@@ -1894,5 +1906,597 @@ describe("agents working in bulk", () => {
       error: "Your day must end after it starts.",
     });
     expect((await call("update_settings", { agentsEditDirectly: true })).status).toBe(400);
+  });
+});
+
+describe("Today's layout and what's left from earlier", () => {
+  test("Today returns the layout choices at their defaults, and the profile update saves them", async () => {
+    const { alice, today } = await setup();
+    expect((await alice.query(api.views.today, { today })).profile).toEqual({
+      timeZone: "UTC",
+      dayStart: 480,
+      dayEnd: 1320,
+      dailyCapacity: 420,
+      todayLayout: "blocks",
+      earlierWindow: "week",
+      showSpace: true,
+      hideDone: false,
+      nowBadge: true,
+      reviewTime: 1200,
+    });
+    await alice.mutation(api.account.updateProfile, {
+      todayLayout: "list",
+      earlierWindow: "month",
+      showSpace: false,
+      hideDone: true,
+      nowBadge: false,
+    });
+    const p = (await alice.query(api.views.today, { today })).profile;
+    expect([p.todayLayout, p.earlierWindow, p.showSpace, p.hideDone, p.nowBadge]).toEqual([
+      "list",
+      "month",
+      false,
+      true,
+      false,
+    ]);
+  });
+
+  test("earlier keeps a week by default with how old each is; older ones wait in the Inbox", async () => {
+    const { alice } = await setup();
+    const today = "2026-10-13";
+    await alice.mutation(api.tasks.add, { title: "Problem set 3", date: "2026-10-12" });
+    await alice.mutation(api.tasks.add, { title: "Workshop 7 coding", deadline: "2026-10-06" });
+    await alice.mutation(api.tasks.add, { title: "Submit advising form", date: "2026-10-05" });
+    await alice.mutation(api.tasks.add, { title: "Return the library book", deadline: "2026-09-01" });
+    await alice.mutation(api.tasks.add, { title: "Look into internships" });
+    const earlier = async () =>
+      (await alice.query(api.views.today, { today })).earlier.map((t) => [t.title, t.ageDays]);
+    const older = async () => {
+      const inbox = await alice.query(api.views.inbox, { today });
+      // Captured in the same instant (the clock is frozen), so their order is a tie.
+      return {
+        tasks: inbox.tasks.map((t) => t.title).sort(),
+        older: inbox.older.map((t) => [t.title, t.ageDays]),
+      };
+    };
+    expect(await earlier()).toEqual([
+      ["Problem set 3", 1],
+      ["Workshop 7 coding", 7],
+    ]);
+    // The undated library book is in the Inbox's own list already, so it isn't listed twice.
+    expect(await older()).toEqual({
+      tasks: ["Look into internships", "Return the library book", "Workshop 7 coding"],
+      older: [["Submit advising form", 8]],
+    });
+
+    await alice.mutation(api.account.updateProfile, { earlierWindow: "month" });
+    expect(await earlier()).toEqual([
+      ["Submit advising form", 8],
+      ["Problem set 3", 1],
+      ["Workshop 7 coding", 7],
+    ]);
+    expect((await older()).older).toEqual([]);
+
+    await alice.mutation(api.account.updateProfile, { earlierWindow: "all" });
+    expect((await earlier()).map(([title]) => title)).toEqual([
+      "Submit advising form",
+      "Problem set 3",
+      "Workshop 7 coding",
+      "Return the library book",
+    ]);
+
+    await alice.mutation(api.account.updateProfile, { earlierWindow: "none" });
+    expect(await earlier()).toEqual([]);
+    expect((await older()).older).toEqual([
+      ["Problem set 3", 1],
+      ["Submit advising form", 8],
+    ]);
+  });
+});
+
+describe("routines", () => {
+  // Tuesday 13 October 2026; Gym runs Mon, Wed, Fri and Sat.
+  async function morning() {
+    const ctx = await setup();
+    const { alice } = ctx;
+    const health = await alice.mutation(api.organize.addSpace, { name: "Health", color: "green" });
+    const goal = await alice.mutation(api.organize.addGoal, {
+      title: "Lose 5 kg",
+      kind: "number",
+      target: 5,
+      unit: "kg",
+    });
+    const meditate = await alice.mutation(api.organize.addHabit, { title: "Meditate", target: 7 });
+    const gym = await alice.mutation(api.organize.addHabit, { title: "Gym", target: 4, goalId: goal });
+    const read = await alice.mutation(api.organize.addHabit, { title: "Read", target: 5 });
+    const routineId = await alice.mutation(api.routines.add, {
+      title: "Morning routine",
+      spaceId: health,
+      time: 420,
+      parts: [
+        { title: "Brush teeth", length: 5 },
+        { title: "Meditate", length: 10, habitId: meditate },
+        { title: "Gym", length: 45, habitId: gym, weekdays: [0, 2, 4, 5] },
+        { title: "Cold plunge", length: 5 },
+        { title: "Shower", length: 10 },
+      ],
+    });
+    return { ...ctx, health, goal, meditate, gym, read, routineId };
+  }
+
+  test("a day shows only the parts that run that weekday, with their length added up", async () => {
+    const { alice, routineId, health } = await morning();
+    const tue = (await alice.query(api.views.today, { today: "2026-10-13" })).routines;
+    expect(tue).toEqual([
+      {
+        _id: routineId,
+        title: "Morning routine",
+        color: "green",
+        spaceId: health,
+        time: 420,
+        length: 30,
+        parts: [
+          { index: 0, title: "Brush teeth", length: 5, habitId: null, done: false },
+          { index: 1, title: "Meditate", length: 10, habitId: expect.any(String), done: false },
+          { index: 3, title: "Cold plunge", length: 5, habitId: null, done: false },
+          { index: 4, title: "Shower", length: 10, habitId: null, done: false },
+        ],
+        streak: 0,
+        done: false,
+      },
+    ]);
+    const wed = (await alice.query(api.views.today, { today: "2026-10-14" })).routines[0]!;
+    expect([wed.length, wed.parts.map((p) => [p.index, p.title])]).toEqual([
+      75,
+      [
+        [0, "Brush teeth"],
+        [1, "Meditate"],
+        [2, "Gym"],
+        [3, "Cold plunge"],
+        [4, "Shower"],
+      ],
+    ]);
+  });
+
+  test("habits inside a routine leave Today's own habits and say which routine and goal they feed", async () => {
+    const { alice, routineId, goal, today } = await morning();
+    const day = await alice.query(api.views.today, { today });
+    expect(day.habits.map((h) => [h.title, h.routineId, h.goalId])).toEqual([["Read", null, null]]);
+    const progress = await alice.query(api.views.progress, { today });
+    expect(progress.habits.map((h) => [h.title, h.routineId, h.goalId])).toEqual([
+      ["Meditate", routineId, null],
+      ["Gym", routineId, goal],
+      ["Read", null, null],
+    ]);
+  });
+
+  test("ticking a part checks its habit, and unticking takes the check back", async () => {
+    const { alice, routineId, meditate } = await morning();
+    const wed = "2026-10-14";
+    await alice.mutation(api.routines.tickPart, { routineId, index: 2, date: wed, done: true });
+    await alice.mutation(api.routines.tickPart, { routineId, index: 1, date: wed, done: true });
+    const habits = async () =>
+      (await alice.query(api.views.progress, { today: wed })).habits.map((h) => [
+        h.title,
+        h.doneToday,
+        h.thisWeek,
+      ]);
+    expect(await habits()).toEqual([
+      ["Meditate", true, 1],
+      ["Gym", true, 1],
+      ["Read", false, 0],
+    ]);
+    const parts = async () =>
+      (await alice.query(api.views.today, { today: wed })).routines[0]!.parts.filter((p) => p.done).map(
+        (p) => p.title,
+      );
+    expect(await parts()).toEqual(["Meditate", "Gym"]);
+
+    await alice.mutation(api.routines.tickPart, { routineId, index: 1, date: wed, done: false });
+    expect(await habits()).toEqual([
+      ["Meditate", false, 0],
+      ["Gym", true, 1],
+      ["Read", false, 0],
+    ]);
+    expect(await parts()).toEqual(["Gym"]);
+
+    // Checking the habit on its own reads as that part done too.
+    await alice.mutation(api.organize.checkHabit, { id: meditate, done: true, date: wed });
+    expect(await parts()).toEqual(["Meditate", "Gym"]);
+  });
+
+  test("a part that doesn't run that day, or isn't there, can't be ticked", async () => {
+    const { alice, routineId } = await morning();
+    await expect(
+      alice.mutation(api.routines.tickPart, { routineId, index: 2, date: "2026-10-13", done: true }),
+    ).rejects.toThrow("Gym isn't part of Morning routine on that day.");
+    await expect(
+      alice.mutation(api.routines.tickPart, { routineId, index: 9, date: "2026-10-13", done: true }),
+    ).rejects.toThrow("Morning routine has parts 0 to 4.");
+  });
+
+  test("the streak counts days all done back from yesterday, and today once it's done", async () => {
+    const { alice, routineId, today } = await morning();
+    for (const date of ["2026-10-09", "2026-10-11", "2026-10-12"])
+      await alice.mutation(api.routines.tickAll, { routineId, date, done: true });
+    // Saturday the 10th was missed, so the run starts on Sunday.
+    const read = async () => {
+      const r = (await alice.query(api.views.today, { today })).routines[0]!;
+      return [r.streak, r.done];
+    };
+    expect(await read()).toEqual([2, false]);
+    await alice.mutation(api.routines.tickAll, { routineId, date: today, done: true });
+    expect(await read()).toEqual([3, true]);
+    await alice.mutation(api.routines.tickAll, { routineId, date: "2026-10-10", done: true });
+    expect(await read()).toEqual([5, true]);
+    // Taking back one part of Monday's breaks the run there.
+    await alice.mutation(api.routines.tickPart, { routineId, index: 4, date: "2026-10-12", done: false });
+    expect(await read()).toEqual([1, true]);
+  });
+
+  test("tick all checks every habit for that day, and all undone unchecks them", async () => {
+    const { alice, routineId } = await morning();
+    const sat = "2026-10-17";
+    await alice.mutation(api.routines.tickAll, { routineId, date: sat, done: true });
+    const habits = async () =>
+      (await alice.query(api.views.progress, { today: sat })).habits.map((h) => [h.title, h.doneToday]);
+    expect(await habits()).toEqual([
+      ["Meditate", true],
+      ["Gym", true],
+      ["Read", false],
+    ]);
+    await alice.mutation(api.routines.tickAll, { routineId, date: sat, done: false });
+    expect(await habits()).toEqual([
+      ["Meditate", false],
+      ["Gym", false],
+      ["Read", false],
+    ]);
+  });
+
+  test("a habit belongs to one routine; an archived routine gives its habits back to Today", async () => {
+    const { alice, routineId, meditate, today } = await morning();
+    await expect(
+      alice.mutation(api.routines.add, {
+        title: "Night routine",
+        time: 1320,
+        parts: [{ title: "Meditate", habitId: meditate }],
+      }),
+    ).rejects.toThrow("Meditate is already part of Morning routine.");
+    await expect(
+      alice.mutation(api.routines.update, { routineId, parts: [{ title: "Stretch", weekdays: [] }] }),
+    ).rejects.toThrow(/at least one weekday/);
+    await alice.mutation(api.routines.update, { routineId, title: "Mornings", time: 435 });
+    expect((await alice.query(api.views.today, { today })).routines.map((r) => [r.title, r.time])).toEqual([
+      ["Mornings", 435],
+    ]);
+    await alice.mutation(api.routines.remove, { routineId });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.routines).toEqual([]);
+    expect(day.habits.map((h) => h.title)).toEqual(["Meditate", "Gym", "Read"]);
+  });
+
+  test("nobody else can see, change or tick a person's routine", async () => {
+    const { t, routineId, today } = await morning();
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    expect((await bob.query(api.views.today, { today })).routines).toEqual([]);
+    await expect(bob.mutation(api.routines.tickAll, { routineId, date: today, done: true })).rejects.toThrow(
+      "That routine doesn't exist or isn't yours.",
+    );
+    await expect(bob.mutation(api.routines.remove, { routineId })).rejects.toThrow(/isn't yours/);
+  });
+});
+
+describe("goal entries and what feeds a goal", () => {
+  test("logging a money goal sets where it stands and keeps one entry a day for the trend line", async () => {
+    const { alice, today } = await setup();
+    const goalId = await alice.mutation(api.organize.addGoal, {
+      title: "Save $2,000",
+      kind: "number",
+      target: 2000,
+      unit: "$",
+      dueDate: "2026-12-31",
+    });
+    await alice.mutation(api.goals.log, { goalId, value: 300, date: "2026-09-01" });
+    await alice.mutation(api.goals.log, { goalId, value: 900, date: "2026-10-01" });
+    await alice.mutation(api.goals.log, { goalId, value: 1220 });
+    // A second log the same day replaces the first.
+    await alice.mutation(api.goals.log, { goalId, value: 1240 });
+    // History filled in later doesn't move where it stands now.
+    await alice.mutation(api.goals.log, { goalId, value: 600, date: "2026-09-15" });
+    const [goal] = await alice.query(api.views.goals, { today });
+    expect([goal!.current, goal!.unit, goal!.progress, goal!.entries]).toEqual([
+      1240,
+      "$",
+      0.62,
+      [
+        { date: "2026-09-01", value: 300 },
+        { date: "2026-09-15", value: 600 },
+        { date: "2026-10-01", value: 900 },
+        { date: "2026-10-13", value: 1240 },
+      ],
+    ]);
+  });
+
+  test("the trend line keeps the last 12 entries", async () => {
+    const { alice, today } = await setup();
+    const goalId = await alice.mutation(api.organize.addGoal, {
+      title: "Run 100 km",
+      kind: "number",
+      target: 100,
+    });
+    for (let day = 1; day <= 13; day++)
+      await alice.mutation(api.goals.log, {
+        goalId,
+        value: day * 5,
+        date: `2026-10-${String(day).padStart(2, "0")}`,
+      });
+    const [goal] = await alice.query(api.views.goals, { today });
+    expect(goal!.entries.map((e) => e.date)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `2026-10-${String(i + 2).padStart(2, "0")}`),
+    );
+    expect(goal!.current).toBe(65);
+  });
+
+  test("only a number goal takes a log, of something that already happened", async () => {
+    const { alice } = await setup();
+    const tasksGoal = await alice.mutation(api.organize.addGoal, {
+      title: "Ship 3.0",
+      kind: "tasks",
+      target: 5,
+    });
+    await expect(alice.mutation(api.goals.log, { goalId: tasksGoal, value: 2 })).rejects.toThrow(
+      /nothing to log/,
+    );
+    const goalId = await alice.mutation(api.organize.addGoal, {
+      title: "Lose 5 kg",
+      kind: "number",
+      target: 5,
+    });
+    await expect(alice.mutation(api.goals.log, { goalId, value: 1, date: "2026-10-14" })).rejects.toThrow(
+      "Log what's already happened, today or before.",
+    );
+    await expect(alice.mutation(api.goals.log, { goalId, value: -1 })).rejects.toThrow(
+      "Progress can't be below 0.",
+    );
+  });
+
+  test("a goal says which habits feed it and counts its linked tasks, done ones too", async () => {
+    const { t, alice, today } = await setup();
+    const ship = await alice.mutation(api.organize.addGoal, { title: "Ship 3.0", kind: "tasks", target: 4 });
+    const weight = await alice.mutation(api.organize.addGoal, {
+      title: "Lose 5 kg",
+      kind: "number",
+      target: 5,
+    });
+    await alice.mutation(api.organize.addHabit, { title: "Gym", target: 4, goalId: weight });
+    const walk = await alice.mutation(api.organize.addHabit, { title: "Walk", target: 3 });
+    await alice.mutation(api.organize.updateHabit, { id: walk, goalId: weight });
+    const archived = await alice.mutation(api.organize.addHabit, {
+      title: "Swim",
+      target: 2,
+      goalId: weight,
+    });
+    await alice.mutation(api.organize.updateHabit, { id: archived, archived: true });
+    await alice.mutation(api.tasks.add, { title: "Weigh in", goalId: weight });
+    const a = await alice.mutation(api.tasks.add, { title: "Build Today", goalId: ship });
+    await alice.mutation(api.tasks.add, { title: "Build the menu", goalId: ship, date: today });
+    const gone = await alice.mutation(api.tasks.add, { title: "Old idea", goalId: ship });
+    await alice.mutation(api.tasks.complete, { id: a });
+    await alice.mutation(api.tasks.remove, { id: gone });
+    // An agent's task counts like the person's own.
+    await t.mutation(internal.agent.add_task, {
+      ownerId: ALICE.tokenIdentifier,
+      agent: "Claude",
+      title: "Ship notes",
+      goalId: ship,
+    });
+    const goals = await alice.query(api.views.goals, { today });
+    expect(goals.map((g) => [g.title, g.feeds, g.next?.title ?? null, g.current])).toEqual([
+      ["Ship 3.0", { habits: [], tasks: 3 }, "Build the menu", 1],
+      ["Lose 5 kg", { habits: ["Gym", "Walk"], tasks: 1 }, "Weigh in", 0],
+    ]);
+  });
+});
+
+describe("study sessions", () => {
+  test("a session says which test it prepares for and how many days are left from its own day", async () => {
+    const { alice, today } = await setup();
+    const exam = await alice.mutation(api.tasks.add, {
+      title: "CSC 316 exam 2",
+      date: "2026-10-20",
+      time: 810,
+      length: 75,
+      event: true,
+    });
+    const study = await alice.mutation(api.tasks.add, {
+      title: "Study for CSC 316 exam 2",
+      date: today,
+      time: 510,
+      length: 90,
+      repeat: { freq: "day", interval: 1, end: { kind: "on", date: "2026-10-19" } },
+      prepFor: exam,
+    });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.scheduled.map((t) => [t.title, t.prepFor])).toEqual([
+      ["Study for CSC 316 exam 2", { title: "CSC 316 exam 2", date: "2026-10-20", daysLeft: 7 }],
+    ]);
+    const week = await alice.query(api.views.week, { start: "2026-10-12", today });
+    expect(
+      week.days.map((d) => [d.date, d.scheduled.find((t) => t._id === study)?.prepFor?.daysLeft ?? null]),
+    ).toEqual([
+      ["2026-10-12", null],
+      ["2026-10-13", 7],
+      ["2026-10-14", 6],
+      ["2026-10-15", 5],
+      ["2026-10-16", 4],
+      ["2026-10-17", 3],
+      ["2026-10-18", 2],
+    ]);
+    // The exam itself prepares for nothing.
+    expect(week.days.flatMap((d) => d.scheduled).find((t) => t._id === exam)).toBeUndefined();
+    await alice.mutation(api.tasks.update, { id: study, prepFor: null });
+    expect((await alice.query(api.views.today, { today })).scheduled[0]!.prepFor).toBeNull();
+  });
+
+  test("a deleted test stops showing, and a task can't prepare for itself or someone else's", async () => {
+    const { t, alice, today } = await setup();
+    const exam = await alice.mutation(api.tasks.add, {
+      title: "Physics midterm",
+      date: "2026-10-16",
+      event: true,
+    });
+    const study = await alice.mutation(api.tasks.add, {
+      title: "Review chapter 7",
+      date: today,
+      prepFor: exam,
+    });
+    await expect(alice.mutation(api.tasks.update, { id: study, prepFor: study })).rejects.toThrow(
+      "A task can't prepare for itself.",
+    );
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    await expect(bob.mutation(api.tasks.add, { title: "Copy", prepFor: exam })).rejects.toThrow(
+      "That task to prepare for doesn't exist or isn't yours.",
+    );
+    expect((await alice.query(api.views.today, { today })).anytime[0]!.prepFor).toEqual({
+      title: "Physics midterm",
+      date: "2026-10-16",
+      daysLeft: 3,
+    });
+    await alice.mutation(api.tasks.remove, { id: exam });
+    expect((await alice.query(api.views.today, { today })).anytime[0]!.prepFor).toBeNull();
+  });
+
+  test("an agent links a session to its test, reads it back, and Undo takes the link away", async () => {
+    const { t, alice, today } = await setup();
+    const owner = { ownerId: ALICE.tokenIdentifier, agent: "Claude" };
+    const exam = await alice.mutation(api.tasks.add, {
+      title: "Calculus exam",
+      date: "2026-10-23",
+      event: true,
+    });
+    const study = await alice.mutation(api.tasks.add, { title: "Practice integrals", date: today });
+    const { task } = await t.mutation(internal.agent.update_task, { ...owner, taskId: study, prepFor: exam });
+    expect(task.prepFor).toEqual({ title: "Calculus exam", date: "2026-10-23", daysLeft: 10 });
+    const [change] = await alice.query(api.assistant.activity, { today, days: 1 });
+    await alice.mutation(api.assistant.undoAction, { id: change!._id });
+    expect((await alice.query(api.views.task, { id: study }))?.prepFor).toBeUndefined();
+  });
+});
+
+describe("agents plan routines, goals and study sessions", () => {
+  async function withToken(name = "Claude") {
+    const ctx = await setup();
+    const { token } = await ctx.alice.mutation(api.account.createToken, { name });
+    const call = async (op: string, body: unknown = {}) => {
+      const res = await ctx.t.fetch(`/api/v1/${op}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, body: (await res.json()) as { result?: any; error?: string } };
+    };
+    const ok = async (op: string, body: unknown = {}) => {
+      const reply = await call(op, body);
+      if (reply.status !== 200) throw new Error(`${op}: ${reply.status} ${reply.body.error}`);
+      return reply.body.result;
+    };
+    return { ...ctx, call, ok };
+  }
+
+  test("an agent builds a morning routine with habits that feed a goal, and ticks it", async () => {
+    const { alice, ok, call, today } = await withToken();
+    const { goalId } = await ok("add_goal", { title: "Lose 5 kg", kind: "number", target: 5, unit: "kg" });
+    const { habitId: gym } = await ok("add_habit", { title: "Gym", target: 4, goalId });
+    const { habitId: meditate } = await ok("add_habit", { title: "Meditate", target: 7 });
+    const { routineId } = await ok("add_routine", {
+      title: "Morning routine",
+      time: 420,
+      parts: [
+        { title: "Brush teeth", length: 5 },
+        { title: "Meditate", length: 10, habitId: meditate },
+        { title: "Gym", length: 45, habitId: gym, weekdays: [0, 2, 4, 5] },
+      ],
+    });
+    expect((await ok("list_routines")).routines).toEqual([
+      {
+        _id: routineId,
+        title: "Morning routine",
+        spaceId: null,
+        time: 420,
+        parts: [
+          { index: 0, title: "Brush teeth", length: 5, habitId: null, weekdays: null },
+          { index: 1, title: "Meditate", length: 10, habitId: meditate, weekdays: null },
+          { index: 2, title: "Gym", length: 45, habitId: gym, weekdays: [0, 2, 4, 5] },
+        ],
+      },
+    ]);
+    const ticked = await ok("tick_routine", { routineId, index: 1, done: true });
+    expect([ticked.date, ticked.done, ticked.parts.map((p: { done: boolean }) => p.done)]).toEqual([
+      today,
+      false,
+      [false, true],
+    ]);
+    const all = await ok("tick_routine", { routineId, done: true });
+    expect([all.done, all.streak]).toEqual([true, 1]);
+    const day = await ok("get_today");
+    expect([day.routines[0].done, day.habits]).toEqual([true, []]);
+    const [goal] = await alice.query(api.views.goals, { today });
+    expect(goal!.feeds).toEqual({ habits: ["Gym"], tasks: 0 });
+
+    await ok("update_routine", { routineId, title: "Mornings", time: 435 });
+    expect((await call("tick_routine", { routineId, index: 2, done: true })).body).toEqual({
+      error: "Gym isn't part of Mornings on that day.",
+    });
+    await ok("update_habit", { habitId: gym, goalId: null });
+    await ok("delete_routine", { routineId });
+    expect((await ok("get_today")).habits.map((h: { title: string }) => h.title)).toEqual([
+      "Gym",
+      "Meditate",
+    ]);
+    const actions = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(actions.slice(0, 5).map((a) => [a.agent, a.kind, a.title, a.undoable])).toEqual([
+      ["Claude", "other", "Archived routine Mornings", false],
+      ["Claude", "other", "Habit Gym", false],
+      ["Claude", "other", "Routine Mornings", false],
+      ["Claude", "other", "Ticked Morning routine", false],
+      ["Claude", "other", "Ticked Meditate in Morning routine", false],
+    ]);
+  });
+
+  test("an agent logs a money goal and links a study session to its exam", async () => {
+    const { ok, call, today } = await withToken();
+    const { goalId } = await ok("add_goal", {
+      title: "Save $2,000",
+      kind: "number",
+      target: 2000,
+      unit: "$",
+    });
+    await ok("log_goal", { goalId, value: 900, date: "2026-10-01" });
+    expect(await ok("log_goal", { goalId, value: 1240 })).toEqual({ goalId, current: 1240 });
+    const progress = await ok("get_progress");
+    expect(progress.goals[0].entries).toEqual([
+      { date: "2026-10-01", value: 900 },
+      { date: today, value: 1240 },
+    ]);
+    expect((await call("log_goal", { goalId, value: 50, date: "2026-10-20" })).status).toBe(400);
+
+    const { taskId: exam } = await ok("add_task", {
+      title: "CSC 316 exam 2",
+      date: "2026-10-20",
+      event: true,
+    });
+    const { task } = await ok("add_task", {
+      text: "Study for CSC 316 exam 2 every day 8:30 for 1h30",
+      prepFor: exam,
+    });
+    expect(task.prepFor).toEqual({ title: "CSC 316 exam 2", date: "2026-10-20", daysLeft: 7 });
+    const batch = await ok("update_tasks", { updates: [{ taskId: task._id, prepFor: "not-an-id" }] });
+    expect(batch.results[0]).toEqual({
+      index: 0,
+      ok: false,
+      error: "That task to prepare for doesn't exist or isn't yours.",
+    });
   });
 });

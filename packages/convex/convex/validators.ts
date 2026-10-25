@@ -44,6 +44,24 @@ export const reminderV = v.union(
 
 export const colorV = v.union(...SPACE_COLORS.map((c) => v.literal(c)));
 
+/** A routine's part: Gym, 45 minutes, a habit, on Mon/Wed/Fri/Sat. */
+export const routinePartV = v.object({
+  title: v.string(),
+  length: v.optional(v.number()),
+  habitId: v.optional(v.id("habits")),
+  /** 0 Monday to 6 Sunday; unset is every day. */
+  weekdays: v.optional(v.array(v.number())),
+});
+
+export const todayLayoutV = v.union(v.literal("blocks"), v.literal("list"));
+
+export const earlierWindowV = v.union(
+  v.literal("none"),
+  v.literal("week"),
+  v.literal("month"),
+  v.literal("all"),
+);
+
 export const sourceV = v.union(v.literal("app"), v.literal("agent"));
 
 export const stepV = v.object({ title: v.string(), done: v.boolean() });
@@ -79,6 +97,7 @@ export const taskBeforeV = v.object({
   event: was(v.boolean()),
   goalId: was(v.id("goals")),
   externalId: was(v.string()),
+  prepFor: was(v.id("tasks")),
 });
 
 // The validators and the shared types in @kriyan/core must describe the same shapes.

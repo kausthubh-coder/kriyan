@@ -80,7 +80,7 @@ const browser = await launch();
   const ctx = await signedInContext(browser, { width: 390, height: 844 });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
-  const inbox = await op("get_inbox");
+  const inbox = (await op("get_inbox")).tasks;
   const desks = inbox.find((t) => t.title === "Look into standing desks");
   await op("delete_task", { taskId: desks._id });
   // On a phone, Settings is under Browse.
@@ -96,7 +96,7 @@ const browser = await launch();
   await page.getByRole("button", { name: "Restore Look into standing desks" }).click();
   await page.getByRole("status").filter({ hasText: "Restored: Look into standing desks" }).waitFor();
   check(
-    (await op("get_inbox")).some((t) => t.title === "Look into standing desks"),
+    (await op("get_inbox")).tasks.some((t) => t.title === "Look into standing desks"),
     "390: Restore puts it back in the Inbox",
   );
   await page.screenshot({ path: artifact("recently-deleted-390-empty.png") });

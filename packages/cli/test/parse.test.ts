@@ -191,6 +191,36 @@ describe("colour", () => {
     expect(dots.length).toBe(9);
   });
 
+  test("routines show their time, then how many parts are done or the streak", () => {
+    const part = (index: number, title: string, length: number, done: boolean) => ({
+      index,
+      title,
+      length,
+      habitId: null,
+      done,
+    });
+    const routine = {
+      _id: "k97morning000000000000000000001",
+      title: "Morning routine",
+      color: null,
+      spaceId: null,
+      time: 420,
+      length: 30,
+      streak: 0,
+      done: false,
+      parts: [part(0, "Brush teeth", 5, true), part(1, "Meditate", 10, false), part(3, "Shower", 15, false)],
+    };
+    const night = { ...routine, title: "Night routine", time: 1320, length: 0, streak: 12, done: true };
+    const text = renderToday(
+      { ...f.today(), routines: [routine, night] },
+      { color: false, now },
+      new RefBook(),
+    );
+    expect(text).toContain(
+      "\nRoutines\n  Morning routine  07:00–07:30  1 of 3 done\n  Night routine    22:00        done, 12 days in a row\n",
+    );
+  });
+
   test("without colour there are no escapes and no dots", () => {
     const text = renderToday(f.today(), { color: false, now }, new RefBook());
     expect(text).toContain("\n  3  14:00–15:30  Essay draft       School\n");

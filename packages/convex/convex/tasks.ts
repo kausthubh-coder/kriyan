@@ -21,6 +21,7 @@ const fields = {
   steps: v.optional(v.array(stepV)),
   event: v.optional(v.boolean()),
   goalId: v.optional(v.id("goals")),
+  prepFor: v.optional(v.id("tasks")),
 };
 
 const nullable = <T extends Parameters<typeof v.optional>[0]>(validator: T) =>
@@ -57,6 +58,7 @@ export const update = mutation({
     steps: nullable(v.array(stepV)),
     event: nullable(v.boolean()),
     goalId: nullable(v.id("goals")),
+    prepFor: nullable(v.id("tasks")),
   },
   handler: async (ctx, { id, ...patch }) => Tasks.updateTask(ctx, await requireOwner(ctx), id, patch),
 });

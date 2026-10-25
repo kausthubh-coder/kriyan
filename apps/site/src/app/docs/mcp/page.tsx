@@ -115,6 +115,17 @@ export default function McpDocs() {
           <code>undo_changes</code>.
         </li>
         <li>
+          Agents can build your routines. <code>add_routine</code> makes one block of small parts, like a
+          morning routine at 07:00; a part can be a habit, and <code>tick_routine</code> ticks a part and
+          checks the habit with it, so it still counts toward the habit&apos;s week and its goal.
+        </li>
+        <li>
+          Agents log goals and link what feeds them. <code>log_goal</code> records where a goal stands, like
+          &ldquo;$1,240 saved&rdquo;, for its trend line; a habit or task feeds a goal through its{" "}
+          <code>goalId</code>. A study session takes the exam it prepares for in <code>prepFor</code>, and
+          shows how many days are left.
+        </li>
+        <li>
           Captured tasks use the same words as quick add, so an agent can pass your sentence as it is. See{" "}
           <Link href="/docs/quick-add">Quick add</Link>.
         </li>
@@ -157,6 +168,8 @@ export default function McpDocs() {
         <li>&ldquo;Add: Mum&apos;s birthday 16 oct every year, remind day before at 20:00.&rdquo;</li>
         <li>&ldquo;Sync my Moodle assignments into the School space, with their due times.&rdquo;</li>
         <li>&ldquo;What did you change this morning? Undo it.&rdquo;</li>
+        <li>&ldquo;Make me a morning routine at 7: brush teeth, meditate 10 min, gym on weekdays.&rdquo;</li>
+        <li>&ldquo;I&apos;ve saved $1,240 now. Log it.&rdquo;</li>
       </ul>
 
       <h2 id="trouble">If it doesn&apos;t connect</h2>

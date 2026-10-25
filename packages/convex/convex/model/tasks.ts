@@ -28,6 +28,8 @@ export interface TaskFields {
   steps?: Step[];
   event?: boolean;
   goalId?: Id<"goals">;
+  /** The test this one prepares for (a study session before an exam). */
+  prepFor?: Id<"tasks">;
   /** The agent's source id, unique per owner (see findByExternalId). */
   externalId?: string;
 }
@@ -128,10 +130,15 @@ async function checkExternalId(ctx: QueryCtx, ownerId: string, externalId: strin
 async function checkRefs(
   ctx: MutationCtx,
   ownerId: string,
-  fields: { spaceId?: Id<"spaces"> | null; goalId?: Id<"goals"> | null },
+  fields: { spaceId?: Id<"spaces"> | null; goalId?: Id<"goals"> | null; prepFor?: Id<"tasks"> | null },
+  self?: Id<"tasks">,
 ) {
   if (fields.spaceId) owned(await ctx.db.get(fields.spaceId), ownerId, "space");
   if (fields.goalId) owned(await ctx.db.get(fields.goalId), ownerId, "goal");
+  if (fields.prepFor) {
+    if (fields.prepFor === self) throw new ConvexError("A task can't prepare for itself.");
+    owned(await ctx.db.get(fields.prepFor), ownerId, "task to prepare for");
+  }
 }
 
 export async function createTask(
@@ -165,6 +172,7 @@ export async function createTask(
     ...(fields.steps?.length ? { steps: fields.steps.map((st) => ({ ...st, title: st.title.trim() })) } : {}),
     event: fields.event ?? false,
     ...(fields.goalId ? { goalId: fields.goalId } : {}),
+    ...(fields.prepFor ? { prepFor: fields.prepFor } : {}),
     order: Date.now(),
     source: options.source,
     ...(options.proposedBy ? { proposedBy: options.proposedBy } : {}),
@@ -219,7 +227,7 @@ export async function updateTask(
   for (const [k, v] of Object.entries(patch))
     if (v !== null && v !== undefined) (set as Record<string, unknown>)[k] = v;
   check(set);
-  await checkRefs(ctx, ownerId, patch);
+  await checkRefs(ctx, ownerId, patch, id);
   if (set.externalId !== undefined) await checkExternalId(ctx, ownerId, set.externalId, id);
   const next: Partial<Doc<"tasks">> = {};
   for (const [k, v] of Object.entries(patch)) {

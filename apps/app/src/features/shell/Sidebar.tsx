@@ -179,7 +179,7 @@ export function Sidebar() {
   const path = usePathname();
   const { today, now } = useClock();
   const spaces = useSpaces();
-  const inbox = useInboxView();
+  const inbox = useInboxView()?.tasks;
   const todayView = useTodayView();
   // The seven days after today, for "Coming up".
   const next = useWeekView(addDays(today, 1));

@@ -113,6 +113,11 @@ const taskFields: Record<string, Schema> = {
     description: "True for something attended (a class, a meeting) rather than ticked off.",
   },
   goalId: id("goal"),
+  prepFor: {
+    type: "string",
+    description:
+      "The id of the test or deadline this task prepares for, like a daily study session before an exam event. Its view then says the test and how many days are left.",
+  },
   externalId: {
     type: "string",
     maxLength: 200,
@@ -177,7 +182,7 @@ const BASE_OPS: OpSpec[] = [
     title: "Get today",
     kind: "read",
     description:
-      "Read the person's plan for a day (today by default): scheduled blocks, anytime tasks, tasks due that day with no day of their own, done tasks, tasks left from earlier days, and habits. Read this before planning.",
+      "Read the person's plan for a day (today by default): scheduled blocks, anytime tasks, tasks due that day with no day of their own, done tasks, tasks left from earlier days (`earlier`, each with `ageDays`, within the person's earlier window; older ones are in get_inbox), and habits. Read this before planning.",
     input: obj({ date }),
   },
   {
@@ -192,7 +197,8 @@ const BASE_OPS: OpSpec[] = [
     name: "get_inbox",
     title: "Get the inbox",
     kind: "read",
-    description: "Read tasks captured without a date or a space.",
+    description:
+      "Read tasks captured without a date or a space (`tasks`), and `older`: tasks left from earlier days that are too old for Today's earlier window, each with `ageDays`.",
     input: obj({}),
   },
   {
@@ -363,12 +369,14 @@ const BASE_OPS: OpSpec[] = [
     name: "add_habit",
     title: "Add a habit",
     kind: "write",
-    description: "Add a habit with a weekly target (1 to 7 times a week).",
+    description:
+      "Add a habit with a weekly target (1 to 7 times a week), optionally feeding a goal (goalId). To do it as part of a routine, add it here, then put its id on the routine's part.",
     input: obj(
       {
         title: { type: "string" },
         target: { type: "integer", minimum: 1, maximum: 7 },
         spaceId: id("space"),
+        goalId: id("goal it feeds"),
       },
       ["title", "target"],
     ),
@@ -658,13 +666,15 @@ const BULK_OPS: OpSpec[] = [
     kind: "write",
     destructive: true,
     idempotent: true,
-    description: "Rename a habit, change its weekly target (1 to 7) or its space (null for none).",
+    description:
+      "Rename a habit, change its weekly target (1 to 7), its space or the goal it feeds (goalId; null for none).",
     input: obj(
       {
         habitId: id("habit"),
         title: { type: "string" },
         target: { type: "integer", minimum: 1, maximum: 7 },
         spaceId: nullable(id("space")),
+        goalId: nullable(id("goal it feeds")),
       },
       ["habitId"],
     ),
@@ -692,7 +702,7 @@ const BULK_OPS: OpSpec[] = [
     title: "Get settings",
     kind: "read",
     description:
-      "Read the person's time zone, day start and end, daily capacity, default reminders, review time, semester dates and whether agents edit directly.",
+      "Read the person's time zone, day start (Wake up) and end (Wind down), daily capacity, default reminders, review time, semester dates, whether agents edit directly, and how Today looks: todayLayout, earlierWindow, showSpace, hideDone, nowBadge.",
     input: obj({}),
   },
   {
@@ -702,7 +712,7 @@ const BULK_OPS: OpSpec[] = [
     destructive: true,
     idempotent: true,
     description:
-      "Change the day's start and end, the daily capacity (minutes of planned work), default reminders for new timed tasks, the review time or the semester dates (null clears one). The time zone follows the person's device, and whether agents edit directly is theirs to choose in Settings.",
+      "Change the day's start (Wake up) and end (Wind down), the daily capacity (minutes of planned work), default reminders for new timed tasks, the review time, the semester dates (null clears one) or how Today looks. The time zone follows the person's device, and whether agents edit directly is theirs to choose in Settings.",
     input: obj({
       dayStart: minutes("When the day starts"),
       dayEnd: {
@@ -716,11 +726,147 @@ const BULK_OPS: OpSpec[] = [
       reviewTime: minutes("When Review today shows"),
       semesterStart: nullable(date),
       semesterEnd: nullable(date),
+      todayLayout: { enum: ["blocks", "list"], description: "Time blocks (default) or one line per item." },
+      earlierWindow: {
+        enum: ["none", "week", "month", "all"],
+        description: "How far back Today shows what's left from earlier days. Default week.",
+      },
+      showSpace: { type: "boolean", description: "Show the space's name after a row's title." },
+      hideDone: { type: "boolean", description: "Hide finished items from Today." },
+      nowBadge: { type: "boolean", description: "Mark the item happening now." },
     }),
   },
 ];
 
-export const OPS: OpSpec[] = [...BASE_OPS, ...BULK_OPS].map(named);
+const routinePart: Schema = obj(
+  {
+    title: { type: "string", maxLength: 200 },
+    length: {
+      type: "integer",
+      minimum: 1,
+      maximum: 1440,
+      description: "Minutes. Leave it out unless the person said how long; never guess.",
+    },
+    habitId: {
+      type: "string",
+      description:
+        "A habit this part is (Meditate, Gym): ticking the part checks the habit. A habit can be in one routine.",
+    },
+    weekdays: {
+      type: "array",
+      minItems: 1,
+      items: { type: "integer", minimum: 0, maximum: 6 },
+      description: "The days it runs, 0 Monday to 6 Sunday. Leave it out for every day.",
+    },
+  },
+  ["title"],
+);
+
+const routineParts: Schema = {
+  type: "array",
+  minItems: 1,
+  maxItems: 30,
+  description:
+    "The parts in order, like [{title:'Brush teeth',length:5},{title:'Gym',length:45,habitId:'...',weekdays:[0,2,4,5]}]. Send the whole list; it replaces the old one. Ticks are kept by a part's place, so add new parts at the end.",
+  items: routinePart,
+};
+
+/** Routines (a morning routine of small parts) and goal logging, from design v5. */
+const ROUTINE_OPS: OpSpec[] = [
+  {
+    name: "list_routines",
+    title: "List routines",
+    kind: "read",
+    description:
+      "List the person's routines with every part (each with its index, length, habit and weekdays). get_today shows the day's routines with only that day's parts, what's ticked and the streak.",
+    input: obj({}),
+  },
+  {
+    name: "add_routine",
+    title: "Add a routine",
+    kind: "write",
+    description:
+      "Add a routine: one block of small parts done in a row at a time of day, like a morning routine at 07:00. Morning routines sit right after Wake up on Today, night routines right before Wind down.",
+    input: obj(
+      {
+        title: { type: "string" },
+        time: minutes("When it starts"),
+        parts: routineParts,
+        spaceId: id("space"),
+      },
+      ["title", "time", "parts"],
+    ),
+  },
+  {
+    name: "update_routine",
+    title: "Change a routine",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description: "Rename a routine, move its time, change its space (null for none) or replace its parts.",
+    input: obj(
+      {
+        routineId: id("routine"),
+        title: { type: "string" },
+        time: minutes("When it starts"),
+        parts: routineParts,
+        spaceId: nullable(id("space")),
+      },
+      ["routineId"],
+    ),
+  },
+  {
+    name: "delete_routine",
+    title: "Archive a routine",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Archive a routine: it leaves Today. Its habits stay and show on their own again; their history stays.",
+    input: obj({ routineId: id("routine") }, ["routineId"]),
+  },
+  {
+    name: "tick_routine",
+    title: "Tick a routine",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Tick one part of a routine on a day (today by default), or every part that runs that day when index is left out. done false takes ticks back. A part that's a habit checks or unchecks the habit too.",
+    input: obj(
+      {
+        routineId: id("routine"),
+        index: {
+          type: "integer",
+          minimum: 0,
+          description: "The part's index, from list_routines or get_today.",
+        },
+        done: { type: "boolean" },
+        date,
+      },
+      ["routineId", "done"],
+    ),
+  },
+  {
+    name: "log_goal",
+    title: "Log a goal",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Log where a number goal stands now ($1,240 saved, 1.4 kg lost): value is the new total, not a change. It becomes the goal's current value and an entry on its trend line, one per day (a second log that day replaces the first). Pass an earlier date to fill in history. A tasks goal counts its linked tasks instead.",
+    input: obj(
+      {
+        goalId: id("goal"),
+        value: { type: "number", minimum: 0 },
+        date: { ...date, description: "Today by default." },
+      },
+      ["goalId", "value"],
+    ),
+  },
+];
+
+export const OPS: OpSpec[] = [...BASE_OPS, ...BULK_OPS, ...ROUTINE_OPS].map(named);
 
 export function findOp(name: string): OpSpec | undefined {
   return OPS.find((op) => op.name === name);

@@ -516,9 +516,9 @@ describe("raw operations", () => {
   test("ops lists every operation", async () => {
     const r = await run("ops");
     const lines = r.stdout.trimEnd().split("\n");
-    expect(lines).toHaveLength(42);
+    expect(lines).toHaveLength(48);
     expect(lines[0]).toBe("get_today        read   Get today");
-    expect(lines.at(-1)).toBe("update_settings  write  Change settings");
+    expect(lines.at(-1)).toBe("log_goal         write  Log a goal");
   });
 });
 

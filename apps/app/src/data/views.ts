@@ -43,8 +43,10 @@ export function useWeekView(start: string) {
   return useQuery(api.views.week, useAuthed() ? { start, today } : "skip");
 }
 
+/** The Inbox's tasks, and `older`: leftovers too old for Today's earlier window. */
 export function useInboxView() {
-  return useQuery(api.views.inbox, useAuthed() ? {} : "skip");
+  const { today } = useClock();
+  return useQuery(api.views.inbox, useAuthed() ? { today } : "skip");
 }
 
 export function useGoals() {

@@ -29,7 +29,12 @@ export const archiveSpace = mutation({
 });
 
 export const addHabit = mutation({
-  args: { title: v.string(), target: v.number(), spaceId: v.optional(v.id("spaces")) },
+  args: {
+    title: v.string(),
+    target: v.number(),
+    spaceId: v.optional(v.id("spaces")),
+    goalId: v.optional(v.id("goals")),
+  },
   handler: async (ctx, args) => Progress.createHabit(ctx, await requireOwner(ctx), args),
 });
 
@@ -39,6 +44,7 @@ export const updateHabit = mutation({
     title: v.optional(v.string()),
     target: v.optional(v.number()),
     spaceId: v.optional(v.union(v.id("spaces"), v.null())),
+    goalId: v.optional(v.union(v.id("goals"), v.null())),
     archived: v.optional(v.boolean()),
   },
   handler: async (ctx, { id, ...patch }) => Progress.updateHabit(ctx, await requireOwner(ctx), id, patch),

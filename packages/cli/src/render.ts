@@ -167,6 +167,23 @@ export function renderToday(day: TodayResult, view: View, refs: RefBook): string
           : "Nothing planned.",
     );
 
+  if (day.routines.length) {
+    out.push("", "Routines");
+    out.push(
+      table(
+        day.routines.map((r) => ({
+          cells: [
+            dotted(r.color, r.title, view),
+            formatTimeRange(r.time, r.length || undefined),
+            r.done
+              ? `done, ${plural(r.streak, "day")} in a row`
+              : `${r.parts.filter((p) => p.done).length} of ${r.parts.length} done`,
+          ],
+        })),
+      ),
+    );
+  }
+
   if (day.habits.length) {
     out.push("", "Habits");
     out.push(
@@ -248,14 +265,16 @@ export function renderWeek(week: WeekResult, view: View, refs: RefBook, today: C
 }
 
 export function renderInbox(inbox: InboxResult, view: View, refs: RefBook): string {
-  if (!inbox.length) return 'Your inbox is empty. Capture a task with: kriyan add "buy stamps"';
-  return [
-    "Inbox",
-    table(
-      inbox.map((t) => taskRow(t, "", refs, view)),
-      TASKS,
-    ),
-  ].join("\n");
+  if (!inbox.tasks.length && !inbox.older.length)
+    return 'Your inbox is empty. Capture a task with: kriyan add "buy stamps"';
+  const lines: Line[] = inbox.tasks.map((t) => taskRow(t, "", refs, view));
+  // Leftovers too old for Today's window wait here, so they're never out of sight.
+  if (inbox.older.length) {
+    if (lines.length) lines.push({ text: "" });
+    lines.push({ text: "Older, not on Today" });
+    for (const t of inbox.older) lines.push(taskRow(t, `${plural(t.ageDays, "day")} ago`, refs, view));
+  }
+  return ["Inbox", table(lines, TASKS)].join("\n");
 }
 
 /** Search results: number, when it's planned (or due), title, space and anything not open. */

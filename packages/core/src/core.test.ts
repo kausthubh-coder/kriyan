@@ -236,6 +236,7 @@ describe("agent operations", () => {
       "answer_ask",
       "add_tasks",
       "restore_tasks",
+      "add_routine",
     ]);
   });
 });

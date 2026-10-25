@@ -7,7 +7,7 @@ import { cancelReminders, scheduleReminders } from "./model/reminders";
 import { DEFAULT_PROFILE, getProfile, requireOwner } from "./model/owner";
 import { updateSettings } from "./model/profile";
 import * as Tokens from "./model/tokens";
-import { reminderV } from "./validators";
+import { earlierWindowV, reminderV, todayLayoutV } from "./validators";
 
 export const profile = query({
   args: {},
@@ -79,6 +79,11 @@ export const updateProfile = mutation({
     /** null clears the semester. */
     semesterStart: v.optional(v.union(v.string(), v.null())),
     semesterEnd: v.optional(v.union(v.string(), v.null())),
+    todayLayout: v.optional(todayLayoutV),
+    earlierWindow: v.optional(earlierWindowV),
+    showSpace: v.optional(v.boolean()),
+    hideDone: v.optional(v.boolean()),
+    nowBadge: v.optional(v.boolean()),
   },
   handler: async (ctx, patch) => updateSettings(ctx, await requireOwner(ctx), patch),
 });
@@ -219,7 +224,7 @@ export const revokeToken = mutation({
 
 /**
  * Deletes everything the signed-in person owns: tasks (and their pending reminders), spaces,
- * habits, goals, history, phones and browsers that get reminders, tokens and the profile. Runs in batches until done.
+ * routines, habits, goals, history, phones and browsers that get reminders, tokens and the profile. Runs in batches until done.
  * The Clerk account itself is deleted by the app through Clerk.
  */
 export const deleteMyData = mutation({
@@ -259,8 +264,23 @@ export const deleteDataBatch = internalMutation({
           .take(left),
       () =>
         ctx.db
+          .query("routineTicks")
+          .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("routines")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
           .query("habits")
           .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("goalEntries")
+          .withIndex("by_owner_and_goalId_and_date", (q) => q.eq("ownerId", ownerId))
           .take(left),
       () =>
         ctx.db
