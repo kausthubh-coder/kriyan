@@ -75,13 +75,25 @@ export function ListRow({
         <View style={{ width: BOX + 4, alignItems: "center" }}>
           <Icon icon={CalendarDays} size={20} color={tone.dotHex} strokeWidth={2} />
         </View>
+      ) : task.projected ? (
+        // A later date of a repeat: drawn like the others, ticked off on its own day.
+        <View style={{ width: 24, alignItems: "center" }}>
+          <View
+            style={{
+              width: BOX,
+              height: BOX,
+              borderRadius: r.sm,
+              borderWidth: 2,
+              borderColor: task.color ? tone.dot : c.ink3,
+            }}
+          />
+        </View>
       ) : (
         <Press
           role="checkbox"
           aria-checked={done}
           accessibilityLabel={`${done ? "Mark not done" : "Complete"}: ${task.title}`}
           onPress={onTick}
-          disabled={task.projected}
           hoverBg={null}
           rippleRadius={22}
           style={{ width: 44, height: 44, margin: -10, alignItems: "center", justifyContent: "center" }}

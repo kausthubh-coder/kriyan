@@ -4,7 +4,8 @@
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { Minus, Plus } from "lucide-react-native";
-import { c, family, r, s, shadows } from "@/theme/tokens";
+import { useIsPhone } from "@/theme/layout";
+import { c, family, r, s, shadows, sz } from "@/theme/tokens";
 import { DottedRule } from "@/ui/DottedRule";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
@@ -89,6 +90,7 @@ export function Segmented<T extends string>({
   options: [T, string][];
   onChange: (value: T) => void;
 }) {
+  const phone = useIsPhone();
   return (
     <View
       role="radiogroup"
@@ -108,7 +110,7 @@ export function Segmented<T extends string>({
             scale={false}
             style={({ hovered }) => ({
               flex: 1,
-              height: 36,
+              height: phone ? sz.touch : 36,
               borderRadius: r.ctl,
               alignItems: "center",
               justifyContent: "center",
@@ -161,8 +163,8 @@ function RoundButton({
       onPress={onPress}
       disabled={disabled}
       hoverBg={null}
-      rippleRadius={20}
-      style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}
+      rippleRadius={sz.touch / 2}
+      style={{ width: sz.touch, height: sz.touch, alignItems: "center", justifyContent: "center" }}
     >
       {({ hovered }) => (
         <View

@@ -11,7 +11,8 @@ import { diffDays } from "@kriyan/core/dates";
 import { formatDate } from "@kriyan/core/format";
 import type { SpaceColor } from "@kriyan/core/tokens";
 import { errorText } from "@/features/tasks/actions";
-import { c, family, r, s, spaceTone } from "@/theme/tokens";
+import { useIsPhone } from "@/theme/layout";
+import { c, family, r, s, spaceTone, sz } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Field } from "@/ui/bits";
 import { Popover } from "@/ui/Popover";
@@ -99,6 +100,7 @@ export function GoalCard({ goal, color, today }: { goal: Goal; color: SpaceColor
   const entries = goal.entries.slice(-12);
   const feeds = goal.feeds;
   const log = useLogGoal();
+  const phone = useIsPhone();
   const fed = [...feeds.habits, ...(feeds.tasks ? [plural(feeds.tasks, "task")] : [])];
   return (
     <View
@@ -156,7 +158,7 @@ export function GoalCard({ goal, color, today }: { goal: Goal; color: SpaceColor
               onPress={() => void log(goal, step.delta)}
               hoverBg={null}
               style={({ hovered }) => ({
-                height: 40,
+                height: phone ? sz.touch : 40,
                 paddingHorizontal: s.s4,
                 borderRadius: r.pill,
                 justifyContent: "center",
@@ -183,7 +185,7 @@ function Trend({ values, target, color }: { values: number[]; target: number; co
     .join(" ");
   return (
     <View style={{ marginTop: s.s3, height: 32 }} aria-hidden>
-      <Svg width="100%" height={32} viewBox="0 0 100 28" preserveAspectRatio="none">
+      <Svg width="100%" height={32} viewBox="0 0 100 28">
         <Polyline
           points={points}
           fill="none"
@@ -191,7 +193,6 @@ function Trend({ values, target, color }: { values: number[]; target: number; co
           strokeWidth={2.4}
           strokeLinecap="round"
           strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
         />
       </Svg>
     </View>
@@ -205,8 +206,9 @@ function GoalHead({ goal, today }: { goal: Goal; today: string }) {
   const [value, setValue] = useState(String(goal.current));
   const [why, setWhy] = useState(goal.why ?? "");
   const ref = useRef<View>(null);
+  const phone = useIsPhone();
   return (
-    <View style={{ flexDirection: "row", alignItems: "baseline", gap: s.s3 }}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: s.s3 }}>
       <Press
         ref={ref}
         role="button"
@@ -219,7 +221,7 @@ function GoalHead({ goal, today }: { goal: Goal; today: string }) {
         }}
         hoverBg={null}
         scale={false}
-        style={{ flex: 1, minWidth: 0 }}
+        style={{ flex: 1, minWidth: 0, minHeight: phone ? sz.touch : undefined, justifyContent: "center" }}
       >
         {({ hovered }) => (
           <Txt variant="title" numberOfLines={2} style={hovered ? { textDecorationLine: "underline" } : null}>

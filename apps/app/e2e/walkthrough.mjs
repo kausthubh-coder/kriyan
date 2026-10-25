@@ -31,9 +31,12 @@ async function step(name, fn) {
 const toast = (text) => page.getByRole("status").filter({ hasText: text }).first().waitFor();
 
 async function colour(space, name) {
-  await page.goto(`${BASE}/browse`);
+  await page.goto(`${BASE}/menu`);
   await settle(page);
-  await page.getByRole("link", { name: space, exact: true }).last().click();
+  await page
+    .getByRole("link", { name: new RegExp(`^${space}(, \\d+)?$`) })
+    .last()
+    .click();
   await page.waitForURL(/\/space\//);
   await settle(page);
   await page.getByRole("button", { name: "Space options" }).click();
@@ -52,11 +55,11 @@ await step(
   },
 );
 
-await step("add a habit from Progress and check it on Today", async () => {
-  await page.goto(`${BASE}/progress`);
+await step("add a habit from Goals and habits and check it on Today", async () => {
+  await page.goto(`${BASE}/goals`);
   await settle(page);
   if (!(await page.getByText("Read 20 min", { exact: true }).filter({ visible: true }).count())) {
-    await page.getByRole("button", { name: "Add habit" }).click();
+    await page.getByRole("button", { name: "Add a habit" }).click();
     await page.getByRole("textbox", { name: "Habit" }).fill("Read 20 min");
     await page.getByRole("button", { name: "4 times a week" }).click();
     await page.getByRole("button", { name: "Add habit", exact: true }).last().click();
@@ -75,11 +78,11 @@ await step("add a habit from Progress and check it on Today", async () => {
   );
 });
 
-await step("add a goal from Progress and link a task to it", async () => {
-  await page.goto(`${BASE}/progress`);
+await step("add a goal from Goals and habits and link a task to it", async () => {
+  await page.goto(`${BASE}/goals`);
   await settle(page);
   if (!(await page.getByText("Launch Kriyan by 1 Nov", { exact: true }).count())) {
-    await page.getByRole("button", { name: "Add goal" }).click();
+    await page.getByRole("button", { name: "Add a goal" }).click();
     await page.getByRole("textbox", { name: "Goal" }).fill("Launch Kriyan by 1 Nov");
     await page.getByRole("textbox", { name: "Target" }).fill("14");
     await page.getByRole("button", { name: "Add a due date" }).click();
@@ -228,9 +231,12 @@ await step("keyboard: J selects, X completes, Undo, T and U navigate", async () 
 });
 
 await step("note on a space with the slash menu and a checklist", async () => {
-  await page.goto(`${BASE}/browse`);
+  await page.goto(`${BASE}/menu`);
   await settle(page);
-  await page.getByRole("link", { name: "Kriyan", exact: true }).last().click();
+  await page
+    .getByRole("link", { name: /^Kriyan(, \d+)?$/ })
+    .last()
+    .click();
   await page.waitForURL(/\/space\//);
   await settle(page);
   const existing = await page.getByText("Launch plan", { exact: true }).count();

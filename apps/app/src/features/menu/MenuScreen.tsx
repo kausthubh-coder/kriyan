@@ -48,7 +48,7 @@ export function MenuScreen() {
                   accessibilityLabel={g.parent.name}
                   hoverBg={null}
                   scale={false}
-                  style={{ alignSelf: "flex-start" }}
+                  style={{ alignSelf: "flex-start", minWidth: 44 }}
                 >
                   <GroupLabel>{g.label}</GroupLabel>
                 </Press>

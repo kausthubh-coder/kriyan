@@ -28,6 +28,20 @@ describe("runLines", () => {
     ]);
   });
 
+  test("other changes group by how they start", () => {
+    const actions = [
+      act("other", "New space Work"),
+      act("other", "New space School"),
+      act("other", "New space Life"),
+      act("other", "Logged Lose 5 kg: 0.3 kg"),
+      act("other", "Logged Lose 5 kg: 0.6 kg"),
+    ];
+    expect(runLines(actions).map((l) => [l.text, l.actions.length])).toEqual([
+      ["New space Work, School and 1 more", 3],
+      ["Logged Lose 5 kg: 0.3 kg and 0.6 kg", 2],
+    ]);
+  });
+
   test("two names are joined with and, and a title changed twice is named once", () => {
     expect(runLines([act("move", "Essay"), act("move", "Quiz")])[0]?.text).toBe("Moved Essay and Quiz");
     expect(runLines([act("change", "Essay"), act("change", "Essay")])[0]?.text).toBe("Changed Essay");

@@ -87,30 +87,41 @@ export interface RunLine<A> {
 }
 
 /**
+ * What an "other" action's title shares with its neighbours: the words before a colon ("Logged
+ * Lose 5 kg: 0.3 kg"), or its first two ("New space Thesis"). Lines group on it.
+ */
+function otherHead(title: string): [head: string, rest: string] {
+  const colon = title.indexOf(":");
+  if (colon > 0) return [title.slice(0, colon + 1), title.slice(colon + 1).trim()];
+  const words = title.split(" ");
+  return words.length > 2 ? [words.slice(0, 2).join(" "), words.slice(2).join(" ")] : [title, ""];
+}
+
+/**
  * A run as the Agents page lists it: one line per kind of change, in the order the agent made
  * them ("Added HW17, HW18 and 29 more", "Ticked off Lab 5 check-in"). An "other" action's title
- * is already a phrase ("New space Thesis"), so each gets its own line.
+ * is already a phrase ("New space Thesis"), so those group by how they start ("New space
+ * Work, School and 2 more").
  */
 export function runLines<A extends Action & { title: string }>(actions: A[]): RunLine<A>[] {
-  const lines: RunLine<A>[] = [];
-  const byKind = new Map<ActionKind, RunLine<A>>();
+  const lines: (RunLine<A> & { head: string; names: string[] })[] = [];
+  const byKey = new Map<string, (typeof lines)[number]>();
   for (const action of actions) {
-    if (action.kind === "other") {
-      lines.push({ text: action.title, actions: [action] });
-      continue;
-    }
-    const line = byKind.get(action.kind);
-    if (line) line.actions.push(action);
-    else {
-      const fresh = { text: "", actions: [action] };
-      byKind.set(action.kind, fresh);
+    const [head, rest] =
+      action.kind === "other" ? otherHead(action.title) : [LINE_VERB[action.kind], action.title];
+    const key = `${action.kind}|${head}`;
+    const line = byKey.get(key);
+    if (line) {
+      line.actions.push(action);
+      if (rest && !line.names.includes(rest)) line.names.push(rest);
+    } else {
+      const fresh = { text: "", head, names: rest ? [rest] : [], actions: [action] };
+      byKey.set(key, fresh);
       lines.push(fresh);
     }
   }
-  for (const line of lines) {
-    const kind = line.actions[0]!.kind;
-    if (kind !== "other")
-      line.text = `${LINE_VERB[kind]} ${nameSome([...new Set(line.actions.map((a) => a.title))])}`;
-  }
-  return lines;
+  return lines.map(({ head, names, actions: list }) => ({
+    text: names.length ? `${head} ${nameSome(names)}` : head,
+    actions: list,
+  }));
 }

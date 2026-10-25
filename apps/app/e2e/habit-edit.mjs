@@ -20,22 +20,22 @@ const browser = await launch();
 const ctx = await signedInContext(browser, { width: 1440, height: 900 });
 const page = await ctx.newPage();
 page.setDefaultTimeout(30000);
-await page.goto(`${BASE}/progress`);
+await page.goto(`${BASE}/goals`);
 await settle(page);
 
-await page.getByRole("button", { name: "Edit habit" }).click();
+await page.getByRole("button", { name: /^Raed 20 min, .*Edit or fix a day/ }).click();
 const field = page.getByRole("textbox", { name: "Habit" });
 await field.fill("Read 20 min");
 await page.getByRole("button", { name: "5 times a week" }).click();
 await page.screenshot({ path: artifact("habit-edit-1440.png") });
 await page.getByRole("button", { name: "Save habit" }).click();
-await page.getByText("5 times a week, ").first().waitFor();
+await page.getByRole("button", { name: /^Read 20 min, \d of 5 this week/ }).waitFor();
 check(
   JSON.stringify(await habits()) === JSON.stringify([["Read 20 min", 5]]),
   `1440: renamed and retargeted (get_today: ${JSON.stringify(await habits())})`,
 );
 
-await page.getByRole("button", { name: "Edit habit" }).click();
+await page.getByRole("button", { name: /^Read 20 min, .*Edit or fix a day/ }).click();
 await page.getByRole("button", { name: "Archive habit" }).click();
 const toast = page.getByRole("status").filter({ hasText: "Archived: Read 20 min" });
 await toast.waitFor();
@@ -52,9 +52,9 @@ await ctx.close();
 
 const phone = await signedInContext(browser, { width: 390, height: 844 });
 const p = await phone.newPage();
-await p.goto(`${BASE}/progress`);
+await p.goto(`${BASE}/goals`);
 await settle(p);
-await p.getByRole("button", { name: "Edit habit" }).click();
+await p.getByRole("button", { name: /^Read 20 min, .*Edit or fix a day/ }).click();
 await p.getByRole("button", { name: "Save habit" }).waitFor();
 await p.screenshot({ path: artifact("habit-edit-390.png") });
 await phone.close();

@@ -99,7 +99,7 @@ export function Page({
         contentContainerStyle={{
           paddingHorizontal: phone ? s.s6 : s.s8,
           paddingTop: phone ? 0 : s.s12,
-          paddingBottom: add && phone ? ADD_CLEARANCE + insets.bottom : s.s16,
+          paddingBottom: s.s16,
         }}
       >
         <View style={{ width: "100%", maxWidth: phone ? undefined : PAGE_WIDTH, alignSelf: "center" }}>
@@ -133,6 +133,8 @@ export function Page({
             </View>
           ) : null}
           {children}
+          {/* Room to scroll the last row clear of the floating add button. */}
+          {add && phone ? <View style={{ height: ADD_CLEARANCE - s.s16 + insets.bottom }} /> : null}
         </View>
       </ScrollView>
       {add && phone ? <FloatingAdd spaceId={add.spaceId} /> : null}
@@ -242,7 +244,7 @@ export function GroupLabel({ children }: { children: string }) {
       variant="caption"
       tone="ink3"
       heading={2}
-      style={[family("600"), { paddingTop: s.s6, letterSpacing: 0.3 }]}
+      style={[family("600"), { paddingTop: s.s6, paddingBottom: s.s1, letterSpacing: 0.3 }]}
     >
       {children}
     </Txt>

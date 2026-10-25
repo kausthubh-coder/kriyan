@@ -181,7 +181,7 @@ function Heading({ label, href }: { label: string; href?: Href }) {
         accessibilityLabel={`${label.charAt(0)}${label.slice(1).toLowerCase()}`}
         hoverBg={null}
         scale={false}
-        style={[box, { alignSelf: "flex-start", borderRadius: r.sm }]}
+        style={{ ...box, alignSelf: "flex-start", borderRadius: r.sm }}
       >
         {text}
       </Press>

@@ -12,7 +12,7 @@ process.chdir(new URL("../../../", import.meta.url).pathname.replace(/^\/([A-Z]:
 const TASTE = readFileSync("node_modules/@kausthubh/critly/src/taste.js", "utf8");
 const routes = process.argv.slice(2).length
   ? process.argv.slice(2).map((p) => (p.startsWith("/") ? p : `/${p}`))
-  : ["/today", "/upcoming", "/inbox", "/browse", "/progress", "/settings", "/trash", "/space:Kriyan"];
+  : ["/today", "/menu", "/inbox", "/goals", "/agents", "/settings", "/upcoming", "/trash", "/space:Calculus"];
 const out = ".critly/taste";
 mkdirSync(out, { recursive: true });
 
@@ -27,11 +27,11 @@ for (const viewport of [
   page.setDefaultTimeout(60000);
   for (const route of routes) {
     if (route.startsWith("/space:")) {
-      // A space by name: open it from Browse, the way a person would.
-      await page.goto(`${BASE}/browse`);
+      // A space by name: open it from the menu, the way a person would.
+      await page.goto(`${BASE}/menu`);
       await settle(page);
       await page
-        .getByRole("link", { name: route.slice(7), exact: true })
+        .getByRole("link", { name: new RegExp(`^${route.slice(7)}(, \\d+)?$`) })
         .last()
         .click();
       await page.waitForURL(/\/space\//);
