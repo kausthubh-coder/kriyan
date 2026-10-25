@@ -13,7 +13,7 @@ A person types one sentence and gets a task with its date, time, length, space, 
 ## How to get to it (user POV)
 
 - Today: the `Add a task` field at the top.
-- Press `N` on desktop, or tap the `Add task` button above the phone navigation bar.
+- Press `N` on desktop, or tap the floating `Add` button (Today's centre button, or the one on the Inbox and a space).
 - Press `Ctrl+K`, type into `Search or type a task`, press Enter.
 - `kriyan add "<sentence>"` in a terminal, or an agent calling `add_task`.
 

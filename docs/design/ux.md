@@ -48,11 +48,13 @@ Three groups, always in this order:
 | Spaces   | The person's own tree of spaces, nested as deep as they like | Where things belong |
 | Progress | Goals, Habits, Activity                                      | Am I on track       |
 
-Search and every command live in one command menu (`Ctrl K`). Settings sits at the bottom of the sidebar and is never a tab.
+Search and every command live in one command menu (`Ctrl K`). Design v5 (`docs/design/v5/prototype.html`) has no tab bar: Today is the app, and everything else is one step from it.
 
-**Desktop sidebar:** Inbox (count), Today (count), Upcoming, then Spaces (the tree), then Progress. One click to anything.
+**Phone:** Today's three floating round buttons: Menu (left), Add (centre), Month (right). The menu is a page pushed over Today with Joi's round back button: Inbox (count), the spaces grouped under their top-level parent (School: CSC 316, CSC 281), then Goals and habits, Agents and Settings. Spaces with nothing inside them gather under "Spaces". Each page off the menu has the same back button; lists (Inbox, a space) carry a floating add button.
 
-**Phone tab bar (thumb reach):** Today, Upcoming, Add (centre), Inbox, Browse. Browse holds Spaces, Progress, search and Settings. Habits check-in also appears on Today, because it is daily.
+**Desktop:** a quiet left rail beside the page: the wordmark, Today and Inbox with their counts, the grouped spaces with their open counts, Add a space, then Goals and habits, Agents and Settings, and the keys at the foot. One click to anything. A group's name opens its parent space.
+
+Week (`/upcoming`) and Ask (`/ask`) left the navigation; the command menu and their keys still reach them. Old links to `/browse` open the menu and `/progress` opens Goals and habits.
 
 ### Data, in plain terms
 
@@ -85,11 +87,11 @@ Desktop puts the list and the timeline side by side, and opens a selected task i
 
 ### Inbox
 
-Everything captured without a home. Each row offers "Today", "Pick a date" and "Move to space" without opening the task. Empty Inbox is the one place the app celebrates.
+Ideas captured with no day and no space, then "From before last week": what was planned or due before Today's earlier window (Settings, "What's left from earlier") and never done, each saying when it was meant to happen ("Was due Wed 14 Oct"). Rows open the task, where it gets a day or is let go.
 
 ### Space page
 
-Breadcrumb (Work / Kriyan / Launch), then: next tasks, later tasks, child spaces, goals in this space, and the space's note. Child spaces appear as rows, not cards.
+The big name with its dot and "N open", then the next three weeks by day in v5 rows (repeats on each of their days, due dates with no day planned), what has no day yet, the spaces inside it (rows, not cards), its goals and its note. A parent space lists what its spaces hold, each row naming the space. Rename, colour and archive sit behind the round "…" button.
 
 ### Task detail
 
@@ -115,11 +117,19 @@ The typed grammar is the same in quick add, the CLI and MCP, and lives once in `
 
 A task can have any number. Timed tasks get the person's default reminder (10 minutes before unless they change it); untimed tasks get a separate default (09:00 on the day). Each reminder is either relative ("10 min before", "1 day before at 20:00") or absolute ("Fri 16 Oct at 09:00"). Relative reminders follow the task when it moves. One tap adds the common ones; custom is a second step. The task row shows a bell with the count.
 
-### Progress
+### Goals and habits
 
-- **Goals:** each with its target, where you are, and whether you are on pace ("4 km behind pace"). Linked tasks below.
-- **Habits:** each with this week's progress against its target, "weeks on target" instead of a streak, and a 26-week heatmap. Tap a cell to fix a day. Missing a day never resets anything.
-- **Activity:** a heatmap of completed time per day across the year, filterable by space. "Where did my time go" in one picture.
+- The days left in the year and the weeks left in the semester, as one quiet line.
+- **Goals:** a card each: the title and "by Thu 31 Dec", a bar in its space's colour, where it stands and what's left in a sentence ("$760 to go, $84 a week for 9 weeks"), a small trend line of its logged values, what feeds it ("Fed by Gym"), and quick log buttons (+$20, −0.5 kg). The title opens its editor.
+- **Habits and routines:** v5 rows. A habit's ring checks today and the row says this week's count against its target ("1 of 3"); its name opens the editor with Fix a day. Missing a day never resets anything.
+
+### Agents
+
+Each agent's runs from the last month, a line per kind of change ("Added HW17, HW18 and 29 more") with Undo for all of it, then the MCP address with Copy, how to connect (Claude, ChatGPT, the CLI) and "Let agents edit directly".
+
+### Settings
+
+Your day (Wake up, Review today, Wind down, with − and +), Today shows (what's left from earlier, time blocks or a list, hide finished, each task's space, "Now"), then sounds and haptics, default reminders, capacity and the semester, the command line and its tokens, installing, recently deleted, and the account. Light and dark follow the system.
 
 ## 6. How things react
 
@@ -148,7 +158,7 @@ Every gesture has a visible twin: swipe right to complete has a checkbox, swipe 
 
 ## 8. Keyboard
 
-`N` new task, `Ctrl K` command menu, `T` Today, `U` Upcoming, `I` Inbox, `J` and `K` move, `Enter` open, `X` complete, `D` date, `R` repeat, `M` move to space, `Delete` delete with undo, `Escape` close. Every command shows its shortcut in the command menu.
+`N` new task, `Ctrl K` command menu, `T` Today, `U` Week, `I` Inbox, `J` and `K` move, `Enter` open, `X` complete, `D` date, `R` repeat, `M` move to space, `Delete` delete with undo, `Escape` close. Every command shows its shortcut in the command menu.
 
 ## 9. Agents
 

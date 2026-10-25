@@ -18,7 +18,7 @@ Today shows what's next and when, today's habits, anytime tasks, and a schedule 
 
 ## How to get to it (user POV)
 
-- `/today`, the first screen after sign-in; `T` from anywhere on desktop; the Today tab on phone.
+- `/today`, the first screen after sign-in; `T` from anywhere on desktop; the first screen on phone, where Back from the menu returns.
 
 ## Driving it with Playwright
 
