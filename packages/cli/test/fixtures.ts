@@ -56,6 +56,7 @@ export function task(fields: Partial<TaskView> & Pick<TaskView, "_id" | "title">
     addedBy: null,
     dueTime: null,
     externalId: null,
+    prepFor: null,
     ...fields,
   };
 }
@@ -114,8 +115,26 @@ export const essayPlan = task({ _id: ids.essayPlan, title: "Essay plan", ...scho
 export const dentist = task({ _id: ids.dentist, title: "Book the dentist" });
 
 export const habits: HabitView[] = [
-  { _id: ids.readHabit, title: "Read", color: "green", target: 5, doneToday: false, thisWeek: 1 },
-  { _id: ids.stretch, title: "Stretch", color: null, target: 3, doneToday: true, thisWeek: 2 },
+  {
+    _id: ids.readHabit,
+    title: "Read",
+    color: "green",
+    target: 5,
+    doneToday: false,
+    thisWeek: 1,
+    goalId: null,
+    routineId: null,
+  },
+  {
+    _id: ids.stretch,
+    title: "Stretch",
+    color: null,
+    target: 3,
+    doneToday: true,
+    thisWeek: 2,
+    goalId: null,
+    routineId: null,
+  },
 ];
 
 export const spaces: SpacesResult = [
@@ -134,13 +153,25 @@ export const spaces: SpacesResult = [
 export function today(date = "2026-10-13"): TodayResult {
   return {
     date,
-    profile: { timeZone: "Europe/London", dayStart: 480, dayEnd: 1320, dailyCapacity: 420 },
+    profile: {
+      timeZone: "Europe/London",
+      dayStart: 480,
+      dayEnd: 1320,
+      dailyCapacity: 420,
+      todayLayout: "blocks",
+      earlierWindow: "week",
+      showSpace: true,
+      hideDone: false,
+      nowBadge: true,
+      reviewTime: 1200,
+    },
     scheduled: [gym, lecture, essay, reading, callMum],
     anytime: [stamps],
     done: [rent],
     due: [],
-    earlier: [problems],
+    earlier: [{ ...problems, ageDays: 1 }],
     habits,
+    routines: [],
     proposals: 1,
     spaces,
   };
@@ -194,10 +225,10 @@ export function week(): WeekResult {
   };
 }
 
-export const inbox: InboxResult = [
-  dentist,
-  task({ _id: "k57passport00000000000000000012", title: "Renew passport" }),
-];
+export const inbox: InboxResult = {
+  tasks: [dentist, task({ _id: "k57passport00000000000000000012", title: "Renew passport" })],
+  older: [],
+};
 
 export function progress(): ProgressResult {
   const days = (count: number, done: (i: number) => boolean) =>
@@ -227,6 +258,11 @@ export function progress(): ProgressResult {
         progress: 0.425,
         pace: 0.6,
         next: null,
+        entries: [
+          { date: "2026-10-04", value: 30 },
+          { date: "2026-10-11", value: 42.5 },
+        ],
+        feeds: { habits: ["Run"], tasks: 0 },
       },
       {
         _id: "k97books0000000000000000000002",
@@ -241,6 +277,8 @@ export function progress(): ProgressResult {
         progress: 0.75,
         pace: null,
         next: null,
+        entries: [],
+        feeds: { habits: [], tasks: 12 },
       },
     ],
     habits: habits.map((h) => ({ ...h, days: days(30, (i) => i % 3 === 0) })),

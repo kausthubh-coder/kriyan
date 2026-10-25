@@ -18,8 +18,8 @@ export const week = query({
 });
 
 export const inbox = query({
-  args: {},
-  handler: async (ctx) => Views.inboxView(ctx, await requireOwner(ctx)),
+  args: { today: v.string() },
+  handler: async (ctx, { today }) => Views.inboxView(ctx, await requireOwner(ctx), today),
 });
 
 export const goals = query({

@@ -58,9 +58,9 @@ if (!process.argv.includes("--reset")) {
   await space("Kriyan", "blue", work);
   await space("Clients", "pink", work);
   const school = await space("School", "green");
-  await space("Calculus", "purple", school);
+  const calculus = await space("Calculus", "purple", school);
   await space("Physics", "teal", school);
-  await space("Life", "orange");
+  const life = await space("Life", "orange");
 
   const sentences = [
     "Write MCP tools today 10:00 for 1h30 #work/kriyan",
@@ -75,5 +75,95 @@ if (!process.argv.includes("--reset")) {
   ];
   for (const text of sentences) await op("add_task", { text });
   console.log(`seeded   7 spaces, ${sentences.length} tasks`);
+
+  // Design v5's routines, goals and a study session, with a few weeks of history behind them.
+  const today = (await op("get_today")).date;
+  const day = (offset) =>
+    new Date(Date.parse(`${today}T00:00:00Z`) + offset * 86_400_000).toISOString().slice(0, 10);
+  const goal = async (fields, log) => {
+    const { goalId } = await op("add_goal", { kind: "number", spaceId: life, ...fields });
+    for (const [offset, value] of log) await op("log_goal", { goalId, value, date: day(offset) });
+    return goalId;
+  };
+  // Kilos lost so far, so the bar fills as the weight comes down.
+  const weight = await goal({ title: "Lose 5 kg", target: 5, unit: "kg", dueDate: day(68) }, [
+    [-28, 0],
+    [-21, 0.3],
+    [-14, 0.8],
+    [-7, 1.1],
+    [0, 1.4],
+  ]);
+  const savings = await goal({ title: "Save $2,000", target: 2000, unit: "$", dueDate: day(67) }, [
+    [-54, 300],
+    [-24, 900],
+    [-2, 1240],
+  ]);
+  const meditate = (await op("add_habit", { title: "Meditate", target: 7, spaceId: life })).habitId;
+  const gym = (await op("add_habit", { title: "Gym", target: 4, spaceId: life, goalId: weight })).habitId;
+  const morning = (
+    await op("add_routine", {
+      title: "Morning routine",
+      time: 7 * 60,
+      spaceId: life,
+      parts: [
+        { title: "Brush teeth", length: 5 },
+        { title: "Meditate", length: 10, habitId: meditate },
+        { title: "Gym", length: 45, habitId: gym, weekdays: [0, 2, 4, 5] },
+        { title: "Cold plunge", length: 5 },
+        { title: "Shower", length: 10 },
+      ],
+    })
+  ).routineId;
+  const night = (
+    await op("add_routine", {
+      title: "Night routine",
+      time: 22 * 60,
+      spaceId: life,
+      parts: [
+        { title: "Read", length: 20 },
+        { title: "Brush teeth", length: 5 },
+        { title: "Lay out tomorrow's clothes", length: 5 },
+      ],
+    })
+  ).routineId;
+  // A six-day morning streak and three nights; this morning is two parts in.
+  for (let offset = -6; offset < 0; offset++)
+    await op("tick_routine", { routineId: morning, done: true, date: day(offset) });
+  for (let offset = -3; offset < 0; offset++)
+    await op("tick_routine", { routineId: night, done: true, date: day(offset) });
+  for (const index of [0, 1])
+    await op("tick_routine", { routineId: morning, index, done: true, date: today });
+  await op("add_task", {
+    title: "Move $100 to savings",
+    spaceId: life,
+    goalId: savings,
+    date: today,
+    repeat: { freq: "week", interval: 1 },
+  });
+
+  const exam = await op("add_task", {
+    title: "Calculus exam 2",
+    spaceId: calculus,
+    date: day(7),
+    time: 13 * 60 + 30,
+    length: 75,
+    event: true,
+  });
+  await op("add_task", {
+    title: "Study for Calculus exam 2",
+    spaceId: calculus,
+    date: today,
+    time: 16 * 60,
+    length: 60,
+    repeat: { freq: "day", interval: 1, end: { kind: "on", date: day(6) } },
+    prepFor: exam.taskId,
+    steps: [
+      { title: "Limits and continuity", done: true },
+      { title: "Derivatives", done: false },
+      { title: "Integration by parts", done: false },
+      { title: "Practice exam", done: false },
+    ],
+  });
+  console.log("seeded   2 routines, 2 habits, 2 goals with entries, a study session for an exam in 7 days");
 }
 await browser.close();

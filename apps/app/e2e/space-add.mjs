@@ -50,7 +50,7 @@ for (const [w, h] of [
   const space = await op("get_space", { spaceId: kriyan._id });
   const task = space.later.find((t) => t.title === title);
   check(Boolean(task), `${w}: get_space shows it in Kriyan`);
-  const inbox = await op("get_inbox");
+  const inbox = (await op("get_inbox")).tasks;
   check(!inbox.some((t) => t.title === title), `${w}: get_inbox doesn't have it`);
   if (task) await op("delete_task", { taskId: task._id });
   await ctx.close();

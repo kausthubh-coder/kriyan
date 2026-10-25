@@ -18,11 +18,16 @@ import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
-import { goalEntries, goalFeeds, useLogGoal, type Goal } from "./goalData";
+import { useLogGoal, type Goal } from "./goalData";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+interface Step {
+  label: string;
+  delta: number;
+}
 
 interface Stand {
   /** 0 to 1, for the bar. */
@@ -31,14 +36,14 @@ interface Stand {
   lead: string;
   /** "$760 to go, $84 a week for 9 weeks". */
   rest: string;
-  /** The quick log buttons' steps, empty for a goal that counts tasks. */
-  steps: number[];
+  /** The quick log buttons, none for a goal that counts tasks. */
+  steps: Step[];
 }
+
+const signed = (n: number, unit: string) => `${n < 0 ? "−" : "+"}${Math.abs(n)}${unit}`;
 
 /** Where a goal stands, in the prototype's words. */
 function goalStand(goal: Goal, today: string): Stand {
-  const entries = goalEntries(goal);
-  const start = entries[0]?.value;
   const weeks = goal.dueDate ? Math.max(1, Math.round(diffDays(goal.dueDate, today) / 7)) : null;
   const unit = goal.unit ? ` ${goal.unit}` : "";
   const onPace = goal.pace !== null && goal.progress >= goal.pace - 0.04 ? " On pace." : "";
@@ -54,8 +59,8 @@ function goalStand(goal: Goal, today: string): Stand {
       steps: [],
     };
   }
+  const left = Math.max(0, round1(goal.target - goal.current));
   if (goal.unit === "$") {
-    const left = Math.max(0, goal.target - goal.current);
     return {
       share: goal.progress,
       lead: `${money(goal.current)} of ${money(goal.target)}`,
@@ -65,47 +70,34 @@ function goalStand(goal: Goal, today: string): Stand {
           : weeks
             ? `${money(left)} to go, ${money(left / weeks)} a week for ${plural(weeks, "week")}`
             : `${money(left)} to go`,
-      steps: [20, 50, 100],
+      steps: [20, 50, 100].map((n) => ({ label: `+${money(n)}`, delta: n })),
     };
   }
-  // Going down (a weight to lose): it started above the target.
-  if (start !== undefined && goal.target < start) {
-    const left = Math.max(0, round1(goal.current - goal.target));
-    const small = start - goal.target <= 20;
-    return {
-      share: Math.min(1, Math.max(0, (start - goal.current) / (start - goal.target))),
-      lead: `${goal.current}${unit} now, ${round1(start - goal.current)}${unit} down`,
-      rest:
-        left === 0
-          ? "Reached"
-          : `${left}${unit} to go${weeks ? `, about ${round1(left / weeks)}${unit} a week` : ""}.${onPace}`,
-      steps: small ? [-0.2, -0.5, 0.2] : [-1, -5, 1],
-    };
-  }
-  const left = Math.max(0, round1(goal.target - goal.current));
-  const span = goal.target - (start ?? 0);
+  // "Lose 5 kg" is kept as kilos lost; its buttons read as the scale does (−0.5 kg is 0.5 lost).
+  const losing = /^lose\b/i.test(goal.title);
+  const small = goal.target <= 20;
+  const steps = losing
+    ? (small ? [0.2, 0.5, -0.2] : [1, 5, -1]).map((n) => ({ label: signed(-n, unit), delta: n }))
+    : (goal.target <= 20 ? [1, 2, 5] : goal.target <= 200 ? [1, 5, 10] : [10, 50, 100]).map((n) => ({
+        label: signed(n, unit),
+        delta: n,
+      }));
   return {
     share: goal.progress,
-    lead: `${goal.current} of ${goal.target}${unit}`,
+    lead: `${goal.current} of ${goal.target}${unit}${losing ? " lost" : ""}`,
     rest:
       left === 0
         ? "Reached"
         : `${left}${unit} to go${weeks ? `, about ${round1(left / weeks)}${unit} a week` : ""}.${onPace}`,
-    steps: span <= 20 ? [1, 2, 5] : span <= 200 ? [1, 5, 10] : [10, 50, 100],
+    steps,
   };
-}
-
-function stepLabel(goal: Goal, step: number): string {
-  const sign = step < 0 ? "−" : "+";
-  const n = Math.abs(step);
-  return goal.unit === "$" ? `${sign}${money(n)}` : `${sign}${n}${goal.unit ? ` ${goal.unit}` : ""}`;
 }
 
 export function GoalCard({ goal, color, today }: { goal: Goal; color: SpaceColor | null; today: string }) {
   const tone = spaceTone(color);
   const stand = goalStand(goal, today);
-  const entries = goalEntries(goal).slice(-12);
-  const feeds = goalFeeds(goal);
+  const entries = goal.entries.slice(-12);
+  const feeds = goal.feeds;
   const log = useLogGoal();
   const fed = [...feeds.habits, ...(feeds.tasks ? [plural(feeds.tasks, "task")] : [])];
   return (
@@ -158,10 +150,10 @@ export function GoalCard({ goal, color, today }: { goal: Goal; color: SpaceColor
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: s.s4 }}>
           {stand.steps.map((step) => (
             <Press
-              key={step}
+              key={step.label}
               role="button"
-              accessibilityLabel={`Log ${stepLabel(goal, step)} on ${goal.title}`}
-              onPress={() => void log(goal, step)}
+              accessibilityLabel={`Log ${step.label} on ${goal.title}`}
+              onPress={() => void log(goal, step.delta)}
               hoverBg={null}
               style={({ hovered }) => ({
                 height: 40,
@@ -172,7 +164,7 @@ export function GoalCard({ goal, color, today }: { goal: Goal; color: SpaceColor
               })}
             >
               <Txt variant="label" tnum style={{ fontSize: 14, lineHeight: 20 }}>
-                {stepLabel(goal, step)}
+                {step.label}
               </Txt>
             </Press>
           ))}

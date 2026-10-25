@@ -64,7 +64,7 @@ export function TodayScreen() {
   const { today, now } = useClock();
   const phone = useIsPhone();
   const { width } = useWindowDimensions();
-  const inbox = useInboxView();
+  const inbox = useInboxView()?.tasks;
   const [planning, setPlanning] = useState(false);
   const planRef = useRef<View>(null);
   // The day's hours get their own column when the list still has room beside it.

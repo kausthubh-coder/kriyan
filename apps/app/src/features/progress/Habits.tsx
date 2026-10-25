@@ -135,7 +135,7 @@ export function RoutineRow({ routine }: { routine: Routine }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: s.s4, minHeight: height }}>
       <View style={{ width: 24, alignItems: "center" }}>
-        <Ring color={c.ink3} done={routine.done} size={22} />
+        <Ring color={routine.color ? spaceTone(routine.color).dot : c.ink3} done={routine.done} size={22} />
       </View>
       <Txt variant="subhead" numberOfLines={1} style={[family("500"), { flex: 1 }]}>
         {routine.title}

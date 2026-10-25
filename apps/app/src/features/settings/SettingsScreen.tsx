@@ -40,7 +40,7 @@ import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 
 import { CLI_LINE, GITHUB_URL } from "./links";
-import { saveTodayPrefs, useTodayPrefs, type EarlierWindow, type TodayLayout } from "./todayPrefs";
+import { todayPrefsOf, useSaveTodayPrefs, type EarlierWindow, type TodayLayout } from "./todayPrefs";
 
 // Onboarding copies the MCP address from here.
 export { MCP_URL } from "./links";
@@ -69,7 +69,7 @@ export function SettingsScreen() {
       ) : (
         <>
           <YourDay profile={profile} />
-          <TodayShows />
+          <TodayShows profile={profile} />
           <Feel profile={profile} />
           <DefaultReminders profile={profile} />
           <Planning profile={profile} />
@@ -149,8 +149,9 @@ const LAYOUTS: [TodayLayout, string][] = [
 ];
 
 /** What Today leads with: what's left from earlier, blocks or a list, and three switches. */
-function TodayShows() {
-  const prefs = useTodayPrefs();
+function TodayShows({ profile }: { profile: Profile }) {
+  const prefs = todayPrefsOf(profile);
+  const saveTodayPrefs = useSaveTodayPrefs();
   return (
     <View>
       <GroupLabel>TODAY SHOWS</GroupLabel>

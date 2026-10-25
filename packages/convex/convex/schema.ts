@@ -1,6 +1,17 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { actionKindV, colorV, reminderV, repeatV, sourceV, stepV, taskBeforeV } from "./validators";
+import {
+  actionKindV,
+  colorV,
+  earlierWindowV,
+  reminderV,
+  repeatV,
+  routinePartV,
+  sourceV,
+  stepV,
+  taskBeforeV,
+  todayLayoutV,
+} from "./validators";
 
 // Every row belongs to one person: `ownerId` is their identity's tokenIdentifier.
 // Every query reads through an index that starts with ownerId.
@@ -27,6 +38,16 @@ export default defineSchema({
     /** The semester's first and last days, for the time-left card on Goals. */
     semesterStart: v.optional(v.string()),
     semesterEnd: v.optional(v.string()),
+    /** Today as time blocks (the default) or one line per item. */
+    todayLayout: v.optional(todayLayoutV),
+    /** How far back Today shows what's left from earlier days; older ones wait in the Inbox. Unset is a week. */
+    earlierWindow: v.optional(earlierWindowV),
+    /** The space's name after a row's title. Unset is on. */
+    showSpace: v.optional(v.boolean()),
+    /** Hide what's finished from Today's list. Unset is off. */
+    hideDone: v.optional(v.boolean()),
+    /** The red "Now" pill on the item you're in. Unset is on. */
+    nowBadge: v.optional(v.boolean()),
   }).index("by_owner", ["ownerId"]),
 
   spaces: defineTable({
@@ -66,6 +87,8 @@ export default defineSchema({
     /** Something you attend (a class, a meeting) rather than tick off. */
     event: v.boolean(),
     goalId: v.optional(v.id("goals")),
+    /** The test or deadline this one prepares for: a study session before an exam. */
+    prepFor: v.optional(v.id("tasks")),
     order: v.number(),
     doneAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
@@ -97,7 +120,11 @@ export default defineSchema({
     .index("by_owner_and_deadline", ["ownerId", "deadline"])
     // Maintenance only (emptying the Trash), never read for a person.
     .index("by_deletedAt", ["deletedAt"])
-    .index("by_owner_and_proposedBy", ["ownerId", "proposedBy"]),
+    .index("by_owner_and_proposedBy", ["ownerId", "proposedBy"])
+    // What feeds a goal, on its card.
+    .index("by_owner_and_goalId", ["ownerId", "goalId"])
+    // Study sessions, to show the test each prepares for.
+    .index("by_owner_and_prepFor", ["ownerId", "prepFor"]),
 
   /** One row per occurrence done: a single task, or one date of a repeating one. */
   completions: defineTable({
@@ -121,6 +148,8 @@ export default defineSchema({
     spaceId: v.optional(v.id("spaces")),
     /** Times a week. */
     target: v.number(),
+    /** The goal it feeds ("Fed by Gym"). */
+    goalId: v.optional(v.id("goals")),
     order: v.number(),
     archivedAt: v.optional(v.number()),
   }).index("by_owner", ["ownerId"]),
@@ -131,7 +160,30 @@ export default defineSchema({
     date: v.string(),
   })
     .index("by_owner_and_date", ["ownerId", "date"])
-    .index("by_habitId_and_date", ["habitId", "date"]),
+    .index("by_habitId_and_date", ["habitId", "date"])
+    .index("by_owner_and_habitId_and_date", ["ownerId", "habitId", "date"]),
+
+  /** One block of small parts done in a row (a morning routine). Rules in model/routines.ts. */
+  routines: defineTable({
+    ownerId: v.string(),
+    title: v.string(),
+    spaceId: v.optional(v.id("spaces")),
+    /** Minutes after midnight. */
+    time: v.number(),
+    parts: v.array(routinePartV),
+    order: v.number(),
+    archivedAt: v.optional(v.number()),
+  }).index("by_owner", ["ownerId"]),
+
+  /** One row per part ticked on a day; `index` is the part's place in the routine. */
+  routineTicks: defineTable({
+    ownerId: v.string(),
+    routineId: v.id("routines"),
+    date: v.string(),
+    index: v.number(),
+  })
+    .index("by_owner_and_date", ["ownerId", "date"])
+    .index("by_owner_and_routineId_and_date", ["ownerId", "routineId", "date"]),
 
   goals: defineTable({
     ownerId: v.string(),
@@ -139,7 +191,7 @@ export default defineSchema({
     /** Why it matters, in the person's words ("Keeps the scholarship open"), shown under the title. */
     why: v.optional(v.string()),
     spaceId: v.optional(v.id("spaces")),
-    /** "number": track a value (km, pages); "tasks": count linked tasks done. */
+    /** "number": track a value (km, pages, $ saved); "tasks": count linked tasks done. */
     kind: v.union(v.literal("number"), v.literal("tasks")),
     target: v.number(),
     current: v.number(),
@@ -148,6 +200,14 @@ export default defineSchema({
     dueDate: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
   }).index("by_owner", ["ownerId"]),
+
+  /** A goal's value on a day, for its trend line; goals.log adds one and sets the goal's current. */
+  goalEntries: defineTable({
+    ownerId: v.string(),
+    goalId: v.id("goals"),
+    date: v.string(),
+    value: v.number(),
+  }).index("by_owner_and_goalId_and_date", ["ownerId", "goalId", "date"]),
 
   /** Time spent in Focus, one row per session; Review and Goals add these up. */
   focusSessions: defineTable({

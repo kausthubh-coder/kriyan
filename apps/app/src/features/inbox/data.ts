@@ -1,7 +1,5 @@
-// The Inbox's two lists behind one adapter, so the screen doesn't change when the query does.
-// Today views.inbox is the list of ideas (no day, no space). Design v5 contract A adds the
-// older ones that Today no longer shows ("From before last week", inboxView.older); when that
-// lands, only toInbox changes.
+// The Inbox's two lists: ideas (no day, no space) and the older leftovers Today no longer shows
+// ("From before last week", views.inbox `older`, past the person's earlier window).
 
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@kriyan/convex/api";
@@ -17,7 +15,7 @@ export interface InboxData {
 }
 
 export function toInbox(view: InboxQuery): InboxData {
-  return { ideas: view, older: [] };
+  return { ideas: view.tasks, older: view.older };
 }
 
 export function inboxCount(view: InboxQuery): number {

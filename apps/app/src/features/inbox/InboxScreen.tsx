@@ -6,7 +6,8 @@ import { View } from "react-native";
 import { router } from "expo-router";
 import { formatDate } from "@kriyan/core/format";
 import { useClock } from "@/data/time";
-import { useInboxView, type TaskView } from "@/data/views";
+import { useInboxView, useProfile, type TaskView } from "@/data/views";
+import { todayPrefsOf } from "@/features/settings/todayPrefs";
 import { ListRow } from "@/features/shell/ListRow";
 import { Page, PageEmpty, PageLabel } from "@/features/shell/Page";
 import { useIsPhone } from "@/theme/layout";
@@ -28,6 +29,15 @@ export function InboxScreen() {
   const { today } = useClock();
   const phone = useIsPhone();
   const inbox = view ? toInbox(view) : undefined;
+  const profile = useProfile();
+  // Older than the window Settings gives Today ("What's left from earlier").
+  const earlier = profile ? todayPrefsOf(profile).earlierWindow : "week";
+  const olderLabel =
+    earlier === "month"
+      ? "From before last month"
+      : earlier === "none"
+        ? "From earlier"
+        : "From before last week";
   return (
     <Page tabTitle="Inbox" title="Inbox" sub="No day yet. Give each a day, or let it go." add={{}}>
       {inbox === undefined ? (
@@ -54,7 +64,7 @@ export function InboxScreen() {
           )}
           {inbox.older.length ? (
             <>
-              <PageLabel>From before last week</PageLabel>
+              <PageLabel>{olderLabel}</PageLabel>
               {inbox.older.map((t) => (
                 <ListRow key={t._id} task={t} meta={olderMeta(t, today)} />
               ))}
