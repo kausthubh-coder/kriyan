@@ -35,9 +35,10 @@ import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 import { errorText } from "./actions";
+import { RepeatEditor } from "./RepeatEditor";
 import { StepList } from "./StepList";
 
-export type Picker = "date" | "time" | "due" | "repeat" | "remind" | "space" | "steps" | "goal";
+export type Picker = "date" | "time" | "due" | "repeat" | "custom" | "remind" | "space" | "steps" | "goal";
 
 const LENGTHS: [string, number][] = [
   ["None", 0],
@@ -272,6 +273,12 @@ export function EditSheet({
               !steps.length,
             )}
         {task.event || !goals?.length ? null : row("goal", "Goal", goal?.title ?? "None", !goal)}
+        <Option
+          label="An event you attend, not tick off"
+          toggle
+          on={task.event}
+          onPress={() => void save({ event: !task.event })}
+        />
       </ScrollView>
 
       <FloatCard
@@ -355,6 +362,36 @@ export function EditSheet({
                 );
               });
             })()}
+            <Press
+              role="button"
+              accessibilityLabel="Custom repeat"
+              onPress={() => setOpen("custom")}
+              hoverBg={null}
+              style={{ height: 56, flexDirection: "row", alignItems: "center", gap: s.s3 }}
+            >
+              <T s="row" tone="parse" extra={{ flex: 1 }}>
+                Custom…
+              </T>
+              <Icon icon={ChevronRight} size={18} tone="ink3" />
+            </Press>
+          </>
+        ) : null}
+        {open === "custom" ? (
+          <>
+            <PickTitle>Repeat</PickTitle>
+            <RepeatEditor
+              rule={repeat}
+              first={task.repeatFirst ?? day}
+              time={task.time ?? null}
+              length={task.length ?? null}
+              today={today}
+              onCancel={() => setOpen("repeat")}
+              onSave={(rule) => {
+                setOpen(null);
+                if (rule && !task.date) void save({ repeat: rule, date: firstOccurrence(rule, today) });
+                else void save({ repeat: rule });
+              }}
+            />
           </>
         ) : null}
         {open === "remind" ? (
@@ -439,6 +476,7 @@ const PICKER_LABEL: Record<Picker, string> = {
   time: "Time and length",
   due: "Due",
   repeat: "Repeat",
+  custom: "Custom repeat",
   remind: "Reminders",
   space: "Space",
   steps: "Steps",
