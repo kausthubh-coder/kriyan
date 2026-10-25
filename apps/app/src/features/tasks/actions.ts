@@ -7,7 +7,7 @@ import type { Id } from "@kriyan/convex/dataModel";
 import { convex } from "@/data/convex";
 import { createStore } from "@/data/store";
 import { formatDay } from "@kriyan/core/format";
-import { todayIn } from "@kriyan/core/dates";
+import { formatClock, todayIn } from "@kriyan/core/dates";
 import { deviceTimeZone } from "@/data/time";
 import { playSound } from "@/features/feel/sound";
 import { showToast, updateToast } from "@/ui/toast";
@@ -212,4 +212,61 @@ export function updateTask(args: FunctionArgs<typeof api.tasks.update>) {
   return convex.mutation(api.tasks.update, args).catch((e: unknown) => {
     showToast(errorText(e));
   });
+}
+
+/**
+ * Fill: puts a task at a time on a day with the length the person picked, and offers Undo,
+ * which puts its day, time and length back.
+ */
+export function fillTask(
+  task: { _id: Id<"tasks">; title: string; date: string | null; time: number | null; length: number | null },
+  date: string,
+  time: number,
+  length: number,
+) {
+  commitHaptic();
+  playSound("tick");
+  const range = `${formatClock(time)}–${formatClock(time + length)}`;
+  return convex
+    .mutation(api.tasks.update, { id: task._id, date, time, length })
+    .then(() =>
+      showToast(`${task.title}, ${range}`, {
+        label: "Undo",
+        run: () =>
+          void convex
+            .mutation(api.tasks.update, {
+              id: task._id,
+              date: task.date,
+              time: task.time,
+              length: task.length,
+            })
+            .catch((e: unknown) => showToast(errorText(e))),
+      }),
+    )
+    .catch((e: unknown) => showToast(errorText(e)));
+}
+
+/** Accepts or dismisses an agent's suggestion; Undo isn't offered for a dismissal's delete. */
+export function settleProposal(task: { _id: Id<"tasks">; title: string }, accept: boolean) {
+  commitHaptic();
+  return convex
+    .mutation(api.tasks.settleProposals, { accept, ids: [task._id] })
+    .then(() => showToast(accept ? `Added: ${task.title}` : `Dismissed: ${task.title}`))
+    .catch((e: unknown) => showToast(errorText(e)));
+}
+
+/** Checks a habit off for a day (or takes the check back). */
+export function checkHabit(habit: { _id: Id<"habits">; title: string }, date: string, done: boolean) {
+  commitHaptic();
+  if (done) playSound("done");
+  return convex
+    .mutation(api.organize.checkHabit, { id: habit._id, date, done })
+    .then(() => {
+      if (done)
+        showToast(`${habit.title}, done today`, {
+          label: "Undo",
+          run: () => void convex.mutation(api.organize.checkHabit, { id: habit._id, date, done: false }),
+        });
+    })
+    .catch((e: unknown) => showToast(errorText(e)));
 }

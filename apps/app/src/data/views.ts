@@ -10,6 +10,7 @@ import { useClock } from "./time";
 export type TodayView = FunctionReturnType<typeof api.views.today>;
 export type WeekView = FunctionReturnType<typeof api.views.week>;
 export type SpaceView = FunctionReturnType<typeof api.views.space>;
+export type DueView = FunctionReturnType<typeof api.views.due>;
 export type ProgressView = FunctionReturnType<typeof api.views.progress>;
 export type SpaceNode = FunctionReturnType<typeof api.views.spaces>[number];
 export type TaskDoc = NonNullable<FunctionReturnType<typeof api.views.task>>;
@@ -25,6 +26,16 @@ function useAuthed() {
 export function useTodayView() {
   const { today } = useClock();
   return useQuery(api.views.today, useAuthed() ? { today } : "skip");
+}
+
+/** Any day as Today shows it; `date` is that day. */
+export function useDayView(date: string) {
+  return useQuery(api.views.today, useAuthed() ? { today: date } : "skip");
+}
+
+/** Open things due on each day from start to end, and how many have no day. */
+export function useDue(start: string, end: string) {
+  return useQuery(api.views.due, useAuthed() ? { start, end } : "skip");
 }
 
 export function useWeekView(start: string) {

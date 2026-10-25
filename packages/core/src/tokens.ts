@@ -27,7 +27,7 @@ type Solid =
   | "done"
   | "side"
   | "night";
-type Alpha = "hover" | "select" | "line" | "lineStrong" | "scrim" | "parseFill";
+type Alpha = "hover" | "select" | "line" | "lineStrong" | "scrim" | "parseFill" | "nowFill";
 type ColorName = Solid | Alpha;
 
 // Every text colour holds 4.5:1 on bg, raised and sunken in its scheme; ink3 is the faintest
@@ -91,6 +91,8 @@ const alpha: Record<Scheme, Record<Alpha, string>> = {
     scrim: "oklch(0% 0 0 / 0.32)",
     // Quick add's understood details: the parser's blue, lightly (B2's --blue-bg).
     parseFill: "oklch(53% 0.18 255 / 0.1)",
+    // v5's "Now" pill and Remove tile: the now red, lightly.
+    nowFill: "oklch(55% 0.19 29 / 0.11)",
   },
   dark: {
     hover: "oklch(100% 0 0 / 0.05)",
@@ -99,6 +101,7 @@ const alpha: Record<Scheme, Record<Alpha, string>> = {
     lineStrong: "oklch(100% 0 0 / 0.15)",
     scrim: "oklch(0% 0 0 / 0.55)",
     parseFill: "oklch(72% 0.14 250 / 0.16)",
+    nowFill: "oklch(68% 0.19 27 / 0.16)",
   },
 };
 
@@ -225,10 +228,11 @@ export const space = { s1: 4, s2: 8, s3: 12, s4: 16, s6: 24, s8: 32, s12: 48, s1
 export const SPACE_SCALE = Object.values(space);
 
 /**
+ * `float` is v5's floating sheet (Joi's card over Today): its 24 padding leaves its tiles `box`.
  * `box` is B2's content card (Upcoming, the year cards, Focus's next step, review's card stack):
  * rounder than a control's card, which B2 draws at 18 on every screen.
  */
-export const radius = { sm: 6, ctl: 8, card: 12, box: 18, sheet: 24, pill: 999 } as const;
+export const radius = { sm: 6, ctl: 8, card: 12, box: 18, sheet: 24, float: 42, pill: 999 } as const;
 
 export const size = {
   ctl: 32,

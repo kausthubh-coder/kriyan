@@ -17,6 +17,12 @@ export const week = query({
   handler: async (ctx, { start, today }) => Views.weekView(ctx, await requireOwner(ctx), start, today),
 });
 
+/** Open things due on each day of a range (Today's month and week dots), and how many have no day. */
+export const due = query({
+  args: { start: v.string(), end: v.string() },
+  handler: async (ctx, { start, end }) => Views.dueView(ctx, await requireOwner(ctx), start, end),
+});
+
 export const inbox = query({
   args: {},
   handler: async (ctx) => Views.inboxView(ctx, await requireOwner(ctx)),

@@ -1,598 +1,536 @@
-// Today (docs/design/v4, b2.html?screen=today): the black header with the day in one sentence,
-// the week, what agents did, what's next with Start focus, then the day as a list grouped by
-// part of the day (habits among the anytime things) or as the spine timeline. Desktop: the
-// header card heads a centred column with the ask bar at its foot; on a window wide enough,
-// the day's hours sit in a column on the right with what's next pinned at its foot.
+// Today, v5 (docs/design/v5/prototype.html): Joi's white page with the big day and the week, the
+// pull-down summary, "To fit in", and the day as time blocks from Wake up to Wind down (or a list,
+// one line per item, when Settings says so). Phones float three buttons at the foot: Menu, Add,
+// and Month (on another day, back to today); a tap opens Joi's floating card. Desktop puts the
+// day in a centre column under quick add and a panel on the right: the summary, the month and
+// what's due in the next 7 days, or the selected item with its tiles.
 
-import { DottedRule } from "@/ui/DottedRule";
-import { useCallback, useRef, useState, type ReactNode } from "react";
-import { Platform, RefreshControl, useWindowDimensions, View } from "react-native";
-import { router, useFocusEffect } from "expo-router";
-import { useMutation } from "convex/react";
-import {
-  Check as CheckIcon,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  ListChecks,
-  Moon,
-  Plus,
-  Sun,
-  Sunset,
-  type LucideIcon,
-} from "lucide-react-native";
-import { api } from "@kriyan/convex/api";
-import { formatClock } from "@kriyan/core/dates";
-import { formatDuration } from "@kriyan/core/format";
-import { freeMinutes } from "@kriyan/core/layout";
-import { SPLIT_MIN_WIDTH } from "@kriyan/core/tokens";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Platform, RefreshControl, ScrollView, View } from "react-native";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ArrowLeft, CalendarDays, Plus, Settings } from "lucide-react-native";
+import { addDays, diffDays, formatClock } from "@kriyan/core/dates";
+import { formatDate } from "@kriyan/core/format";
+import { dueDayWord, nextGap } from "@kriyan/core/today";
+import { createStore } from "@/data/store";
 import { useClock } from "@/data/time";
-import { useInboxView, useProfile, useTodayView, type TaskView, type TodayView } from "@/data/views";
-import { AskBox } from "@/features/ask/AskBar";
-import { closedDay } from "@/features/review/closedDay";
-import { moveTasks, placeTasks } from "@/features/tasks/actions";
-import { toggleHaptic } from "@/features/tasks/haptics";
-import { DayPicker } from "@/features/tasks/pickers";
-import { Segmented } from "@/features/tasks/Segmented";
-import { TaskRow } from "@/features/tasks/TaskRow";
-import { useControl, useIsPhone } from "@/theme/layout";
-import { c, family, r, s, spaceTone } from "@/theme/tokens";
-import { Button } from "@/ui/Button";
-import { Ring, Skeleton } from "@/ui/bits";
+import { useDue } from "@/data/views";
+import { quickAddTarget, selection } from "@/features/shell/context";
+import { checkHabit, completeTask } from "@/features/tasks/actions";
+import { QuickAdd, whenWords, type QuickAddHandle } from "@/features/tasks/QuickAdd";
+import { useIsPhone } from "@/theme/layout";
+import { c, r, s, shadows } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
-import { Popover } from "@/ui/Popover";
 import { Press } from "@/ui/Press";
-import { Notice, Screen, SplitScreen } from "@/ui/Screen";
-import { LightStatusBar } from "@/ui/statusBar";
-import { Txt } from "@/ui/Txt";
-import { AgentNote } from "./AgentNote";
-import { DayColumn } from "./DayColumn";
-import { dayRows, type DayRow } from "./dayRows";
-import { measureSlots, registerDropZone } from "./drag";
-import { DragGhost } from "./DragGhost";
-import { DragSource } from "./DragSource";
-import { PlanToday } from "./PlanToday";
-import { ReviewCard } from "./ReviewCard";
-import { FreeGap, Spine } from "./Spine";
+import { Skeleton } from "@/ui/bits";
+import { showToast } from "@/ui/toast";
+import { useRef } from "react";
+import { Blocks, type BlockHandlers } from "./Blocks";
+import { FillCard, HabitCard, ItemCard, RoutineCard, type FillCandidate } from "./Cards";
+import { Curtain, Sentence } from "./Curtain";
+import { DayList } from "./DayList";
+import { MENU_ROUTE, SETTINGS_ROUTE, tickRoutinePart } from "./links";
+import { MonthCard } from "./MonthCard";
+import { FloatCard, T } from "./parts";
+import { FitIn, Top } from "./Top";
+import { useDay, type Day } from "./useDay";
 
-import { TodayHeader } from "./TodayHeader";
-import { UpNext, upNextOf } from "./UpNext";
-import { WeekStrip } from "./WeekStrip";
+/** The day Today shows; null follows today. It outlives a trip to a task and back. */
+export const shownDay = createStore<string | null>(null);
+
+type Sheet =
+  | { kind: "curtain" }
+  | { kind: "month" }
+  | { kind: "fill"; from: number; to: number; preselect: string | null }
+  | { kind: "habit"; id: string }
+  | { kind: "routine"; id: string };
+
+/** The desktop panel's width (v5 `.panel`). */
+const PANEL = 360;
 
 export function TodayScreen() {
-  const view = useTodayView();
-  const { today, now } = useClock();
+  const { today } = useClock();
   const phone = useIsPhone();
-  const { width } = useWindowDimensions();
-  const inbox = useInboxView();
-  const [planning, setPlanning] = useState(false);
-  const planRef = useRef<View>(null);
-  // The day's hours get their own column when the list still has room beside it.
-  const split = !phone && width >= SPLIT_MIN_WIDTH;
+  const params = useLocalSearchParams<{ day?: string }>();
+  const stored = shownDay.useValue((d) => d);
+  const day = stored ?? today;
+  const data = useDay(day);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const close = useCallback(() => setSheet(null), []);
+  const setDay = useCallback((d: string) => shownDay.set(d === today ? null : d), [today]);
 
-  const free = view ? freeTime(view, now) : null;
-  // Planning is offered when there's something to bring in, and never required.
-  // An Inbox task whose due date has passed is already among the earlier ones.
-  const inboxToPlan = (inbox ?? []).filter((t) => !view?.earlier.some((e) => e._id === t._id));
-  const toPlan = view ? view.earlier.length + inboxToPlan.length : 0;
-  // On phones the icon alone, so List / Timeline and Close the day keep one line.
-  const planButton = toPlan ? (
-    <Button
-      ref={planRef}
-      icon={ListChecks}
-      label={phone ? undefined : "Plan today"}
-      accessibilityLabel="Plan today"
-      onPress={() => setPlanning(true)}
-    />
-  ) : null;
-  const header = view ? <TodayHeader view={view} today={today} now={now} free={free} /> : null;
-  // The status bar's icons are light over the black header and follow the scheme once it has
-  // scrolled away; otherwise they'd be white on the white page.
-  const [headHeight, setHeadHeight] = useState(0);
-  const [pastHead, setPastHead] = useState(false);
-  // Pull down at the top to add (B2's gestures); the + button does the same.
-  const [pulling, setPulling] = useState(false);
-  const scrollProps = phone
+  // `/?day=2026-10-28` opens that day (a link from elsewhere).
+  useEffect(() => {
+    if (params.day && /^\d{4}-\d{2}-\d{2}$/.test(params.day)) setDay(params.day);
+  }, [params.day, setDay]);
+
+  const handlers: BlockHandlers | null = data
     ? {
-        scrollEventThrottle: 32,
-        onScroll: (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-          const past = headHeight > 0 && e.nativeEvent.contentOffset.y > headHeight;
-          if (past !== pastHead) setPastHead(past);
+        open: (id) => {
+          const src = data.sources.get(id);
+          if (!src) return;
+          if (!phone) {
+            selection.set({ taskId: id });
+            return;
+          }
+          if (src.type === "task") router.push(`/task/${id}?date=${day}`);
+          else setSheet({ kind: src.type, id });
         },
-        ...(Platform.OS === "web"
+        fill: (from, to) => setSheet({ kind: "fill", from, to, preselect: null }),
+        review: () => router.push("/review"),
+        anchor: () => router.push(SETTINGS_ROUTE),
+        tickRoutinePart: (routine, index, done) => tickRoutinePart(routine, index, day, done),
+        tickHabit: (id) => {
+          const src = data.sources.get(id);
+          if (src?.type === "habit") void checkHabit(src.habit, day, !src.habit.doneToday);
+        },
+      }
+    : null;
+
+  const fitPick = (id: string) => {
+    if (!data) return;
+    const gap = nextGap(data.busy, data.dayStart, data.dayEnd, data.now);
+    if (gap) setSheet({ kind: "fill", from: gap[0], to: gap[1], preselect: id });
+    else showToast("No free time left today. Try tomorrow.");
+  };
+
+  useDesktopKeys(!phone, day, setDay, data);
+
+  const sheets = data ? (
+    <Sheets sheet={sheet} close={close} data={data} today={today} setDay={setDay} center={!phone} />
+  ) : null;
+
+  const content =
+    data && handlers ? (
+      <>
+        <FitIn chips={data.chips} onPick={fitPick} />
+        {data.settings.todayLayout === "list" ? (
+          <View style={{ marginTop: s.s3 }}>
+            <DayList day={data} on={handlers} />
+          </View>
+        ) : (
+          <View style={{ marginLeft: phone ? -s.s6 : -s.s8, marginRight: phone ? -s.s4 : -s.s4 }}>
+            <Blocks day={data} on={handlers} />
+          </View>
+        )}
+      </>
+    ) : (
+      <TodaySkeleton />
+    );
+
+  if (!phone)
+    return (
+      <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: s.s16 }}>
+          <View style={{ width: "100%", maxWidth: 640, alignSelf: "center", paddingHorizontal: s.s8, paddingTop: s.s8 }}>
+            <Top day={day} today={today} onSummary={() => setSheet({ kind: "curtain" })} onPick={setDay} />
+            <DeskAdd day={day} today={today} />
+            {content}
+          </View>
+        </ScrollView>
+        <RightPanel data={data} day={day} today={today} setDay={setDay} />
+        {sheets}
+      </View>
+    );
+
+  return (
+    <PhoneToday
+      day={day}
+      today={today}
+      onSummary={() => setSheet({ kind: "curtain" })}
+      setDay={setDay}
+      onMonth={() => setSheet({ kind: "month" })}
+    >
+      {content}
+      {sheets}
+    </PhoneToday>
+  );
+}
+
+function PhoneToday({
+  day,
+  today,
+  onSummary,
+  setDay,
+  onMonth,
+  children,
+}: {
+  day: string;
+  today: string;
+  onSummary: () => void;
+  setDay: (d: string) => void;
+  onMonth: () => void;
+  children: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  const [pulling, setPulling] = useState(false);
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: insets.top + s.s6, paddingHorizontal: s.s6, paddingBottom: 160 + insets.bottom }}
+        {...(Platform.OS === "web"
           ? {}
           : {
+              // Pull down at the top for the summary (Joi's curtain).
               refreshControl: (
                 <RefreshControl
                   refreshing={pulling}
                   onRefresh={() => {
                     setPulling(true);
-                    router.push("/add");
+                    onSummary();
                     setTimeout(() => setPulling(false), 300);
                   }}
                 />
               ),
-            }),
-      }
-    : undefined;
-
-  const body =
-    view === undefined ? (
-      <TodaySkeleton />
-    ) : (
-      <TodayBody
-        view={view}
-        today={today}
-        now={now}
-        split={split}
-        planButton={planButton}
-        onAdd={() => router.push("/add")}
-      />
-    );
-
-  const plan = view ? (
-    <PlanToday
-      open={planning}
-      onClose={() => setPlanning(false)}
-      anchor={planRef}
-      today={today}
-      earlier={view.earlier}
-      inbox={inboxToPlan}
-      free={free ?? 0}
-    />
-  ) : null;
-
-  if (!phone) {
-    return (
-      <View style={{ flex: 1 }}>
-        <SplitScreen
-          title="Today"
-          right={split && view ? <DayColumn view={view} today={today} now={now} /> : null}
-          footer={<AskBox />}
-        >
-          {header}
-          {/* B2's `.sheet-d`: the list sits a little in from the header card's edges. */}
-          <View style={{ paddingTop: s.s4, paddingHorizontal: s.s1 }}>{body}</View>
-        </SplitScreen>
-        <DragGhost />
-        {plan}
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ flex: 1 }}>
-      <LightStatusBar enabled={!pastHead} />
-      <Screen
-        title="Today"
-        hero={
-          header ? <View onLayout={(e) => setHeadHeight(e.nativeEvent.layout.height)}>{header}</View> : null
-        }
-        scrollProps={scrollProps}
-        pastHero={pastHead}
+            })}
       >
-        {body}
-      </Screen>
-      <DragGhost />
-      {plan}
+        <Top day={day} today={today} onSummary={onSummary} onPick={setDay} />
+        {children}
+      </ScrollView>
+      {/* The page fades out under the buttons (v5 `.fade`). */}
+      <View
+        pointerEvents="none"
+        style={
+          {
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 140 + insets.bottom,
+            experimental_backgroundImage: `linear-gradient(to bottom, transparent, ${c.bg} 62%)`,
+          } as object
+        }
+      />
+      <View
+        role="navigation"
+        aria-label="Main"
+        style={{
+          position: "absolute",
+          left: s.s6,
+          right: s.s6,
+          bottom: s.s8 + insets.bottom,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <RoundButton label="Menu" icon={Settings} onPress={() => router.push(MENU_ROUTE)} />
+        <RoundButton
+          label="Add"
+          icon={Plus}
+          wide
+          onPress={() => router.push(day === today ? "/add" : { pathname: "/add", params: { date: day } })}
+        />
+        {day === today ? (
+          <RoundButton label="Month" icon={CalendarDays} onPress={onMonth} />
+        ) : (
+          <RoundButton label="Back to today" icon={ArrowLeft} onPress={() => setDay(today)} />
+        )}
+      </View>
     </View>
   );
 }
 
-function freeTime(view: TodayView, now: number): number {
-  const busy = view.scheduled
-    .filter((t) => !t.done && t.length && !t.proposedBy)
-    .map((t) => ({ id: t._id, start: t.time ?? 0, length: t.length ?? undefined }));
-  return freeMinutes(busy, Math.max(now, view.profile.dayStart), view.profile.dayEnd);
+function RoundButton({
+  label,
+  icon,
+  onPress,
+  wide,
+}: {
+  label: string;
+  icon: typeof Plus;
+  onPress: () => void;
+  wide?: boolean;
+}) {
+  return (
+    <Press
+      role="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hoverBg={null}
+      rippleRadius={29}
+      style={{
+        height: 58,
+        width: wide ? 108 : 58,
+        borderRadius: 29,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: c.raised,
+        boxShadow: shadows.overlay,
+      }}
+    >
+      <Icon icon={icon} size={wide ? 26 : 24} tone="ink3" strokeWidth={2.25} />
+    </Press>
+  );
 }
 
-/** The parts of the day the list is grouped by, as Tiimo does: by when, not by type. */
-const PARTS = [
-  { title: "Morning", to: 12 * 60, icon: Sun },
-  { title: "Afternoon", to: 17 * 60, icon: Sunset },
-  { title: "Evening", to: 24 * 60, icon: Moon },
-] as const;
-
-const partOf = (minutes: number) => PARTS.find((p) => minutes < p.to) ?? PARTS[2];
-
-/** "Review today" shows at this time when the person hasn't picked one (Settings). */
-const DEFAULT_REVIEW = 20 * 60;
-
-function TodayBody({
-  view,
-  today,
-  now,
-  split,
-  planButton,
-  onAdd,
-}: {
-  view: TodayView;
-  today: string;
-  now: number;
-  /** Desktop with the day column beside the list: what's next is pinned there instead. */
-  split: boolean;
-  planButton: ReactNode;
-  onAdd: () => void;
-}) {
-  const phone = useIsPhone();
-  const profile = useProfile();
-  const closed = closedDay.useValue((d) => d) === today;
-  // Phones have no hour grid on Today: a task held in the list drops on a free stretch.
+/** Desktop's quick add under the week (v5 `.qadd`): N focuses it. */
+function DeskAdd({ day, today }: { day: string; today: string }) {
+  const ref = useRef<QuickAddHandle>(null);
   useFocusEffect(
     useCallback(() => {
-      if (!phone) return;
-      return registerDropZone({
-        // No grid to measure; the free stretches say where they are.
-        measure: () => Promise.resolve(null),
-        startMinutes: 0,
-        hourPx: 60,
-        topPad: 0,
-        slots: measureSlots,
-        onDrop: (taskId, drop) => {
-          if (drop.minutes !== null) void placeTasks([taskId as TaskView["_id"]], today, drop.minutes);
-        },
-      });
-    }, [phone, today]),
+      quickAddTarget.set({ focus: () => ref.current?.focus() });
+      return () => quickAddTarget.set(null);
+    }, []),
   );
-  const [mode, setMode] = useState<"list" | "timeline">("list");
-  const nothing =
-    view.scheduled.length === 0 &&
-    view.anytime.length === 0 &&
-    view.due.length === 0 &&
-    view.done.length === 0 &&
-    view.earlier.length === 0 &&
-    view.habits.length === 0;
-  if (nothing) {
+  return (
+    <View style={{ marginTop: s.s4 }}>
+      <QuickAdd
+        ref={ref}
+        variant="inline"
+        defaultDate={day}
+        placeholder={`Add to ${formatDate(day, today)}, like “HW21 due thu 23:59 #school”`}
+      />
+    </View>
+  );
+}
+
+function Sheets({
+  sheet,
+  close,
+  data,
+  today,
+  setDay,
+  center,
+}: {
+  sheet: Sheet | null;
+  close: () => void;
+  data: Day;
+  today: string;
+  setDay: (d: string) => void;
+  center: boolean;
+}) {
+  const soon = useDue(addDays(data.day, 1), addDays(data.day, 4));
+  if (!sheet) return null;
+  if (sheet.kind === "curtain")
+    return <Curtain open onClose={close} today={today} parts={data.sentence} />;
+  if (sheet.kind === "month")
     return (
-      <View>
-        <WeekStrip today={today} />
-        <AgentNote />
-        <Notice
-          title="Nothing planned for today"
-          body="Add what's on your mind, like “call the bank tomorrow 10am”. Anything without a date waits in your Inbox."
-          action={<Button icon={Plus} label="Add your first task" onPress={onAdd} />}
-        />
-      </View>
-    );
-  }
-
-  const live = view.scheduled.filter((t) => !t.done && !t.proposedBy);
-  const { current, next } = upNextOf(view, now);
-  const left = view.due.length + view.anytime.length;
-  const cleared =
-    left === 0 &&
-    live.every((t) => (t.time ?? 0) + (t.length ?? 0) <= now) &&
-    (view.done.length > 0 || view.scheduled.some((t) => t.done));
-  // The card waits at the review time until the day is closed (b2.html `rvcardtoday`).
-  const reviewAt = closed ? null : (profile?.reviewTime ?? DEFAULT_REVIEW);
-  const anytimeCount = left + view.done.length + view.habits.length;
-
-  const anytimeRows = (
-    <View>
-      {[...view.due, ...view.anytime].map((t) => (
-        <Dotted key={`${t._id}:${t.date}`}>
-          <TaskRow
-            task={t}
-            today={today}
-            movable
-            wrap={(row) => (
-              <DragSource taskId={t._id} title={t.title} color={spaceTone(t.color).dot} length={t.length}>
-                {row}
-              </DragSource>
-            )}
-          />
-        </Dotted>
-      ))}
-      {view.habits.length ? <HabitRows habits={view.habits} today={today} /> : null}
-      {view.done.map((t) => (
-        <Dotted key={`${t._id}:${t.date}:done`}>
-          <TaskRow task={t} today={today} />
-        </Dotted>
-      ))}
-    </View>
-  );
-
-  // The timed rows, grouped into parts of the day, with free stretches, the now line and the
-  // review card between them.
-  const groups: { part: (typeof PARTS)[number]; rows: DayRow[] }[] = [];
-  for (const row of dayRows(view.scheduled, { now, dayStart: view.profile.dayStart, reviewAt })) {
-    const part = partOf(row.kind === "now" ? (row.next?.time ?? row.at) : row.at);
-    const last = groups.at(-1);
-    if (last?.part === part) last.rows.push(row);
-    else groups.push({ part, rows: [row] });
-  }
-
-  const grouped = (
-    <View>
-      {view.earlier.length ? <Earlier tasks={view.earlier} today={today} /> : null}
-      {anytimeCount || cleared ? (
-        <View>
-          <GroupLabel icon={Clock} title="Anytime" count={anytimeCount} />
-          {cleared && view.earlier.length === 0 ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingVertical: s.s2 }}>
-              <Icon icon={CheckIcon} tone="ink2" />
-              <Txt variant="body" tone="ink2">
-                Nothing left today.
-              </Txt>
-            </View>
-          ) : null}
-          {anytimeRows}
-        </View>
-      ) : null}
-      {groups.map((g) => (
-        <View key={g.part.title}>
-          {/* A part with only the now line or the review card in it needs no "EVENING (0)". */}
-          {g.rows.some((row) => row.kind === "task") ? (
-            <GroupLabel
-              icon={g.part.icon}
-              title={g.part.title}
-              count={g.rows.filter((row) => row.kind === "task").length}
-            />
-          ) : null}
-          <View>
-            {g.rows.map((row) =>
-              row.kind === "task" ? (
-                <Dotted key={row.key}>
-                  <TaskRow task={row.task} today={today} movable clock />
-                </Dotted>
-              ) : row.kind === "gap" ? (
-                <View key={row.key} style={{ paddingVertical: s.s1 }}>
-                  <FreeGap start={row.at} minutes={row.minutes} date={today} droppable={phone} />
-                </View>
-              ) : row.kind === "now" ? (
-                <ListNow key={row.key} now={row.at} next={row.next} />
-              ) : (
-                <ReviewCard key={row.key} at={row.at} />
-              ),
-            )}
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-
-  const spine = (
-    <View style={{ marginTop: s.s3 }}>
-      <Spine
-        droppable={phone}
-        date={today}
-        items={view.scheduled}
-        now={now}
-        dayStart={view.profile.dayStart}
-        reviewAt={reviewAt}
-      />
-    </View>
-  );
-
-  const tools = (
-    <View
-      style={{ flexDirection: "row", alignItems: "center", gap: s.s2, flexWrap: "wrap", marginTop: s.s4 }}
-    >
-      <Segmented
-        label="View"
-        value={mode}
-        options={[
-          { value: "list", label: "List" },
-          { value: "timeline", label: "Timeline" },
-        ]}
-        onChange={setMode}
-      />
-      <View style={{ flex: 1 }} />
-      {planButton}
-      {closed ? null : (
-        // B2's quiet link; its label, not its padding, lines up with the column's edge.
-        <Button
-          variant="quiet"
-          label="Close the day"
-          onPress={() => router.push("/review")}
-          style={{ marginRight: -s.s3 }}
-        />
-      )}
-    </View>
-  );
-
-  return (
-    // One sequence with B2's short steps between its parts, not the page's section gaps.
-    <View>
-      <WeekStrip today={today} />
-      <AgentNote />
-      {/* Desktop with the day column pins what's next at the column's foot instead. */}
-      {split || !(current || next) ? null : (
-        <View style={{ marginTop: s.s3 }}>
-          <UpNext current={current} next={next} now={now} />
-        </View>
-      )}
-      {tools}
-      {mode === "list" ? grouped : spine}
-    </View>
-  );
-}
-
-/** B2's group label (`.gh`): a small icon, then "ANYTIME (6)" in quiet small capitals. */
-function GroupLabel({ icon, title, count }: { icon: LucideIcon; title: string; count: number }) {
-  return (
-    <View
-      style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 28, marginTop: s.s4 }}
-      accessibilityLabel={`${title}, ${count}`}
-    >
-      <Icon icon={icon} size={16} />
-      <Txt variant="caption" tone="ink3" heading={2} tnum style={groupText}>
-        {`${title} (${count})`}
-      </Txt>
-    </View>
-  );
-}
-
-/** 0.05em at 12px: small capitals crowd together without it. */
-const groupText = { ...family("600"), textTransform: "uppercase" as const, letterSpacing: 0.6 };
-
-/** The list's now line (b2.html `.now`): the time in red, and the next task when it's close. */
-function ListNow({ now, next }: { now: number; next: TaskView | null }) {
-  const ahead = next?.time != null ? next.time - now : null;
-  const note =
-    next && ahead !== null && ahead <= 20 && !next.event
-      ? ` · ${next.title} starts in ${formatDuration(ahead)}`
-      : "";
-  return (
-    <View
-      aria-label={`Now, ${formatClock(now)}`}
-      style={{ flexDirection: "row", alignItems: "center", gap: s.s2, paddingVertical: s.s2 }}
-    >
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.now }} />
-      <Txt variant="caption" tone="now" tnum numberOfLines={1} style={{ maxWidth: "80%" }}>
-        {`${formatClock(now)}${note}`}
-      </Txt>
-      <View style={{ flex: 1, height: 1, backgroundColor: c.now }} />
-    </View>
-  );
-}
-
-/** The prototype's dotted rule under each row of the day's list (b2.html `.row`). */
-function Dotted({ children }: { children: ReactNode }) {
-  return (
-    <View>
-      {children}
-      <DottedRule />
-    </View>
-  );
-}
-
-/**
- * Habits due today, as rows among the anytime things (B2 lists them with the day, not in a
- * strip of their own). The dashed ring fills once today's check-in is in.
- */
-function HabitRows({ habits, today }: { habits: TodayView["habits"]; today: string }) {
-  const check = useMutation(api.organize.checkHabit).withOptimisticUpdate((store, { id, done }) => {
-    const current = store.getQuery(api.views.today, { today });
-    if (!current) return;
-    store.setQuery(
-      api.views.today,
-      { today },
-      {
-        ...current,
-        habits: current.habits.map((h) =>
-          h._id === id ? { ...h, doneToday: done, thisWeek: h.thisWeek + (done ? 1 : -1) } : h,
-        ),
-      },
-    );
-  });
-  const phone = useIsPhone();
-  const { row } = useControl();
-  return (
-    <>
-      {habits.map((h) => {
-        const tone = spaceTone(h.color ?? "green");
-        return (
-          <Dotted key={h._id}>
-            <Press
-              role="switch"
-              aria-checked={h.doneToday}
-              accessibilityLabel={`${h.title}, ${h.thisWeek} of ${h.target} this week`}
-              onPress={() => {
-                toggleHaptic(!h.doneToday);
-                void check({ id: h._id, done: !h.doneToday, date: today });
-              }}
-              hoverBg={c.hover}
-              scale={false}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: s.s3,
-                minHeight: row,
-                paddingVertical: phone ? s.s1 : s.s2,
-                paddingHorizontal: s.s2,
-                marginHorizontal: -s.s2,
-                borderRadius: r.ctl,
-              }}
-            >
-              {/* The same width as a task's checkbox, so the titles line up. */}
-              <View style={{ width: 16, alignItems: "center" }}>
-                <Ring color={tone.dot} done={h.doneToday} size={16} dashed />
-              </View>
-              <Txt variant="body" tone={h.doneToday ? "ink3" : "ink"} style={{ flex: 1 }} numberOfLines={1}>
-                {h.title}
-              </Txt>
-              <Txt variant="meta" tone="ink3" tnum>
-                {`${h.thisWeek} of ${h.target} this week`}
-              </Txt>
-            </Press>
-          </Dotted>
-        );
-      })}
-    </>
-  );
-}
-
-function Earlier({ tasks, today }: { tasks: TaskView[]; today: string }) {
-  const [open, setOpen] = useState(false);
-  const [picking, setPicking] = useState(false);
-  const pickRef = useRef<View>(null);
-  return (
-    // B2's disclosure: "2 from earlier ⌄" opens the rows, each with its own move, and the two
-    // moves for all of them on one line under it.
-    <View style={{ gap: s.s1, marginTop: s.s4 }}>
-      <View style={{ flexDirection: "row" }}>
-        <Button
-          variant="quiet"
-          label={`${tasks.length} from earlier`}
-          trailing={open ? ChevronDown : ChevronRight}
-          expanded={open}
-          onPress={() => setOpen(!open)}
-          style={{ marginLeft: -s.s3 }}
-        />
-      </View>
-      {open ? (
-        <>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
-            <Button label="Move all to today" onPress={() => void moveTasks(tasks, today)} />
-            <Button ref={pickRef} label="Pick a day" onPress={() => setPicking(true)} />
-          </View>
-          <View>
-            {tasks.map((t) => (
-              <Dotted key={t._id}>
-                <TaskRow task={t} today={today} showWhen movable />
-              </Dotted>
-            ))}
-          </View>
-        </>
-      ) : null}
-      <Popover
-        open={picking}
-        onClose={() => setPicking(false)}
-        anchor={pickRef}
-        title={`Move ${tasks.length} to a day`}
-      >
-        <DayPicker
-          value={null}
+      <FloatCard open onClose={close} label="Month" center={center}>
+        <MonthCard
+          value={data.day}
           today={today}
-          allowNone={false}
-          onPick={(date) => {
-            setPicking(false);
-            if (date) void moveTasks(tasks, date);
+          onPick={(d) => {
+            close();
+            setDay(d);
           }}
         />
-      </Popover>
+      </FloatCard>
+    );
+  if (sheet.kind === "fill") {
+    const fromChips: FillCandidate[] = data.chips.map(({ item, note }) => ({
+      id: item.id,
+      title: item.title,
+      note,
+      date: item.date,
+      time: item.time,
+      length: item.length,
+    }));
+    const seen = new Set(fromChips.map((x) => x.id));
+    const dueSoon: FillCandidate[] = (soon?.due ?? [])
+      .filter((t) => !seen.has(t._id) && t.time === null && !t.event)
+      .map((t) => ({
+        id: t._id,
+        title: t.title,
+        note: `due ${dueDayWord(t.deadline!, data.day)}${t.dueTime !== null ? ` ${formatClock(t.dueTime)}` : ""}`,
+        date: t.date,
+        time: t.time,
+        length: t.length,
+      }));
+    return (
+      <FloatCard open onClose={close} label="Fill free time" center={center}>
+        <FillCard
+          from={sheet.from}
+          to={sheet.to}
+          day={data.day}
+          candidates={[...fromChips, ...dueSoon]}
+          preselect={sheet.preselect}
+          onClose={close}
+        />
+      </FloatCard>
+    );
+  }
+  const src = data.sources.get(sheet.id);
+  if (sheet.kind === "habit" && src?.type === "habit")
+    return (
+      <FloatCard open onClose={close} label={src.habit.title} center={center}>
+        <HabitCard habit={src.habit} day={data.day} onClose={close} />
+      </FloatCard>
+    );
+  if (sheet.kind === "routine" && src?.type === "routine")
+    return (
+      <FloatCard open onClose={close} label={src.routine.title} center={center}>
+        <RoutineCard routine={src.routine} habits={data.view.habits} day={data.day} onClose={close} />
+      </FloatCard>
+    );
+  return null;
+}
+
+/** Desktop's right panel: the selected item, or the summary, the month and what's due soon. */
+function RightPanel({
+  data,
+  day,
+  today,
+  setDay,
+}: {
+  data: Day | undefined;
+  day: string;
+  today: string;
+  setDay: (d: string) => void;
+}) {
+  const selected = selection.useValue((st) => st.taskId);
+  const src = selected && data ? data.sources.get(selected) : undefined;
+  const week = useDue(day, addDays(day, 6));
+  const unselect = () => selection.set({ taskId: null });
+  return (
+    <View
+      role="complementary"
+      aria-label={src ? "Details" : "This week"}
+      style={{ width: PANEL, borderLeftWidth: 1, borderLeftColor: c.line, backgroundColor: c.bg }}
+    >
+      <ScrollView contentContainerStyle={{ padding: s.s6, paddingBottom: s.s12 }}>
+        {src ? (
+          <View>
+            <Press
+              role="button"
+              accessibilityLabel="Close details"
+              onPress={unselect}
+              style={{
+                alignSelf: "flex-end",
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: c.sunken,
+                marginBottom: -s.s6,
+                zIndex: 1,
+              }}
+            >
+              <Icon icon={ArrowLeft} size={16} tone="ink2" />
+            </Press>
+            {src.type === "task" ? (
+              <ItemCard
+                key={src.task._id}
+                id={src.task._id}
+                day={src.task.date ?? day}
+                panel
+                onClose={unselect}
+                onEdit={() => router.push(`/task/${src.task._id}?edit=1`)}
+              />
+            ) : src.type === "habit" ? (
+              <HabitCard habit={src.habit} day={day} onClose={unselect} panel />
+            ) : (
+              <RoutineCard routine={src.routine} habits={data!.view.habits} day={day} onClose={unselect} panel />
+            )}
+          </View>
+        ) : (
+          <View>
+            <View style={{ borderRadius: r.box, backgroundColor: c.head, padding: s.s6 }}>
+              {data ? <Sentence parts={data.sentence} style={{ fontSize: 20, lineHeight: 28, letterSpacing: -0.3 }} /> : null}
+            </View>
+            <View style={{ marginTop: s.s6 }}>
+              <MonthCard value={day} today={today} onPick={setDay} compact />
+            </View>
+            <View style={{ marginTop: s.s6 }}>
+              <T s="strong">Due in the next 7 days</T>
+              {week && !week.due.length ? (
+                <T s="row" tone="ink3" extra={{ textAlign: "center", paddingVertical: s.s6 }}>
+                  Nothing due.
+                </T>
+              ) : null}
+              {week
+                ? Array.from({ length: 7 }, (_, i) => addDays(day, i)).map((d) => {
+                    const items = week.due.filter((t) => t.deadline === d);
+                    if (!items.length) return null;
+                    return (
+                      <View key={d} style={{ marginTop: s.s3 }}>
+                        <T s="small" tone="ink3" extra={{ marginBottom: s.s1 }}>
+                          {d === today ? "Today" : formatDate(d, today)}
+                        </T>
+                        {items.map((t) => (
+                          <Press
+                            key={t._id}
+                            role="button"
+                            accessibilityLabel={`Open ${t.title}`}
+                            onPress={() => {
+                              if (diffDays(t.date ?? d, day) !== 0) setDay(t.date ?? d);
+                              selection.set({ taskId: t._id });
+                            }}
+                            style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 40, borderRadius: r.ctl }}
+                          >
+                            <View
+                              style={{ width: 18, height: 18, borderRadius: 6, borderWidth: 2, borderColor: c.lineStrong }}
+                            />
+                            <T s="body" lines={1} extra={{ flex: 1 }}>
+                              {t.title}
+                            </T>
+                            {t.dueTime !== null ? (
+                              <T s="body" tone="ink3" tnum>
+                                {formatClock(t.dueTime)}
+                              </T>
+                            ) : null}
+                          </Press>
+                        ))}
+                      </View>
+                    );
+                  })
+                : null}
+            </View>
+          </View>
+        )}
+      </ScrollView>
     </View>
+  );
+}
+
+/** Desktop keys on Today: ← and → change the day, T back to today, E edits, X ticks a habit. */
+function useDesktopKeys(active: boolean, day: string, setDay: (d: string) => void, data: Day | undefined) {
+  const latest = useMemo(() => ({ day, data }), [day, data]);
+  const ref = useRef(latest);
+  ref.current = latest;
+  useFocusEffect(
+    useCallback(() => {
+      if (!active || Platform.OS !== "web") return;
+      const onKey = (e: KeyboardEvent) => {
+        const el = e.target as HTMLElement | null;
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+        if (document.querySelector('[aria-modal="true"]')) return;
+        const { day: d, data: now } = ref.current;
+        const selected = selection.get().taskId;
+        if (e.key === "ArrowLeft") setDay(addDays(d, -1));
+        else if (e.key === "ArrowRight") setDay(addDays(d, 1));
+        else if (e.key === "t" || e.key === "T") shownDay.set(null);
+        else if ((e.key === "e" || e.key === "E") && selected) {
+          const src = now?.sources.get(selected);
+          if (src?.type === "task") router.push(`/task/${selected}?edit=1`);
+        } else if ((e.key === "x" || e.key === "X") && selected) {
+          const src = now?.sources.get(selected);
+          if (src?.type === "habit") void checkHabit(src.habit, d, !src.habit.doneToday);
+          // Tasks: the shell's X ticks the selected row.
+          else if (src?.type === "task" && !src.task.done && !document.querySelector(`[data-testid="task-${selected}"]`))
+            completeTask(src.task);
+        } else return;
+        e.preventDefault();
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [active, setDay]),
   );
 }
 
 function TodaySkeleton() {
   return (
-    <View testID="skeleton" aria-busy style={{ gap: s.s12 }}>
-      <View style={{ gap: s.s3 }}>
-        <Skeleton width={120} height={12} />
-        <Skeleton width="70%" height={28} />
-        <Skeleton width="100%" height={2} />
-      </View>
-      <View style={{ gap: s.s4 }}>
-        <Skeleton width={140} height={16} />
-        {[0, 1, 2, 3].map((i) => (
-          <View key={i} style={{ flexDirection: "row", gap: s.s3, alignItems: "center" }}>
-            <Skeleton width={18} height={18} style={{ borderRadius: 9 }} />
-            <Skeleton width={`${60 - i * 8}%`} height={14} />
-          </View>
-        ))}
-      </View>
+    <View testID="skeleton" aria-busy style={{ gap: s.s4, marginTop: s.s6 }}>
+      <Skeleton width="100%" height={72} style={{ borderRadius: r.box }} />
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} width="100%" height={58 + i * 24} style={{ borderRadius: r.box }} />
+      ))}
     </View>
   );
 }
+
+export { whenWords };
