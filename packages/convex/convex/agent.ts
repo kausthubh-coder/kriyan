@@ -18,7 +18,7 @@ import * as Search from "./model/search";
 import * as Spaces from "./model/spaces";
 import * as Tasks from "./model/tasks";
 import * as Views from "./model/views";
-import { colorV, reminderV, repeatV, stepV } from "./validators";
+import { colorV, earlierWindowV, reminderV, repeatV, stepV, todayLayoutV } from "./validators";
 
 const owner = { ownerId: v.string() };
 /** Writes: the owner and the agent's name, both from the HTTP layer. */
@@ -45,7 +45,7 @@ export const get_week = internalQuery({
 
 export const get_inbox = internalQuery({
   args: read,
-  handler: async (ctx, { ownerId }) => Views.inboxView(ctx, ownerId),
+  handler: async (ctx, { ownerId, today }) => Views.inboxView(ctx, ownerId, today),
 });
 
 export const get_space = internalQuery({
@@ -758,6 +758,11 @@ export const update_settings = internalMutation({
     reviewTime: v.optional(v.number()),
     semesterStart: nullable(v.string()),
     semesterEnd: nullable(v.string()),
+    todayLayout: v.optional(todayLayoutV),
+    earlierWindow: v.optional(earlierWindowV),
+    showSpace: v.optional(v.boolean()),
+    hideDone: v.optional(v.boolean()),
+    nowBadge: v.optional(v.boolean()),
   },
   handler: async (ctx, { ownerId, agent, ...patch }) => {
     await Profile.updateSettings(ctx, ownerId, patch);

@@ -95,7 +95,7 @@ function Menu() {
   const roles = useType();
   const { today } = useClock();
   const spaces = useSpaces();
-  const inbox = useInboxView();
+  const inbox = useInboxView()?.tasks;
   const todayView = useTodayView();
   const week = useWeekView(startOfWeek(today));
   const addText = useMutation(api.tasks.addText);

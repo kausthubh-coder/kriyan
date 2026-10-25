@@ -134,12 +134,23 @@ export const spaces: SpacesResult = [
 export function today(date = "2026-10-13"): TodayResult {
   return {
     date,
-    profile: { timeZone: "Europe/London", dayStart: 480, dayEnd: 1320, dailyCapacity: 420 },
+    profile: {
+      timeZone: "Europe/London",
+      dayStart: 480,
+      dayEnd: 1320,
+      dailyCapacity: 420,
+      todayLayout: "blocks",
+      earlierWindow: "week",
+      showSpace: true,
+      hideDone: false,
+      nowBadge: true,
+      reviewTime: 1200,
+    },
     scheduled: [gym, lecture, essay, reading, callMum],
     anytime: [stamps],
     done: [rent],
     due: [],
-    earlier: [problems],
+    earlier: [{ ...problems, ageDays: 1 }],
     habits,
     proposals: 1,
     spaces,
@@ -194,10 +205,10 @@ export function week(): WeekResult {
   };
 }
 
-export const inbox: InboxResult = [
-  dentist,
-  task({ _id: "k57passport00000000000000000012", title: "Renew passport" }),
-];
+export const inbox: InboxResult = {
+  tasks: [dentist, task({ _id: "k57passport00000000000000000012", title: "Renew passport" })],
+  older: [],
+};
 
 export function progress(): ProgressResult {
   const days = (count: number, done: (i: number) => boolean) =>

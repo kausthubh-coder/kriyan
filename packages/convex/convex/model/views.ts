@@ -9,6 +9,7 @@ import type { SpaceColor } from "@kriyan/core/tokens";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { getProfile, owned } from "./owner";
+import { todayPrefs, type EarlierWindow } from "./profile";
 import { listSpaces, spaceTree, type SpaceNode } from "./spaces";
 
 export interface TaskView {
@@ -261,12 +262,23 @@ function civil(value: string, what: string): CivilDate {
   return value;
 }
 
-export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
-  civil(today, "date");
-  const profile = await getProfile(ctx, ownerId);
-  const { map, tree } = await spaceMap(ctx, ownerId);
-  const day = (await plan(ctx, ownerId, today, today, map)).get(today) ?? [];
-  const earlier = (
+/** A task left from an earlier day, with how many days ago it was planned (or due, if it had no day). */
+export type EarlierView = TaskView & { ageDays: number };
+
+/** Whether a leftover `ageDays` old still shows on Today under the person's window. */
+export function inEarlierWindow(ageDays: number, window: EarlierWindow): boolean {
+  if (window === "all") return true;
+  if (window === "week") return ageDays <= 7;
+  if (window === "month") return ageDays <= 31;
+  return false;
+}
+
+/**
+ * Open tasks left from before today: planned for an earlier day, or due on one with no day of
+ * their own. Events are left out (you attended them or you didn't), and so are proposals.
+ */
+async function leftovers(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  const planned = (
     await ctx.db
       .query("tasks")
       .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
@@ -283,6 +295,21 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
   const missed = (await openUndated(ctx, ownerId)).filter(
     (t) => !t.event && t.proposedBy === undefined && t.deadline !== undefined && t.deadline < today,
   );
+  return [...planned, ...missed].map((task) => ({
+    task,
+    ageDays: diffDays(today, task.date ?? task.deadline!),
+  }));
+}
+
+export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  civil(today, "date");
+  const profile = await getProfile(ctx, ownerId);
+  const prefs = todayPrefs(profile);
+  const { map, tree } = await spaceMap(ctx, ownerId);
+  const day = (await plan(ctx, ownerId, today, today, map)).get(today) ?? [];
+  const earlier: EarlierView[] = (await leftovers(ctx, ownerId, today))
+    .filter((l) => inEarlierWindow(l.ageDays, prefs.earlierWindow))
+    .map((l) => ({ ...view(l.task, map), ageDays: l.ageDays }));
   // Due today but planned for no day, or a later one: today's list is where they belong.
   const due = (
     await ctx.db
@@ -303,12 +330,13 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
       dayStart: profile.dayStart,
       dayEnd: profile.dayEnd,
       dailyCapacity: profile.dailyCapacity,
+      ...prefs,
     },
     scheduled: day.filter((t) => t.time !== null),
     anytime: day.filter((t) => t.time === null && !t.done),
     done: day.filter((t) => t.time === null && t.done),
     due: due.map((t) => view(t, map)),
-    earlier: [...earlier, ...missed].map((t) => view(t, map)),
+    earlier,
     habits: await habitViews(ctx, ownerId, today, map),
     proposals: day.filter((t) => t.proposedBy !== null).length,
     spaces: tree,
@@ -446,10 +474,24 @@ export async function trashView(ctx: QueryCtx, ownerId: string) {
   });
 }
 
-export async function inboxView(ctx: QueryCtx, ownerId: string) {
+/**
+ * The Inbox: tasks captured with no day and no space, newest first, and `older`: what's left from
+ * earlier days but too old for Today's window, oldest last, so nothing drops out of sight.
+ */
+export async function inboxView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  civil(today, "date");
+  const { earlierWindow } = todayPrefs(await getProfile(ctx, ownerId));
   const { map } = await spaceMap(ctx, ownerId);
   const undated = (await openUndated(ctx, ownerId)).filter((t) => !t.spaceId);
-  return undated.sort((a, b) => b.order - a.order).map((t) => view(t, map));
+  const older: EarlierView[] = (await leftovers(ctx, ownerId, today))
+    // A missed deadline with no day and no space is already in the list above.
+    .filter((l) => !inEarlierWindow(l.ageDays, earlierWindow) && (l.task.date || l.task.spaceId))
+    .sort((a, b) => a.ageDays - b.ageDays)
+    .map((l) => ({ ...view(l.task, map), ageDays: l.ageDays }));
+  return {
+    tasks: undated.sort((a, b) => b.order - a.order).map((t) => view(t, map)),
+    older,
+  };
 }
 
 /** Every space inside this one, at any depth. `tree` lists parents before their children. */

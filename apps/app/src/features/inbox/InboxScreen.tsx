@@ -23,7 +23,7 @@ import { PageHead, Screen } from "@/ui/Screen";
 import { Txt } from "@/ui/Txt";
 
 export function InboxScreen() {
-  const inbox = useInboxView();
+  const inbox = useInboxView()?.tasks;
   const { today } = useClock();
   const phone = useIsPhone();
   const sub = inbox

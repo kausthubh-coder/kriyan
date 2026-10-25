@@ -1,6 +1,16 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { actionKindV, colorV, reminderV, repeatV, sourceV, stepV, taskBeforeV } from "./validators";
+import {
+  actionKindV,
+  colorV,
+  earlierWindowV,
+  reminderV,
+  repeatV,
+  sourceV,
+  stepV,
+  taskBeforeV,
+  todayLayoutV,
+} from "./validators";
 
 // Every row belongs to one person: `ownerId` is their identity's tokenIdentifier.
 // Every query reads through an index that starts with ownerId.
@@ -27,6 +37,16 @@ export default defineSchema({
     /** The semester's first and last days, for the time-left card on Goals. */
     semesterStart: v.optional(v.string()),
     semesterEnd: v.optional(v.string()),
+    /** Today as time blocks (the default) or one line per item. */
+    todayLayout: v.optional(todayLayoutV),
+    /** How far back Today shows what's left from earlier days; older ones wait in the Inbox. Unset is a week. */
+    earlierWindow: v.optional(earlierWindowV),
+    /** The space's name after a row's title. Unset is on. */
+    showSpace: v.optional(v.boolean()),
+    /** Hide what's finished from Today's list. Unset is off. */
+    hideDone: v.optional(v.boolean()),
+    /** The red "Now" pill on the item you're in. Unset is on. */
+    nowBadge: v.optional(v.boolean()),
   }).index("by_owner", ["ownerId"]),
 
   spaces: defineTable({

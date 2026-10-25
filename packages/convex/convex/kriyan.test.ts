@@ -74,7 +74,7 @@ describe("quick add and today", () => {
       ["Call Mum", 1020],
       ["Water the plants", 1080],
     ]);
-    expect(await alice.query(api.views.inbox, {})).toEqual([]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks).toEqual([]);
   });
 
   test("a task without a time is an anytime task; one without a date goes to the inbox", async () => {
@@ -84,7 +84,9 @@ describe("quick add and today", () => {
     expect((await alice.query(api.views.today, { today })).anytime.map((t) => t.title)).toEqual([
       "Send invoice",
     ]);
-    expect((await alice.query(api.views.inbox, {})).map((t) => t.title)).toEqual(["Look into cron limits"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((t) => t.title)).toEqual([
+      "Look into cron limits",
+    ]);
   });
 
   test("the week projects repeats forward and sums planned hours per day", async () => {
@@ -186,7 +188,9 @@ describe("completing", () => {
     await alice.mutation(api.tasks.undoComplete, { id, completion: done });
     await alice.mutation(api.tasks.undoComplete, { id, completion: done });
     expect((await t.run((ctx) => ctx.db.get(goal)))?.current).toBe(1);
-    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Ship the CLI"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((x) => x.title)).toEqual([
+      "Ship the CLI",
+    ]);
   });
 
   test("the editor's goal list has the person's open goals, as Progress shows them", async () => {
@@ -415,7 +419,7 @@ describe("ownership", () => {
 
   test("signed-out calls are refused", async () => {
     const t = convexTest(schema, modules);
-    await expect(t.query(api.views.inbox, {})).rejects.toThrow("Sign in to continue.");
+    await expect(t.query(api.views.inbox, { today: "2026-10-13" })).rejects.toThrow("Sign in to continue.");
   });
 });
 
@@ -637,9 +641,8 @@ describe("agent API", () => {
     try {
       const res = await inbox(secret, ALICE.subject);
       expect(res.status).toBe(200);
-      expect(((await res.json()) as { result: { title: string }[] }).result.map((x) => x.title)).toEqual([
-        "Book the dentist",
-      ]);
+      const body = (await res.json()) as { result: { tasks: { title: string }[] } };
+      expect(body.result.tasks.map((x) => x.title)).toEqual(["Book the dentist"]);
       expect((await inbox(`${secret.slice(1)}t`, ALICE.subject)).status).toBe(401);
       expect((await inbox(secret, `${ALICE.subject}|other`)).status).toBe(401);
     } finally {
@@ -942,7 +945,9 @@ describe("months of use", () => {
     const { t, alice, today } = await setup();
     await history(t, 520, {});
     await alice.mutation(api.tasks.addText, { text: "New idea" });
-    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["New idea"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((x) => x.title)).toEqual([
+      "New idea",
+    ]);
     expect(
       (await alice.query(api.views.week, { start: "2026-10-12", today })).inbox.map((x) => x.title),
     ).toEqual(["New idea"]);
@@ -1023,7 +1028,9 @@ describe("the trash", () => {
     const left = await t.run((ctx) => ctx.db.query("tasks").collect());
     expect(left.map((x) => x.title)).toEqual(["Recent idea"]);
     await alice.mutation(api.tasks.restore, { id: recent });
-    expect((await alice.query(api.views.inbox, {})).map((x) => x.title)).toEqual(["Recent idea"]);
+    expect((await alice.query(api.views.inbox, { today: "2026-10-13" })).tasks.map((x) => x.title)).toEqual([
+      "Recent idea",
+    ]);
   });
 
   test("recently deleted lists what's in the trash, newest first, and only the person's own", async () => {
@@ -1882,6 +1889,11 @@ describe("agents working in bulk", () => {
       sounds: false,
       semesterStart: null,
       semesterEnd: null,
+      todayLayout: "blocks",
+      earlierWindow: "week",
+      showSpace: true,
+      hideDone: false,
+      nowBadge: true,
     });
     const { settings } = await ok("update_settings", {
       dayStart: 420,
@@ -1894,5 +1906,90 @@ describe("agents working in bulk", () => {
       error: "Your day must end after it starts.",
     });
     expect((await call("update_settings", { agentsEditDirectly: true })).status).toBe(400);
+  });
+});
+
+describe("Today's layout and what's left from earlier", () => {
+  test("Today returns the layout choices at their defaults, and the profile update saves them", async () => {
+    const { alice, today } = await setup();
+    expect((await alice.query(api.views.today, { today })).profile).toEqual({
+      timeZone: "UTC",
+      dayStart: 480,
+      dayEnd: 1320,
+      dailyCapacity: 420,
+      todayLayout: "blocks",
+      earlierWindow: "week",
+      showSpace: true,
+      hideDone: false,
+      nowBadge: true,
+      reviewTime: 1200,
+    });
+    await alice.mutation(api.account.updateProfile, {
+      todayLayout: "list",
+      earlierWindow: "month",
+      showSpace: false,
+      hideDone: true,
+      nowBadge: false,
+    });
+    const p = (await alice.query(api.views.today, { today })).profile;
+    expect([p.todayLayout, p.earlierWindow, p.showSpace, p.hideDone, p.nowBadge]).toEqual([
+      "list",
+      "month",
+      false,
+      true,
+      false,
+    ]);
+  });
+
+  test("earlier keeps a week by default with how old each is; older ones wait in the Inbox", async () => {
+    const { alice } = await setup();
+    const today = "2026-10-13";
+    await alice.mutation(api.tasks.add, { title: "Problem set 3", date: "2026-10-12" });
+    await alice.mutation(api.tasks.add, { title: "Workshop 7 coding", deadline: "2026-10-06" });
+    await alice.mutation(api.tasks.add, { title: "Submit advising form", date: "2026-10-05" });
+    await alice.mutation(api.tasks.add, { title: "Return the library book", deadline: "2026-09-01" });
+    await alice.mutation(api.tasks.add, { title: "Look into internships" });
+    const earlier = async () =>
+      (await alice.query(api.views.today, { today })).earlier.map((t) => [t.title, t.ageDays]);
+    const older = async () => {
+      const inbox = await alice.query(api.views.inbox, { today });
+      // Captured in the same instant (the clock is frozen), so their order is a tie.
+      return {
+        tasks: inbox.tasks.map((t) => t.title).sort(),
+        older: inbox.older.map((t) => [t.title, t.ageDays]),
+      };
+    };
+    expect(await earlier()).toEqual([
+      ["Problem set 3", 1],
+      ["Workshop 7 coding", 7],
+    ]);
+    // The undated library book is in the Inbox's own list already, so it isn't listed twice.
+    expect(await older()).toEqual({
+      tasks: ["Look into internships", "Return the library book", "Workshop 7 coding"],
+      older: [["Submit advising form", 8]],
+    });
+
+    await alice.mutation(api.account.updateProfile, { earlierWindow: "month" });
+    expect(await earlier()).toEqual([
+      ["Submit advising form", 8],
+      ["Problem set 3", 1],
+      ["Workshop 7 coding", 7],
+    ]);
+    expect((await older()).older).toEqual([]);
+
+    await alice.mutation(api.account.updateProfile, { earlierWindow: "all" });
+    expect((await earlier()).map(([title]) => title)).toEqual([
+      "Submit advising form",
+      "Problem set 3",
+      "Workshop 7 coding",
+      "Return the library book",
+    ]);
+
+    await alice.mutation(api.account.updateProfile, { earlierWindow: "none" });
+    expect(await earlier()).toEqual([]);
+    expect((await older()).older).toEqual([
+      ["Problem set 3", 1],
+      ["Submit advising form", 8],
+    ]);
   });
 });

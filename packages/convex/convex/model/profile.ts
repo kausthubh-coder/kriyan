@@ -1,11 +1,12 @@
 // The person's settings: their day, capacity, default reminders, review time and semester.
 // The app's Settings and agents' update_settings both change them through updateSettings.
 
-import { ConvexError } from "convex/values";
+import { ConvexError, type Infer } from "convex/values";
 import { isCivilDate } from "@kriyan/core/dates";
 import type { Reminder } from "@kriyan/core/reminders";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { getProfile } from "./owner";
+import type { earlierWindowV, todayLayoutV } from "../validators";
+import { getProfile, type Profile } from "./owner";
 import { checkReminders } from "./tasks";
 
 export interface SettingsPatch {
@@ -20,6 +21,27 @@ export interface SettingsPatch {
   /** null clears the semester. */
   semesterStart?: string | null;
   semesterEnd?: string | null;
+  todayLayout?: TodayLayout;
+  earlierWindow?: EarlierWindow;
+  showSpace?: boolean;
+  hideDone?: boolean;
+  nowBadge?: boolean;
+}
+
+export type TodayLayout = Infer<typeof todayLayoutV>;
+export type EarlierWindow = Infer<typeof earlierWindowV>;
+
+/** How Today is laid out, with each unset choice at its default. */
+export function todayPrefs(p: Profile) {
+  return {
+    todayLayout: p.todayLayout ?? ("blocks" as TodayLayout),
+    earlierWindow: p.earlierWindow ?? ("week" as EarlierWindow),
+    showSpace: p.showSpace ?? true,
+    hideDone: p.hideDone ?? false,
+    nowBadge: p.nowBadge ?? true,
+    /** Unset means 20:00. */
+    reviewTime: p.reviewTime ?? 20 * 60,
+  };
 }
 
 export async function updateSettings(ctx: MutationCtx, ownerId: string, patch: SettingsPatch): Promise<void> {
@@ -75,11 +97,10 @@ export async function settingsView(ctx: QueryCtx, ownerId: string) {
     dayEnd: p.dayEnd,
     dailyCapacity: p.dailyCapacity,
     defaultReminders: p.defaultReminders,
-    /** Unset means 20:00, as Today shows it. */
-    reviewTime: p.reviewTime ?? 20 * 60,
     agentsEditDirectly: p.agentsEditDirectly,
     sounds: p.sounds ?? false,
     semesterStart: p.semesterStart ?? null,
     semesterEnd: p.semesterEnd ?? null,
+    ...todayPrefs(p),
   };
 }

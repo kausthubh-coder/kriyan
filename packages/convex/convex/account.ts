@@ -7,7 +7,7 @@ import { cancelReminders, scheduleReminders } from "./model/reminders";
 import { DEFAULT_PROFILE, getProfile, requireOwner } from "./model/owner";
 import { updateSettings } from "./model/profile";
 import * as Tokens from "./model/tokens";
-import { reminderV } from "./validators";
+import { earlierWindowV, reminderV, todayLayoutV } from "./validators";
 
 export const profile = query({
   args: {},
@@ -79,6 +79,11 @@ export const updateProfile = mutation({
     /** null clears the semester. */
     semesterStart: v.optional(v.union(v.string(), v.null())),
     semesterEnd: v.optional(v.union(v.string(), v.null())),
+    todayLayout: v.optional(todayLayoutV),
+    earlierWindow: v.optional(earlierWindowV),
+    showSpace: v.optional(v.boolean()),
+    hideDone: v.optional(v.boolean()),
+    nowBadge: v.optional(v.boolean()),
   },
   handler: async (ctx, patch) => updateSettings(ctx, await requireOwner(ctx), patch),
 });

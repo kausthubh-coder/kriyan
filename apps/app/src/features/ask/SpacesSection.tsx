@@ -63,7 +63,7 @@ function NavRow({
 
 export function SpacesSection() {
   const spaces = useSpaces();
-  const inbox = useInboxView();
+  const inbox = useInboxView()?.tasks;
   const [adding, setAdding] = useState(false);
   return (
     <View testID="spaces">

@@ -44,6 +44,15 @@ export const reminderV = v.union(
 
 export const colorV = v.union(...SPACE_COLORS.map((c) => v.literal(c)));
 
+export const todayLayoutV = v.union(v.literal("blocks"), v.literal("list"));
+
+export const earlierWindowV = v.union(
+  v.literal("none"),
+  v.literal("week"),
+  v.literal("month"),
+  v.literal("all"),
+);
+
 export const sourceV = v.union(v.literal("app"), v.literal("agent"));
 
 export const stepV = v.object({ title: v.string(), done: v.boolean() });

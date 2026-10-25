@@ -177,7 +177,7 @@ const BASE_OPS: OpSpec[] = [
     title: "Get today",
     kind: "read",
     description:
-      "Read the person's plan for a day (today by default): scheduled blocks, anytime tasks, tasks due that day with no day of their own, done tasks, tasks left from earlier days, and habits. Read this before planning.",
+      "Read the person's plan for a day (today by default): scheduled blocks, anytime tasks, tasks due that day with no day of their own, done tasks, tasks left from earlier days (`earlier`, each with `ageDays`, within the person's earlier window; older ones are in get_inbox), and habits. Read this before planning.",
     input: obj({ date }),
   },
   {
@@ -192,7 +192,8 @@ const BASE_OPS: OpSpec[] = [
     name: "get_inbox",
     title: "Get the inbox",
     kind: "read",
-    description: "Read tasks captured without a date or a space.",
+    description:
+      "Read tasks captured without a date or a space (`tasks`), and `older`: tasks left from earlier days that are too old for Today's earlier window, each with `ageDays`.",
     input: obj({}),
   },
   {
@@ -692,7 +693,7 @@ const BULK_OPS: OpSpec[] = [
     title: "Get settings",
     kind: "read",
     description:
-      "Read the person's time zone, day start and end, daily capacity, default reminders, review time, semester dates and whether agents edit directly.",
+      "Read the person's time zone, day start (Wake up) and end (Wind down), daily capacity, default reminders, review time, semester dates, whether agents edit directly, and how Today looks: todayLayout, earlierWindow, showSpace, hideDone, nowBadge.",
     input: obj({}),
   },
   {
@@ -702,7 +703,7 @@ const BULK_OPS: OpSpec[] = [
     destructive: true,
     idempotent: true,
     description:
-      "Change the day's start and end, the daily capacity (minutes of planned work), default reminders for new timed tasks, the review time or the semester dates (null clears one). The time zone follows the person's device, and whether agents edit directly is theirs to choose in Settings.",
+      "Change the day's start (Wake up) and end (Wind down), the daily capacity (minutes of planned work), default reminders for new timed tasks, the review time, the semester dates (null clears one) or how Today looks. The time zone follows the person's device, and whether agents edit directly is theirs to choose in Settings.",
     input: obj({
       dayStart: minutes("When the day starts"),
       dayEnd: {
@@ -716,6 +717,14 @@ const BULK_OPS: OpSpec[] = [
       reviewTime: minutes("When Review today shows"),
       semesterStart: nullable(date),
       semesterEnd: nullable(date),
+      todayLayout: { enum: ["blocks", "list"], description: "Time blocks (default) or one line per item." },
+      earlierWindow: {
+        enum: ["none", "week", "month", "all"],
+        description: "How far back Today shows what's left from earlier days. Default week.",
+      },
+      showSpace: { type: "boolean", description: "Show the space's name after a row's title." },
+      hideDone: { type: "boolean", description: "Hide finished items from Today." },
+      nowBadge: { type: "boolean", description: "Mark the item happening now." },
     }),
   },
 ];
