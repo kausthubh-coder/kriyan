@@ -31,7 +31,6 @@ import { parseTask } from "@kriyan/core/parse";
 import { useClock } from "@/data/time";
 import { useInboxView, useSpaces, useTodayView, useWeekView, type TaskView } from "@/data/views";
 import { closeDay, completeTask, deleteTask, errorText, moveTasks } from "@/features/tasks/actions";
-import { openAgentSettings } from "@/features/ask/agents";
 import { findSpace } from "@/features/tasks/QuickAdd";
 import { useIsPhone, useType } from "@/theme/layout";
 import { c, hex, r, s, shadows, spaceTone } from "@/theme/tokens";
@@ -69,15 +68,10 @@ const GO: {
   { label: "Week", href: "/upcoming", icon: CalendarDays, kbd: "U", keywords: "upcoming plan" },
   { label: "Inbox", href: "/inbox", icon: Inbox, kbd: "I" },
   { label: "Ask Kriyan", href: "/ask", icon: Sparkles, kbd: "A", keywords: "assistant agents automations" },
-  { label: "Goals and habits", href: "/progress", icon: Target, keywords: "progress heatmap time" },
-  { label: "Settings", href: "/settings", icon: SlidersHorizontal, keywords: "tokens reminders day" },
-  {
-    label: "Connect an agent",
-    href: "/settings",
-    icon: Bot,
-    keywords: "ai mcp claude chatgpt codex cli token",
-    go: openAgentSettings,
-  },
+  { label: "Goals and habits", href: "/goals", icon: Target, keywords: "progress routines" },
+  { label: "Agents", href: "/agents", icon: Bot, keywords: "ai mcp claude chatgpt codex connect undo" },
+  { label: "Settings", href: "/settings", icon: SlidersHorizontal, keywords: "tokens reminders day cli" },
+  { label: "Menu", href: "/menu", icon: Layers, keywords: "spaces browse" },
   { label: "Recently deleted", href: "/trash", icon: Trash2, keywords: "trash restore undo" },
 ];
 

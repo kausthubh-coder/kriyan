@@ -1,7 +1,6 @@
 // Small things the Ask tab says about agents: one line per change an agent made, and the way
-// to Settings' agent section.
+// to the Agents page.
 
-import { Platform } from "react-native";
 import { router } from "expo-router";
 import type { ActionKind } from "@kriyan/core/activity";
 import type { ActionView, AskView } from "@/data/views";
@@ -38,17 +37,7 @@ export function noAgentYet(
   return !tokens.length && !activity.length && !asks.some((a) => a.agent && a.agent !== KRIYAN);
 }
 
-/** Opens Settings at "Agents and automations" (its section's id is "connect-ai"). */
+/** Opens Agents, where the MCP address and what agents did live (design v5). */
 export function openAgentSettings() {
-  router.push("/settings");
-  if (Platform.OS !== "web") return;
-  // Settings is long and draws its sections once the profile loads; wait for the one people
-  // came for instead of leaving them at the top.
-  let tries = 0;
-  const find = () => {
-    const section = document.getElementById("connect-ai");
-    if (section) section.scrollIntoView({ block: "start" });
-    else if (++tries < 40) setTimeout(find, 50);
-  };
-  setTimeout(find, 50);
+  router.push("/agents");
 }

@@ -1,31 +1,21 @@
-// Settings (b2.html?screen=settings): in B2's order, who's signed in, how it feels (sounds and
-// haptics), the evening review, agents and the command line, and installing it; then what B2
-// doesn't picture: the semester, your day, default reminders, access tokens, recently deleted,
-// and deleting your data.
+// Settings (docs/design/v5 prototype `page("settings")`): your day (wake up, review, wind down)
+// and what Today shows first, as the prototype has them; then what it doesn't picture: how it
+// feels, default reminders, capacity and the semester, the command line and its tokens,
+// installing it, recently deleted, and the account. Connecting agents lives on Agents.
 
 import { DottedRule } from "@/ui/DottedRule";
 import { AllowReminders } from "@/features/notifications/AllowReminders";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Linking, Modal, Platform, useWindowDimensions, View } from "react-native";
+import { Modal, View } from "react-native";
 import { useClerk, useUser } from "@clerk/expo";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { useMutation } from "convex/react";
-import {
-  ChevronLeft,
-  KeyRound,
-  Link,
-  Play,
-  RotateCcw,
-  Sparkles,
-  Terminal,
-  Trash2,
-} from "lucide-react-native";
+import { KeyRound, Play, RotateCcw, Trash2 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { formatClock } from "@kriyan/core/dates";
 import { formatDate } from "@kriyan/core/format";
-import { parseClock } from "@kriyan/core/parse";
 import type { Reminder } from "@kriyan/core/reminders";
 import { useClock } from "@/data/time";
 import { useAccessTokens, useProfile, type Profile } from "@/data/views";
@@ -33,31 +23,27 @@ import { hapticsOn, setHapticsOn, setSoundsOn, soundsOn } from "@/features/feel/
 import { playSound } from "@/features/feel/sound";
 import { forgetDevice } from "@/features/notifications/register";
 import { canVibrate } from "@/features/feel/vibrate";
-import { SectionLabel } from "@/features/progress/SectionLabel";
 import { SmallButton } from "@/features/progress/SmallButton";
-import { Dock } from "@/features/shell/Dock";
+import { Segmented, StackedSetting, StepperRow, ToggleRow } from "@/features/shell/controls";
+import { GroupLabel, Page } from "@/features/shell/Page";
 import { errorText } from "@/features/tasks/actions";
 import { commitHaptic, toggleHaptic } from "@/features/tasks/haptics";
 import { DayPicker } from "@/features/tasks/pickers";
 import { ReminderEditor } from "@/features/tasks/ReminderEditor";
-import { useIsPhone } from "@/theme/layout";
-import { c, family, r, s, shadows, sz } from "@/theme/tokens";
+import { c, family, r, s, shadows } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Field, Skeleton } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Popover } from "@/ui/Popover";
-import { Press } from "@/ui/Press";
-import { goBack, PageHead, Screen } from "@/ui/Screen";
 import { showToast } from "@/ui/toast";
 import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 
-export const MCP_URL = "https://kriyan.app/mcp";
-// The CLI isn't on npm yet, so it runs from a copy of the code; ship-kriyan step 6 says when this changes.
-export const CLI_LINE = "bun run kriyan login";
-export const MCP_DOCS = "https://kriyan.app/docs/mcp";
-export const CLI_DOCS = "https://kriyan.app/docs/cli";
-const GITHUB_URL = "https://github.com/kausthubh-coder/kriyan";
+import { CLI_LINE, GITHUB_URL } from "./links";
+import { saveTodayPrefs, useTodayPrefs, type EarlierWindow, type TodayLayout } from "./todayPrefs";
+
+// Onboarding copies the MCP address from here.
+export { MCP_URL } from "./links";
 
 /** The CLI isn't on npm, so its setup starts from a clone. */
 const CLI_SETUP = [`git clone ${GITHUB_URL}`, "cd kriyan && bun install", CLI_LINE];
@@ -72,93 +58,29 @@ async function copy(text: string, what: string) {
 
 export function SettingsScreen() {
   const profile = useProfile();
-  const phone = useIsPhone();
   return (
-    <Screen
-      title="Settings"
-      back
-      width="full"
-      // B2 keeps the dock on Settings. The web layout draws it on every phone page; on Android
-      // Settings is pushed over the tabs, so it draws its own.
-      footer={Platform.OS === "web" ? null : <Dock />}
-      // B2's desktop page starts 36 from the top, with Back above the title.
-      scrollProps={
-        phone
-          ? undefined
-          : { contentContainerStyle: { paddingTop: s.s8, paddingHorizontal: s.s8, paddingBottom: s.s16 } }
-      }
-    >
-      {/* One centred 680 column with B2's short section breaks (the frame's are 32 and 48 and
-          hold pages to its left edge). On phones it sits 16 under the title. */}
-      <View
-        style={{
-          width: "100%",
-          maxWidth: sz.column,
-          alignSelf: "center",
-          gap: s.s4,
-          ...(phone ? { marginTop: -s.s4 } : null),
-        }}
-      >
-        {phone ? null : (
-          <View>
-            <DeskBack />
-            <PageHead title="Settings" />
-          </View>
-        )}
-        {profile === undefined ? (
-          <View testID="skeleton" style={{ gap: s.s4 }}>
-            <Skeleton width="100%" height={72} />
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} width={`${70 - i * 10}%`} />
-            ))}
-          </View>
-        ) : (
-          <>
-            <AccountCard profile={profile} />
-            <Feel profile={profile} />
-            <EveningReview profile={profile} />
-            <ConnectAI />
-            <Install />
-            <Semester profile={profile} />
-            <YourDay profile={profile} />
-            <DefaultReminders profile={profile} />
-            <AgentAccess profile={profile} />
-            <Deleted />
-            <DeleteData />
-          </>
-        )}
-      </View>
-    </Screen>
-  );
-}
-
-/** "Back" above the desktop title (b2.html `.back`), like the phone's. */
-function DeskBack() {
-  return (
-    <Press
-      role="button"
-      accessibilityLabel="Back"
-      onPress={() => goBack()}
-      hoverBg={null}
-      scale={false}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        alignSelf: "flex-start",
-        minHeight: sz.touch,
-        marginLeft: -s.s1,
-        paddingRight: s.s2,
-      }}
-    >
-      {({ hovered }) => (
+    <Page tabTitle="Settings" barTitle="Settings">
+      {profile === undefined ? (
+        <View testID="skeleton" style={{ gap: s.s4, paddingTop: s.s6 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} width={`${70 - i * 10}%`} />
+          ))}
+        </View>
+      ) : (
         <>
-          <Icon icon={ChevronLeft} size={20} tone={hovered ? "ink" : "ink2"} />
-          <Txt variant="label" tone={hovered ? "ink" : "ink2"}>
-            Back
-          </Txt>
+          <YourDay profile={profile} />
+          <TodayShows />
+          <Feel profile={profile} />
+          <DefaultReminders profile={profile} />
+          <Planning profile={profile} />
+          <Semester profile={profile} />
+          <CommandLine />
+          <Install />
+          <Deleted />
+          <Account profile={profile} />
         </>
       )}
-    </Press>
+    </Page>
   );
 }
 
@@ -168,13 +90,101 @@ function useUpdateProfile() {
     update(patch).catch((e: unknown) => showToast(errorText(e)));
 }
 
-/** A section: the quiet uppercase label, then its rows. */
+/** A group: the small uppercase label, then its rows. */
 function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <View nativeID={id} style={{ marginTop: s.s1 }}>
-      <SectionLabel title={title} />
-      {/* The label's own height leaves 8 under its words, so its rows follow straight on. */}
-      <View style={{ gap: s.s2 }}>{children}</View>
+    <View nativeID={id}>
+      <GroupLabel>{title.toUpperCase()}</GroupLabel>
+      <View style={{ gap: s.s2, paddingTop: s.s1 }}>{children}</View>
+    </View>
+  );
+}
+
+/** Unset means 20:00, like the backend. */
+const DEFAULT_REVIEW = 20 * 60;
+/** The shortest day the steppers allow, so Wind down always stays after Wake up. */
+const SHORTEST_DAY = 60;
+
+/** The prototype's three times: when the day starts, when Review today shows up, when it ends. */
+function YourDay({ profile }: { profile: Profile }) {
+  const update = useUpdateProfile();
+  const review = profile.reviewTime ?? DEFAULT_REVIEW;
+  return (
+    <View>
+      <GroupLabel>YOUR DAY</GroupLabel>
+      <StepperRow
+        label="Wake up"
+        value={profile.dayStart}
+        text={formatClock(profile.dayStart)}
+        max={profile.dayEnd - SHORTEST_DAY}
+        onChange={(dayStart) => void update({ dayStart })}
+      />
+      <StepperRow
+        label="Review today"
+        value={review}
+        text={formatClock(review)}
+        onChange={(reviewTime) => void update({ reviewTime })}
+      />
+      <StepperRow
+        label="Wind down"
+        value={profile.dayEnd}
+        text={formatClock(profile.dayEnd)}
+        min={profile.dayStart + SHORTEST_DAY}
+        max={1440}
+        onChange={(dayEnd) => void update({ dayEnd })}
+      />
+    </View>
+  );
+}
+
+const EARLIER: [EarlierWindow, string][] = [
+  ["none", "Don't show"],
+  ["week", "1 week"],
+  ["month", "1 month"],
+  ["all", "All"],
+];
+const LAYOUTS: [TodayLayout, string][] = [
+  ["blocks", "Time blocks"],
+  ["list", "List"],
+];
+
+/** What Today leads with: what's left from earlier, blocks or a list, and three switches. */
+function TodayShows() {
+  const prefs = useTodayPrefs();
+  return (
+    <View>
+      <GroupLabel>TODAY SHOWS</GroupLabel>
+      <StackedSetting label="What's left from earlier">
+        <Segmented
+          label="What's left from earlier"
+          value={prefs.earlierWindow}
+          options={EARLIER}
+          onChange={(earlierWindow) => saveTodayPrefs({ earlierWindow })}
+        />
+      </StackedSetting>
+      <StackedSetting label="Today shows">
+        <Segmented
+          label="Today shows"
+          value={prefs.todayLayout}
+          options={LAYOUTS}
+          onChange={(todayLayout) => saveTodayPrefs({ todayLayout })}
+        />
+      </StackedSetting>
+      <ToggleRow
+        label="Hide finished items"
+        on={prefs.hideDone}
+        onChange={(hideDone) => saveTodayPrefs({ hideDone })}
+      />
+      <ToggleRow
+        label="Show each task's space"
+        on={prefs.showSpace}
+        onChange={(showSpace) => saveTodayPrefs({ showSpace })}
+      />
+      <ToggleRow
+        label={'Show "Now" on what\'s happening'}
+        on={prefs.nowBadge}
+        onChange={(nowBadge) => saveTodayPrefs({ nowBadge })}
+      />
     </View>
   );
 }
@@ -227,172 +237,20 @@ function AccountCard({ profile }: { profile: Profile }) {
   );
 }
 
-/**
- * One setting (b2.html `.togrow`): its name and a hint on the left, the control on the right,
- * over a dotted rule. Controls too wide for the right side go under the name instead.
- */
-function Row({
-  label,
-  hint,
-  children,
-  below,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-  below?: boolean;
-}) {
-  const phone = useIsPhone();
-  const stack = below && phone;
+/** One setting: its name on the left and the control on the right, over a dotted rule (v5 `.opt`). */
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View
-      style={{
-        flexDirection: stack ? "column" : "row",
-        alignItems: stack ? "flex-start" : "center",
-        gap: stack ? s.s2 : s.s4,
-        minHeight: 48,
-        paddingVertical: s.s2,
-      }}
+      style={{ flexDirection: "row", alignItems: "center", gap: s.s4, minHeight: 56, paddingVertical: s.s2 }}
     >
-      <View style={{ flex: stack ? undefined : 1 }}>
-        <Txt variant="label">{label}</Txt>
-        {hint ? (
-          <Txt variant="meta" tone="ink3">
-            {hint}
-          </Txt>
-        ) : null}
-      </View>
+      <Txt variant="subhead" style={[family("500"), { flex: 1 }]}>
+        {label}
+      </Txt>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, alignItems: "center" }}>
         {children}
       </View>
-      <DottedRule />
+      <DottedRule width={2} />
     </View>
-  );
-}
-
-function TimeField({
-  label,
-  value,
-  onSave,
-}: {
-  label: string;
-  value: number;
-  onSave: (minutes: number) => void;
-}) {
-  const { fontScale } = useWindowDimensions();
-  const [text, setText] = useState(formatClock(value));
-  const commit = () => {
-    const m = parseClock(text.trim());
-    if (m === null) {
-      showToast(`Type ${label.toLowerCase()} like 08:00 or 8am.`);
-      setText(formatClock(value));
-    } else if (m !== value) onSave(m);
-    else setText(formatClock(value));
-  };
-  return (
-    <Field
-      label={label}
-      value={text}
-      onChangeText={setText}
-      onBlur={commit}
-      onSubmitEditing={commit}
-      // Wide enough for "08:00" at the phone's text size, so large text never clips it.
-      containerStyle={{ width: Math.round(96 * Math.max(1, fontScale)) }}
-    />
-  );
-}
-
-/**
- * One of a few values for a setting (b2.html `.chip`, `.chip.on`): the chosen one is filled, the
- * others are outlined, so the current value reads at a glance.
- */
-function Choice({
-  label,
-  on,
-  onPress,
-  accessibilityLabel,
-}: {
-  label: string;
-  on: boolean;
-  onPress: () => void;
-  accessibilityLabel?: string;
-}) {
-  const phone = useIsPhone();
-  return (
-    <Press
-      role="radio"
-      aria-checked={on}
-      accessibilityLabel={accessibilityLabel ?? label}
-      onPress={onPress}
-      hoverBg={null}
-      style={{ height: phone ? sz.touch : sz.ctl, justifyContent: "center" }}
-    >
-      {({ hovered }) => (
-        <View
-          style={{
-            // B2's chips are compact on phones too (`.chip`, 34 high); the target stays 44.
-            height: sz.ctl,
-            minWidth: 56,
-            paddingHorizontal: s.s3,
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: r.ctl,
-            backgroundColor: on ? c.ink : hovered ? c.hover : "transparent",
-            boxShadow: on ? undefined : `inset 0 0 0 1px ${c.lineStrong}`,
-          }}
-        >
-          <Txt
-            variant="label"
-            tone={on ? "onInk" : "ink2"}
-            tnum
-            numberOfLines={1}
-            style={{ fontSize: 14, lineHeight: 20 }}
-          >
-            {label}
-          </Txt>
-        </View>
-      )}
-    </Press>
-  );
-}
-
-/** A setting that is on or off (b2.html `.togrow`): the whole row flips it. */
-function SwitchRow({
-  label,
-  hint,
-  on,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <Press
-      role="switch"
-      aria-checked={on}
-      accessibilityLabel={label}
-      onPress={() => onChange(!on)}
-      scale={false}
-      hoverBg={null}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: s.s4,
-        minHeight: 48,
-        paddingVertical: s.s2,
-      }}
-    >
-      <View style={{ flex: 1 }}>
-        <Txt variant="label">{label}</Txt>
-        <Txt variant="meta" tone="ink3">
-          {hint}
-        </Txt>
-      </View>
-      <Switch on={on} />
-      <DottedRule />
-    </Press>
   );
 }
 
@@ -409,7 +267,7 @@ function Feel({ profile }: { profile: Profile }) {
   return (
     <Section title="Feel">
       <View>
-        <SwitchRow
+        <ToggleRow
           label="Sounds"
           hint="A soft tick when you finish or move something"
           on={on}
@@ -421,7 +279,7 @@ function Feel({ profile }: { profile: Profile }) {
           }}
         />
         {vibrates ? (
-          <SwitchRow
+          <ToggleRow
             label="Haptics"
             hint="A light tap when you tick, move or drop something"
             on={haptics}
@@ -444,39 +302,6 @@ function Feel({ profile }: { profile: Profile }) {
             else showToast("Sounds are off. Turn them on to hear one.");
           }}
         />
-      </View>
-    </Section>
-  );
-}
-
-/** The prototype's four review times. Unset means 20:00, like the backend. */
-const REVIEW_TIMES = [19 * 60, 20 * 60, 21 * 60, 22 * 60];
-const DEFAULT_REVIEW = 20 * 60;
-
-function EveningReview({ profile }: { profile: Profile }) {
-  const update = useUpdateProfile();
-  const phone = useIsPhone();
-  const current = profile.reviewTime ?? DEFAULT_REVIEW;
-  return (
-    <Section title="Evening review">
-      {/* 14 on phones too, so it stays one line like B2's. */}
-      <Txt variant={phone ? "meta" : "body"} tone="ink3">
-        When “Review today” shows up in your evening.
-      </Txt>
-      <View
-        role="radiogroup"
-        aria-label="Review time"
-        style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}
-      >
-        {REVIEW_TIMES.map((m) => (
-          <Choice
-            key={m}
-            label={formatClock(m)}
-            on={current === m}
-            accessibilityLabel={`Review at ${formatClock(m)}`}
-            onPress={() => void update({ reviewTime: m })}
-          />
-        ))}
       </View>
     </Section>
   );
@@ -557,45 +382,21 @@ function Semester({ profile }: { profile: Profile }) {
   );
 }
 
-function YourDay({ profile }: { profile: Profile }) {
+const CAPACITY: [string, string][] = [4, 5, 6, 7, 8].map((h) => [String(h * 60), `${h}h`]);
+
+/** How much planned work a day holds, for the Week's load lines. */
+function Planning({ profile }: { profile: Profile }) {
   const update = useUpdateProfile();
-  const hours = profile.dailyCapacity / 60;
   return (
-    <Section title="Your day">
-      <View>
-        <Row label="Day starts" hint="The schedule starts here">
-          <TimeField
-            key={profile.dayStart}
-            label="Day starts"
-            value={profile.dayStart}
-            onSave={(dayStart) => void update({ dayStart })}
-          />
-        </Row>
-        <Row label="Day ends" hint="Free time is counted until here">
-          <TimeField
-            key={profile.dayEnd}
-            label="Day ends"
-            value={profile.dayEnd}
-            onSave={(dayEnd) => void update({ dayEnd })}
-          />
-        </Row>
-        <Row label="Daily capacity" hint="Planned work a day can hold, for the load lines" below>
-          <View
-            role="radiogroup"
-            aria-label="Daily capacity"
-            style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}
-          >
-            {[4, 5, 6, 7, 8].map((h) => (
-              <Choice
-                key={h}
-                label={`${h}h`}
-                on={hours === h}
-                onPress={() => void update({ dailyCapacity: h * 60 })}
-              />
-            ))}
-          </View>
-        </Row>
-      </View>
+    <Section title="Planning">
+      <StackedSetting label="Daily capacity">
+        <Segmented
+          label="Daily capacity"
+          value={String(profile.dailyCapacity)}
+          options={CAPACITY}
+          onChange={(v) => void update({ dailyCapacity: Number(v) })}
+        />
+      </StackedSetting>
     </Section>
   );
 }
@@ -636,114 +437,6 @@ function CopyLine({ text, what, label = "Copy" }: { text: string; what: string; 
       </View>
       <SmallButton label={label} accessibilityLabel={`Copy ${what}`} onPress={() => void copy(text, what)} />
     </View>
-  );
-}
-
-/**
- * One way to connect (b2.html `.conn-r`): an icon, what it is in a few words, and what to copy on
- * the right; on a phone what to copy wraps under the words.
- */
-function ConnRow({
-  icon,
-  title,
-  meta,
-  guide,
-  children,
-  last,
-}: {
-  icon: typeof Link;
-  title: string;
-  meta: string;
-  /** The step-by-step guide on kriyan.app, linked after the words. */
-  guide?: string;
-  children?: ReactNode;
-  last?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        flexWrap: "wrap",
-        alignItems: "center",
-        columnGap: s.s3,
-        rowGap: s.s2,
-        paddingVertical: s.s3,
-      }}
-    >
-      <View style={{ flex: 1, minWidth: 180, flexDirection: "row", alignItems: "center", gap: s.s3 }}>
-        <Icon icon={icon} size={20} tone="ink2" />
-        <View style={{ flex: 1 }}>
-          <Txt variant="label" style={family("600")}>
-            {title}
-          </Txt>
-          <Txt variant="meta" tone="ink3">
-            {meta}
-            {guide ? (
-              <>
-                {" "}
-                <Txt
-                  variant="meta"
-                  tone="parse"
-                  role="link"
-                  accessibilityLabel={`${title} guide`}
-                  onPress={() => void Linking.openURL(guide)}
-                >
-                  Guide
-                </Txt>
-              </>
-            ) : null}
-          </Txt>
-        </View>
-      </View>
-      {children}
-      {last ? null : <DottedRule />}
-    </View>
-  );
-}
-
-function ConnectAI() {
-  return (
-    <Section title="Agents and automations" id="connect-ai">
-      <View
-        style={{
-          paddingHorizontal: s.s4,
-          paddingVertical: s.s1,
-          borderRadius: r.box,
-          backgroundColor: c.sunken,
-        }}
-      >
-        <ConnRow icon={Link} title="MCP server" meta="For Claude, ChatGPT and Codex." guide={MCP_DOCS}>
-          <CopyLine text={MCP_URL} what="the MCP address" label="Copy URL" />
-        </ConnRow>
-        {/* Not on npm yet, so the setup is a clone (shown below the card) rather than one line. */}
-        <ConnRow
-          icon={Terminal}
-          title="Command line"
-          meta="For scripts and scheduled runs. Clone it, install, then sign in with a token."
-          guide={CLI_DOCS}
-        >
-          <SmallButton
-            label="Copy setup"
-            accessibilityLabel="Copy the setup commands"
-            onPress={() => void copy(CLI_SETUP.join("\n"), "the setup commands")}
-          />
-        </ConnRow>
-        <ConnRow
-          icon={Sparkles}
-          title="Codex"
-          meta={`Add the MCP URL, then schedule: “Every day at 07:00, read Moodle and Gmail and add what's due to Kriyan.”`}
-        />
-        <ConnRow
-          icon={Sparkles}
-          title="Claude and ChatGPT"
-          meta="Settings, Connectors, Add custom connector, then paste the URL. Ask “plan my week” from there."
-          last
-        />
-      </View>
-      {/* B2 goes straight from the card to the terminal; what agents may do lives with the
-          tokens that let them in, after Install. */}
-      <TerminalBlock lines={[...CLI_SETUP, ...CLI_EXAMPLES]} label="Command line setup and examples" />
-    </Section>
   );
 }
 
@@ -809,36 +502,11 @@ function Install() {
   );
 }
 
-/** The prototype's switch (b2.html `.switch`): green when on, a white knob that slides. */
-function Switch({ on }: { on: boolean }) {
-  return (
-    <View
-      aria-hidden
-      style={{
-        width: 48,
-        height: 28,
-        borderRadius: r.pill,
-        padding: s.s1,
-        backgroundColor: on ? c.done : c.lineStrong,
-        alignItems: on ? "flex-end" : "flex-start",
-      }}
-    >
-      <View
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: r.pill,
-          backgroundColor: c.headInk,
-          boxShadow: shadows.raised,
-        }}
-      />
-    </View>
-  );
-}
-
-/** What agents may do, and the tokens that let the command line and scripts in. */
-function AgentAccess({ profile }: { profile: Profile }) {
-  const update = useUpdateProfile();
+/**
+ * The command line: how to set it up, and the access tokens that let it and scripts in. MCP and
+ * whether agents may edit directly live on Agents.
+ */
+function CommandLine() {
   const tokens = useAccessTokens();
   const create = useMutation(api.account.createToken);
   const revoke = useMutation(api.account.revokeToken);
@@ -861,17 +529,15 @@ function AgentAccess({ profile }: { profile: Profile }) {
   };
   const day = (ms: number) => formatDate(new Date(ms).toISOString().slice(0, 10), today);
   return (
-    <Section title="Agent access">
-      <SwitchRow
-        label="Let agents edit directly"
-        hint={
-          profile.agentsEditDirectly
-            ? "On: an agent's plans go straight onto your days."
-            : "Off: an agent's plans wait for you to accept. Its edits to your tasks apply right away."
-        }
-        on={profile.agentsEditDirectly}
-        onChange={(agentsEditDirectly) => void update({ agentsEditDirectly })}
-      />
+    <Section title="Command line">
+      <TerminalBlock lines={[...CLI_SETUP, ...CLI_EXAMPLES]} label="Command line setup and examples" />
+      <View style={{ alignSelf: "flex-start" }}>
+        <SmallButton
+          label="Copy setup"
+          accessibilityLabel="Copy the setup commands"
+          onPress={() => void copy(CLI_SETUP.join("\n"), "the setup commands")}
+        />
+      </View>
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
         Access tokens are for the command line and scripts. Each token can read and change your plan, so give
         it a name you’ll recognise and revoke it when you stop using it.
@@ -968,11 +634,12 @@ function Deleted() {
   );
 }
 
-/** Sign out sits in the account card at the top; this is the one way to leave for good. */
-function DeleteData() {
+/** Who's signed in with Sign out, and the one way to leave for good. */
+function Account({ profile }: { profile: Profile }) {
   const [confirm, setConfirm] = useState(false);
   return (
     <Section title="Account">
+      <AccountCard profile={profile} />
       <Txt variant="body" tone="ink3" style={{ maxWidth: 560 }}>
         Deleting your data removes everything you’ve made in Kriyan, and your account.
       </Txt>
