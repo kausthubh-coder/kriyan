@@ -35,7 +35,7 @@ export function Top({
           accessibilityLabel="Show the summary"
           onPress={onSummary}
           hoverBg={null}
-          style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}
+          style={{ flexDirection: "row", alignItems: "center", gap: s.s2, minHeight: 44 }}
         >
           <Txt heading={1} style={[ty.day, { color: c.ink }]}>
             {name}
@@ -150,7 +150,7 @@ export function FitIn({ chips, onPick }: { chips: FitChip[]; onPick: (id: string
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: s.s2, paddingHorizontal: s.s3, paddingTop: s.s2, paddingBottom: s.s3 }}
+        contentContainerStyle={{ gap: s.s2, paddingHorizontal: s.s3, paddingBottom: s.s1 }}
       >
         {chips.map(({ item, note }) => (
           <Press
@@ -159,29 +159,34 @@ export function FitIn({ chips, onPick }: { chips: FitChip[]; onPick: (id: string
             accessibilityLabel={`Fit in ${item.title}, ${note}`}
             onPress={() => onPick(item.id)}
             hoverBg={null}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: s.s2,
-              height: 32,
-              paddingLeft: s.s3,
-              paddingRight: s.s3,
-              borderRadius: r.pill,
-              backgroundColor: c.bg,
-            }}
+            // A 32 chip in a 44 target.
+            style={{ height: 44, justifyContent: "center" }}
           >
             <View
               style={{
-                width: 10,
-                height: 10,
-                borderRadius: 5,
-                backgroundColor: item.color ? spaceTone(item.color).dot : c.ink3,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: s.s2,
+                height: 32,
+                paddingLeft: s.s3,
+                paddingRight: s.s3,
+                borderRadius: r.pill,
+                backgroundColor: c.bg,
               }}
-            />
-            <T s="body">{item.title}</T>
-            <T s="small" tone="ink3" tnum>
-              {note}
-            </T>
+            >
+              <View
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: item.color ? spaceTone(item.color).dot : c.ink3,
+                }}
+              />
+              <T s="body">{item.title}</T>
+              <T s="small" tone="ink3" tnum>
+                {note}
+              </T>
+            </View>
           </Press>
         ))}
       </ScrollView>

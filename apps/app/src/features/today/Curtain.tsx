@@ -1,7 +1,7 @@
 // The pull-down summary (v5 `.curtain`): the day in one black sentence, the counts and the free
 // time strong. Phones pull it down over Today (or tap the day); desktop shows it as a card.
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Modal, Platform, Pressable, View, type TextStyle } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,7 @@ import type { SentencePart } from "@kriyan/core/today";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s } from "@/theme/tokens";
 import { Grabber } from "@/ui/bits";
+import { useInertOutside } from "@/ui/inert";
 import { Txt } from "@/ui/Txt";
 import { T, ty } from "./parts";
 
@@ -43,6 +44,8 @@ export function Curtain({
 }) {
   const phone = useIsPhone();
   const insets = useSafeAreaInsets();
+  const layer = useRef<View>(null);
+  useInertOutside(layer, open);
   useEffect(() => {
     if (!open || Platform.OS !== "web") return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -129,7 +132,10 @@ export function Curtain({
   );
   if (Platform.OS === "web")
     return (
-      <View style={{ position: "fixed" as "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 30 }}>
+      <View
+        ref={layer}
+        style={{ position: "fixed" as "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 30 }}
+      >
         {body}
       </View>
     );

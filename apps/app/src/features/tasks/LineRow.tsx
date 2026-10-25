@@ -150,9 +150,14 @@ function NowPill() {
         paddingHorizontal: s.s2,
         paddingVertical: 2,
         borderRadius: r.card,
-        backgroundColor: c.nowFill,
+        backgroundColor: c.bg,
+        overflow: "hidden",
       }}
     >
+      <View
+        pointerEvents="none"
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.nowFill }}
+      />
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.now }} />
       <Txt style={{ ...family("600"), fontSize: 12, lineHeight: 16, color: c.now }}>Now</Txt>
     </View>

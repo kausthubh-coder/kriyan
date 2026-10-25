@@ -342,7 +342,7 @@ function RoutineParts({
   on: BlockHandlers;
 }) {
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: s.s2 }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: s.s2, rowGap: s.s1, marginTop: s.s2 }}>
       {routine.parts.map((p) => (
         <MiniChip
           key={p.index}
@@ -363,7 +363,7 @@ function RoutineParts({
 function InClass({ tasks, color }: { tasks: TaskView[]; color: TaskView["color"] }) {
   if (!tasks.length) return null;
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: s.s2 }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: s.s2, rowGap: s.s1, marginTop: s.s2 }}>
       {tasks.map((t) => (
         <InClassChip key={t._id} task={t} color={color} />
       ))}
@@ -415,43 +415,46 @@ function MiniChip({
       accessibilityLabel={label}
       onPress={onPress}
       hoverBg={null}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: s.s2,
-        height: 32,
-        paddingLeft: s.s2,
-        paddingRight: s.s3,
-        borderRadius: r.pill,
-        backgroundColor: c.bg,
-        // Smaller than a row, so on touch it grows its target without growing its look.
-        ...(phone ? { marginVertical: 0 } : null),
-      }}
+      // A 32 pill; on touch its target grows to 44 without growing the look.
+      style={phone ? { minHeight: 44, marginVertical: -s.s1, justifyContent: "center" } : null}
     >
       <View
         style={{
-          width: 18,
-          height: 18,
-          borderRadius: round ? 9 : 5,
-          borderWidth: 2,
-          borderColor: tone.dot,
-          backgroundColor: done ? tone.dot : "transparent",
+          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
+          gap: s.s2,
+          height: 32,
+          paddingLeft: s.s2,
+          paddingRight: s.s3,
+          borderRadius: r.pill,
+          backgroundColor: c.bg,
         }}
       >
-        {done ? <CheckGlyph size={11} color={hex.bg} strokeWidth={3.5} /> : null}
+        <View
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: round ? 9 : 5,
+            borderWidth: 2,
+            borderColor: tone.dot,
+            backgroundColor: done ? tone.dot : "transparent",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {done ? <CheckGlyph size={11} color={hex.bg} strokeWidth={3.5} /> : null}
+        </View>
+        <Txt
+          style={[
+            ty.small,
+            { color: done ? c.ink2 : c.ink },
+            done ? { textDecorationLine: "line-through" } : null,
+          ]}
+        >
+          {title}
+        </Txt>
+        {note ? <Txt style={[ty.small, { color: c.ink3 }]}>{note}</Txt> : null}
       </View>
-      <Txt
-        style={[
-          ty.small,
-          { color: done ? c.ink2 : c.ink },
-          done ? { textDecorationLine: "line-through" } : null,
-        ]}
-      >
-        {title}
-      </Txt>
-      {note ? <Txt style={[ty.small, { color: c.ink3 }]}>{note}</Txt> : null}
     </Press>
   );
 }
@@ -543,6 +546,7 @@ function Thin({
   testID?: string;
   selected?: boolean;
 }) {
+  const phone = useIsPhone();
   return (
     <Press
       testID={testID}
@@ -551,7 +555,7 @@ function Thin({
       onPress={onPress}
       scale={false}
       style={{
-        minHeight: 40,
+        minHeight: phone ? 44 : 40,
         flexDirection: "row",
         alignItems: "center",
         gap: s.s3,
@@ -584,6 +588,7 @@ function Thin({
 
 /** A free stretch: "1 h 45 free", or in red "Now, 2 h 50 free until 13:30". Tapping it opens Fill. */
 function Gap({ from, to, now, onPress }: { from: number; to: number; now: boolean; onPress: () => void }) {
+  const phone = useIsPhone();
   const span = formatSpan(to - from);
   const text = now ? `Now, ${span} free until ${formatClock(to)}` : `${span} free`;
   return (
@@ -594,7 +599,7 @@ function Gap({ from, to, now, onPress }: { from: number; to: number; now: boolea
       scale={false}
       hoverBg={null}
       style={({ hovered }) => ({
-        minHeight: 40,
+        minHeight: phone ? 44 : 40,
         marginVertical: s.s1,
         flexDirection: "row",
         alignItems: "center",

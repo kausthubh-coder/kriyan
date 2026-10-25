@@ -134,10 +134,20 @@ export function SpaceBox({
   );
 }
 
+/** The now red's light fill, over the page colour its parent paints, so red text keeps 4.5:1. */
+function RedWash() {
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.nowFill }}
+    />
+  );
+}
+
 /** "● Now" in red, "Suggested" in blue, "19 days" in orange. */
 export function Pill({ kind, text }: { kind: "now" | "sug" | "streak"; text: string }) {
   const orange = spaceTone("orange");
-  const bg = kind === "now" ? c.nowFill : kind === "sug" ? c.parseFill : orange.surface;
+  const bg = kind === "now" ? c.bg : kind === "sug" ? c.parseFill : orange.surface;
   const fg = kind === "now" ? c.now : kind === "sug" ? c.parse : orange.dot;
   return (
     <View
@@ -199,10 +209,12 @@ export function Tiles({
               alignItems: "center",
               justifyContent: "center",
               gap: s.s2,
-              backgroundColor: t.tone === "red" ? c.nowFill : t.tone === "primary" ? c.ink : c.select,
+              backgroundColor: t.tone === "red" ? c.bg : t.tone === "primary" ? c.ink : c.select,
+              overflow: "hidden",
               opacity: hovered ? 0.85 : 1,
             })}
           >
+            {t.tone === "red" ? <RedWash /> : null}
             <Icon icon={t.icon} size={22} tone={ink} strokeWidth={2.25} />
             <Txt style={[ty.strong, { color: fg }]}>{t.label}</Txt>
           </Press>
@@ -374,6 +386,7 @@ export function Facts({ items }: { items: { icon?: LucideIcon; dot?: string; tex
 
 /** A choice chip (v5 `.lchips`): a length, a due time. */
 export function LenChip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+  const phone = useIsPhone();
   return (
     <Press
       role="radio"
@@ -382,7 +395,7 @@ export function LenChip({ label, on, onPress }: { label: string; on: boolean; on
       onPress={onPress}
       hoverBg={null}
       style={{
-        height: 40,
+        height: phone ? 44 : 40,
         paddingHorizontal: s.s4,
         borderRadius: r.pill,
         justifyContent: "center",

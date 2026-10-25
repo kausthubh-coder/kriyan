@@ -105,6 +105,22 @@ describe("quick add and today", () => {
   });
 });
 
+describe("Today's month and week dots", () => {
+  test("counts what's open and due on each day, and the tasks with no day", async () => {
+    const { alice, today } = await setup();
+    await alice.mutation(api.tasks.addText, { text: "Problem set 4 due thu 23:55 #school" });
+    await alice.mutation(api.tasks.addText, { text: "Lab report due thu 9am" });
+    const done = await alice.mutation(api.tasks.addText, { text: "Quiz due wed" });
+    await alice.mutation(api.tasks.complete, { id: done, date: null });
+    await alice.mutation(api.tasks.addText, { text: "Look into standing desks" });
+    const due = await alice.query(api.views.due, { start: today, end: "2026-10-18", today });
+    expect(due.days.filter((d) => d.due).map((d) => [d.date, d.due])).toEqual([["2026-10-15", 2]]);
+    expect(due.due.map((t) => t.title)).toEqual(["Lab report", "Problem set 4"]);
+    // Both due-only tasks and the Inbox one have no day yet.
+    expect(due.undated).toBe(3);
+  });
+});
+
 describe("completing", () => {
   test("a repeating task moves to its next date, and undo puts it back", async () => {
     const { alice } = await setup();

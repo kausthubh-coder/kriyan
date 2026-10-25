@@ -91,8 +91,9 @@ const alpha: Record<Scheme, Record<Alpha, string>> = {
     scrim: "oklch(0% 0 0 / 0.32)",
     // Quick add's understood details: the parser's blue, lightly (B2's --blue-bg).
     parseFill: "oklch(53% 0.18 255 / 0.1)",
-    // v5's "Now" pill and Remove tile: the now red, lightly.
-    nowFill: "oklch(55% 0.19 29 / 0.11)",
+    // v5's "Now" pill and Remove tile: the now red, lightly, always laid over bg so the red
+    // text on it keeps 4.5:1 whatever surface the pill sits on.
+    nowFill: "oklch(55% 0.19 29 / 0.08)",
   },
   dark: {
     hover: "oklch(100% 0 0 / 0.05)",

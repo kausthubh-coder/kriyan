@@ -539,7 +539,13 @@ export function RoutineCard({
               accessibilityLabel={p.title}
               onPress={() => tickRoutinePart(routine, p.index, day, !p.done)}
               hoverBg={null}
-              style={{ flexDirection: "row", alignItems: "flex-start", gap: s.s3, paddingVertical: s.s2 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: s.s3,
+                paddingVertical: s.s2,
+                minHeight: 44,
+              }}
             >
               <View
                 style={{

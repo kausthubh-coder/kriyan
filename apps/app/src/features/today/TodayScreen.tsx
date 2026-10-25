@@ -182,7 +182,6 @@ function PhoneToday({
         contentContainerStyle={{
           paddingTop: insets.top + s.s6,
           paddingHorizontal: s.s6,
-          paddingBottom: 160 + insets.bottom,
         }}
         {...(Platform.OS === "web"
           ? {}
@@ -202,6 +201,8 @@ function PhoneToday({
       >
         <Top day={day} today={today} onSummary={onSummary} onPick={setDay} />
         {children}
+        {/* Room for the last block above the floating buttons. */}
+        <View style={{ height: 160 + insets.bottom }} />
       </ScrollView>
       {/* The page fades out under the buttons (v5 `.fade`). */}
       <View

@@ -361,7 +361,7 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
             onPress={() => setKind(k)}
             hoverBg={null}
             style={{
-              minHeight: 40,
+              minHeight: phone ? 44 : 40,
               justifyContent: "center",
               paddingHorizontal: s.s4,
               borderRadius: r.box,

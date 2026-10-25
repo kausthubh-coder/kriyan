@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { addMonths, daysInMonth, fromParts, parts, weekday } from "@kriyan/core/dates";
 import { formatDate, MONTH_SHORT } from "@kriyan/core/format";
 import { useDue } from "@/data/views";
+import { useIsPhone } from "@/theme/layout";
 import { c, family, r, s } from "@/theme/tokens";
 import { DottedRule } from "@/ui/DottedRule";
 import { Icon } from "@/ui/Icon";
@@ -44,8 +45,9 @@ export function MonthCard({
     ...Array.from({ length: count }, (_, i) => fromParts(month[0], month[1], i + 1)),
   ];
   while (cells.length % 7) cells.push(null);
-  const size = compact ? 32 : 40;
-  const navSize = compact ? 32 : 40;
+  const size = compact ? 32 : 44;
+  const phone = useIsPhone();
+  const navSize = compact ? 32 : phone ? 44 : 40;
   const nav = (label: string, onPress: () => void, child: React.ReactNode, wide?: boolean) => (
     <Press
       role="button"

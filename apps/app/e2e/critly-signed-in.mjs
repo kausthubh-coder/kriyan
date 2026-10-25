@@ -5,12 +5,13 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { expectCritly } from "@kausthubh/critly/playwright";
+import { op } from "./api.mjs";
 import { artifact, BASE, launch, settle, signedInContext } from "./lib.mjs";
 
 process.chdir(new URL("../../../", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"));
 
 const screens = [
-  { name: "today", go: (p) => p.goto(`${BASE}/today`) },
+  { name: "today", go: (p) => p.goto(`${BASE}/`) },
   { name: "review", go: (p) => p.goto(`${BASE}/review`) },
   { name: "upcoming", go: (p) => p.goto(`${BASE}/upcoming`) },
   { name: "inbox", go: (p) => p.goto(`${BASE}/inbox`) },
@@ -28,30 +29,69 @@ const screens = [
     },
   },
   {
-    name: "task panel",
+    // Phones open Joi's floating card on its own route; desktop shows it in Today's right panel.
+    name: "task sheet",
     go: async (p) => {
-      await p.goto(`${BASE}/today`);
-      await settle(p);
-      await p
-        .getByRole("button", { name: /^Open Run/ })
-        .first()
-        .click();
-      await p.waitForURL(/\/task\//);
+      await openTask(p);
     },
   },
   {
-    name: "repeat editor",
+    name: "edit and its repeat picker",
     go: async (p) => {
-      await p.goto(`${BASE}/today`);
+      await openTask(p);
+      await p.getByRole("button", { name: "Edit", exact: true }).click();
+      await p.getByRole("button", { name: /^Repeat/ }).click();
+    },
+  },
+  {
+    name: "routine sheet",
+    go: async (p) => {
+      await p.goto(`${BASE}/`);
       await settle(p);
       await p
-        .getByRole("button", { name: /^Open Run/ })
+        .getByRole("button", { name: /^Open Morning routine/ })
         .first()
         .click();
-      await p.waitForURL(/\/task\//);
-      await settle(p);
-      await p.getByRole("button", { name: /^Repeat:/ }).click();
     },
+  },
+  {
+    name: "fill",
+    go: async (p) => {
+      await p.goto(`${BASE}/`);
+      await settle(p);
+      await p
+        .getByRole("button", { name: /free\. Fill/ })
+        .first()
+        .click();
+      await p.getByRole("radio").first().click();
+    },
+  },
+  {
+    name: "summary",
+    go: async (p) => {
+      await p.goto(`${BASE}/`);
+      await settle(p);
+      await p.getByRole("button", { name: "Show the summary" }).click();
+    },
+  },
+  {
+    name: "month",
+    go: async (p) => {
+      await p.goto(`${BASE}/`);
+      await settle(p);
+      // Phones have the Month button; desktop shows the month in the right panel already.
+      if ((p.viewportSize()?.width ?? 0) < 760) await p.getByRole("button", { name: "Month" }).click();
+    },
+  },
+  {
+    name: "today as a list",
+    go: async (p) => {
+      await op("update_settings", { todayLayout: "list" });
+      await p.goto(`${BASE}/`);
+      await settle(p);
+      await p.getByLabel("Today's list").filter({ visible: true }).first().waitFor();
+    },
+    after: () => op("update_settings", { todayLayout: "blocks" }),
   },
   {
     name: "command menu",
@@ -71,6 +111,17 @@ const screens = [
     },
   },
 ];
+
+async function openTask(p) {
+  await p.goto(`${BASE}/`);
+  await settle(p);
+  await p
+    .getByRole("button", { name: /^Open Write MCP tools/ })
+    .first()
+    .click();
+  if ((p.viewportSize()?.width ?? 0) < 760) await p.waitForURL(/\/task\//);
+  else await p.getByRole("complementary", { name: "Details" }).waitFor();
+}
 
 const policy = JSON.parse(readFileSync(".critly/policy.json", "utf8"));
 delete policy.$schema;
@@ -138,7 +189,13 @@ for (const viewport of [
   for (const screen of screens) {
     const page = await ctx.newPage();
     page.setDefaultTimeout(60000);
-    await screen.go(page);
+    try {
+      await screen.go(page);
+    } catch (error) {
+      // Put back whatever the state changed (the list layout) before giving up.
+      await screen.after?.();
+      throw error;
+    }
     await settle(page);
     checks++;
     try {
@@ -153,6 +210,7 @@ for (const viewport of [
       failures++;
       console.log(`FAIL ${screen.name} ${viewport.width}\n${String(error.message).split("Fix the UI")[0]}`);
     }
+    await screen.after?.();
     await page.close();
   }
   await ctx.close();
