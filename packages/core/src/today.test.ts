@@ -85,6 +85,14 @@ describe("timeline", () => {
     );
   });
 
+  test("a morning routine set before Wake up comes first, so the times never run backwards", () => {
+    const out = timeline({ items: [routine], dayStart: at(8), dayEnd: at(22), reviewTime: null, now: null });
+    const times = out.flatMap((e) =>
+      e.kind === "anchor" ? [e.time] : e.kind === "gap" ? [] : [e.item.time],
+    );
+    expect(times).toEqual([at(7), at(8), at(22)]);
+  });
+
   test("blocks are sized by length with a floor", () => {
     expect(blockHeight(90)).toBe(95);
     expect(blockHeight(20)).toBe(58);

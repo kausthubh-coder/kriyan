@@ -72,8 +72,16 @@ const MIN_GAP = 15;
 const NOON = 12 * 60;
 const NIGHT = 21 * 60;
 
-/** The order on the day: time, but a morning routine right after Wake up and a night one right before Wind down. */
-function order(e: { time: number; anchor?: Anchor; routine?: "morning" | "night" }): number {
+/**
+ * The order on the day: time, but a morning routine right after Wake up and a night one right
+ * before Wind down. A routine set earlier than Wake up keeps its place before it, so the times
+ * down the side never run backwards.
+ */
+function order(
+  e: { time: number; anchor?: Anchor; routine?: "morning" | "night" },
+  dayStart: number,
+): number {
+  if (e.routine === "morning" && e.time < dayStart) return -3;
   if (e.anchor === "wake") return -2;
   if (e.routine === "morning") return -1;
   if (e.anchor === "wind") return 1e6 + 1;
@@ -106,7 +114,10 @@ export function timeline({ items, dayStart, dayEnd, reviewTime, now }: TimelineI
           : {}),
       })),
   ];
-  entries.sort((a, b) => order(a) - order(b) || (a.item?.title ?? "").localeCompare(b.item?.title ?? ""));
+  entries.sort(
+    (a, b) =>
+      order(a, dayStart) - order(b, dayStart) || (a.item?.title ?? "").localeCompare(b.item?.title ?? ""),
+  );
   const out: TimelineEntry[] = [];
   let cursor = dayStart;
   const gap = (from: number, to: number) => {
