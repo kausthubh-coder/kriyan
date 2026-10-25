@@ -22,12 +22,14 @@ const browser = await launch();
   const ctx = await signedInContext(browser, { width: 1440, height: 900 });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
-  await page.goto(`${BASE}/today`);
+  await page.goto(`${BASE}/`);
   await settle(page);
+  const box = (name) => page.getByRole("checkbox", { name }).filter({ visible: true });
 
-  // A toast's 5 seconds stop while the pointer is on it.
-  await page.getByRole("checkbox", { name: "Complete: Book the dentist" }).click();
-  const ticked = page.getByRole("status").filter({ hasText: "Done: Book the dentist" });
+  // A toast's 5 seconds stop while the pointer is on it. (On v5's blocks, timed tasks carry
+  // their checkbox; "Book the dentist" has no time and waits in To fit in.)
+  await box("Complete: Write MCP tools").click();
+  const ticked = page.getByRole("status").filter({ hasText: "Done: Write MCP tools" });
   await ticked.waitFor();
   await ticked.hover();
   await page.waitForTimeout(6500);
@@ -38,14 +40,18 @@ const browser = await launch();
   check(!(await ticked.isVisible()), "1440: it goes within 6 s of the pointer leaving");
 
   // Ctrl+Z runs the newest Undo, with focus nowhere near the toast.
-  await page.getByRole("checkbox", { name: "Complete: Write MCP tools" }).click();
-  await page.getByRole("status").filter({ hasText: "Done: Write MCP tools" }).waitFor();
+  const study = (await op("get_today")).scheduled.find((t) => t.prepFor)?.title ?? "Write MCP tools";
+  await box(`Complete: ${study}`).click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: `Done: ${study}` })
+    .waitFor();
   await page.waitForTimeout(1500); // past the 900 ms before the tick is sent
   // Focus is on the checkbox just ticked, not in a text field, where Ctrl+Z stays the browser's.
   await page.keyboard.press("Control+z");
   await page.waitForTimeout(1500);
-  const mcp = await taskOnToday("Write MCP tools");
-  check(mcp && !mcp.done, "1440: Ctrl+Z took the tick on Write MCP tools back (get_today shows it open)");
+  const back = await taskOnToday(study);
+  check(back && !back.done, `1440: Ctrl+Z took the tick on ${study} back (get_today shows it open)`);
 
   // A delete with no toast to undo (an agent's) comes back from Recently deleted.
   const reading = await taskOnToday("Read chapter 7.4");

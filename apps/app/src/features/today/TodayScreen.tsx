@@ -29,7 +29,7 @@ import { Blocks, type BlockHandlers } from "./Blocks";
 import { FillCard, HabitCard, ItemCard, RoutineCard, type FillCandidate } from "./Cards";
 import { Curtain, Sentence } from "./Curtain";
 import { DayList } from "./DayList";
-import { MENU_ROUTE, SETTINGS_ROUTE, tickRoutinePart } from "./links";
+import { MENU_ROUTE, SETTINGS_ROUTE, tickRoutineAll, tickRoutinePart } from "./links";
 import { MonthCard } from "./MonthCard";
 import { FloatCard, T } from "./parts";
 import { FitIn, Top } from "./Top";
@@ -103,7 +103,7 @@ export function TodayScreen() {
   const content =
     data && handlers ? (
       <>
-        <FitIn chips={data.chips} onPick={fitPick} />
+        <FitIn chips={data.chips} onPick={fitPick} onOpen={handlers.open} />
         {data.settings.todayLayout === "list" ? (
           <View style={{ marginTop: s.s3 }}>
             <DayList day={data} on={handlers} />
@@ -531,7 +531,7 @@ function RightPanel({
   );
 }
 
-/** Desktop keys on Today: ← and → change the day, T back to today, E edits, X ticks a habit. */
+/** Desktop keys on Today: ← and → change the day, T back to today, E edits, X finishes a habit or a routine. */
 function useDesktopKeys(active: boolean, day: string, setDay: (d: string) => void, data: Day | undefined) {
   const ref = useRef({ day, data });
   useEffect(() => {
@@ -556,6 +556,7 @@ function useDesktopKeys(active: boolean, day: string, setDay: (d: string) => voi
         } else if ((e.key === "x" || e.key === "X") && selected) {
           const src = now?.sources.get(selected);
           if (src?.type === "habit") void checkHabit(src.habit, d, !src.habit.doneToday);
+          else if (src?.type === "routine") void tickRoutineAll(src.routine, d, !src.routine.done);
           // Tasks: the shell's X ticks the selected row.
           else if (
             src?.type === "task" &&

@@ -1,10 +1,12 @@
 // Walks the main flows on the desktop web app the way a person would and checks what lands
-// on screen: space colours, a habit, a goal, complete and undo, delete and undo, drag onto the
-// timeline, resize, the command menu, keyboard shortcuts, a note with the slash menu, tokens.
+// on screen: space colours, a habit, a goal, complete and undo, Fill a free stretch, a block's
+// time and length, remove and undo, the command menu, keyboard shortcuts, a note with the
+// slash menu, tokens.
 //   node apps/app/e2e/seed.mjs && node apps/app/e2e/walkthrough.mjs
 
 import { addDays, todayIn } from "@kriyan/core/dates";
 import { formatDay } from "@kriyan/core/format";
+import { op } from "./api.mjs";
 import { BASE, artifact, launch, settle, signedInContext } from "./lib.mjs";
 
 // Starts from `node apps/app/e2e/seed.mjs`: "Run" repeats every 2 days after it's done.
@@ -62,18 +64,27 @@ await step("add a habit from Progress and check it on Today", async () => {
     await page.getByRole("button", { name: "Add habit", exact: true }).last().click();
     await page.getByText("Read 20 min", { exact: true }).filter({ visible: true }).first().waitFor();
   }
-  await page.goto(`${BASE}/today`);
+  await page.goto(`${BASE}/`);
   await settle(page);
-  const habit = page.getByRole("switch", { name: /^Read 20 min/ });
+  // v5: a habit with no time of its own is a thin row with a dashed box, before the night routine.
+  const habit = page.getByRole("checkbox", { name: /: Read 20 min$/ }).filter({ visible: true });
   const before = await habit.getAttribute("aria-checked");
   await habit.click();
   await page.waitForFunction(
     (b) =>
-      document.querySelector('[role="switch"][aria-label^="Read 20 min"]')?.getAttribute("aria-checked") !==
-      b,
+      [...document.querySelectorAll('[role="checkbox"]')]
+        .find((e) => /: Read 20 min$/.test(e.getAttribute("aria-label") ?? "") && e.offsetParent)
+        ?.getAttribute("aria-checked") !== b,
     before,
   );
 });
+
+// Desktop Today selects a row and shows it in the right panel; Edit opens over the page.
+const panel = page.getByRole("complementary", { name: "Details" });
+const openRow = async (name) => {
+  await page.getByRole("button", { name }).filter({ visible: true }).first().click();
+  await panel.waitFor();
+};
 
 await step("add a goal from Progress and link a task to it", async () => {
   await page.goto(`${BASE}/progress`);
@@ -88,107 +99,118 @@ await step("add a goal from Progress and link a task to it", async () => {
     await page.getByRole("button", { name: "Add goal", exact: true }).last().click();
     await page.getByText("Launch Kriyan by 1 Nov", { exact: true }).waitFor();
   }
-  await page.goto(`${BASE}/today`);
+  await page.goto(`${BASE}/`);
   await settle(page);
-  // After 11:00 the 10:00 block sits behind the "Earlier today" fold.
-  if (await page.getByRole("button", { name: /^Earlier today/ }).count())
-    await page.getByRole("button", { name: /^Earlier today/ }).click();
+  await openRow(/^Open Write MCP tools/);
+  await panel.getByRole("button", { name: "Edit", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit Write MCP tools" });
+  await edit.getByRole("button", { name: /^Goal/ }).click();
   await page
-    .getByRole("button", { name: /^Open Write MCP tools/ })
-    .first()
+    .getByRole("dialog", { name: "Goal" })
+    .getByRole("radio", { name: "Launch Kriyan by 1 Nov" })
     .click();
-  await page.getByRole("button", { name: /^Goal:/ }).click();
-  await page.getByRole("menuitem", { name: "Launch Kriyan by 1 Nov" }).first().click();
-  await page.getByRole("button", { name: "Goal: Launch Kriyan by 1 Nov" }).waitFor();
-  await page.keyboard.press("Escape");
+  await edit.getByRole("button", { name: "Goal: Launch Kriyan by 1 Nov" }).waitFor();
+  await edit.getByRole("button", { name: "Done", exact: true }).first().click();
+  // The panel says what it counts toward.
+  await panel.getByText("Launch Kriyan by 1 Nov").waitFor();
 });
 
 await step(
   "tick a repeating task: it shows done at once, the toast names the next date, Undo brings it back",
   async () => {
-    await page.goto(`${BASE}/today`);
+    // "Run" has no time, so blocks offer it in To fit in; the list layout has its checkbox.
+    await op("update_settings", { todayLayout: "list" });
+    await page.goto(`${BASE}/`);
     await settle(page);
-    await page.getByRole("checkbox", { name: "Complete: Run" }).click();
-    await page.getByRole("checkbox", { name: "Mark not done: Run" }).first().waitFor({ timeout: 1000 });
+    await page.getByRole("checkbox", { name: "Complete: Run" }).filter({ visible: true }).click();
+    await page
+      .getByRole("checkbox", { name: "Mark not done: Run" })
+      .filter({ visible: true })
+      .first()
+      .waitFor({ timeout: 1000 });
     await toast("Done: Run");
     await toast(`Next: ${formatDay(addDays(today, 2), today)}`);
     await page.screenshot({ path: artifact("flow-complete-toast-1440.png") });
     await page.getByRole("button", { name: "Undo" }).click();
-    await page.getByRole("checkbox", { name: "Complete: Run" }).waitFor();
+    await page.getByRole("checkbox", { name: "Complete: Run" }).filter({ visible: true }).waitFor();
   },
 );
 
 await step("tick and untick before the row moves (Undo during the moment it stays)", async () => {
-  await page.getByRole("checkbox", { name: "Complete: Book the dentist" }).click();
+  await page.getByRole("checkbox", { name: "Complete: Book the dentist" }).filter({ visible: true }).click();
   await page.getByRole("button", { name: "Undo" }).first().click();
   await page.waitForTimeout(1500);
-  await page.getByRole("checkbox", { name: "Complete: Book the dentist" }).waitFor();
+  await page
+    .getByRole("checkbox", { name: "Complete: Book the dentist" })
+    .filter({ visible: true })
+    .waitFor();
+  await op("update_settings", { todayLayout: "blocks" });
 });
 
-const dragTitle = `Pack the gym bag ${new Date().getMinutes()}${new Date().getSeconds()}`;
-// The timeline hides an hour's label within 20 minutes of now, so drop on one far from now.
-const dropAt =
-  Math.abs(new Date().getHours() * 60 + new Date().getMinutes() - 18 * 60) <= 30 ? "14:00" : "18:00";
-await step("drag an anytime task onto the timeline at a 15-minute step", async () => {
-  await page.goto(`${BASE}/today`);
+const fillTitle = `Pack the gym bag ${new Date().getMinutes()}${new Date().getSeconds()}`;
+await step("Fill: a free stretch takes a new task with the length picked, Undo puts it back", async () => {
+  await page.goto(`${BASE}/`);
   await settle(page);
   // A fresh task from Today's field (no date typed, so it lands on today with no time).
-  await page.getByRole("textbox", { name: "Add a task" }).fill(dragTitle);
+  await page.getByRole("textbox", { name: "Add a task" }).fill(fillTitle);
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: `Open ${dragTitle}` }).waitFor();
-  if (await page.getByRole("button", { name: /^Earlier today/ }).count())
-    await page.getByRole("button", { name: /^Earlier today/ }).click();
-  const row = page.getByRole("button", { name: `Open ${dragTitle}` });
-  const box = await row.boundingBox();
-  const timeline = page.getByLabel("Schedule");
-  await timeline.scrollIntoViewIfNeeded();
-  const t = await timeline.boundingBox();
-  if (!box || !t) throw new Error("no boxes");
-  await row.scrollIntoViewIfNeeded();
-  const b2 = await row.boundingBox();
-  await page.mouse.move(b2.x + 20, b2.y + 10);
-  await page.mouse.down();
-  await page.mouse.move(b2.x + 30, b2.y + 30, { steps: 4 });
-  await timeline.scrollIntoViewIfNeeded();
-  const t2 = await timeline.boundingBox();
-  const label = page.getByLabel("Schedule").getByText(dropAt, { exact: true });
-  const lb = await label.boundingBox();
-  await page.mouse.move(t2.x + 300, lb.y + 8 + 2, { steps: 8 });
-  await page.screenshot({ path: artifact("flow-drag-1440.png") });
-  await page.mouse.up();
-  await page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}, ${dropAt}`) }).waitFor();
+  await page.getByRole("button", { name: `Fit in ${fillTitle}, any time` }).waitFor();
+  await page.getByRole("button", { name: `Fit in ${fillTitle}, any time` }).click();
+  const fill = page.getByRole("dialog", { name: "Fill free time" });
+  await fill.waitFor();
+  // The task is picked already; Kriyan never guesses how long, so the button waits for a length.
+  await fill.getByRole("button", { name: "Pick how long" }).waitFor();
+  await fill.getByRole("radio", { name: "30 min", exact: true }).click();
+  const put = fill.getByRole("button", { name: /^Put it at \d\d:\d\d–\d\d:\d\d$/ });
+  const label = (await put.getAttribute("aria-label")) ?? "";
+  const range = label.replace("Put it at ", "");
+  await page.screenshot({ path: artifact("flow-fill-1440.png") });
+  await put.click();
+  await toast(`${fillTitle}, ${range}`);
+  await page.getByRole("button", { name: `Open ${fillTitle}, ${range}` }).waitFor();
+  await page.getByRole("status").filter({ hasText: fillTitle }).getByRole("button", { name: "Undo" }).click();
+  await page.getByRole("button", { name: `Fit in ${fillTitle}, any time` }).waitFor();
+  // Put it back for the next step.
+  await page.getByRole("button", { name: `Fit in ${fillTitle}, any time` }).click();
+  await fill.getByRole("radio", { name: "30 min", exact: true }).click();
+  await fill.getByRole("button", { name: /^Put it at / }).click();
+  await page.getByRole("button", { name: new RegExp(`^Open ${fillTitle}, `) }).waitFor();
 });
 
-await step("resize a block by its bottom edge to set a length", async () => {
-  const block = page.getByRole("button", { name: new RegExp(`^Open ${dragTitle}, ${dropAt}`) });
-  const before = await block.getAttribute("aria-label");
-  const b = await block.boundingBox();
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height + 1);
-  await page.mouse.down();
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height + 30, { steps: 6 });
-  await page.mouse.up();
-  // 30px down is 30 minutes longer at 56px an hour.
+await step("a block's time and length: Edit makes it 30 minutes longer", async () => {
+  await openRow(new RegExp(`^Open ${fillTitle}, `));
+  const before = await page
+    .getByRole("button", { name: new RegExp(`^Open ${fillTitle}, `) })
+    .getAttribute("aria-label");
+  await panel.getByRole("button", { name: "Edit", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: `Edit ${fillTitle}` });
+  await edit.getByRole("button", { name: /^Time and length/ }).click();
+  const picker = page.getByRole("dialog", { name: "Time and length" });
+  await picker.getByRole("radio", { name: "1 h", exact: true }).click();
+  await picker.getByText(/^Ends \d\d:\d\d\. Kriyan never guesses a length\.$/).waitFor();
+  await page.keyboard.press("Escape");
+  await edit.getByRole("button", { name: "Done", exact: true }).first().click();
   await page.waitForFunction(
     ([b, prefix]) =>
       [...document.querySelectorAll("[aria-label]")].some(
         (e) => (e.getAttribute("aria-label") ?? "").startsWith(prefix) && e.getAttribute("aria-label") !== b,
       ),
-    [before, `Open ${dragTitle}, ${dropAt}–`],
+    [before, `Open ${fillTitle}, `],
   );
-  console.log(`     ${before} -> ${await block.getAttribute("aria-label")}`);
+  console.log(`     ${before} -> 1 h`);
 });
 
-await step("delete from the panel, then Undo restores it", async () => {
+await step("remove from the panel, then Undo restores it", async () => {
+  await openRow(new RegExp(`^Open ${fillTitle}`));
+  await panel.getByRole("button", { name: "Remove", exact: true }).click();
+  await toast(`Deleted: ${fillTitle}`);
   await page
-    .getByRole("button", { name: new RegExp(`^Open ${dragTitle}`) })
-    .first()
+    .getByRole("status")
+    .filter({ hasText: `Deleted: ${fillTitle}` })
+    .getByRole("button", { name: "Undo" })
     .click();
-  await page.getByRole("button", { name: "More" }).click();
-  await page.getByRole("menuitem", { name: "Delete task" }).click();
-  await toast(`Deleted: ${dragTitle}`);
-  await page.getByRole("button", { name: "Undo" }).click();
   await page
-    .getByRole("button", { name: new RegExp(`^Open ${dragTitle}`) })
+    .getByRole("button", { name: new RegExp(`^Open ${fillTitle}`) })
     .first()
     .waitFor();
 });
@@ -206,7 +228,7 @@ await step("command menu adds a task from one sentence", async () => {
 });
 
 await step("keyboard: J selects, X completes, Undo, T and U navigate", async () => {
-  await page.goto(`${BASE}/today`);
+  await page.goto(`${BASE}/`);
   await settle(page);
   await page.locator("body").click({ position: { x: 1300, y: 600 } });
   await page.keyboard.press("j");
@@ -219,7 +241,12 @@ await step("keyboard: J selects, X completes, Undo, T and U navigate", async () 
   );
   if (selected < 1) throw new Error("nothing selected");
   await page.keyboard.press("x");
-  await toast("Done:");
+  // X finishes what's selected: a task ("Done: …") or a whole routine ("…, all done").
+  await page
+    .getByRole("status")
+    .filter({ hasText: /Done:|all done/ })
+    .first()
+    .waitFor();
   await page.getByRole("button", { name: "Undo" }).first().click();
   await page.keyboard.press("u");
   await page.waitForURL(/\/upcoming/);
@@ -270,7 +297,7 @@ await step("settings: create a token, see it once, revoke it", async () => {
   await toast("Revoked Walkthrough CLI");
 });
 
-await page.goto(`${BASE}/today`);
+await page.goto(`${BASE}/`);
 await settle(page);
 await page.screenshot({ path: artifact("today-after-walkthrough-1440.png"), fullPage: false });
 if (errors.length) console.log(`page errors:\n  ${[...new Set(errors)].join("\n  ")}`);

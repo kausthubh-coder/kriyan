@@ -1,10 +1,12 @@
-// Fixing a day that slipped, the way a person does it (after `seed.mjs`):
-//   desktop: hover a row, move it to tomorrow, Undo; pick a day from the row; close the day, Undo;
+// Fixing a day that slipped, the way a person does it on v5's Today (after `seed.mjs`). It
+// switches Today to the list layout (one line per item, where the swipes live) and back:
+//   desktop: select a row, Tomorrow in the right panel moves it, Undo; Edit's Day picker moves a
+//   task to another day; close the day from the command menu, Undo;
 //   phone: swipe left to see the actions, a long swipe left moves, a long swipe right ticks off.
 // Prints ok or FAIL per step and saves a screenshot of each state to .artifacts/app/.
 
 import { addDays } from "@kriyan/core/dates";
-import { formatDay } from "@kriyan/core/format";
+import { formatDate } from "@kriyan/core/format";
 import { BASE, artifact, launch, settle, signedInContext } from "./lib.mjs";
 import { op } from "./api.mjs";
 
@@ -23,56 +25,74 @@ const expectEq = (actual, expected, what) => {
     throw new Error(`${what}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 };
 const anytimeTitles = async () => (await op("get_today", {})).anytime.map((t) => t.title).sort();
+const dateOf = async (title) =>
+  JSON.stringify(await op("search_tasks", { text: title })).match(/"date":"(\d{4}-\d{2}-\d{2})"/)?.[1];
 
 const browser = await launch();
 const today = (await op("get_today", {})).date;
 const tomorrow = addDays(today, 1);
+await op("update_settings", { todayLayout: "list" });
 
 // Desktop.
 {
   const ctx = await signedInContext(browser, { width: 1440, height: 900 });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
-  await page.goto(`${BASE}/today`);
+  await page.goto(`${BASE}/`);
   await settle(page);
   const status = page.getByRole("status");
+  const row = (title) =>
+    page.getByRole("button", { name: `Open ${title}`, exact: true }).filter({ visible: true });
+  const panel = page.getByRole("complementary", { name: "Details" });
 
-  await step("hover a row: Tomorrow moves it, the toast names it, Undo brings it back", async () => {
-    await page.getByRole("button", { name: "Open Book the dentist" }).hover();
-    await page.screenshot({ path: artifact("fix-hover-1440.png") });
-    await page.getByRole("button", { name: "Tomorrow", exact: true }).click();
-    await status.filter({ hasText: "Moved to tomorrow: Book the dentist" }).waitFor();
-    await page.getByRole("button", { name: "Open Book the dentist" }).waitFor({ state: "detached" });
-    expectEq((await anytimeTitles()).includes("Book the dentist"), false, "after the move");
-    await status.filter({ hasText: "Book the dentist" }).getByRole("button", { name: "Undo" }).click();
-    await page.getByRole("button", { name: "Open Book the dentist" }).waitFor();
-    expectEq((await anytimeTitles()).includes("Book the dentist"), true, "after Undo");
-  });
+  await step(
+    "select a row: Tomorrow in the panel moves it, the toast names it, Undo brings it back",
+    async () => {
+      await row("Book the dentist").click();
+      await panel.waitFor();
+      await page.screenshot({ path: artifact("fix-panel-1440.png") });
+      await panel.getByRole("button", { name: "Tomorrow", exact: true }).click();
+      await status.filter({ hasText: "Moved to tomorrow: Book the dentist" }).waitFor();
+      await row("Book the dentist").waitFor({ state: "detached" });
+      expectEq((await anytimeTitles()).includes("Book the dentist"), false, "after the move");
+      await status.filter({ hasText: "Book the dentist" }).getByRole("button", { name: "Undo" }).click();
+      await row("Book the dentist").waitFor();
+      expectEq((await anytimeTitles()).includes("Book the dentist"), true, "after Undo");
+    },
+  );
 
-  await step("hover a row: Pick a day opens a calendar and moves it there", async () => {
-    await page.mouse.move(0, 0);
-    await page.getByRole("button", { name: "Open Run" }).hover();
-    await page.getByRole("button", { name: "Pick a day" }).click();
-    const dialog = page.getByRole("dialog", { name: "Move to a day" });
-    await dialog.waitFor();
-    await page.screenshot({ path: artifact("fix-pick-1440.png") });
+  await step("Edit's Day picker moves a task to another day", async () => {
     const target = addDays(today, 2);
-    await dialog
-      .getByRole("button", { name: formatDay(target, today), exact: true })
+    await row("Run").click();
+    await panel.getByRole("button", { name: "Edit", exact: true }).click();
+    const edit = page.getByRole("dialog", { name: "Edit Run" });
+    await edit.waitFor();
+    await edit.getByRole("button", { name: /^Day/ }).click();
+    const picker = page.getByRole("dialog", { name: "Day" });
+    await picker.waitFor();
+    await page.screenshot({ path: artifact("fix-pick-1440.png") });
+    await picker
+      .getByRole("button", { name: formatDate(target), exact: true })
       .first()
       .click();
-    // Mid-sentence "Tomorrow" is lower case in the toast.
-    const day = formatDay(target, today).replace(/^(Today|Tomorrow)$/, (w) => w.toLowerCase());
-    await status.filter({ hasText: `Moved to ${day}: Run` }).waitFor();
-    await status.filter({ hasText: "Run" }).getByRole("button", { name: "Undo" }).click();
-    await page.getByRole("button", { name: "Open Run" }).waitFor();
+    await page.waitForTimeout(800);
+    expectEq(await dateOf("Run"), target, "Run's day after the pick");
+    // Back to today the same way.
+    await edit.getByRole("button", { name: /^Day/ }).click();
+    await page
+      .getByRole("dialog", { name: "Day" })
+      .getByRole("button", { name: formatDate(today), exact: true })
+      .first()
+      .click();
+    await page.waitForTimeout(800);
+    expectEq(await dateOf("Run"), today, "Run's day after picking today");
+    await edit.getByRole("button", { name: "Done", exact: true }).first().click();
   });
 
   await step("close the day: everything open today goes to tomorrow, Undo puts it back", async () => {
-    // B2 replaced Today's "N still open today" row with the evening review; the one-step move
-    // lives in the command menu's Close the day.
-    await page.mouse.move(0, 0);
-    await page.screenshot({ path: artifact("fix-close-day-before-1440.png") });
+    // v5's evening review row leads to Review; the one-step move lives in the command menu.
+    await page.goto(`${BASE}/`);
+    await settle(page);
     await page.keyboard.press("Control+k");
     await page.keyboard.type("close the day");
     await page.getByRole("dialog", { name: "Command menu" }).getByText("Close the day").click();
@@ -84,10 +104,18 @@ const tomorrow = addDays(today, 1);
     const there = [...next.anytime, ...next.scheduled].map((t) => t.title);
     for (const title of ["Book the dentist", "Run", "Read chapter 7.4"])
       if (!there.includes(title)) throw new Error(`${title} is not on ${tomorrow}: ${there.join(", ")}`);
-    expectEq(await anytimeTitles(), [], "anytime after closing the day");
+    expectEq(
+      (await anytimeTitles()).filter((t) => !/savings/.test(t)),
+      [],
+      "anytime after closing the day",
+    );
     await moved.getByRole("button", { name: "Undo" }).click();
-    await page.getByRole("button", { name: "Open Run" }).waitFor();
-    expectEq(await anytimeTitles(), ["Book the dentist", "Run"], "anytime after Undo");
+    await row("Run").waitFor();
+    expectEq(
+      (await anytimeTitles()).filter((t) => !/savings/.test(t)),
+      ["Book the dentist", "Run"],
+      "anytime after Undo",
+    );
   });
 
   await step("the command menu has Close the day", async () => {
@@ -105,11 +133,13 @@ const tomorrow = addDays(today, 1);
   const ctx = await signedInContext(browser, { width: 390, height: 844 });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
-  await page.goto(`${BASE}/today`);
+  await page.goto(`${BASE}/`);
   await settle(page);
   const status = page.getByRole("status");
   const swipe = async (name, dx) => {
-    const box = await page.getByRole("button", { name: `Open ${name}` }).boundingBox();
+    const target = page.getByRole("button", { name: `Open ${name}`, exact: true }).filter({ visible: true });
+    await target.scrollIntoViewIfNeeded();
+    const box = await target.boundingBox();
     const y = box.y + box.height / 2;
     const x = dx < 0 ? 300 : 120;
     await page.mouse.move(x, y);
@@ -152,7 +182,10 @@ const tomorrow = addDays(today, 1);
     await release();
     await status.filter({ hasText: "Moved to tomorrow: Book the dentist" }).waitFor();
     await status.filter({ hasText: "Book the dentist" }).getByRole("button", { name: "Undo" }).click();
-    await page.getByRole("button", { name: "Open Book the dentist" }).waitFor();
+    await page
+      .getByRole("button", { name: "Open Book the dentist", exact: true })
+      .filter({ visible: true })
+      .waitFor();
   });
 
   await step("phone: a long swipe right ticks it off", async () => {
@@ -166,6 +199,7 @@ const tomorrow = addDays(today, 1);
   await ctx.close();
 }
 
+await op("update_settings", { todayLayout: "blocks" });
 await browser.close();
 console.log(`fix-the-day: ${failures.length} failing`);
 process.exit(failures.length ? 1 : 0);

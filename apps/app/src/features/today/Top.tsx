@@ -119,8 +119,17 @@ export function Top({
   );
 }
 
-/** "To fit in": one row of chips that scrolls sideways; a chip opens Fill for that task. */
-export function FitIn({ chips, onPick }: { chips: FitChip[]; onPick: (id: string) => void }) {
+/** "To fit in": one row of chips that scrolls sideways; a chip opens Fill for that task, a long press the task. */
+export function FitIn({
+  chips,
+  onPick,
+  onOpen,
+}: {
+  chips: FitChip[];
+  onPick: (id: string) => void;
+  /** A long press opens the task itself (to tick it off, edit or remove it). */
+  onOpen: (id: string) => void;
+}) {
   if (!chips.length) return null;
   return (
     <View
@@ -158,6 +167,7 @@ export function FitIn({ chips, onPick }: { chips: FitChip[]; onPick: (id: string
             role="button"
             accessibilityLabel={`Fit in ${item.title}, ${note}`}
             onPress={() => onPick(item.id)}
+            onLongPress={() => onOpen(item.id)}
             hoverBg={null}
             // A 32 chip in a 44 target.
             style={{ height: 44, justifyContent: "center" }}
