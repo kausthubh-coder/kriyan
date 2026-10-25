@@ -13,7 +13,7 @@ import {
   Repeat2,
   Sparkles,
   SquareCheck,
-  X,
+  Delete,
 } from "lucide-react-native";
 import type { Id } from "@kriyan/convex/dataModel";
 import { addDays, diffDays, formatClock, weekday } from "@kriyan/core/dates";
@@ -194,7 +194,7 @@ function TaskCardBody({
   } else if (yearly) {
     tiles = [
       { label: "Edit", icon: Pencil, onPress: onEdit },
-      { label: "Remove", icon: X, tone: "red", onPress: () => deleteTask(task, onClose) },
+      { label: "Remove", icon: Delete, tone: "red", onPress: () => deleteTask(task, onClose) },
     ];
     columns = 2;
   } else if (task.event) {
@@ -212,7 +212,7 @@ function TaskCardBody({
             },
           ]
         : []),
-      { label: "Remove", icon: X, tone: "red" as const, onPress: () => deleteTask(task, onClose) },
+      { label: "Remove", icon: Delete, tone: "red" as const, onPress: () => deleteTask(task, onClose) },
     ];
     columns = tiles.length;
   } else {
@@ -235,7 +235,7 @@ function TaskCardBody({
         onPress: () => (onClose(), void moveTasks([placement], target)),
       },
       { label: "Edit", icon: Pencil, onPress: onEdit },
-      { label: "Remove", icon: X, tone: "red", onPress: () => deleteTask(task, onClose) },
+      { label: "Remove", icon: Delete, tone: "red", onPress: () => deleteTask(task, onClose) },
     ];
   }
   if (panel) columns = 2;
@@ -424,7 +424,7 @@ export function HabitCard({
           { label: "Edit", icon: Pencil, onPress: () => (onClose(), router.push(GOALS_ROUTE)) },
           {
             label: "Remove",
-            icon: X,
+            icon: Delete,
             tone: "red",
             onPress: () => {
               onClose();
@@ -604,7 +604,7 @@ export function RoutineCard({
             onPress: () => (tickRoutineAll(routine, day, !routine.done), onClose()),
           },
           { label: "Edit", icon: Pencil, onPress: () => (onClose(), router.push(GOALS_ROUTE)) },
-          { label: "Remove", icon: X, tone: "red", onPress: () => (onClose(), removeRoutine(routine)) },
+          { label: "Remove", icon: Delete, tone: "red", onPress: () => (onClose(), removeRoutine(routine)) },
         ]}
       />
       <T s="body" tone="ink2" extra={{ marginTop: s.s4 }}>
