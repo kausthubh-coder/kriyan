@@ -73,7 +73,8 @@ export function Page({
         <View
           style={{
             paddingTop: insets.top + s.s2,
-            paddingHorizontal: s.s4,
+            // The round buttons' circles line up with the page's 24 edge; their 44 targets reach past it.
+            paddingHorizontal: s.s6,
             height: insets.top + s.s2 + sz.touch + s.s1,
             flexDirection: "row",
             alignItems: "center",
@@ -90,7 +91,7 @@ export function Page({
               </Txt>
             ) : null}
           </View>
-          <View style={{ marginLeft: "auto" }}>{right}</View>
+          <View style={{ marginLeft: "auto", marginRight: -2 }}>{right}</View>
         </View>
       ) : null}
       <ScrollView

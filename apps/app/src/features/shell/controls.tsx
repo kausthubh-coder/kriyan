@@ -222,12 +222,15 @@ export function StepperRow({
       >
         {text}
       </Txt>
-      <RoundButton
-        icon={Plus}
-        label={`${label} later`}
-        onPress={() => onChange(value + step)}
-        disabled={value + step > max}
-      />
+      {/* The circle, not its 44 target, ends on the row's right edge. */}
+      <View style={{ marginRight: -6 }}>
+        <RoundButton
+          icon={Plus}
+          label={`${label} later`}
+          onPress={() => onChange(value + step)}
+          disabled={value + step > max}
+        />
+      </View>
       <DottedRule width={2} />
     </View>
   );
