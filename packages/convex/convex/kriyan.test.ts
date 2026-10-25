@@ -2384,3 +2384,119 @@ describe("study sessions", () => {
     expect((await alice.query(api.views.task, { id: study }))?.prepFor).toBeUndefined();
   });
 });
+
+describe("agents plan routines, goals and study sessions", () => {
+  async function withToken(name = "Claude") {
+    const ctx = await setup();
+    const { token } = await ctx.alice.mutation(api.account.createToken, { name });
+    const call = async (op: string, body: unknown = {}) => {
+      const res = await ctx.t.fetch(`/api/v1/${op}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, body: (await res.json()) as { result?: any; error?: string } };
+    };
+    const ok = async (op: string, body: unknown = {}) => {
+      const reply = await call(op, body);
+      if (reply.status !== 200) throw new Error(`${op}: ${reply.status} ${reply.body.error}`);
+      return reply.body.result;
+    };
+    return { ...ctx, call, ok };
+  }
+
+  test("an agent builds a morning routine with habits that feed a goal, and ticks it", async () => {
+    const { alice, ok, call, today } = await withToken();
+    const { goalId } = await ok("add_goal", { title: "Lose 5 kg", kind: "number", target: 5, unit: "kg" });
+    const { habitId: gym } = await ok("add_habit", { title: "Gym", target: 4, goalId });
+    const { habitId: meditate } = await ok("add_habit", { title: "Meditate", target: 7 });
+    const { routineId } = await ok("add_routine", {
+      title: "Morning routine",
+      time: 420,
+      parts: [
+        { title: "Brush teeth", length: 5 },
+        { title: "Meditate", length: 10, habitId: meditate },
+        { title: "Gym", length: 45, habitId: gym, weekdays: [0, 2, 4, 5] },
+      ],
+    });
+    expect((await ok("list_routines")).routines).toEqual([
+      {
+        _id: routineId,
+        title: "Morning routine",
+        spaceId: null,
+        time: 420,
+        parts: [
+          { index: 0, title: "Brush teeth", length: 5, habitId: null, weekdays: null },
+          { index: 1, title: "Meditate", length: 10, habitId: meditate, weekdays: null },
+          { index: 2, title: "Gym", length: 45, habitId: gym, weekdays: [0, 2, 4, 5] },
+        ],
+      },
+    ]);
+    const ticked = await ok("tick_routine", { routineId, index: 1, done: true });
+    expect([ticked.date, ticked.done, ticked.parts.map((p: { done: boolean }) => p.done)]).toEqual([
+      today,
+      false,
+      [false, true],
+    ]);
+    const all = await ok("tick_routine", { routineId, done: true });
+    expect([all.done, all.streak]).toEqual([true, 1]);
+    const day = await ok("get_today");
+    expect([day.routines[0].done, day.habits]).toEqual([true, []]);
+    const [goal] = await alice.query(api.views.goals, { today });
+    expect(goal!.feeds).toEqual({ habits: ["Gym"], tasks: 0 });
+
+    await ok("update_routine", { routineId, title: "Mornings", time: 435 });
+    expect((await call("tick_routine", { routineId, index: 2, done: true })).body).toEqual({
+      error: "Gym isn't part of Mornings on that day.",
+    });
+    await ok("update_habit", { habitId: gym, goalId: null });
+    await ok("delete_routine", { routineId });
+    expect((await ok("get_today")).habits.map((h: { title: string }) => h.title)).toEqual([
+      "Gym",
+      "Meditate",
+    ]);
+    const actions = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(actions.slice(0, 5).map((a) => [a.agent, a.kind, a.title, a.undoable])).toEqual([
+      ["Claude", "other", "Archived routine Mornings", false],
+      ["Claude", "other", "Habit Gym", false],
+      ["Claude", "other", "Routine Mornings", false],
+      ["Claude", "other", "Ticked Morning routine", false],
+      ["Claude", "other", "Ticked Meditate in Morning routine", false],
+    ]);
+  });
+
+  test("an agent logs a money goal and links a study session to its exam", async () => {
+    const { ok, call, today } = await withToken();
+    const { goalId } = await ok("add_goal", {
+      title: "Save $2,000",
+      kind: "number",
+      target: 2000,
+      unit: "$",
+    });
+    await ok("log_goal", { goalId, value: 900, date: "2026-10-01" });
+    expect(await ok("log_goal", { goalId, value: 1240 })).toEqual({ goalId, current: 1240 });
+    const progress = await ok("get_progress");
+    expect(progress.goals[0].entries).toEqual([
+      { date: "2026-10-01", value: 900 },
+      { date: today, value: 1240 },
+    ]);
+    expect((await call("log_goal", { goalId, value: 50, date: "2026-10-20" })).status).toBe(400);
+
+    const { taskId: exam } = await ok("add_task", {
+      title: "CSC 316 exam 2",
+      date: "2026-10-20",
+      event: true,
+    });
+    const { task } = await ok("add_task", {
+      text: "Study for CSC 316 exam 2 every day 8:30 for 1h30",
+      prepFor: exam,
+    });
+    expect(task.prepFor).toEqual({ title: "CSC 316 exam 2", date: "2026-10-20", daysLeft: 7 });
+    const batch = await ok("update_tasks", { updates: [{ taskId: task._id, prepFor: "not-an-id" }] });
+    expect(batch.results[0]).toEqual({
+      index: 0,
+      ok: false,
+      error: "That task to prepare for doesn't exist or isn't yours.",
+    });
+  });
+});

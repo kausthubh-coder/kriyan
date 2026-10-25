@@ -113,6 +113,11 @@ const taskFields: Record<string, Schema> = {
     description: "True for something attended (a class, a meeting) rather than ticked off.",
   },
   goalId: id("goal"),
+  prepFor: {
+    type: "string",
+    description:
+      "The id of the test or deadline this task prepares for, like a daily study session before an exam event. Its view then says the test and how many days are left.",
+  },
   externalId: {
     type: "string",
     maxLength: 200,
@@ -364,12 +369,14 @@ const BASE_OPS: OpSpec[] = [
     name: "add_habit",
     title: "Add a habit",
     kind: "write",
-    description: "Add a habit with a weekly target (1 to 7 times a week).",
+    description:
+      "Add a habit with a weekly target (1 to 7 times a week), optionally feeding a goal (goalId). To do it as part of a routine, add it here, then put its id on the routine's part.",
     input: obj(
       {
         title: { type: "string" },
         target: { type: "integer", minimum: 1, maximum: 7 },
         spaceId: id("space"),
+        goalId: id("goal it feeds"),
       },
       ["title", "target"],
     ),
@@ -659,13 +666,15 @@ const BULK_OPS: OpSpec[] = [
     kind: "write",
     destructive: true,
     idempotent: true,
-    description: "Rename a habit, change its weekly target (1 to 7) or its space (null for none).",
+    description:
+      "Rename a habit, change its weekly target (1 to 7), its space or the goal it feeds (goalId; null for none).",
     input: obj(
       {
         habitId: id("habit"),
         title: { type: "string" },
         target: { type: "integer", minimum: 1, maximum: 7 },
         spaceId: nullable(id("space")),
+        goalId: nullable(id("goal it feeds")),
       },
       ["habitId"],
     ),
@@ -729,7 +738,135 @@ const BULK_OPS: OpSpec[] = [
   },
 ];
 
-export const OPS: OpSpec[] = [...BASE_OPS, ...BULK_OPS].map(named);
+const routinePart: Schema = obj(
+  {
+    title: { type: "string", maxLength: 200 },
+    length: {
+      type: "integer",
+      minimum: 1,
+      maximum: 1440,
+      description: "Minutes. Leave it out unless the person said how long; never guess.",
+    },
+    habitId: {
+      type: "string",
+      description:
+        "A habit this part is (Meditate, Gym): ticking the part checks the habit. A habit can be in one routine.",
+    },
+    weekdays: {
+      type: "array",
+      minItems: 1,
+      items: { type: "integer", minimum: 0, maximum: 6 },
+      description: "The days it runs, 0 Monday to 6 Sunday. Leave it out for every day.",
+    },
+  },
+  ["title"],
+);
+
+const routineParts: Schema = {
+  type: "array",
+  minItems: 1,
+  maxItems: 30,
+  description:
+    "The parts in order, like [{title:'Brush teeth',length:5},{title:'Gym',length:45,habitId:'...',weekdays:[0,2,4,5]}]. Send the whole list; it replaces the old one. Ticks are kept by a part's place, so add new parts at the end.",
+  items: routinePart,
+};
+
+/** Routines (a morning routine of small parts) and goal logging, from design v5. */
+const ROUTINE_OPS: OpSpec[] = [
+  {
+    name: "list_routines",
+    title: "List routines",
+    kind: "read",
+    description:
+      "List the person's routines with every part (each with its index, length, habit and weekdays). get_today shows the day's routines with only that day's parts, what's ticked and the streak.",
+    input: obj({}),
+  },
+  {
+    name: "add_routine",
+    title: "Add a routine",
+    kind: "write",
+    description:
+      "Add a routine: one block of small parts done in a row at a time of day, like a morning routine at 07:00. Morning routines sit right after Wake up on Today, night routines right before Wind down.",
+    input: obj(
+      {
+        title: { type: "string" },
+        time: minutes("When it starts"),
+        parts: routineParts,
+        spaceId: id("space"),
+      },
+      ["title", "time", "parts"],
+    ),
+  },
+  {
+    name: "update_routine",
+    title: "Change a routine",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description: "Rename a routine, move its time, change its space (null for none) or replace its parts.",
+    input: obj(
+      {
+        routineId: id("routine"),
+        title: { type: "string" },
+        time: minutes("When it starts"),
+        parts: routineParts,
+        spaceId: nullable(id("space")),
+      },
+      ["routineId"],
+    ),
+  },
+  {
+    name: "delete_routine",
+    title: "Archive a routine",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Archive a routine: it leaves Today. Its habits stay and show on their own again; their history stays.",
+    input: obj({ routineId: id("routine") }, ["routineId"]),
+  },
+  {
+    name: "tick_routine",
+    title: "Tick a routine",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Tick one part of a routine on a day (today by default), or every part that runs that day when index is left out. done false takes ticks back. A part that's a habit checks or unchecks the habit too.",
+    input: obj(
+      {
+        routineId: id("routine"),
+        index: {
+          type: "integer",
+          minimum: 0,
+          description: "The part's index, from list_routines or get_today.",
+        },
+        done: { type: "boolean" },
+        date,
+      },
+      ["routineId", "done"],
+    ),
+  },
+  {
+    name: "log_goal",
+    title: "Log a goal",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Log where a number goal stands now ($1,240 saved, 1.4 kg lost): value is the new total, not a change. It becomes the goal's current value and an entry on its trend line, one per day (a second log that day replaces the first). Pass an earlier date to fill in history. A tasks goal counts its linked tasks instead.",
+    input: obj(
+      {
+        goalId: id("goal"),
+        value: { type: "number", minimum: 0 },
+        date: { ...date, description: "Today by default." },
+      },
+      ["goalId", "value"],
+    ),
+  },
+];
+
+export const OPS: OpSpec[] = [...BASE_OPS, ...BULK_OPS, ...ROUTINE_OPS].map(named);
 
 export function findOp(name: string): OpSpec | undefined {
   return OPS.find((op) => op.name === name);

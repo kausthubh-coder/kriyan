@@ -13,12 +13,13 @@ import * as Asks from "./model/asks";
 import * as Activity from "./model/activity";
 import { getProfile, owned } from "./model/owner";
 import * as Profile from "./model/profile";
+import * as Routines from "./model/routines";
 import * as Progress from "./model/progress";
 import * as Search from "./model/search";
 import * as Spaces from "./model/spaces";
 import * as Tasks from "./model/tasks";
 import * as Views from "./model/views";
-import { colorV, earlierWindowV, reminderV, repeatV, stepV, todayLayoutV } from "./validators";
+import { colorV, earlierWindowV, reminderV, repeatV, routinePartV, stepV, todayLayoutV } from "./validators";
 
 const owner = { ownerId: v.string() };
 /** Writes: the owner and the agent's name, both from the HTTP layer. */
@@ -302,7 +303,13 @@ export const update_space = internalMutation({
 });
 
 export const add_habit = internalMutation({
-  args: { ...writer, title: v.string(), target: v.number(), spaceId: v.optional(v.id("spaces")) },
+  args: {
+    ...writer,
+    title: v.string(),
+    target: v.number(),
+    spaceId: v.optional(v.id("spaces")),
+    goalId: v.optional(v.id("goals")),
+  },
   handler: async (ctx, { ownerId, agent, ...input }) => {
     const habitId = await Progress.createHabit(ctx, ownerId, input);
     await Activity.record(ctx, ownerId, agent, { kind: "other", title: `New habit ${input.title.trim()}` });
@@ -703,9 +710,9 @@ export const update_habit = internalMutation({
     title: v.optional(v.string()),
     target: v.optional(v.number()),
     spaceId: nullable(v.id("spaces")),
+    goalId: nullable(v.id("goals")),
   },
   handler: async (ctx, { ownerId, agent, habitId, ...patch }) => {
-    if (patch.spaceId) owned(await ctx.db.get(patch.spaceId), ownerId, "space");
     await Progress.updateHabit(ctx, ownerId, habitId, patch);
     const habit = owned(await ctx.db.get(habitId), ownerId, "habit");
     await Activity.record(ctx, ownerId, agent, { kind: "other", title: `Habit ${habit.title}` });
@@ -783,5 +790,99 @@ export const update_settings = internalMutation({
     await Profile.updateSettings(ctx, ownerId, patch);
     await Activity.record(ctx, ownerId, agent, { kind: "other", title: "Changed settings" });
     return { settings: await Profile.settingsView(ctx, ownerId) };
+  },
+});
+
+// Routines and goal logs. Like habits and goals, they're listed for the person as "other"
+// changes, which Undo in the app doesn't take back.
+
+export const list_routines = internalQuery({
+  args: read,
+  handler: async (ctx, { ownerId }) => ({ routines: await Routines.routineList(ctx, ownerId) }),
+});
+
+export const add_routine = internalMutation({
+  args: {
+    ...writer,
+    title: v.string(),
+    time: v.number(),
+    parts: v.array(routinePartV),
+    spaceId: v.optional(v.id("spaces")),
+  },
+  handler: async (ctx, { ownerId, agent, ...input }) => {
+    const routineId = await Routines.createRoutine(ctx, ownerId, input);
+    await Activity.record(ctx, ownerId, agent, { kind: "other", title: `New routine ${input.title.trim()}` });
+    return { routineId };
+  },
+});
+
+export const update_routine = internalMutation({
+  args: {
+    ...writer,
+    routineId: v.id("routines"),
+    title: v.optional(v.string()),
+    time: v.optional(v.number()),
+    parts: v.optional(v.array(routinePartV)),
+    spaceId: nullable(v.id("spaces")),
+  },
+  handler: async (ctx, { ownerId, agent, routineId, ...patch }) => {
+    await Routines.updateRoutine(ctx, ownerId, routineId, patch);
+    const routine = owned(await ctx.db.get(routineId), ownerId, "routine");
+    await Activity.record(ctx, ownerId, agent, { kind: "other", title: `Routine ${routine.title}` });
+    return { routineId };
+  },
+});
+
+export const delete_routine = internalMutation({
+  args: { ...writer, routineId: v.id("routines") },
+  handler: async (ctx, { ownerId, agent, routineId }) => {
+    await Routines.archiveRoutine(ctx, ownerId, routineId);
+    const routine = owned(await ctx.db.get(routineId), ownerId, "routine");
+    await Activity.record(ctx, ownerId, agent, { kind: "other", title: `Archived routine ${routine.title}` });
+    return { routineId, archived: true };
+  },
+});
+
+export const tick_routine = internalMutation({
+  args: {
+    ...writer,
+    routineId: v.id("routines"),
+    index: v.optional(v.number()),
+    done: v.boolean(),
+    date: v.optional(v.string()),
+  },
+  handler: async (ctx, { ownerId, agent, routineId, index, done, date }) => {
+    const day = date ?? (await todayOf(ctx, ownerId));
+    if (index === undefined) await Routines.tickAll(ctx, ownerId, { routineId, date: day, done });
+    else await Routines.tickPart(ctx, ownerId, { routineId, index, date: day, done });
+    const routine = owned(await ctx.db.get(routineId), ownerId, "routine");
+    const what = index === undefined ? routine.title : `${routine.parts[index]!.title} in ${routine.title}`;
+    await Activity.record(ctx, ownerId, agent, {
+      kind: "other",
+      title: `${done ? "Ticked" : "Unticked"} ${what}`,
+    });
+    const [view] = (await Routines.routineViews(ctx, ownerId, day, () => null)).filter(
+      (r) => r._id === routineId,
+    );
+    return {
+      routineId,
+      date: day,
+      done: view?.done ?? false,
+      streak: view?.streak ?? 0,
+      parts: view?.parts ?? [],
+    };
+  },
+});
+
+export const log_goal = internalMutation({
+  args: { ...writer, goalId: v.id("goals"), value: v.number(), date: v.optional(v.string()) },
+  handler: async (ctx, { ownerId, agent, ...input }) => {
+    await Progress.logGoal(ctx, ownerId, input);
+    const goal = owned(await ctx.db.get(input.goalId), ownerId, "goal");
+    await Activity.record(ctx, ownerId, agent, {
+      kind: "other",
+      title: `Logged ${goal.title}: ${input.value}${goal.unit ? ` ${goal.unit}` : ""}`,
+    });
+    return { goalId: goal._id, current: goal.current };
   },
 });

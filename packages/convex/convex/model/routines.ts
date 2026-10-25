@@ -301,3 +301,20 @@ export function routineOfHabit(routines: Doc<"routines">[]): Map<string, Id<"rou
     for (const p of r.parts) if (p.habitId && !map.has(p.habitId)) map.set(p.habitId, r._id);
   return map;
 }
+
+/** Every live routine with all its parts, for agents to read ids and indexes from. */
+export async function routineList(ctx: QueryCtx, ownerId: string) {
+  return (await liveRoutines(ctx, ownerId)).map((r) => ({
+    _id: r._id,
+    title: r.title,
+    spaceId: r.spaceId ?? null,
+    time: r.time,
+    parts: r.parts.map((p, index) => ({
+      index,
+      title: p.title,
+      length: p.length ?? null,
+      habitId: p.habitId ?? null,
+      weekdays: p.weekdays ?? null,
+    })),
+  }));
+}
