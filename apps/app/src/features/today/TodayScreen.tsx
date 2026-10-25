@@ -72,7 +72,9 @@ export function TodayScreen() {
 
   const free = view ? freeTime(view, now) : null;
   // Planning is offered when there's something to bring in, and never required.
-  const toPlan = view ? view.earlier.length + (inbox?.length ?? 0) : 0;
+  // An Inbox task whose due date has passed is already among the earlier ones.
+  const inboxToPlan = (inbox ?? []).filter((t) => !view?.earlier.some((e) => e._id === t._id));
+  const toPlan = view ? view.earlier.length + inboxToPlan.length : 0;
   // On phones the icon alone, so List / Timeline and Close the day keep one line.
   const planButton = toPlan ? (
     <Button
@@ -135,7 +137,7 @@ export function TodayScreen() {
       anchor={planRef}
       today={today}
       earlier={view.earlier}
-      inbox={inbox ?? []}
+      inbox={inboxToPlan}
       free={free ?? 0}
     />
   ) : null;
@@ -319,11 +321,14 @@ function TodayBody({
       ) : null}
       {groups.map((g) => (
         <View key={g.part.title}>
-          <GroupLabel
-            icon={g.part.icon}
-            title={g.part.title}
-            count={g.rows.filter((row) => row.kind === "task").length}
-          />
+          {/* A part with only the now line or the review card in it needs no "EVENING (0)". */}
+          {g.rows.some((row) => row.kind === "task") ? (
+            <GroupLabel
+              icon={g.part.icon}
+              title={g.part.title}
+              count={g.rows.filter((row) => row.kind === "task").length}
+            />
+          ) : null}
           <View>
             {g.rows.map((row) =>
               row.kind === "task" ? (

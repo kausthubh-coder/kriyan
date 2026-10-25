@@ -279,6 +279,10 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
       )
       .take(LIMIT)
   ).filter((t) => !t.event);
+  // Due on an earlier day and planned for none: without this it showed nowhere on Today.
+  const missed = (await openUndated(ctx, ownerId)).filter(
+    (t) => !t.event && t.proposedBy === undefined && t.deadline !== undefined && t.deadline < today,
+  );
   // Due today but planned for no day, or a later one: today's list is where they belong.
   const due = (
     await ctx.db
@@ -304,7 +308,7 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
     anytime: day.filter((t) => t.time === null && !t.done),
     done: day.filter((t) => t.time === null && t.done),
     due: due.map((t) => view(t, map)),
-    earlier: earlier.map((t) => view(t, map)),
+    earlier: [...earlier, ...missed].map((t) => view(t, map)),
     habits: await habitViews(ctx, ownerId, today, map),
     proposals: day.filter((t) => t.proposedBy !== null).length,
     spaces: tree,

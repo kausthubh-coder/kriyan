@@ -238,6 +238,16 @@ describe("completing", () => {
       ["Problem set 3"],
     );
   });
+
+  test("a task due on an earlier day with no day of its own shows as from earlier", async () => {
+    const { alice } = await setup();
+    await alice.mutation(api.tasks.add, { title: "Workshop 8 coding", deadline: "2026-10-12" });
+    await alice.mutation(api.tasks.add, { title: "Workshop 9 coding", deadline: "2026-10-20" });
+    await alice.mutation(api.tasks.add, { title: "Read chapter 4" });
+    expect((await alice.query(api.views.today, { today: "2026-10-13" })).earlier.map((t) => t.title)).toEqual(
+      ["Workshop 8 coding"],
+    );
+  });
 });
 
 describe("reminders", () => {

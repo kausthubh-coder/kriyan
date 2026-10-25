@@ -101,6 +101,8 @@ export function facts(
           : day,
     });
   }
+  // Due the day it's planned for (and untimed): one "Due Wed 14 Oct", not the date twice.
+  if (task.deadline && task.deadline === task.date && task.time === null && !yearly) out.length = 0;
   if (task.deadline) out.push({ icon: Flag, text: formatDue(task.deadline, task.dueTime, today) });
   if (!yearly && task.repeatText) out.push({ icon: Repeat2, text: task.repeatText });
   if (task.reminders.length) out.push({ icon: Bell, text: String(task.reminders.length) });
