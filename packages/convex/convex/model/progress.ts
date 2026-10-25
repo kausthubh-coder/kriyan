@@ -30,16 +30,18 @@ function why(value: string | null | undefined): string | undefined {
 export async function createHabit(
   ctx: MutationCtx,
   ownerId: string,
-  input: { title: string; target: number; spaceId?: Id<"spaces"> },
+  input: { title: string; target: number; spaceId?: Id<"spaces">; goalId?: Id<"goals"> },
 ) {
   if (!Number.isInteger(input.target) || input.target < 1 || input.target > 7)
     throw new ConvexError("A habit's target is 1 to 7 times a week.");
   if (input.spaceId) owned(await ctx.db.get(input.spaceId), ownerId, "space");
+  if (input.goalId) owned(await ctx.db.get(input.goalId), ownerId, "goal");
   return await ctx.db.insert("habits", {
     ownerId,
     title: title(input.title, "habit"),
     target: input.target,
     ...(input.spaceId ? { spaceId: input.spaceId } : {}),
+    ...(input.goalId ? { goalId: input.goalId } : {}),
     order: Date.now(),
   });
 }
@@ -48,9 +50,17 @@ export async function updateHabit(
   ctx: MutationCtx,
   ownerId: string,
   id: Id<"habits">,
-  patch: { title?: string; target?: number; spaceId?: Id<"spaces"> | null; archived?: boolean },
+  patch: {
+    title?: string;
+    target?: number;
+    spaceId?: Id<"spaces"> | null;
+    goalId?: Id<"goals"> | null;
+    archived?: boolean;
+  },
 ) {
   owned(await ctx.db.get(id), ownerId, "habit");
+  if (patch.spaceId) owned(await ctx.db.get(patch.spaceId), ownerId, "space");
+  if (patch.goalId) owned(await ctx.db.get(patch.goalId), ownerId, "goal");
   if (
     patch.target !== undefined &&
     (!Number.isInteger(patch.target) || patch.target < 1 || patch.target > 7)
@@ -61,6 +71,7 @@ export async function updateHabit(
     ...(patch.title !== undefined ? { title: title(patch.title, "habit") } : {}),
     ...(patch.target !== undefined ? { target: patch.target } : {}),
     ...(patch.spaceId !== undefined ? { spaceId: patch.spaceId ?? undefined } : {}),
+    ...(patch.goalId !== undefined ? { goalId: patch.goalId ?? undefined } : {}),
     ...(patch.archived !== undefined ? { archivedAt: patch.archived ? Date.now() : undefined } : {}),
   });
 }

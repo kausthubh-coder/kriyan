@@ -1993,3 +1993,196 @@ describe("Today's layout and what's left from earlier", () => {
     ]);
   });
 });
+
+describe("routines", () => {
+  // Tuesday 13 October 2026; Gym runs Mon, Wed, Fri and Sat.
+  async function morning() {
+    const ctx = await setup();
+    const { alice } = ctx;
+    const health = await alice.mutation(api.organize.addSpace, { name: "Health", color: "green" });
+    const goal = await alice.mutation(api.organize.addGoal, {
+      title: "Lose 5 kg",
+      kind: "number",
+      target: 5,
+      unit: "kg",
+    });
+    const meditate = await alice.mutation(api.organize.addHabit, { title: "Meditate", target: 7 });
+    const gym = await alice.mutation(api.organize.addHabit, { title: "Gym", target: 4, goalId: goal });
+    const read = await alice.mutation(api.organize.addHabit, { title: "Read", target: 5 });
+    const routineId = await alice.mutation(api.routines.add, {
+      title: "Morning routine",
+      spaceId: health,
+      time: 420,
+      parts: [
+        { title: "Brush teeth", length: 5 },
+        { title: "Meditate", length: 10, habitId: meditate },
+        { title: "Gym", length: 45, habitId: gym, weekdays: [0, 2, 4, 5] },
+        { title: "Cold plunge", length: 5 },
+        { title: "Shower", length: 10 },
+      ],
+    });
+    return { ...ctx, health, goal, meditate, gym, read, routineId };
+  }
+
+  test("a day shows only the parts that run that weekday, with their length added up", async () => {
+    const { alice, routineId, health } = await morning();
+    const tue = (await alice.query(api.views.today, { today: "2026-10-13" })).routines;
+    expect(tue).toEqual([
+      {
+        _id: routineId,
+        title: "Morning routine",
+        color: "green",
+        spaceId: health,
+        time: 420,
+        length: 30,
+        parts: [
+          { index: 0, title: "Brush teeth", length: 5, habitId: null, done: false },
+          { index: 1, title: "Meditate", length: 10, habitId: expect.any(String), done: false },
+          { index: 3, title: "Cold plunge", length: 5, habitId: null, done: false },
+          { index: 4, title: "Shower", length: 10, habitId: null, done: false },
+        ],
+        streak: 0,
+        done: false,
+      },
+    ]);
+    const wed = (await alice.query(api.views.today, { today: "2026-10-14" })).routines[0]!;
+    expect([wed.length, wed.parts.map((p) => [p.index, p.title])]).toEqual([
+      75,
+      [
+        [0, "Brush teeth"],
+        [1, "Meditate"],
+        [2, "Gym"],
+        [3, "Cold plunge"],
+        [4, "Shower"],
+      ],
+    ]);
+  });
+
+  test("habits inside a routine leave Today's own habits and say which routine and goal they feed", async () => {
+    const { alice, routineId, goal, today } = await morning();
+    const day = await alice.query(api.views.today, { today });
+    expect(day.habits.map((h) => [h.title, h.routineId, h.goalId])).toEqual([["Read", null, null]]);
+    const progress = await alice.query(api.views.progress, { today });
+    expect(progress.habits.map((h) => [h.title, h.routineId, h.goalId])).toEqual([
+      ["Meditate", routineId, null],
+      ["Gym", routineId, goal],
+      ["Read", null, null],
+    ]);
+  });
+
+  test("ticking a part checks its habit, and unticking takes the check back", async () => {
+    const { alice, routineId, meditate } = await morning();
+    const wed = "2026-10-14";
+    await alice.mutation(api.routines.tickPart, { routineId, index: 2, date: wed, done: true });
+    await alice.mutation(api.routines.tickPart, { routineId, index: 1, date: wed, done: true });
+    const habits = async () =>
+      (await alice.query(api.views.progress, { today: wed })).habits.map((h) => [
+        h.title,
+        h.doneToday,
+        h.thisWeek,
+      ]);
+    expect(await habits()).toEqual([
+      ["Meditate", true, 1],
+      ["Gym", true, 1],
+      ["Read", false, 0],
+    ]);
+    const parts = async () =>
+      (await alice.query(api.views.today, { today: wed })).routines[0]!.parts.filter((p) => p.done).map(
+        (p) => p.title,
+      );
+    expect(await parts()).toEqual(["Meditate", "Gym"]);
+
+    await alice.mutation(api.routines.tickPart, { routineId, index: 1, date: wed, done: false });
+    expect(await habits()).toEqual([
+      ["Meditate", false, 0],
+      ["Gym", true, 1],
+      ["Read", false, 0],
+    ]);
+    expect(await parts()).toEqual(["Gym"]);
+
+    // Checking the habit on its own reads as that part done too.
+    await alice.mutation(api.organize.checkHabit, { id: meditate, done: true, date: wed });
+    expect(await parts()).toEqual(["Meditate", "Gym"]);
+  });
+
+  test("a part that doesn't run that day, or isn't there, can't be ticked", async () => {
+    const { alice, routineId } = await morning();
+    await expect(
+      alice.mutation(api.routines.tickPart, { routineId, index: 2, date: "2026-10-13", done: true }),
+    ).rejects.toThrow("Gym isn't part of Morning routine on that day.");
+    await expect(
+      alice.mutation(api.routines.tickPart, { routineId, index: 9, date: "2026-10-13", done: true }),
+    ).rejects.toThrow("Morning routine has parts 0 to 4.");
+  });
+
+  test("the streak counts days all done back from yesterday, and today once it's done", async () => {
+    const { alice, routineId, today } = await morning();
+    for (const date of ["2026-10-09", "2026-10-11", "2026-10-12"])
+      await alice.mutation(api.routines.tickAll, { routineId, date, done: true });
+    // Saturday the 10th was missed, so the run starts on Sunday.
+    const read = async () => {
+      const r = (await alice.query(api.views.today, { today })).routines[0]!;
+      return [r.streak, r.done];
+    };
+    expect(await read()).toEqual([2, false]);
+    await alice.mutation(api.routines.tickAll, { routineId, date: today, done: true });
+    expect(await read()).toEqual([3, true]);
+    await alice.mutation(api.routines.tickAll, { routineId, date: "2026-10-10", done: true });
+    expect(await read()).toEqual([5, true]);
+    // Taking back one part of Monday's breaks the run there.
+    await alice.mutation(api.routines.tickPart, { routineId, index: 4, date: "2026-10-12", done: false });
+    expect(await read()).toEqual([1, true]);
+  });
+
+  test("tick all checks every habit for that day, and all undone unchecks them", async () => {
+    const { alice, routineId } = await morning();
+    const sat = "2026-10-17";
+    await alice.mutation(api.routines.tickAll, { routineId, date: sat, done: true });
+    const habits = async () =>
+      (await alice.query(api.views.progress, { today: sat })).habits.map((h) => [h.title, h.doneToday]);
+    expect(await habits()).toEqual([
+      ["Meditate", true],
+      ["Gym", true],
+      ["Read", false],
+    ]);
+    await alice.mutation(api.routines.tickAll, { routineId, date: sat, done: false });
+    expect(await habits()).toEqual([
+      ["Meditate", false],
+      ["Gym", false],
+      ["Read", false],
+    ]);
+  });
+
+  test("a habit belongs to one routine; an archived routine gives its habits back to Today", async () => {
+    const { alice, routineId, meditate, today } = await morning();
+    await expect(
+      alice.mutation(api.routines.add, {
+        title: "Night routine",
+        time: 1320,
+        parts: [{ title: "Meditate", habitId: meditate }],
+      }),
+    ).rejects.toThrow("Meditate is already part of Morning routine.");
+    await expect(
+      alice.mutation(api.routines.update, { routineId, parts: [{ title: "Stretch", weekdays: [] }] }),
+    ).rejects.toThrow(/at least one weekday/);
+    await alice.mutation(api.routines.update, { routineId, title: "Mornings", time: 435 });
+    expect((await alice.query(api.views.today, { today })).routines.map((r) => [r.title, r.time])).toEqual([
+      ["Mornings", 435],
+    ]);
+    await alice.mutation(api.routines.remove, { routineId });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.routines).toEqual([]);
+    expect(day.habits.map((h) => h.title)).toEqual(["Meditate", "Gym", "Read"]);
+  });
+
+  test("nobody else can see, change or tick a person's routine", async () => {
+    const { t, routineId, today } = await morning();
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    expect((await bob.query(api.views.today, { today })).routines).toEqual([]);
+    await expect(bob.mutation(api.routines.tickAll, { routineId, date: today, done: true })).rejects.toThrow(
+      "That routine doesn't exist or isn't yours.",
+    );
+    await expect(bob.mutation(api.routines.remove, { routineId })).rejects.toThrow(/isn't yours/);
+  });
+});

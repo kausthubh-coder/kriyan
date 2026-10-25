@@ -6,6 +6,7 @@ import {
   earlierWindowV,
   reminderV,
   repeatV,
+  routinePartV,
   sourceV,
   stepV,
   taskBeforeV,
@@ -141,6 +142,8 @@ export default defineSchema({
     spaceId: v.optional(v.id("spaces")),
     /** Times a week. */
     target: v.number(),
+    /** The goal it feeds ("Fed by Gym"). */
+    goalId: v.optional(v.id("goals")),
     order: v.number(),
     archivedAt: v.optional(v.number()),
   }).index("by_owner", ["ownerId"]),
@@ -151,7 +154,30 @@ export default defineSchema({
     date: v.string(),
   })
     .index("by_owner_and_date", ["ownerId", "date"])
-    .index("by_habitId_and_date", ["habitId", "date"]),
+    .index("by_habitId_and_date", ["habitId", "date"])
+    .index("by_owner_and_habitId_and_date", ["ownerId", "habitId", "date"]),
+
+  /** One block of small parts done in a row (a morning routine). Rules in model/routines.ts. */
+  routines: defineTable({
+    ownerId: v.string(),
+    title: v.string(),
+    spaceId: v.optional(v.id("spaces")),
+    /** Minutes after midnight. */
+    time: v.number(),
+    parts: v.array(routinePartV),
+    order: v.number(),
+    archivedAt: v.optional(v.number()),
+  }).index("by_owner", ["ownerId"]),
+
+  /** One row per part ticked on a day; `index` is the part's place in the routine. */
+  routineTicks: defineTable({
+    ownerId: v.string(),
+    routineId: v.id("routines"),
+    date: v.string(),
+    index: v.number(),
+  })
+    .index("by_owner_and_date", ["ownerId", "date"])
+    .index("by_owner_and_routineId_and_date", ["ownerId", "routineId", "date"]),
 
   goals: defineTable({
     ownerId: v.string(),

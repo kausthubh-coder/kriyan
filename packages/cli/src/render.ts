@@ -167,6 +167,23 @@ export function renderToday(day: TodayResult, view: View, refs: RefBook): string
           : "Nothing planned.",
     );
 
+  if (day.routines.length) {
+    out.push("", "Routines");
+    out.push(
+      table(
+        day.routines.map((r) => ({
+          cells: [
+            dotted(r.color, r.title, view),
+            formatTimeRange(r.time, r.length || undefined),
+            r.done
+              ? `done, ${plural(r.streak, "day")} in a row`
+              : `${r.parts.filter((p) => p.done).length} of ${r.parts.length} done`,
+          ],
+        })),
+      ),
+    );
+  }
+
   if (day.habits.length) {
     out.push("", "Habits");
     out.push(

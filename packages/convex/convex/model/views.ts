@@ -10,6 +10,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { getProfile, owned } from "./owner";
 import { todayPrefs, type EarlierWindow } from "./profile";
+import { liveRoutines, routineOfHabit, routineViews } from "./routines";
 import { listSpaces, spaceTree, type SpaceNode } from "./spaces";
 
 export interface TaskView {
@@ -223,6 +224,10 @@ export interface HabitView {
   target: number;
   doneToday: boolean;
   thisWeek: number;
+  /** The goal it feeds. */
+  goalId: Id<"goals"> | null;
+  /** The routine it's a part of; such a habit is ticked inside the routine, not on its own. */
+  routineId: Id<"routines"> | null;
 }
 
 async function habitViews(
@@ -244,6 +249,7 @@ async function habitViews(
       q.eq("ownerId", ownerId).gte("date", weekStart).lte("date", addDays(weekStart, 6)),
     )
     .take(1000);
+  const inRoutine = routineOfHabit(await liveRoutines(ctx, ownerId));
   return habits
     .sort((a, b) => a.order - b.order)
     .map((h) => ({
@@ -253,6 +259,8 @@ async function habitViews(
       target: h.target,
       doneToday: checks.some((c) => c.habitId === h._id && c.date === today),
       thisWeek: checks.filter((c) => c.habitId === h._id).length,
+      goalId: h.goalId ?? null,
+      routineId: inRoutine.get(h._id) ?? null,
     }));
 }
 
@@ -337,7 +345,9 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
     done: day.filter((t) => t.time === null && t.done),
     due: due.map((t) => view(t, map)),
     earlier,
-    habits: await habitViews(ctx, ownerId, today, map),
+    // A habit inside a routine is ticked there, so it doesn't show again on its own.
+    habits: (await habitViews(ctx, ownerId, today, map)).filter((h) => h.routineId === null),
+    routines: await routineViews(ctx, ownerId, today, (id) => (id ? (map.get(id)?.color ?? null) : null)),
     proposals: day.filter((t) => t.proposedBy !== null).length,
     spaces: tree,
   };

@@ -114,8 +114,26 @@ export const essayPlan = task({ _id: ids.essayPlan, title: "Essay plan", ...scho
 export const dentist = task({ _id: ids.dentist, title: "Book the dentist" });
 
 export const habits: HabitView[] = [
-  { _id: ids.readHabit, title: "Read", color: "green", target: 5, doneToday: false, thisWeek: 1 },
-  { _id: ids.stretch, title: "Stretch", color: null, target: 3, doneToday: true, thisWeek: 2 },
+  {
+    _id: ids.readHabit,
+    title: "Read",
+    color: "green",
+    target: 5,
+    doneToday: false,
+    thisWeek: 1,
+    goalId: null,
+    routineId: null,
+  },
+  {
+    _id: ids.stretch,
+    title: "Stretch",
+    color: null,
+    target: 3,
+    doneToday: true,
+    thisWeek: 2,
+    goalId: null,
+    routineId: null,
+  },
 ];
 
 export const spaces: SpacesResult = [
@@ -152,6 +170,7 @@ export function today(date = "2026-10-13"): TodayResult {
     due: [],
     earlier: [{ ...problems, ageDays: 1 }],
     habits,
+    routines: [],
     proposals: 1,
     spaces,
   };

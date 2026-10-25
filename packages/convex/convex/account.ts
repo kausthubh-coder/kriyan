@@ -224,7 +224,7 @@ export const revokeToken = mutation({
 
 /**
  * Deletes everything the signed-in person owns: tasks (and their pending reminders), spaces,
- * habits, goals, history, phones and browsers that get reminders, tokens and the profile. Runs in batches until done.
+ * routines, habits, goals, history, phones and browsers that get reminders, tokens and the profile. Runs in batches until done.
  * The Clerk account itself is deleted by the app through Clerk.
  */
 export const deleteMyData = mutation({
@@ -261,6 +261,16 @@ export const deleteDataBatch = internalMutation({
         ctx.db
           .query("habitChecks")
           .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("routineTicks")
+          .withIndex("by_owner_and_date", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
+          .query("routines")
+          .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
           .take(left),
       () =>
         ctx.db
