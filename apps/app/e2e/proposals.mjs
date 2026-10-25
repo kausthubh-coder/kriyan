@@ -1,8 +1,10 @@
 // An agent proposes blocks through the agent API (with a token made in Settings, the way a
-// person connects the CLI), then the person reviews them on Upcoming and accepts them.
+// person connects the CLI); on Today they're dashed "Suggested" blocks on their day, and the
+// person accepts one (1440) or says Not now (390) from its sheet.
 //   node apps/app/e2e/proposals.mjs
 
 import { readFileSync } from "node:fs";
+import { formatDate } from "@kriyan/core/format";
 import { BASE, artifact, launch, settle, signedInContext } from "./lib.mjs";
 
 const env = readFileSync(new URL("../../../packages/convex/.env.local", import.meta.url), "utf8");
@@ -34,31 +36,59 @@ for (const viewport of [
     ),
   );
   const plus = (n) => new Date(Date.parse(`${today}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+  const day = plus(1);
   const res = await fetch(`${site}/api/v1/propose_plan`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({
       agent: "Claude",
       blocks: [
-        { title: "Record the demo", date: plus(3), time: 15 * 60 + 30, length: 90 },
-        { title: "Ship the CLI", date: plus(4), time: 10 * 60, length: 120 },
+        { title: `Record the demo ${viewport.width}`, date: day, time: 15 * 60 + 30, length: 90 },
+        { title: `Ship the CLI ${viewport.width}`, date: day, time: 10 * 60, length: 120 },
       ],
     }),
   });
   console.log(`propose_plan: HTTP ${res.status}`);
 
-  await page.goto(`${BASE}/upcoming`);
+  // v5: suggestions sit on their day as dashed blue blocks; the sheet has Accept and Not now.
+  await page.goto(`${BASE}/today`);
   await settle(page);
-  await page.getByText(/^Claude proposed 2 blocks/).waitFor();
-  await page.screenshot({ path: artifact(`upcoming-proposals-${viewport.width}.png`) });
-  if (viewport.width === 1440) {
-    await page.getByRole("button", { name: "Accept all" }).click();
-    await page.getByRole("status").filter({ hasText: "Added 2 to your plan" }).waitFor();
-    console.log("accepted: banner gone =", (await page.getByText(/^Claude proposed/).count()) === 0);
+  if (viewport.width >= 760) {
+    // → shows the next day; the big day name says "Tmrw".
+    await page.getByRole("heading", { level: 1 }).first().waitFor();
+    await page.keyboard.press("ArrowRight");
+    await page.getByRole("heading", { level: 1, name: "Tmrw" }).waitFor();
   } else {
-    await page.getByRole("button", { name: "Discard" }).click();
-    await page.getByRole("status").filter({ hasText: "Discarded 2 proposed" }).waitFor();
-    console.log("discarded: banner gone =", (await page.getByText(/^Claude proposed/).count()) === 0);
+    await page.getByRole("button", { name: "Month" }).click();
+    await page
+      .getByRole("dialog", { name: "Month" })
+      .getByRole("button", { name: formatDate(day) })
+      .click();
+  }
+  const demo = page.getByRole("button", { name: `Open Record the demo ${viewport.width}, 15:30–17:00` });
+  await demo.waitFor();
+  console.log(`suggested: ${(await demo.innerText()).replace(/\s+/g, " ")}`);
+  await page.screenshot({ path: artifact(`today-proposals-${viewport.width}.png`) });
+  if (viewport.width === 1440) {
+    await demo.click();
+    await page.getByRole("complementary", { name: "Details" }).getByText("Suggested by Claude").waitFor();
+    await page.getByRole("button", { name: "Accept", exact: true }).click();
+    await page
+      .getByRole("status")
+      .filter({ hasText: `Added: Record the demo ${viewport.width}` })
+      .waitFor();
+    await page.waitForTimeout(800);
+    console.log("accepted: no longer suggested =", !/Suggested/.test(await demo.innerText()));
+  } else {
+    await demo.click();
+    await page.getByRole("dialog").getByText("Suggested by Claude").waitFor();
+    await page.screenshot({ path: artifact(`today-suggestion-sheet-390.png`) });
+    await page.getByRole("button", { name: "Not now", exact: true }).click();
+    await page
+      .getByRole("status")
+      .filter({ hasText: `Dismissed: Record the demo ${viewport.width}` })
+      .waitFor();
+    console.log("dismissed: block gone =", (await demo.count()) === 0);
   }
 
   // Revoke the token again.

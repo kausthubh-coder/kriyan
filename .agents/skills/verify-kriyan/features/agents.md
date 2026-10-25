@@ -1,6 +1,6 @@
 # Agents
 
-A person connects their AI to Kriyan with a personal access token (or OAuth on the hosted MCP). Agents read the plan, add and change tasks, and can propose blocks the person accepts or discards on Upcoming.
+A person connects their AI to Kriyan with a personal access token (or OAuth on the hosted MCP). Agents read the plan, add and change tasks, and can propose blocks the person accepts or turns down on Today.
 
 ## Sub-features
 
@@ -9,7 +9,7 @@ A person connects their AI to Kriyan with a personal access token (or OAuth on t
 - `agents-cli` the `kriyan` CLI over the same API.
 - `agents-mcp` the MCP server at `/mcp` on the site: tools, a read, a write.
 - `agents-oauth` a connector signs in through Clerk (dynamic registration, consent) and calls MCP with the OAuth token.
-- `agents-proposals` `propose_plan` puts blocks on Upcoming behind a `Claude proposed N blocks` banner with `Accept all` and `Discard`.
+- `agents-proposals` `propose_plan` puts dashed "Suggested" blocks on their day on Today; the sheet says "Suggested by Claude" with `Accept` and `Not now` (Upcoming still has `Accept all` and `Discard`).
 
 ## How to get to it (user POV)
 
@@ -25,8 +25,8 @@ Preconditions: baseline seed; `bun run dev` serving the site.
 - **API.** `fetch(<CONVEX_SITE_URL>/api/v1/get_today, { method: "POST", headers: { authorization: "Bearer " + token } })` returns `{ result: { ... } }` with the seeded tasks; without the header it returns 401.
 - **CLI.** `KRIYAN_TOKEN=<token> KRIYAN_API_URL=<CONVEX_SITE_URL> bun run kriyan today` lists today's plan; `... bun run kriyan done Run` prints `Done "Run". Next: <day>.`
 - **MCP.** `KRIYAN_TOKEN=<token> node apps/site/scripts/mcp-e2e.mjs http://localhost:<PORT_SITE>/mcp` connects, lists the tools, reads today, adds a task and deletes it; run it again with `legacy` as the second argument for older clients. `node apps/site/scripts/mcp-bulk-e2e.mjs <same url>` drives the bulk tools a sync agent uses (upsert_tasks twice, the second reporting unchanged; add_tasks with a refused item; search_tasks; get_range; list_changes; undo_changes) and prints PASS or FAIL per step. Without a browser sign-in, a token for the local backend comes from `bunx convex run --identity '{"tokenIdentifier":"https://proof.local|user_proof","subject":"user_proof","issuer":"https://proof.local"}' account:createToken '{"name":"Chitti school"}'` in `packages/convex` (after `account:ensureProfile` with the same identity); keep it in a file, never print it.
-- **Proposals.** `node apps/app/e2e/proposals.mjs` creates a token, proposes two blocks through the API, accepts them on Upcoming, proposes again, discards, and revokes the token.
-- **Proof.** The command outputs with exit codes, the Upcoming banner screenshot, and the plan after a reload.
+- **Proposals.** `node apps/app/e2e/proposals.mjs` creates a token, proposes two blocks for tomorrow through the API, accepts one from Today's panel at 1440, says Not now to one from the phone's sheet at 390, and revokes the token.
+- **Proof.** The command outputs with exit codes, `today-proposals-*.png`, and the plan after a reload.
 - **Revoke.** Click `Revoke <name>` at the end; the same token then gets 401.
 
 ## Gotchas

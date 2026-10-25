@@ -20,7 +20,7 @@ One file per user-facing feature. Each lists every entry point a person uses, ho
 ## Features
 
 - [Capture](./capture.md): one sentence becomes a task, from Today's field, quick add, the command menu, the API and the CLI.
-- [Today and the timeline](./today.md): what's next, anytime tasks, the schedule, drag, resize, the "Earlier today" fold, moving a row (hover or swipe), Close the day, Plan today, row selection.
+- [Today](./today.md): v5's one screen: the time blocks and free stretches, routines, classes, To fit in and Fill, the list layout and its swipes, the sheets (task, event, suggestion, routine, habit, time block, study session), Edit's pickers, Add, the month, the summary, the desktop panel and keys.
 - Planning the week: the Week's "Not scheduled yet" tray (Inbox and undated tasks; the toolbar's "To plan" button shows or hides it) drags onto a day's header (that day, no time) or into the grid (at a time). `node apps/app/e2e/plan-week.mjs` after `seed.mjs`.
 - [Complete and repeat](./complete-repeat.md): tick off, undo, a repeating task moving to its next date.
 - Undo and Recently deleted: a toast's 5 seconds stop while the pointer or focus is on it; Ctrl+Z (outside text fields) runs the newest toast's Undo; Recently deleted (`/trash`, from Settings' "Open recently deleted" or the command menu) lists deleted tasks by the day they were deleted, each with `button "Restore <title>"`, for 30 days. `node apps/app/e2e/undo-and-trash.mjs` after `seed.mjs` (both widths).
@@ -29,7 +29,7 @@ One file per user-facing feature. Each lists every entry point a person uses, ho
 - Agents (`/agents`): each run's lines with `button "Undo: Added …"`, the MCP address with `button "Copy the MCP address"`, `switch "Let agents edit directly"`.
 - [Reminders](./reminders.md): a reminder ringing on Android, including for tasks added elsewhere.
 - Ask (`/ask`, out of the navigation in v5; the command menu and `A` reach it): `textbox "Ask Kriyan"` and the suggestion chips; Kriyan answers fixed requests itself with Undo, anything else shows "Waiting for a connected agent to answer" until an agent calls `answer_ask`; an agent's reply lists its changes with Undo and Edit; Automations lists this week's agent runs. With no token and no agent activity it says "Kriyan has no AI of its own". `node apps/app/e2e/ask.mjs` after `seed.mjs` (`W=390` for the phone).
-- [Agents](./agents.md): personal access tokens, the API, the CLI, the MCP server, proposals reviewed on Upcoming.
+- [Agents](./agents.md): personal access tokens, the API, the CLI, the MCP server, suggestions accepted from Today.
 - [Spaces and notes](./spaces-notes.md): nested spaces, colours, Markdown notes with the slash menu.
 - [Android](./android.md): opening the dev build and driving it with adb.
 - First run and sign-in: signed out, a browser that has never had anyone signed in opens `/onboarding` (steps 1 to 9; the step lives in `localStorage["kriyan.onboarding"]`), one that has opens `/sign-in`, which leads with Google and `button "Email me a code"`, with the password form behind `button "Use a password instead"`. Drive onboarding as the test account: "I already have an account" or step 6's `textbox "Email"`, `button "Send code"`, then `textbox "6-digit code"` filled with `424242`; the draft (hours, first task) saves to the account once, and a second run adds nothing when `onboardedAt` is set. A brand-new address hits Clerk's captcha headless, so sign-up can't be automated.

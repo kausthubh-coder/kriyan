@@ -1,6 +1,7 @@
-// Opens a task from Today, then its repeat editor, at desktop and phone widths.
+// Opens a task from Today (the card, or the desktop panel), then Edit's repeat picker, at
+// desktop and phone widths. `node apps/app/e2e/panel.mjs "<title>"` for another task.
 import { BASE, launch, artifact, signedInContext, settle } from "./lib.mjs";
-const name = process.argv[2] ?? "Run";
+const name = process.argv[2] ?? "Write MCP tools";
 const browser = await launch();
 for (const [w, h] of [
   [1440, 900],
@@ -19,7 +20,8 @@ for (const [w, h] of [
     .click();
   await page.waitForTimeout(1200);
   await page.screenshot({ path: artifact(`panel-${w}.png`) });
-  await page.getByRole("button", { name: /^Repeat:/ }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: /^Repeat/ }).click();
   await page.waitForTimeout(800);
   await page.screenshot({ path: artifact(`repeat-${w}.png`) });
   await ctx.close();

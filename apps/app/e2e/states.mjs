@@ -1,7 +1,8 @@
-// Screenshots of the states, not just the resting screens: the task panel, the repeat
-// editor, the command menu, quick add, the slash menu, an error, the offline notice and a
+// Screenshots of the states, not just the resting screens: the task card and Edit's time,
+// reminder and repeat pickers, the command menu, quick add, the slash menu, an error, the offline notice and a
 // loading skeleton. At 390 and 1440.
 
+import { op } from "./api.mjs";
 import { BASE, artifact, launch, settle, signedInContext } from "./lib.mjs";
 
 const browser = await launch();
@@ -22,15 +23,13 @@ for (const [w, h] of [
     .click();
   await page.waitForTimeout(800);
   await shot("panel");
-  await page.getByRole("button", { name: /^When:/ }).click();
+  // v5: the card's Edit opens the rows; each row opens its picker over the page.
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: /^Time and length/ }).click();
   await page.waitForTimeout(500);
   await shot("when-editor");
-  // The picker sits over the task on both layouts; Done closes it.
-  await page.getByRole("button", { name: "Done", exact: true }).click();
-  await page
-    .getByRole("button", { name: /^Reminders|^Add reminder|^Reminder:/ })
-    .first()
-    .click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^Reminders/ }).click();
   await page.waitForTimeout(500);
   await shot("reminders-editor");
 
@@ -41,17 +40,13 @@ for (const [w, h] of [
     .first()
     .click()
     .catch(() => undefined);
-  await page.goto(`${BASE}/upcoming`);
+  // The weekly lecture, opened by its link (its day may be later this week).
+  const lectureId = (await op("search_tasks", { text: "Calculus II lecture" })).tasks[0]?.taskId;
+  await page.goto(`${BASE}/task/${lectureId}`);
   await settle(page);
-  // The lecture is on Tuesdays and Thursdays from the seed day, so from Friday it's next week.
-  const lecture = page.getByRole("button", { name: /^Open Calculus II lecture/ }).first();
-  if (!(await lecture.isVisible().catch(() => false))) {
-    await page.getByRole("button", { name: "Next week" }).click();
-    await settle(page);
-  }
-  await lecture.click();
   await page.waitForTimeout(800);
-  await page.getByRole("button", { name: /^Repeat:/ }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: /^Repeat/ }).click();
   await page.waitForTimeout(500);
   await shot("repeat-editor-weekly");
 
@@ -64,9 +59,9 @@ for (const [w, h] of [
     await shot("command-search");
     await page.keyboard.press("Escape");
   } else {
-    await page.getByRole("button", { name: "Add a task" }).click();
+    await page.getByRole("button", { name: "Add", exact: true }).click();
     await page
-      .getByRole("textbox", { name: "Add a task" })
+      .getByRole("textbox", { name: "Task title" })
       .fill("Essay fri 5pm #school every week remind 1h before");
     await page.waitForTimeout(400);
     await shot("add-sheet");
