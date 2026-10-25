@@ -76,7 +76,8 @@ export function useDay(day: string): Day | undefined {
   const { today, now } = useClock();
   const closedOn = closedDay.useValue((d) => d);
   return useMemo(
-    () => (view ? compose(view, day, today, now, profile?.reviewTime ?? DEFAULT_REVIEW, closedOn) : undefined),
+    () =>
+      view ? compose(view, day, today, now, profile?.reviewTime ?? DEFAULT_REVIEW, closedOn) : undefined,
     [view, day, today, now, profile?.reviewTime, closedOn],
   );
 }
@@ -102,15 +103,15 @@ function compose(
   const habits = standaloneHabits(view);
   for (const h of habits) sources.set(h._id, { type: "habit", habit: h });
 
-  const timed = [
-    ...view.scheduled.map(taskItem),
-    ...routines.map((r) => routineItem(r, view.spaces)),
-  ]
+  const timed = [...view.scheduled.map(taskItem), ...routines.map((r) => routineItem(r, view.spaces))]
     .filter(keep)
     .sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
   const untimedTasks = [...view.anytime, ...view.done];
   const birthdays = untimedTasks.filter((t) => t.repeat?.freq === "year");
-  const untimed = untimedTasks.filter((t) => t.repeat?.freq !== "year").map(taskItem).filter(keep);
+  const untimed = untimedTasks
+    .filter((t) => t.repeat?.freq !== "year")
+    .map(taskItem)
+    .filter(keep);
   const due = isToday || day > today ? view.due.map(taskItem) : [];
   const earlier = isToday ? view.earlier.map(taskItem) : [];
   const events = timed.filter((i) => i.kind === "event");
@@ -145,14 +146,16 @@ function compose(
   const studySession = view.scheduled.find((t) => prepForOf(t) && !t.done);
   const prep = studySession ? prepForOf(studySession) : null;
   const block = timed.find((i) => isSpaceBlock(i) && !i.done);
-  const openHabits =
-    habits.filter((h) => !h.doneToday).length + routines.filter((r) => !r.done).length;
+  const openHabits = habits.filter((h) => !h.doneToday).length + routines.filter((r) => !r.done).length;
   const next = timed.find((i) => (i.time ?? 0) > clock && !i.proposed && !i.done);
   const sentence = daySentence({
     now: clock,
     classes: events.filter((e) => !isSpaceBlock(e) && !e.done).length,
     due: [...due, ...untimed.filter((i) => i.deadline === day)].filter((i) => !i.done).length,
-    study: prep && studySession ? { test: prep.title.replace(/ \d+$/, ""), length: studySession.length ?? 60 } : null,
+    study:
+      prep && studySession
+        ? { test: prep.title.replace(/ \d+$/, ""), length: studySession.length ?? 60 }
+        : null,
     habits: openHabits,
     block: block?.spaceName ? { space: block.spaceName, length: block.length ?? 60 } : null,
     left: chips.filter((c) => earlier.includes(c.item)).length,

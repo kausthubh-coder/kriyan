@@ -1,8 +1,8 @@
 // Android: the route is already a native sheet (two heights, swipe down to close); this
-// draws its handle and room for the note toolbar.
+// draws its handle, the card's padding, and room for the note toolbar.
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 import { useNavigation } from "expo-router";
 import { NoteToolbarHost } from "@/features/notes/NoteEditor";
 import { c, s } from "@/theme/tokens";
@@ -12,7 +12,16 @@ import { Grabber } from "@/ui/bits";
 /** The task sheet's heights, as parts of the screen: it opens at the first. */
 export const TASK_SHEET_DETENTS = [0.6, 1];
 
-export function TaskPanel({ children, label }: { children: ReactNode; onClose: () => void; label: string }) {
+export function TaskPanel({
+  children,
+  label,
+  mode = "card",
+}: {
+  children: ReactNode;
+  onClose: () => void;
+  label: string;
+  mode?: "card" | "edit";
+}) {
   // The sheet lays its content out at full height whatever height it shows, so at the lower
   // height the thumb bar would sit below the screen. Fit the content to the height it settled at.
   const navigation = useNavigation();
@@ -43,7 +52,11 @@ export function TaskPanel({ children, label }: { children: ReactNode; onClose: (
       <View style={{ alignItems: "center", paddingTop: s.s3 }}>
         <Grabber />
       </View>
-      {children}
+      {mode === "card" ? (
+        <ScrollView contentContainerStyle={{ padding: s.s6, paddingTop: s.s4 }}>{children}</ScrollView>
+      ) : (
+        children
+      )}
       <NoteToolbarHost />
     </View>
   );

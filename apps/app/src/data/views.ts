@@ -35,7 +35,8 @@ export function useDayView(date: string) {
 
 /** Open things due on each day from start to end, and how many have no day. */
 export function useDue(start: string, end: string) {
-  return useQuery(api.views.due, useAuthed() ? { start, end } : "skip");
+  const { today } = useClock();
+  return useQuery(api.views.due, useAuthed() ? { start, end, today } : "skip");
 }
 
 export function useWeekView(start: string) {

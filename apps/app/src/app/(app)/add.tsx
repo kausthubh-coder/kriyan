@@ -12,10 +12,12 @@ export default function AddRoute() {
   const { today } = useClock();
   const minutes = time ? (parseTask(`x at ${time}`, today).time ?? null) : null;
   const day = date && isCivilDate(date) ? date : minutes !== null ? today : null;
+  // From Today the sheet adds to the day on screen; a time from a free stretch is typed in.
   return (
     <AddSheet
       onClose={() => goBack("/today")}
-      initialText={day ? whenWords(day, minutes, today) : undefined}
+      defaultDate={day ?? today}
+      initialText={minutes !== null && day ? whenWords(day, minutes, today) : undefined}
     />
   );
 }

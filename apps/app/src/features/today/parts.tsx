@@ -3,7 +3,15 @@
 // big tiles of a sheet, and the floating card the sheets sit in.
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { Modal, Platform, Pressable, ScrollView, View, useWindowDimensions, type TextStyle } from "react-native";
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+  useWindowDimensions,
+  type TextStyle,
+} from "react-native";
 import Animated, { FadeIn, Keyframe } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check as CheckGlyph, type LucideIcon } from "lucide-react-native";
@@ -113,7 +121,13 @@ export function SpaceBox({
       disabled={disabled}
       hoverBg={null}
       rippleRadius={target / 2}
-      style={{ width: target, height: target, margin: -inset, alignItems: "center", justifyContent: "center" }}
+      style={{
+        width: target,
+        height: target,
+        margin: -inset,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
       {mark}
     </Press>
@@ -137,7 +151,9 @@ export function Pill({ kind, text }: { kind: "now" | "sug" | "streak"; text: str
         backgroundColor: bg,
       }}
     >
-      {kind === "now" ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.now }} /> : null}
+      {kind === "now" ? (
+        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.now }} />
+      ) : null}
       <Txt style={[ty.small, family("600"), { color: fg }]}>{text}</Txt>
     </View>
   );
@@ -153,7 +169,15 @@ export interface TileSpec {
 }
 
 /** A sheet's big buttons (Joi's tiles): Complete, Tomorrow, Edit, Remove. */
-export function Tiles({ tiles, columns, height = 80 }: { tiles: TileSpec[]; columns?: number; height?: number }) {
+export function Tiles({
+  tiles,
+  columns,
+  height = 80,
+}: {
+  tiles: TileSpec[];
+  columns?: number;
+  height?: number;
+}) {
   const n = columns ?? tiles.length;
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: s.s6 }}>
@@ -303,14 +327,19 @@ export function FloatCard({
   );
   if (Platform.OS === "web")
     return (
-      <View
-        style={{ position: "fixed" as "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 30 }}
-      >
+      <View style={{ position: "fixed" as "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 30 }}>
         {body}
       </View>
     );
   return (
-    <Modal transparent visible animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <Modal
+      transparent
+      visible
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       {body}
     </Modal>
   );
@@ -318,7 +347,11 @@ export function FloatCard({
 
 /** A sheet's kind over its title ("Event", "Habit, 4 times a week"). */
 export function Kicker({ children, tone = "ink2" }: { children: ReactNode; tone?: Tone }) {
-  return <T s="body" tone={tone}>{children}</T>;
+  return (
+    <T s="body" tone={tone}>
+      {children}
+    </T>
+  );
 }
 
 /** A row of facts under a sheet's title: space, repeat, reminders, place. */

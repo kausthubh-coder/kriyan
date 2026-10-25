@@ -77,10 +77,12 @@ describe("timeline", () => {
 
   test("another day shows every gap and no now", () => {
     const out = timeline({ items: [klass], dayStart: at(7), dayEnd: at(22), reviewTime: null, now: null });
-    expect(out.filter((e) => e.kind === "gap").map((e) => e.kind === "gap" && [e.from, e.to, e.now])).toEqual([
-      [at(7), at(13, 30), false],
-      [at(14, 45), at(22), false],
-    ]);
+    expect(out.filter((e) => e.kind === "gap").map((e) => e.kind === "gap" && [e.from, e.to, e.now])).toEqual(
+      [
+        [at(7), at(13, 30), false],
+        [at(14, 45), at(22), false],
+      ],
+    );
   });
 
   test("blocks are sized by length with a floor", () => {
@@ -117,7 +119,15 @@ describe("fitIn", () => {
   test("earlier tasks stay off other days", () => {
     const old = item({ title: "Homework 3", date: "2026-10-23" });
     expect(
-      fitIn({ day: "2026-10-27", isToday: false, due: [], untimed: [], earlier: [old], events: [], window: "all" }),
+      fitIn({
+        day: "2026-10-27",
+        isToday: false,
+        due: [],
+        untimed: [],
+        earlier: [old],
+        events: [],
+        window: "all",
+      }),
     ).toEqual([]);
   });
 });
@@ -136,16 +146,20 @@ describe("rows", () => {
   test("say one fact on the right", () => {
     expect(rowFact(study, { day: DAY, now: at(9) })).toEqual({ text: "Now", now: true });
     expect(rowFact(study, { day: DAY, now: at(12) })).toEqual({ text: "08:30–10:00" });
-    expect(rowFact(item({ title: "a", deadline: DAY, dueTime: at(23, 59) }), { day: DAY, now: null })).toEqual({
+    expect(
+      rowFact(item({ title: "a", deadline: DAY, dueTime: at(23, 59) }), { day: DAY, now: null }),
+    ).toEqual({
       text: "Due 23:59",
     });
-    expect(rowFact(item({ title: "b", deadline: "2026-10-30" }), { day: DAY, now: null })).toEqual({ text: "Due Fri" });
+    expect(rowFact(item({ title: "b", deadline: "2026-10-30" }), { day: DAY, now: null })).toEqual({
+      text: "Due Fri",
+    });
     expect(rowFact(item({ title: "c", date: "2026-10-23" }), { day: DAY, now: null, left: true })).toEqual({
       text: "3 days ago",
     });
-    expect(rowFact(item({ title: "Gym", kind: "habit" }), { day: DAY, now: null, habit: { done: 1, target: 3 } })).toEqual(
-      { text: "1 of 3" },
-    );
+    expect(
+      rowFact(item({ title: "Gym", kind: "habit" }), { day: DAY, now: null, habit: { done: 1, target: 3 } }),
+    ).toEqual({ text: "1 of 3" });
   });
   test("hide the space name when the title already says it", () => {
     expect(showsSpaceName("CSC 316 class", "CSC 316")).toBe(false);

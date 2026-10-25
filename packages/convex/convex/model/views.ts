@@ -439,13 +439,20 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
  * Today's month sheet, week strip and "Due in the next 7 days": each day from start to end with
  * how many open things are due on it, those things, and how many open tasks have no day yet.
  */
-export async function dueView(ctx: QueryCtx, ownerId: string, start: CivilDate, end: CivilDate) {
+export async function dueView(
+  ctx: QueryCtx,
+  ownerId: string,
+  start: CivilDate,
+  end: CivilDate,
+  today: CivilDate,
+) {
   civil(start, "start");
+  civil(today, "date");
   civil(end, "end");
   if (end < start) throw new ConvexError("The end must be on or after the start.");
   if (diffDays(end, start) + 1 > MAX_RANGE_DAYS)
     throw new ConvexError(`Ask for at most ${MAX_RANGE_DAYS} days at a time.`);
-  const { map } = await spaceMap(ctx, ownerId);
+  const { refs } = await taskRefs(ctx, ownerId, today);
   const due = (
     await ctx.db
       .query("tasks")
@@ -456,8 +463,7 @@ export async function dueView(ctx: QueryCtx, ownerId: string, start: CivilDate, 
   )
     .filter((t) => live(t) && t.doneAt === undefined && t.proposedBy === undefined)
     .sort(
-      (a, b) =>
-        (a.deadline ?? "").localeCompare(b.deadline ?? "") || (a.dueTime ?? 1e9) - (b.dueTime ?? 1e9),
+      (a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? "") || (a.dueTime ?? 1e9) - (b.dueTime ?? 1e9),
     );
   const undated = (await openUndated(ctx, ownerId)).filter((t) => t.proposedBy === undefined);
   return {
@@ -465,7 +471,7 @@ export async function dueView(ctx: QueryCtx, ownerId: string, start: CivilDate, 
       const date = addDays(start, i);
       return { date, due: due.filter((t) => t.deadline === date).length };
     }),
-    due: due.map((t) => view(t, map)),
+    due: due.map((t) => view(t, refs)),
     undated: undated.length,
   };
 }

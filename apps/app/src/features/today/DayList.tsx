@@ -28,7 +28,8 @@ export function DayList({ day, on }: { day: Day; on: BlockHandlers }) {
   const morning = timed.filter((i) => i.kind === "routine" && (i.time ?? 0) < 12 * 60);
   const night = timed.filter((i) => i.kind === "routine" && (i.time ?? 0) >= 21 * 60);
   const rest = timed.filter((i) => !morning.includes(i) && !night.includes(i));
-  const over = day.now !== null ? rest.filter((i) => (i.time ?? 0) + (i.length ?? 0) <= day.now!) : [];
+  const now = day.now;
+  const over = now !== null ? rest.filter((i) => (i.time ?? 0) + (i.length ?? 0) <= now) : [];
   const ahead = rest.filter((i) => !over.includes(i));
   const leftIds = new Set(day.chips.filter((ch) => day.earlier.includes(ch.item)).map((ch) => ch.item.id));
   const left = day.earlier.filter((i) => leftIds.has(i.id));
@@ -50,7 +51,15 @@ export function DayList({ day, on }: { day: Day; on: BlockHandlers }) {
     rows.push(
       <LineRow
         key={kind}
-        title={kind === "wake" ? "Wake up" : kind === "wind" ? "Wind down" : day.closed ? "Day closed" : "Review today"}
+        title={
+          kind === "wake"
+            ? "Wake up"
+            : kind === "wind"
+              ? "Wind down"
+              : day.closed
+                ? "Day closed"
+                : "Review today"
+        }
         spaceName={null}
         icon={
           kind === "wake" ? (
@@ -91,15 +100,16 @@ export function DayList({ day, on }: { day: Day; on: BlockHandlers }) {
   left.forEach((i) => add(i, "left"));
   day.due.filter((i) => !(day.settings.hideDone && i.done)).forEach((i) => add(i));
   // The review row takes its place among the rest of the day.
-  let reviewed = day.reviewTime === null;
+  const review = day.reviewTime;
+  let reviewed = review === null;
   for (const i of ahead) {
-    if (!reviewed && (i.time ?? 0) > day.reviewTime!) {
-      anchor("review", day.reviewTime!);
+    if (review !== null && !reviewed && (i.time ?? 0) > review) {
+      anchor("review", review);
       reviewed = true;
     }
     add(i);
   }
-  if (!reviewed) anchor("review", day.reviewTime!);
+  if (review !== null && !reviewed) anchor("review", review);
   day.untimed.filter((i) => !dueIds.has(i.id)).forEach((i) => add(i));
   day.habitItems.forEach((i) => add(i));
   night.forEach((i) => add(i));
@@ -176,7 +186,12 @@ function ItemRow({
   ) : task && isSpaceBlock(item) ? (
     <Icon icon={CalendarRange} size={22} color={spaceTone(color).dotHex} strokeWidth={2} />
   ) : task?.event ? (
-    <Icon icon={Calendar} size={22} color={color && day.settings.showSpace ? spaceTone(color).dotHex : hex.ink3} strokeWidth={2} />
+    <Icon
+      icon={Calendar}
+      size={22}
+      color={color && day.settings.showSpace ? spaceTone(color).dotHex : hex.ink3}
+      strokeWidth={2}
+    />
   ) : task ? (
     <SpaceBox
       color={day.settings.showSpace ? color : null}
@@ -198,7 +213,14 @@ function ItemRow({
         left,
         ...(habit ? { habit: { done: habit.thisWeek, target: habit.target } } : {}),
       });
-  const pill = routine && done ? <Pill kind="streak" text={`${routine.streak} days`} /> : task?.proposedBy ? <Pill kind="sug" text="Suggested" /> : habit && done ? <Pill kind="streak" text={`${habit.thisWeek} this week`} /> : undefined;
+  const pill =
+    routine && done ? (
+      <Pill kind="streak" text={`${routine.streak} days`} />
+    ) : task?.proposedBy ? (
+      <Pill kind="sug" text="Suggested" />
+    ) : habit && done ? (
+      <Pill kind="streak" text={`${habit.thisWeek} this week`} />
+    ) : undefined;
   const past =
     task?.event && day.now !== null && (item.time ?? 0) + (item.length ?? 0) <= day.now ? true : false;
   const target = !task?.date || task.date < day.view.date ? day.view.date : addDays(day.view.date, 1);
@@ -208,7 +230,9 @@ function ItemRow({
       testID={`task-${item.id}`}
       title={item.title}
       spaceName={
-        day.settings.showSpace && item.spaceName && showsSpaceName(item.title, item.spaceName) ? item.spaceName : null
+        day.settings.showSpace && item.spaceName && showsSpaceName(item.title, item.spaceName)
+          ? item.spaceName
+          : null
       }
       icon={icon}
       fact={done && !habit ? null : fact}

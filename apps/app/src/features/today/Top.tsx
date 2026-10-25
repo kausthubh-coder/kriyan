@@ -26,7 +26,7 @@ export function Top({
   const [y, m, d] = day.split("-").map(Number) as [number, number, number];
   const name = day === addDays(today, 1) ? "Tmrw" : WEEKDAY_SHORT[weekday(day)];
   const week = weekDays(day);
-  const due = useDue(week[0]!, week[6]!);
+  const due = useDue(week[0] ?? day, week[6] ?? day);
   return (
     <View>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -41,7 +41,9 @@ export function Top({
             {name}
           </Txt>
           {day === today ? (
-            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.now, marginTop: s.s2 }} />
+            <View
+              style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.now, marginTop: s.s2 }}
+            />
           ) : null}
         </Press>
         <T s="date" tone="ink3" extra={{ textAlign: "right" }}>
@@ -86,7 +88,13 @@ export function Top({
               <Txt
                 tnum
                 maxFontSizeMultiplier={1.4}
-                style={{ ...family("500"), fontSize: 20, lineHeight: 24, letterSpacing: -0.4, color: on || isToday ? c.ink : c.ink3 }}
+                style={{
+                  ...family("500"),
+                  fontSize: 20,
+                  lineHeight: 24,
+                  letterSpacing: -0.4,
+                  color: on || isToday ? c.ink : c.ink3,
+                }}
               >
                 {String(Number(date.slice(8)))}
               </Txt>
@@ -101,7 +109,7 @@ export function Top({
                   color: isToday ? c.now : c.ink3,
                 }}
               >
-                {WEEKDAY_SHORT[i]!.toUpperCase()}
+                {(WEEKDAY_SHORT[i] ?? "").toUpperCase()}
               </Txt>
             </Press>
           );
@@ -117,7 +125,13 @@ export function FitIn({ chips, onPick }: { chips: FitChip[]; onPick: (id: string
   return (
     <View
       aria-label={`To fit in, ${chips.length}`}
-      style={{ marginTop: s.s4, borderRadius: r.box, backgroundColor: c.sunken, paddingTop: s.s2, overflow: "hidden" }}
+      style={{
+        marginTop: s.s4,
+        borderRadius: r.box,
+        backgroundColor: c.sunken,
+        paddingTop: s.s2,
+        overflow: "hidden",
+      }}
     >
       <View
         style={{
@@ -156,7 +170,14 @@ export function FitIn({ chips, onPick }: { chips: FitChip[]; onPick: (id: string
               backgroundColor: c.bg,
             }}
           >
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.color ? spaceTone(item.color).dot : c.ink3 }} />
+            <View
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: item.color ? spaceTone(item.color).dot : c.ink3,
+              }}
+            />
             <T s="body">{item.title}</T>
             <T s="small" tone="ink3" tnum>
               {note}

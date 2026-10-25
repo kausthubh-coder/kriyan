@@ -66,24 +66,45 @@ export function MonthCard({
   );
   return (
     <View>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: s.s2 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingBottom: s.s2,
+        }}
+      >
         <Txt style={{ ...family("600"), fontSize: 20, lineHeight: 28, color: c.ink }}>
-          {MONTH_SHORT[month[1] - 1]} <Txt style={{ ...family("600"), fontSize: 20, lineHeight: 28, color: c.ink3 }}>{month[0]}</Txt>
+          {MONTH_SHORT[month[1] - 1]}{" "}
+          <Txt style={{ ...family("600"), fontSize: 20, lineHeight: 28, color: c.ink3 }}>{month[0]}</Txt>
         </Txt>
         <View style={{ flexDirection: "row", gap: s.s2 }}>
-          {nav("Previous month", () => setMonth(addMonths(month[0], month[1], -1)), <Icon icon={ChevronLeft} size={18} tone="ink" />)}
+          {nav(
+            "Previous month",
+            () => setMonth(addMonths(month[0], month[1], -1)),
+            <Icon icon={ChevronLeft} size={18} tone="ink" />,
+          )}
           {nav(
             "This month",
             () => setMonth([parts(today)[0], parts(today)[1]]),
             <T s="strong">Today</T>,
             true,
           )}
-          {nav("Next month", () => setMonth(addMonths(month[0], month[1], 1)), <Icon icon={ChevronRight} size={18} tone="ink" />)}
+          {nav(
+            "Next month",
+            () => setMonth(addMonths(month[0], month[1], 1)),
+            <Icon icon={ChevronRight} size={18} tone="ink" />,
+          )}
         </View>
       </View>
       <View style={{ flexDirection: "row" }}>
         {LETTERS.map((l, i) => (
-          <T key={i} s="small" tone="ink3" extra={{ flex: 1, textAlign: "center", paddingVertical: s.s2, ...family("600") }}>
+          <T
+            key={i}
+            s="small"
+            tone="ink3"
+            extra={{ flex: 1, textAlign: "center", paddingVertical: s.s2, ...family("600") }}
+          >
             {l}
           </T>
         ))}
@@ -145,7 +166,13 @@ export function MonthCard({
           role="link"
           accessibilityLabel={`${due.undated} with no day yet`}
           onPress={() => router.push("/inbox")}
-          style={{ height: 56, marginTop: s.s3, flexDirection: "row", alignItems: "center", borderRadius: r.ctl }}
+          style={{
+            height: 56,
+            marginTop: s.s3,
+            flexDirection: "row",
+            alignItems: "center",
+            borderRadius: r.ctl,
+          }}
           hoverBg={null}
         >
           <DottedRule edge="top" width={2} />

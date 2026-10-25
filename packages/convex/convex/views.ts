@@ -19,8 +19,9 @@ export const week = query({
 
 /** Open things due on each day of a range (Today's month and week dots), and how many have no day. */
 export const due = query({
-  args: { start: v.string(), end: v.string() },
-  handler: async (ctx, { start, end }) => Views.dueView(ctx, await requireOwner(ctx), start, end),
+  args: { start: v.string(), end: v.string(), today: v.string() },
+  handler: async (ctx, { start, end, today }) =>
+    Views.dueView(ctx, await requireOwner(ctx), start, end, today),
 });
 
 export const inbox = query({
@@ -72,6 +73,12 @@ export const task = query({
     const tree = spaceTree(await listSpaces(ctx, ownerId));
     const space = tree.find((s) => s._id === task.spaceId);
     const tracked = await Focus.trackedMinutes(ctx, ownerId, task._id);
-    return { ...task, spacePath: space?.path ?? null, color: space?.color ?? null, tracked };
+    // A study session's test, for the sheet's "CSC 316 exam 2 in 7 days".
+    const test = task.prepFor ? await ctx.db.get(task.prepFor) : null;
+    const prepTest =
+      test && test.ownerId === ownerId && test.deletedAt === undefined
+        ? { title: test.title, date: test.date ?? null }
+        : null;
+    return { ...task, spacePath: space?.path ?? null, color: space?.color ?? null, tracked, prepTest };
   },
 });

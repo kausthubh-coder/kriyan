@@ -9,7 +9,16 @@ import { c, s } from "@/theme/tokens";
 import { QuickAdd } from "./QuickAdd";
 import { Grabber } from "@/ui/bits";
 
-export function AddSheet({ onClose, initialText }: { onClose: () => void; initialText?: string }) {
+export function AddSheet({
+  onClose,
+  initialText,
+  defaultDate,
+}: {
+  onClose: () => void;
+  initialText?: string;
+  /** Tasks with no day typed land here (the day Today shows). */
+  defaultDate?: string;
+}) {
   // `height` runs from 0 to minus the keyboard's height as it opens.
   const { height } = useReanimatedKeyboardAnimation();
   const lift = useAnimatedStyle(() => ({ paddingBottom: s.s4 - height.value }));
@@ -18,7 +27,14 @@ export function AddSheet({ onClose, initialText }: { onClose: () => void; initia
       <View style={{ alignItems: "center" }}>
         <Grabber />
       </View>
-      <QuickAdd variant="sheet" autoFocus initialText={initialText} onAdded={onClose} onClose={onClose} />
+      <QuickAdd
+        variant="sheet"
+        autoFocus
+        initialText={initialText}
+        defaultDate={defaultDate}
+        onAdded={onClose}
+        onClose={onClose}
+      />
     </Animated.View>
   );
 }

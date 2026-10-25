@@ -6,9 +6,27 @@
 
 import { memo, useEffect, type ReactNode } from "react";
 import { View } from "react-native";
-import { Asterisk, Calendar, CalendarRange, ListChecks, Moon, Plus, Sparkles, Sun } from "lucide-react-native";
+import {
+  Asterisk,
+  Calendar,
+  Check as CheckGlyph,
+  CalendarRange,
+  ListChecks,
+  Moon,
+  Plus,
+  Sparkles,
+  Sun,
+} from "lucide-react-native";
 import { formatClock } from "@kriyan/core/dates";
-import { blockHeight, dueDayWord, formatSpan, isLive, isSpaceBlock, showsSpaceName, type DayItem } from "@kriyan/core/today";
+import {
+  blockHeight,
+  dueDayWord,
+  formatSpan,
+  isLive,
+  isSpaceBlock,
+  showsSpaceName,
+  type DayItem,
+} from "@kriyan/core/today";
 import { useSpaceView, type TaskView } from "@/data/views";
 import { selection } from "@/features/shell/context";
 import { rowRegistry } from "@/features/shell/rows";
@@ -51,7 +69,9 @@ export function Blocks({ day, on }: { day: Day; on: BlockHandlers }) {
     );
   // Habits without a time of their own sit with the evening, before the night routine.
   const habitsAt = day.entries.findIndex(
-    (e) => (e.kind === "anchor" && e.anchor === "wind") || (e.kind === "item" && e.item.kind === "routine" && (e.item.time ?? 0) >= 21 * 60),
+    (e) =>
+      (e.kind === "anchor" && e.anchor === "wind") ||
+      (e.kind === "item" && e.item.kind === "routine" && (e.item.time ?? 0) >= 21 * 60),
   );
   day.entries.forEach((e, i) => {
     if (i === habitsAt)
@@ -104,7 +124,15 @@ export function Blocks({ day, on }: { day: Day; on: BlockHandlers }) {
                 <Icon icon={ListChecks} size={20} tone="ink3" />
               )
             }
-            title={e.anchor === "wake" ? "Wake up" : e.anchor === "wind" ? "Wind down" : day.closed ? "Day closed" : "Review today"}
+            title={
+              e.anchor === "wake"
+                ? "Wake up"
+                : e.anchor === "wind"
+                  ? "Wind down"
+                  : day.closed
+                    ? "Day closed"
+                    : "Review today"
+            }
             past={past}
             pill={reviewNow ? "Now" : undefined}
             label={e.anchor === "review" ? "Review today" : e.anchor === "wake" ? "Wake up" : "Wind down"}
@@ -204,8 +232,12 @@ const Block = memo(function Block({
   const prep = task ? prepForOf(task) : null;
   const range = `${formatClock(item.time ?? 0)}–${formatClock((item.time ?? 0) + length)}`;
   const bits = [range];
-  if (item.spaceName && day.settings.showSpace && showsSpaceName(item.title, item.spaceName)) bits.push(item.spaceName);
-  if (prep) bits.push(`${prep.title.replace(/ \d+$/, "")} in ${prep.daysLeft} ${prep.daysLeft === 1 ? "day" : "days"}`);
+  if (item.spaceName && day.settings.showSpace && showsSpaceName(item.title, item.spaceName))
+    bits.push(item.spaceName);
+  if (prep?.daysLeft)
+    bits.push(
+      `${prep.title.replace(/ \d+$/, "")} in ${prep.daysLeft} ${prep.daysLeft === 1 ? "day" : "days"}`,
+    );
   if (task?.deadline && !task.event)
     bits.push(
       `due ${task.deadline === day.day ? (task.dueTime !== null ? formatClock(task.dueTime) : "today") : dueDayWord(task.deadline, day.day)}`,
@@ -218,7 +250,12 @@ const Block = memo(function Block({
   ) : block ? (
     <Icon icon={CalendarRange} size={20} color={tone.dotHex} strokeWidth={2} />
   ) : task?.event ? (
-    <Icon icon={Calendar} size={20} color={day.settings.showSpace && color ? tone.dotHex : hex.ink3} strokeWidth={2} />
+    <Icon
+      icon={Calendar}
+      size={20}
+      color={day.settings.showSpace && color ? tone.dotHex : hex.ink3}
+      strokeWidth={2}
+    />
   ) : task ? (
     <TaskBox task={task} />
   ) : null;
@@ -264,7 +301,17 @@ const Block = memo(function Block({
             backgroundColor: c.now,
           }}
         >
-          <View style={{ position: "absolute", left: -1, top: -3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.now }} />
+          <View
+            style={{
+              position: "absolute",
+              left: -1,
+              top: -3,
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: c.now,
+            }}
+          />
         </View>
       ) : null}
       <View style={{ flexDirection: "row", alignItems: "center", gap: s.s3 }}>
@@ -392,8 +439,16 @@ function MiniChip({
           alignItems: "center",
           justifyContent: "center",
         }}
-      />
-      <Txt style={[ty.small, { color: done ? c.ink2 : c.ink }, done ? { textDecorationLine: "line-through" } : null]}>
+      >
+        {done ? <CheckGlyph size={11} color={hex.bg} strokeWidth={3.5} /> : null}
+      </View>
+      <Txt
+        style={[
+          ty.small,
+          { color: done ? c.ink2 : c.ink },
+          done ? { textDecorationLine: "line-through" } : null,
+        ]}
+      >
         {title}
       </Txt>
       {note ? <Txt style={[ty.small, { color: c.ink3 }]}>{note}</Txt> : null}
@@ -429,14 +484,22 @@ function ThinItem({
   const task = src?.type === "task" ? src.task : null;
   useRegister(task);
   const past = day.now !== null && (item.time ?? 0) < day.now;
-  const label = item.spaceName && day.settings.showSpace && showsSpaceName(item.title, item.spaceName) ? item.spaceName : null;
+  const label =
+    item.spaceName && day.settings.showSpace && showsSpaceName(item.title, item.spaceName)
+      ? item.spaceName
+      : null;
   return (
     <Thin
       icon={
         task?.proposedBy ? (
           <Icon icon={Sparkles} size={20} tone="parse" />
         ) : task?.event ? (
-          <Icon icon={Calendar} size={20} color={task.color ? spaceTone(task.color).dotHex : hex.ink3} strokeWidth={2} />
+          <Icon
+            icon={Calendar}
+            size={20}
+            color={task.color ? spaceTone(task.color).dotHex : hex.ink3}
+            strokeWidth={2}
+          />
         ) : task ? (
           <TaskBox task={task} size={18} />
         ) : null
@@ -500,7 +563,11 @@ function Thin({
       <View style={{ width: 20, alignItems: "center" }}>{icon}</View>
       <Txt
         numberOfLines={1}
-        style={[ty.body, { flex: 1, color: past && !pill ? c.ink3 : c.ink2 }, done ? { textDecorationLine: "line-through" } : null]}
+        style={[
+          ty.body,
+          { flex: 1, color: past && !pill ? c.ink3 : c.ink2 },
+          done ? { textDecorationLine: "line-through" } : null,
+        ]}
       >
         {title}
         {space ? <Txt style={[ty.small, { color: c.ink3 }]}>{`  ${space}`}</Txt> : null}
@@ -552,7 +619,16 @@ function Gap({ from, to, now, onPress }: { from: number; to: number; now: boolea
           </>
         )}
       </Txt>
-      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c.sunken, alignItems: "center", justifyContent: "center" }}>
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: c.sunken,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Icon icon={Plus} size={14} tone="ink3" strokeWidth={2.5} />
       </View>
     </Press>

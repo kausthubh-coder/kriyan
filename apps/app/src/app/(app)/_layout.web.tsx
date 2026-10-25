@@ -35,7 +35,10 @@ export default function AppLayout() {
   // and centres Focus in the rest of the window, as B2 does.
   const immersive = path.startsWith("/focus/");
   // Like the prototype, the dock leaves for a sheet (a task, quick add) and the evening review.
-  const dock = phone && !immersive && !path.startsWith("/task/") && path !== "/add" && path !== "/review";
+  // Today draws its own three buttons (v5), so the old dock stays off it.
+  const today = path === "/" || path === "/today";
+  const dock =
+    phone && !today && !immersive && !path.startsWith("/task/") && path !== "/add" && path !== "/review";
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg, height: "100%" }}>
       {phone ? null : <Sidebar />}

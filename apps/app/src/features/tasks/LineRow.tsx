@@ -33,7 +33,13 @@ export interface LineRowProps {
   onPress: () => void;
   testID?: string;
   /** Phones: swipe right to finish, left to move. */
-  swipe?: { color: string; onComplete?: () => void; moveLabel: string; onMove: () => void; onPick: () => void };
+  swipe?: {
+    color: string;
+    onComplete?: () => void;
+    moveLabel: string;
+    onMove: () => void;
+    onPick: () => void;
+  };
 }
 
 export function LineRow(p: LineRowProps) {
@@ -86,7 +92,15 @@ export function LineRow(p: LineRowProps) {
           {p.title}
         </Txt>
         {p.spaceName ? (
-          <Txt style={{ ...family("500"), fontSize: 14, lineHeight: 24, color: c.ink3, opacity: quiet ? 0.7 : 1 }}>
+          <Txt
+            style={{
+              ...family("500"),
+              fontSize: 14,
+              lineHeight: 24,
+              color: c.ink3,
+              opacity: quiet ? 0.7 : 1,
+            }}
+          >
             {p.spaceName}
           </Txt>
         ) : null}

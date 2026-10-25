@@ -5,11 +5,11 @@
 // day in a centre column under quick add and a panel on the right: the summary, the month and
 // what's due in the next 7 days, or the selected item with its tiles.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform, RefreshControl, ScrollView, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, CalendarDays, Plus, Settings } from "lucide-react-native";
+import { ArrowLeft, CalendarDays, ChevronRight, Plus, Settings } from "lucide-react-native";
 import { addDays, diffDays, formatClock } from "@kriyan/core/dates";
 import { formatDate } from "@kriyan/core/format";
 import { dueDayWord, nextGap } from "@kriyan/core/today";
@@ -20,12 +20,11 @@ import { quickAddTarget, selection } from "@/features/shell/context";
 import { checkHabit, completeTask } from "@/features/tasks/actions";
 import { QuickAdd, whenWords, type QuickAddHandle } from "@/features/tasks/QuickAdd";
 import { useIsPhone } from "@/theme/layout";
-import { c, r, s, shadows } from "@/theme/tokens";
+import { c, r, s, scheme, shadows } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Skeleton } from "@/ui/bits";
 import { showToast } from "@/ui/toast";
-import { useRef } from "react";
 import { Blocks, type BlockHandlers } from "./Blocks";
 import { FillCard, HabitCard, ItemCard, RoutineCard, type FillCandidate } from "./Cards";
 import { Curtain, Sentence } from "./Curtain";
@@ -123,7 +122,15 @@ export function TodayScreen() {
     return (
       <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg }}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: s.s16 }}>
-          <View style={{ width: "100%", maxWidth: 640, alignSelf: "center", paddingHorizontal: s.s8, paddingTop: s.s8 }}>
+          <View
+            style={{
+              width: "100%",
+              maxWidth: 640,
+              alignSelf: "center",
+              paddingHorizontal: s.s8,
+              paddingTop: s.s8,
+            }}
+          >
             <Top day={day} today={today} onSummary={() => setSheet({ kind: "curtain" })} onPick={setDay} />
             <DeskAdd day={day} today={today} />
             {content}
@@ -141,9 +148,9 @@ export function TodayScreen() {
       onSummary={() => setSheet({ kind: "curtain" })}
       setDay={setDay}
       onMonth={() => setSheet({ kind: "month" })}
+      overlay={sheets}
     >
       {content}
-      {sheets}
     </PhoneToday>
   );
 }
@@ -154,6 +161,7 @@ function PhoneToday({
   onSummary,
   setDay,
   onMonth,
+  overlay,
   children,
 }: {
   day: string;
@@ -161,7 +169,9 @@ function PhoneToday({
   onSummary: () => void;
   setDay: (d: string) => void;
   onMonth: () => void;
-  children: React.ReactNode;
+  /** The sheets, over the buttons. */
+  overlay: ReactNode;
+  children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const [pulling, setPulling] = useState(false);
@@ -169,7 +179,11 @@ function PhoneToday({
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: insets.top + s.s6, paddingHorizontal: s.s6, paddingBottom: 160 + insets.bottom }}
+        contentContainerStyle={{
+          paddingTop: insets.top + s.s6,
+          paddingHorizontal: s.s6,
+          paddingBottom: 160 + insets.bottom,
+        }}
         {...(Platform.OS === "web"
           ? {}
           : {
@@ -229,6 +243,7 @@ function PhoneToday({
           <RoundButton label="Back to today" icon={ArrowLeft} onPress={() => setDay(today)} />
         )}
       </View>
+      {overlay}
     </View>
   );
 }
@@ -304,8 +319,7 @@ function Sheets({
 }) {
   const soon = useDue(addDays(data.day, 1), addDays(data.day, 4));
   if (!sheet) return null;
-  if (sheet.kind === "curtain")
-    return <Curtain open onClose={close} today={today} parts={data.sentence} />;
+  if (sheet.kind === "curtain") return <Curtain open onClose={close} today={today} parts={data.sentence} />;
   if (sheet.kind === "month")
     return (
       <FloatCard open onClose={close} label="Month" center={center}>
@@ -334,7 +348,7 @@ function Sheets({
       .map((t) => ({
         id: t._id,
         title: t.title,
-        note: `due ${dueDayWord(t.deadline!, data.day)}${t.dueTime !== null ? ` ${formatClock(t.dueTime)}` : ""}`,
+        note: `due ${t.deadline ? dueDayWord(t.deadline, data.day) : ""}${t.dueTime !== null ? ` ${formatClock(t.dueTime)}` : ""}`,
         date: t.date,
         time: t.time,
         length: t.length,
@@ -409,7 +423,7 @@ function RightPanel({
                 zIndex: 1,
               }}
             >
-              <Icon icon={ArrowLeft} size={16} tone="ink2" />
+              <Icon icon={ChevronRight} size={16} tone="ink2" />
             </Press>
             {src.type === "task" ? (
               <ItemCard
@@ -423,13 +437,31 @@ function RightPanel({
             ) : src.type === "habit" ? (
               <HabitCard habit={src.habit} day={day} onClose={unselect} panel />
             ) : (
-              <RoutineCard routine={src.routine} habits={data!.view.habits} day={day} onClose={unselect} panel />
+              <RoutineCard
+                routine={src.routine}
+                habits={data?.view.habits ?? []}
+                day={day}
+                onClose={unselect}
+                panel
+              />
             )}
           </View>
         ) : (
           <View>
-            <View style={{ borderRadius: r.box, backgroundColor: c.head, padding: s.s6 }}>
-              {data ? <Sentence parts={data.sentence} style={{ fontSize: 20, lineHeight: 28, letterSpacing: -0.3 }} /> : null}
+            <View
+              // Black on the white page; on dark's black page it lifts to the header's fill.
+              style={{
+                borderRadius: r.box,
+                backgroundColor: scheme === "dark" ? c.headFill : c.head,
+                padding: s.s6,
+              }}
+            >
+              {data ? (
+                <Sentence
+                  parts={data.sentence}
+                  style={{ fontSize: 20, lineHeight: 28, letterSpacing: -0.3 }}
+                />
+              ) : null}
             </View>
             <View style={{ marginTop: s.s6 }}>
               <MonthCard value={day} today={today} onPick={setDay} compact />
@@ -459,10 +491,22 @@ function RightPanel({
                               if (diffDays(t.date ?? d, day) !== 0) setDay(t.date ?? d);
                               selection.set({ taskId: t._id });
                             }}
-                            style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 40, borderRadius: r.ctl }}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: s.s3,
+                              minHeight: 40,
+                              borderRadius: r.ctl,
+                            }}
                           >
                             <View
-                              style={{ width: 18, height: 18, borderRadius: 6, borderWidth: 2, borderColor: c.lineStrong }}
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 6,
+                                borderWidth: 2,
+                                borderColor: c.lineStrong,
+                              }}
                             />
                             <T s="body" lines={1} extra={{ flex: 1 }}>
                               {t.title}
@@ -488,9 +532,10 @@ function RightPanel({
 
 /** Desktop keys on Today: ← and → change the day, T back to today, E edits, X ticks a habit. */
 function useDesktopKeys(active: boolean, day: string, setDay: (d: string) => void, data: Day | undefined) {
-  const latest = useMemo(() => ({ day, data }), [day, data]);
-  const ref = useRef(latest);
-  ref.current = latest;
+  const ref = useRef({ day, data });
+  useEffect(() => {
+    ref.current = { day, data };
+  }, [day, data]);
   useFocusEffect(
     useCallback(() => {
       if (!active || Platform.OS !== "web") return;
@@ -511,7 +556,11 @@ function useDesktopKeys(active: boolean, day: string, setDay: (d: string) => voi
           const src = now?.sources.get(selected);
           if (src?.type === "habit") void checkHabit(src.habit, d, !src.habit.doneToday);
           // Tasks: the shell's X ticks the selected row.
-          else if (src?.type === "task" && !src.task.done && !document.querySelector(`[data-testid="task-${selected}"]`))
+          else if (
+            src?.type === "task" &&
+            !src.task.done &&
+            !document.querySelector(`[data-testid="task-${selected}"]`)
+          )
             completeTask(src.task);
         } else return;
         e.preventDefault();

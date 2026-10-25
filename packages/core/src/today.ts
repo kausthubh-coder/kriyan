@@ -270,7 +270,12 @@ export function fillLengths(room: number): number[] {
 /** What a list row says on its right, one fact: a time, Now, a due, how long ago, a count. */
 export function rowFact(
   item: DayItem,
-  { day, now, left, habit }: { day: CivilDate; now: number | null; left?: boolean; habit?: { done: number; target: number } },
+  {
+    day,
+    now,
+    left,
+    habit,
+  }: { day: CivilDate; now: number | null; left?: boolean; habit?: { done: number; target: number } },
 ): { text: string; now?: boolean } | null {
   if (item.done && item.kind !== "habit") return null;
   if (item.yearly) return null;
@@ -342,7 +347,8 @@ export function daySentence({
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   if (classes) bits.push([{ text: plural(classes, "class", "classes"), strong: true }]);
   if (due) bits.push([{ text: plural(due, "thing", "things") + " due", strong: true }]);
-  if (study) bits.push([{ text: `${spoken(study.length)} of study`, strong: true }, { text: ` for ${study.test}` }]);
+  if (study)
+    bits.push([{ text: `${spoken(study.length)} of study`, strong: true }, { text: ` for ${study.test}` }]);
   if (habits) bits.push([{ text: plural(habits, "habit", "habits"), strong: true }]);
   if (block) bits.push([{ text: `${spoken(block.length)} on ${block.space}`, strong: true }]);
   const out: SentencePart[] = [{ text: part, strong: true }];
@@ -354,9 +360,14 @@ export function daySentence({
     });
     out.push({ text: " today." });
   } else out.push({ text: " Nothing planned today." });
-  if (left) out.push({ text: " " }, { text: `${left} from this week`, strong: true }, { text: " still open." });
+  if (left)
+    out.push({ text: " " }, { text: `${left} from this week`, strong: true }, { text: " still open." });
   if (freeUntil !== null)
-    out.push({ text: " You're " }, { text: `free until ${formatClock(freeUntil)}`, strong: true }, { text: "." });
+    out.push(
+      { text: " You're " },
+      { text: `free until ${formatClock(freeUntil)}`, strong: true },
+      { text: "." },
+    );
   else out.push({ text: " The rest of the day is " }, { text: "yours", strong: true }, { text: "." });
   return out;
 }

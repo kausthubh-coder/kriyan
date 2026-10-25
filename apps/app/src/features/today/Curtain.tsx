@@ -17,7 +17,10 @@ import { T, ty } from "./parts";
 
 export function Sentence({ parts, style }: { parts: SentencePart[]; style?: TextStyle }) {
   return (
-    <Txt style={[ty.sentence, { color: c.headDim }, style]} accessibilityLabel={parts.map((p) => p.text).join("")}>
+    <Txt
+      style={[ty.sentence, { color: c.headDim }, style]}
+      accessibilityLabel={parts.map((p) => p.text).join("")}
+    >
       {parts.map((p, i) => (
         <Txt key={i} style={[ty.sentence, style, { color: p.strong ? c.headInk : c.headDim }]}>
           {p.text}
@@ -57,11 +60,18 @@ export function Curtain({
       <StatusBar style="light" />
       <Animated.View entering={FadeIn.duration(200)} role="dialog" aria-label="Summary" style={{ flex: 1 }}>
         <View
-          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: s.s6 }}
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            paddingHorizontal: s.s6,
+          }}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: s.s2 }}>
             <Txt style={[ty.day, { color: c.headInk }]}>{WEEKDAY_SHORT[weekday(today)]}</Txt>
-            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.now, marginTop: s.s2 }} />
+            <View
+              style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.now, marginTop: s.s2 }}
+            />
           </View>
           <T s="date" tone="headDim" extra={{ textAlign: "right" }}>
             {`${d} ${MONTH_LONG[m - 1]}\n${y}`}
@@ -92,7 +102,11 @@ export function Curtain({
       </Animated.View>
     </Pressable>
   ) : (
-    <Pressable accessibilityLabel="Close the summary" onPress={onClose} style={{ flex: 1, backgroundColor: c.scrim }}>
+    <Pressable
+      accessibilityLabel="Close the summary"
+      onPress={onClose}
+      style={{ flex: 1, backgroundColor: c.scrim }}
+    >
       <Animated.View
         entering={FadeIn.duration(150)}
         role="dialog"
@@ -115,10 +129,19 @@ export function Curtain({
   );
   if (Platform.OS === "web")
     return (
-      <View style={{ position: "fixed" as "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 30 }}>{body}</View>
+      <View style={{ position: "fixed" as "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 30 }}>
+        {body}
+      </View>
     );
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <Modal
+      transparent
+      visible
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       {body}
     </Modal>
   );

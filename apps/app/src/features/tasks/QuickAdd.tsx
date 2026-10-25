@@ -15,9 +15,7 @@ import {
   Flag,
   Hourglass,
   Inbox,
-  Plus,
   Repeat2,
-  X,
   type LucideIcon,
 } from "lucide-react-native";
 import { api } from "@kriyan/convex/api";
@@ -29,16 +27,14 @@ import type { Repeat } from "@kriyan/core/repeat";
 import { useClock } from "@/data/time";
 import { useSpaces, type SpaceNode } from "@/data/views";
 import { ensureNotifications } from "@/features/notifications/register";
-import { useIsPhone, useType } from "@/theme/layout";
-import { c, hex, r, s, shadows, spaceTone } from "@/theme/tokens";
-import { Button } from "@/ui/Button";
+import { useIsPhone } from "@/theme/layout";
+import { bold, c, family, hex, r, s, spaceTone } from "@/theme/tokens";
 import { Dot } from "@/ui/bits";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { showToast } from "@/ui/toast";
 import { Txt } from "@/ui/Txt";
 import { errorText } from "./actions";
-import { Segmented } from "./Segmented";
 
 export interface QuickAddHandle {
   focus: () => void;
@@ -63,6 +59,8 @@ interface Props {
 }
 
 const EXAMPLE = "Gym tomorrow 7am for 45m every mon wed fri remind 10m before #health";
+
+const KIND_LABEL: Record<Kind, string> = { habit: "Habit", task: "Task", event: "Event" };
 
 const PLACEHOLDER: Record<Kind, string> = {
   task: "Task title",
@@ -150,21 +148,6 @@ function chipsFor(parsed: ParsedTask, today: string, spaces: SpaceNode[] | undef
   return out;
 }
 
-/** The details not set yet, as quiet chips that teach the grammar (the sheet only). */
-function missingFor(
-  parsed: ParsedTask,
-): { key: string; label: string; icon: LucideIcon; dashed?: boolean }[] {
-  const out: { key: string; label: string; icon: LucideIcon; dashed?: boolean }[] = [];
-  if (!parsed.date) out.push({ key: "date", label: "No date", icon: CalendarDays });
-  if (parsed.time === undefined) out.push({ key: "time", label: "No time", icon: Clock });
-  // Dashed: Kriyan never guesses a length, so its absence is a choice, not a gap.
-  if (!parsed.length) out.push({ key: "length", label: "No length", icon: Hourglass, dashed: true });
-  if (!parsed.repeat) out.push({ key: "repeat", label: "No repeat", icon: Repeat2 });
-  if (!parsed.reminders.length) out.push({ key: "rem", label: "No reminder", icon: Bell });
-  if (!parsed.spaceName) out.push({ key: "space", label: "No space", icon: Inbox });
-  return out;
-}
-
 /** The input with every span of the given kinds cut out. */
 function without(text: string, parsed: ParsedTask, kinds: SpanKind[]): string {
   let out = text;
@@ -203,7 +186,6 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
   const update = useMutation(api.tasks.update);
   const addHabit = useMutation(api.organize.addHabit);
   const phone = useIsPhone();
-  const roles = useType();
   const input = useRef<TextInput>(null);
   const [text, setText] = useState(initialText ?? "");
   const [kind, setKind] = useState<Kind>("task");
@@ -225,9 +207,11 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
   const parsed = useMemo(() => parseTask(text, today), [text, today]);
   const chips = useMemo(() => chipsFor(parsed, today, spaces), [parsed, today, spaces]);
   // The day it lands on: the sentence's, the screen's, today for a time with no day (as the
-  // server does) or for an event, else the inbox.
+  // server does) or for an event, else the inbox. A task with only a due date keeps no day:
+  // Today offers it to fit in on the day it's due.
+  const fallback = kind === "task" && parsed.deadline && parsed.time === undefined ? undefined : defaultDate;
   const day: CivilDate | null =
-    parsed.date ?? defaultDate ?? (parsed.time !== undefined || kind === "event" ? today : null);
+    parsed.date ?? fallback ?? (parsed.time !== undefined || kind === "event" ? today : null);
   const dayWord = day
     ? formatDay(day, today)
         .replace(/^Today$/, "today")
@@ -250,7 +234,7 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
         });
         showToast(`Added habit: ${parsed.title || value}`);
       } else {
-        const date = parsed.date ? undefined : (defaultDate ?? (kind === "event" ? today : undefined));
+        const date = parsed.date ? undefined : (fallback ?? (kind === "event" ? today : undefined));
         const id = await addText({
           text: value,
           ...(date ? { date } : {}),
@@ -278,7 +262,9 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
     }
   };
 
-  const fieldText: TextStyle = sheet ? roles.title : roles.body;
+  const fieldText: TextStyle = sheet
+    ? { ...bold, fontSize: 28, lineHeight: 34, letterSpacing: -0.7 }
+    : { ...family("500"), fontSize: 16, lineHeight: 24 };
   const minLines = sheet ? 2 : 1;
 
   const field = (
@@ -298,96 +284,122 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
       }}
       autoFocus={autoFocus}
       placeholder={sheet ? PLACEHOLDER[kind] : placeholder}
+      label={sheet ? PLACEHOLDER[kind] : "Add a task"}
       textStyle={fieldText}
       // At least 24 tall (44 on touch), so the one-line field is a full target (Hit Areas).
       minHeight={Math.max(phone ? 44 : 24, (fieldText.lineHeight ?? 20) * minLines)}
     />
   );
 
-  const chipRow =
-    chips.length || sheet ? (
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
-        {chips.map((chip) => (
-          <ParsedChip
-            key={chip.key}
-            label={chip.label}
-            icon={chip.icon}
-            dot={chip.dot}
-            onPress={() => setText(without(text, parsed, chip.kinds))}
-          />
-        ))}
-        {sheet && kind !== "habit"
-          ? missingFor(parsed).map((m) => (
-              <QuietChip key={m.key} label={m.label} icon={m.icon} dashed={m.dashed} />
-            ))
-          : null}
-      </View>
-    ) : null;
+  const parsedChips = chips.map((chip) => (
+    <ParsedChip
+      key={chip.key}
+      label={chip.label}
+      icon={chip.icon}
+      dot={chip.dot}
+      small={!sheet}
+      onPress={() => setText(without(text, parsed, chip.kinds))}
+    />
+  ));
 
   if (!sheet) {
+    // v5's `.qadd`: a soft field under the week; what it understood shows as blue chips.
     return (
-      <View style={{ gap: s.s3 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: s.s3,
-            minHeight: 44,
-            paddingVertical: s.s3,
-            paddingLeft: s.s4,
-            paddingRight: s.s3,
-            borderRadius: r.card,
-            backgroundColor: c.raised,
-            boxShadow: shadows.raised,
-          }}
-        >
-          <Icon icon={Plus} />
-          <View style={{ flex: 1, minWidth: 0 }}>{field}</View>
-          {text ? null : (
-            <Txt variant="caption" tone="ink3">
-              N
-            </Txt>
-          )}
-        </View>
-        {chips.length ? <View style={{ paddingHorizontal: s.s1 }}>{chipRow}</View> : null}
+      <View
+        style={{
+          paddingVertical: s.s3,
+          paddingHorizontal: s.s4,
+          borderRadius: r.box,
+          backgroundColor: c.sunken,
+          gap: s.s2,
+        }}
+      >
+        {field}
+        {text ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+            {chips.length ? (
+              parsedChips
+            ) : (
+              <QuietChip label={day ? formatDay(day, today) : "Inbox"} icon={CalendarDays} small />
+            )}
+          </View>
+        ) : null}
       </View>
     );
   }
 
+  // The sheet's quiet chips say what isn't set yet (v5 `addSheet`).
+  const has = (k: string) => chips.some((ch) => ch.key === k);
+  const quiet: { key: string; label: string; icon: LucideIcon; set?: boolean }[] = [];
+  if (kind === "habit")
+    quiet.push({ key: "often", label: "Every day, or say “every mon wed”", icon: Repeat2 });
+  else {
+    if (!has("date"))
+      quiet.push({
+        key: "date",
+        label: day ? formatDay(day, today) : "No day",
+        icon: CalendarDays,
+        set: Boolean(day),
+      });
+    if (!has("time")) quiet.push({ key: "time", label: "Add time", icon: Clock });
+    if (kind === "task" && !has("deadline")) quiet.push({ key: "due", label: "Due", icon: Flag });
+  }
+
   return (
-    <View style={{ gap: s.s3 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Segmented
-          label="Add a"
-          value={kind}
-          options={[
-            { value: "task", label: "Task" },
-            { value: "event", label: "Event" },
-            { value: "habit", label: "Habit" },
-          ]}
-          onChange={setKind}
-        />
-        {onClose ? <Button icon={X} accessibilityLabel="Close" onPress={onClose} /> : null}
+    <View style={{ gap: s.s3, flex: 1 }}>
+      <View
+        role="tablist"
+        aria-label="Add a"
+        style={{ flexDirection: "row", justifyContent: "center", gap: s.s1 }}
+      >
+        {(["habit", "task", "event"] as const).map((k) => (
+          <Press
+            key={k}
+            role="tab"
+            aria-selected={kind === k}
+            accessibilityLabel={KIND_LABEL[k]}
+            onPress={() => setKind(k)}
+            hoverBg={null}
+            style={{
+              minHeight: 40,
+              justifyContent: "center",
+              paddingHorizontal: s.s4,
+              borderRadius: r.box,
+              backgroundColor: kind === k ? c.sunken : "transparent",
+            }}
+          >
+            <Txt
+              style={{ ...family("500"), fontSize: 16, lineHeight: 24, color: kind === k ? c.ink : c.ink3 }}
+            >
+              {KIND_LABEL[k]}
+            </Txt>
+          </Press>
+        ))}
       </View>
-      <View style={{ marginTop: s.s1 }}>{field}</View>
-      {chipRow}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: s.s1 }}>
-        <Txt variant="meta" tone="ink3">
-          {text ? "Words in blue set the details. Delete them to undo." : "Type it like you'd say it."}
-        </Txt>
+      <View style={{ marginTop: s.s2, paddingHorizontal: s.s2 }}>{field}</View>
+      <View style={{ paddingHorizontal: s.s2, minHeight: 24 }}>
         {text ? null : (
           <Press
             role="button"
             accessibilityLabel="Try an example"
-            onPress={() => setText(EXAMPLE)}
+            onPress={() => setText(kind === "habit" ? "Read 20 pages every day" : EXAMPLE)}
             hoverBg={null}
-            style={{ minHeight: phone ? 44 : 24, justifyContent: "center" }}
+            style={{ alignSelf: "flex-start" }}
           >
-            <Txt variant="meta" tone="parse" style={{ fontWeight: "600" }}>
-              Try an example
+            <Txt style={{ ...family("400"), fontSize: 16, lineHeight: 24, color: c.ink3 }}>
+              {kind === "habit"
+                ? "Try “Read 20 pages every day”"
+                : "Try “HW21 due thu 23:59 #school” or “gym every monday 7am”"}
             </Txt>
           </Press>
         )}
+      </View>
+      <View style={{ flex: 1 }} />
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2 }}>
+        {quiet.map((q) => (
+          <QuietChip key={q.key} label={q.label} icon={q.icon} set={q.set} />
+        ))}
+        {parsedChips}
       </View>
       <Press
         role="button"
@@ -396,18 +408,23 @@ export const QuickAdd = forwardRef<QuickAddHandle, Props>(function QuickAdd(
         disabled={!parsed.title.trim() || busy}
         hoverBg={null}
         style={({ hovered }: { hovered?: boolean }) => ({
-          minHeight: 52,
-          marginTop: s.s1,
+          height: 56,
           alignItems: "center",
           justifyContent: "center",
-          paddingHorizontal: s.s4,
-          borderRadius: r.card,
+          borderRadius: r.box,
           backgroundColor: parsed.title.trim() ? c.ink : c.sunken,
           opacity: hovered && parsed.title.trim() ? 0.92 : 1,
         })}
       >
-        <Txt variant="subhead" tone={parsed.title.trim() ? "onInk" : "ink3"}>
-          {buttonLabel}
+        <Txt
+          style={{
+            ...family("600"),
+            fontSize: 16,
+            lineHeight: 24,
+            color: parsed.title.trim() ? c.onInk : c.ink3,
+          }}
+        >
+          Add
         </Txt>
       </Press>
     </View>
@@ -429,11 +446,12 @@ const ParsedField = forwardRef<
     onEscape: () => void;
     autoFocus?: boolean;
     placeholder: string;
+    label: string;
     textStyle: TextStyle;
     minHeight: number;
   }
 >(function ParsedField(
-  { text, parsed, onChangeText, onSubmit, onEscape, autoFocus, placeholder, textStyle, minHeight },
+  { text, parsed, onChangeText, onSubmit, onEscape, autoFocus, placeholder, label, textStyle, minHeight },
   ref,
 ) {
   const spans = segments(text, parsed).map((seg, i) => (
@@ -446,7 +464,7 @@ const ParsedField = forwardRef<
     autoFocus,
     placeholder,
     placeholderTextColor: hex.ink3,
-    accessibilityLabel: "What do you want to do?",
+    accessibilityLabel: label,
     autoCapitalize: "sentences" as const,
     // The grammar ("9am", "20m", "#life") isn't misspelt English; the keyboard mustn't fix it.
     autoCorrect: false,
@@ -519,68 +537,81 @@ function ParsedChip({
   label,
   icon,
   dot,
+  small,
   onPress,
 }: {
   label: string;
   icon: LucideIcon;
   dot?: string;
+  small?: boolean;
   onPress: () => void;
 }) {
-  const phone = useIsPhone();
   return (
     <Press
       role="button"
       accessibilityLabel={`Remove ${label}`}
       onPress={onPress}
       hoverBg={null}
-      style={{ minHeight: phone ? 44 : CHIP, justifyContent: "center", marginVertical: phone ? -s.s1 : 0 }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: s.s2,
+        height: small ? 32 : 44,
+        paddingHorizontal: s.s3,
+        borderRadius: r.pill,
+        backgroundColor: c.parseFill,
+      }}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: s.s2,
-          height: CHIP,
-          paddingHorizontal: s.s3,
-          borderRadius: r.card,
-          backgroundColor: c.parseFill,
-        }}
+      {dot ? (
+        <Dot color={dot} size={10} />
+      ) : (
+        <Icon icon={icon} size={small ? 14 : 18} tone="parse" strokeWidth={2.25} />
+      )}
+      <Txt
+        tnum
+        numberOfLines={1}
+        style={{ ...family("500"), fontSize: small ? 14 : 16, lineHeight: 20, color: c.parse }}
       >
-        <Icon icon={icon} size={16} tone="parse" />
-        {dot ? <Dot color={dot} /> : null}
-        <Txt variant="label" tone="parse" tnum numberOfLines={1} style={{ fontSize: 14, lineHeight: 20 }}>
-          {label}
-        </Txt>
-      </View>
+        {label}
+      </Txt>
     </Press>
   );
 }
 
-function QuietChip({ label, icon, dashed }: { label: string; icon: LucideIcon; dashed?: boolean }) {
+/** What isn't set yet, quietly (v5 `.chip`); `set` when it lands somewhere anyway. */
+function QuietChip({
+  label,
+  icon,
+  small,
+  set,
+}: {
+  label: string;
+  icon: LucideIcon;
+  small?: boolean;
+  set?: boolean;
+}) {
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
         gap: s.s2,
-        height: CHIP,
+        height: small ? 32 : 44,
         paddingHorizontal: s.s3,
-        borderRadius: r.card,
-        borderWidth: 1,
-        borderStyle: dashed ? "dashed" : "solid",
-        borderColor: c.lineStrong,
+        borderRadius: r.pill,
+        backgroundColor: small ? c.bg : c.sunken,
       }}
     >
-      <Icon icon={icon} size={16} />
-      <Txt variant="label" tone="ink3" numberOfLines={1} style={{ fontSize: 14, lineHeight: 20 }}>
+      <Icon icon={icon} size={small ? 14 : 18} tone={set ? "ink" : "ink3"} strokeWidth={2.25} />
+      <Txt
+        numberOfLines={1}
+        style={{ ...family("500"), fontSize: small ? 14 : 16, lineHeight: 20, color: set ? c.ink : c.ink3 }}
+      >
         {label}
       </Txt>
     </View>
   );
 }
-
-/** B2's chip height (`.chip`), on both layouts; on touch the target still reaches 44. */
-const CHIP = 34;
 
 /** "Today" and "Tomorrow" are labels; inside a sentence they're words. */
 function inSentence(day: string): string {

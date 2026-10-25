@@ -27,6 +27,7 @@ import {
   checkHabit,
   completeTask,
   deleteTask,
+  errorText,
   fillTask,
   moveTasks,
   reopenTask,
@@ -42,9 +43,8 @@ import { Txt } from "@/ui/Txt";
 import { convex } from "@/data/convex";
 import { api } from "@kriyan/convex/api";
 import { showToast } from "@/ui/toast";
-import { errorText } from "@/features/tasks/actions";
 import { GOALS_ROUTE, removeRoutine, tickRoutineAll, tickRoutinePart } from "./links";
-import { prepForOf, spaceName, type HabitView, type RoutineView } from "./model";
+import { spaceName, type HabitView, type PrepFor, type RoutineView } from "./model";
 import { Facts, InfoCard, Kicker, LenChip, SpaceBox, T, Tiles, WideButton, type TileSpec } from "./parts";
 
 const relDay = (date: string, today: string) => {
@@ -52,7 +52,7 @@ const relDay = (date: string, today: string) => {
   if (k === 0) return "Today";
   if (k === 1) return "Tomorrow";
   if (k === -1) return "Yesterday";
-  if (k > 1 && k < 7) return WEEKDAY_SHORT[weekday(date)]!;
+  if (k > 1 && k < 7) return WEEKDAY_SHORT[weekday(date)];
   return formatDate(date, today);
 };
 
@@ -89,7 +89,17 @@ export function ItemCard({
         <WideButton label="Close" onPress={onClose} />
       </View>
     );
-  return <TaskCardBody task={task} day={day ?? task.date ?? today} today={today} now={now} onClose={onClose} onEdit={onEdit} panel={panel} />;
+  return (
+    <TaskCardBody
+      task={task}
+      day={day ?? task.date ?? today}
+      today={today}
+      now={now}
+      onClose={onClose}
+      onEdit={onEdit}
+      panel={panel}
+    />
+  );
 }
 
 function TaskCardBody({
@@ -120,7 +130,9 @@ function TaskCardBody({
     spaceName: name,
   });
   const yearly = task.repeat?.freq === "year";
-  const prep = prepForOf(task as never);
+  const prep = task.prepTest
+    ? { ...task.prepTest, daysLeft: task.prepTest.date ? diffDays(task.prepTest.date, day) : null }
+    : null;
   const range =
     task.time !== undefined
       ? task.length
@@ -132,9 +144,13 @@ function TaskCardBody({
   if (block) facts.push({ icon: CalendarRange, text: "Time for this space" });
   if (name) facts.push({ dot: tone.dot, text: name });
   if (task.repeat && !yearly)
-    facts.push({ icon: Repeat2, text: describeRepeat(task.repeat as Repeat, task.repeatFirst ?? task.date ?? day, today) });
+    facts.push({
+      icon: Repeat2,
+      text: describeRepeat(task.repeat as Repeat, task.repeatFirst ?? task.date ?? day, today),
+    });
   if (task.reminders.length) facts.push({ icon: Bell, text: reminderText(task.reminders as Reminder[]) });
-  if (task.addedBy && !task.proposedBy) facts.push({ icon: Sparkles, text: `From ${task.addedBy}` });
+  if (task.addedBy && !task.proposedBy)
+    facts.push({ icon: Sparkles, text: `From ${task.addedBy === "An agent" ? "an agent" : task.addedBy}` });
 
   let kicker: string | null = null;
   let sub = "";
@@ -152,7 +168,12 @@ function TaskCardBody({
     const due = task.deadline
       ? `due ${task.deadline === day ? "" : formatDate(task.deadline, today)}${task.dueTime !== undefined ? `${task.deadline === day ? "" : ", "}${formatClock(task.dueTime)}` : task.deadline === day ? "today" : ""}`
       : "";
-    sub = task.date || range ? [when, due].filter(Boolean).join(", ") : task.deadline ? due.replace(/^due/, "Due") : "No day yet";
+    sub =
+      task.date || range
+        ? [when, due].filter(Boolean).join(", ")
+        : task.deadline
+          ? due.replace(/^due/, "Due")
+          : "No day yet";
   }
 
   const target = !task.date || task.date < today ? today : addDays(day, 1);
@@ -161,7 +182,12 @@ function TaskCardBody({
   let columns = 4;
   if (task.proposedBy) {
     tiles = [
-      { label: "Accept", icon: SquareCheck, tone: "primary", onPress: () => (onClose(), void settleProposal(task, true)) },
+      {
+        label: "Accept",
+        icon: SquareCheck,
+        tone: "primary",
+        onPress: () => (onClose(), void settleProposal(task, true)),
+      },
       { label: "Not now", icon: ArrowRight, onPress: () => (onClose(), void settleProposal(task, false)) },
     ];
     columns = 2;
@@ -179,7 +205,10 @@ function TaskCardBody({
             {
               label: "Skip once",
               icon: ArrowRight,
-              onPress: () => (onClose(), void skipTask({ _id: task._id, title: task.title, time: task.time ?? null })),
+              onPress: () => (
+                onClose(),
+                void skipTask({ _id: task._id, title: task.title, time: task.time ?? null })
+              ),
             },
           ]
         : []),
@@ -251,7 +280,7 @@ function TaskCardBody({
 }
 
 /** "CSC 316 exam 2 in 7 days" and which session this is. */
-function StudyFacts({ prep, task, day }: { prep: NonNullable<ReturnType<typeof prepForOf>>; task: TaskDoc; day: string }) {
+function StudyFacts({ prep, task, day }: { prep: PrepFor; task: TaskDoc; day: string }) {
   const first = task.repeatFirst ?? task.date ?? day;
   const end = task.repeat?.end?.kind === "on" ? task.repeat.end.date : null;
   const step = task.repeat?.freq === "day" ? task.repeat.interval : null;
@@ -259,9 +288,15 @@ function StudyFacts({ prep, task, day }: { prep: NonNullable<ReturnType<typeof p
   const of = step && end ? Math.floor(diffDays(end, first) / step) + 1 : null;
   return (
     <InfoCard>
-      <T s="title">{`${prep.title} in ${prep.daysLeft} ${prep.daysLeft === 1 ? "day" : "days"}`}</T>
+      <T s="title">
+        {prep.daysLeft === null
+          ? `For ${prep.title}`
+          : prep.daysLeft <= 0
+            ? `${prep.title} is today`
+            : `${prep.title} in ${prep.daysLeft} ${prep.daysLeft === 1 ? "day" : "days"}`}
+      </T>
       <T s="body" tone="ink2" extra={{ marginTop: 2 }}>
-        {`${formatDate(prep.date)}.${session && of ? ` Session ${session} of ${of}${task.length ? `, ${formatSpan(task.length)} a day` : ""}.` : ""}`}
+        {`${prep.date ? `${formatDate(prep.date)}.` : ""}${session && of ? ` Session ${session} of ${of}${task.length ? `, ${formatSpan(task.length)} a day` : ""}.` : ""}`}
       </T>
     </InfoCard>
   );
@@ -281,7 +316,13 @@ function NextInSpace({ spaceId, name }: { spaceId: Id<"spaces">; name: string })
       ) : null}
       {tasks.map((t) => (
         <View key={t._id} style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 40 }}>
-          <SpaceBox color={t.color} done={false} size={18} label={`Complete ${t.title}`} onPress={() => completeTask(t)} />
+          <SpaceBox
+            color={t.color}
+            done={false}
+            size={18}
+            label={`Complete ${t.title}`}
+            onPress={() => completeTask(t)}
+          />
           <T s="row" lines={1} extra={{ flex: 1 }}>
             {t.title}
           </T>
@@ -315,7 +356,10 @@ function Steps({ task }: { task: TaskDoc }) {
   return (
     <View style={{ marginTop: s.s4 }} accessibilityLabel="Steps">
       {steps.map((st, i) => (
-        <View key={`${i}:${st.title}`} style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 36 }}>
+        <View
+          key={`${i}:${st.title}`}
+          style={{ flexDirection: "row", alignItems: "center", gap: s.s3, minHeight: 36 }}
+        >
           <SpaceBox
             color={null}
             done={st.done}
@@ -333,7 +377,17 @@ function Steps({ task }: { task: TaskDoc }) {
 }
 
 /** A habit: Done today, its weeks, and the month's dots. */
-export function HabitCard({ habit, day, onClose, panel }: { habit: HabitView; day: string; onClose: () => void; panel?: boolean }) {
+export function HabitCard({
+  habit,
+  day,
+  onClose,
+  panel,
+}: {
+  habit: HabitView;
+  day: string;
+  onClose: () => void;
+  panel?: boolean;
+}) {
   const progress = useProgressView();
   const history = progress?.habits.find((h) => h._id === habit._id)?.days ?? [];
   const [y, m] = day.split("-").map(Number) as [number, number];
@@ -379,7 +433,8 @@ export function HabitCard({ habit, day, onClose, panel }: { habit: HabitView; da
                 .then(() =>
                   showToast(`Removed ${habit.title}`, {
                     label: "Undo",
-                    run: () => void convex.mutation(api.organize.updateHabit, { id: habit._id, archived: false }),
+                    run: () =>
+                      void convex.mutation(api.organize.updateHabit, { id: habit._id, archived: false }),
                   }),
                 )
                 .catch((e: unknown) => showToast(errorText(e)));
@@ -395,17 +450,23 @@ export function HabitCard({ habit, day, onClose, panel }: { habit: HabitView; da
         ]}
       />
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: s.s6 }}>
-        <T s="title">{MONTH_LONG[m - 1]!}</T>
+        <T s="title">{MONTH_LONG[m - 1] ?? ""}</T>
         <T s="title" tone="ink3" tnum>{`${inMonth} of ${daysIn}`}</T>
       </View>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: s.s4, rowGap: s.s4 }} aria-label="This month">
+      <View
+        style={{ flexDirection: "row", flexWrap: "wrap", marginTop: s.s4, rowGap: s.s4 }}
+        aria-label="This month"
+      >
         {Array.from({ length: Math.ceil((lead + daysIn) / 7) * 7 }, (_, k) => {
           const dnum = k - lead + 1;
           const date = `${monthKey}-${String(dnum).padStart(2, "0")}`;
           const real = dnum >= 1 && dnum <= daysIn;
           const on = real && checked.has(date);
           return (
-            <View key={k} style={{ width: `${100 / 7}%`, alignItems: "center", justifyContent: "center", height: 16 }}>
+            <View
+              key={k}
+              style={{ width: `${100 / 7}%`, alignItems: "center", justifyContent: "center", height: 16 }}
+            >
               {real ? (
                 <View
                   style={{
@@ -420,9 +481,7 @@ export function HabitCard({ habit, day, onClose, panel }: { habit: HabitView; da
           );
         })}
       </View>
-      {goal ? (
-        <T s="body" tone="ink2" extra={{ marginTop: s.s4 }}>{`Counts toward ${goal.title}`}</T>
-      ) : null}
+      {goal ? <T s="body" tone="ink2" extra={{ marginTop: s.s4 }}>{`Counts toward ${goal.title}`}</T> : null}
       <T s="body" tone="ink2" extra={{ marginTop: s.s4 }}>
         Counted by week. Missing a day never resets anything.
       </T>
@@ -498,10 +557,21 @@ export function RoutineCard({
               </View>
               <View style={{ flex: 1 }}>
                 <Txt style={{ ...family("500"), fontSize: 16, lineHeight: 24 }}>
-                  <Txt style={{ ...family("500"), fontSize: 16, color: p.done ? c.ink3 : c.ink, textDecorationLine: p.done ? "line-through" : "none" }}>
+                  <Txt
+                    style={{
+                      ...family("500"),
+                      fontSize: 16,
+                      color: p.done ? c.ink3 : c.ink,
+                      textDecorationLine: p.done ? "line-through" : "none",
+                    }}
+                  >
                     {p.title}
                   </Txt>
-                  {p.length ? <Txt style={{ ...family("400"), fontSize: 14, color: c.ink3 }}>{`  ${formatSpan(p.length)}`}</Txt> : null}
+                  {p.length ? (
+                    <Txt
+                      style={{ ...family("400"), fontSize: 14, color: c.ink3 }}
+                    >{`  ${formatSpan(p.length)}`}</Txt>
+                  ) : null}
                 </Txt>
                 {habit ? (
                   <T s="small" tone="ink2">{`Habit, ${habit.thisWeek} of ${habit.target} this week`}</T>
@@ -613,7 +683,10 @@ export function FillCard({
           <T s="body" tone="ink2" extra={{ marginTop: s.s4 }}>
             How long?
           </T>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: s.s3 }} role="radiogroup">
+          <View
+            style={{ flexDirection: "row", flexWrap: "wrap", gap: s.s2, marginTop: s.s3 }}
+            role="radiogroup"
+          >
             {fillLengths(room).map((x) => (
               <LenChip key={x} label={formatSpan(x)} on={length === x} onPress={() => setLength(x)} />
             ))}
@@ -625,7 +698,13 @@ export function FillCard({
               if (!length) return;
               onClose();
               void fillTask(
-                { _id: choice.id as Id<"tasks">, title: choice.title, date: choice.date, time: choice.time, length: choice.length },
+                {
+                  _id: choice.id as Id<"tasks">,
+                  title: choice.title,
+                  date: choice.date,
+                  time: choice.time,
+                  length: choice.length,
+                },
                 day,
                 from,
                 length,
@@ -641,4 +720,3 @@ export function FillCard({
     </View>
   );
 }
-
