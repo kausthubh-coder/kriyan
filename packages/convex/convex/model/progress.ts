@@ -157,3 +157,38 @@ export async function updateGoal(
     ...(patch.archived !== undefined ? { archivedAt: patch.archived ? Date.now() : undefined } : {}),
   });
 }
+
+/**
+ * Logs where a number goal stands ("$1,240 saved", "1.4 kg lost"): the value becomes one entry for
+ * its day, replacing that day's earlier one, and the goal's current is its newest entry's value.
+ * `date` defaults to the person's today; an agent filling in history passes earlier ones.
+ */
+export async function logGoal(
+  ctx: MutationCtx,
+  ownerId: string,
+  input: { goalId: Id<"goals">; value: number; date?: string },
+) {
+  const goal = owned(await ctx.db.get(input.goalId), ownerId, "goal");
+  if (goal.archivedAt !== undefined) throw new ConvexError("That goal is archived.");
+  if (goal.kind === "tasks")
+    throw new ConvexError("A tasks goal counts its linked tasks as they're done; there's nothing to log.");
+  if (!Number.isFinite(input.value) || input.value < 0) throw new ConvexError("Progress can't be below 0.");
+  const today = todayIn((await getProfile(ctx, ownerId)).timeZone);
+  const date = input.date ?? today;
+  if (!isCivilDate(date)) throw new ConvexError("The date must look like 2026-10-13.");
+  if (date > today) throw new ConvexError("Log what's already happened, today or before.");
+  const sameDay = await ctx.db
+    .query("goalEntries")
+    .withIndex("by_owner_and_goalId_and_date", (q) =>
+      q.eq("ownerId", ownerId).eq("goalId", goal._id).eq("date", date),
+    )
+    .take(10);
+  for (const e of sameDay) await ctx.db.delete(e._id);
+  await ctx.db.insert("goalEntries", { ownerId, goalId: goal._id, date, value: input.value });
+  const [newest] = await ctx.db
+    .query("goalEntries")
+    .withIndex("by_owner_and_goalId_and_date", (q) => q.eq("ownerId", ownerId).eq("goalId", goal._id))
+    .order("desc")
+    .take(1);
+  await ctx.db.patch(goal._id, { current: newest!.value });
+}

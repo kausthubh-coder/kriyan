@@ -2186,3 +2186,115 @@ describe("routines", () => {
     await expect(bob.mutation(api.routines.remove, { routineId })).rejects.toThrow(/isn't yours/);
   });
 });
+
+describe("goal entries and what feeds a goal", () => {
+  test("logging a money goal sets where it stands and keeps one entry a day for the trend line", async () => {
+    const { alice, today } = await setup();
+    const goalId = await alice.mutation(api.organize.addGoal, {
+      title: "Save $2,000",
+      kind: "number",
+      target: 2000,
+      unit: "$",
+      dueDate: "2026-12-31",
+    });
+    await alice.mutation(api.goals.log, { goalId, value: 300, date: "2026-09-01" });
+    await alice.mutation(api.goals.log, { goalId, value: 900, date: "2026-10-01" });
+    await alice.mutation(api.goals.log, { goalId, value: 1220 });
+    // A second log the same day replaces the first.
+    await alice.mutation(api.goals.log, { goalId, value: 1240 });
+    // History filled in later doesn't move where it stands now.
+    await alice.mutation(api.goals.log, { goalId, value: 600, date: "2026-09-15" });
+    const [goal] = await alice.query(api.views.goals, { today });
+    expect([goal!.current, goal!.unit, goal!.progress, goal!.entries]).toEqual([
+      1240,
+      "$",
+      0.62,
+      [
+        { date: "2026-09-01", value: 300 },
+        { date: "2026-09-15", value: 600 },
+        { date: "2026-10-01", value: 900 },
+        { date: "2026-10-13", value: 1240 },
+      ],
+    ]);
+  });
+
+  test("the trend line keeps the last 12 entries", async () => {
+    const { alice, today } = await setup();
+    const goalId = await alice.mutation(api.organize.addGoal, {
+      title: "Run 100 km",
+      kind: "number",
+      target: 100,
+    });
+    for (let day = 1; day <= 13; day++)
+      await alice.mutation(api.goals.log, {
+        goalId,
+        value: day * 5,
+        date: `2026-10-${String(day).padStart(2, "0")}`,
+      });
+    const [goal] = await alice.query(api.views.goals, { today });
+    expect(goal!.entries.map((e) => e.date)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `2026-10-${String(i + 2).padStart(2, "0")}`),
+    );
+    expect(goal!.current).toBe(65);
+  });
+
+  test("only a number goal takes a log, of something that already happened", async () => {
+    const { alice } = await setup();
+    const tasksGoal = await alice.mutation(api.organize.addGoal, {
+      title: "Ship 3.0",
+      kind: "tasks",
+      target: 5,
+    });
+    await expect(alice.mutation(api.goals.log, { goalId: tasksGoal, value: 2 })).rejects.toThrow(
+      /nothing to log/,
+    );
+    const goalId = await alice.mutation(api.organize.addGoal, {
+      title: "Lose 5 kg",
+      kind: "number",
+      target: 5,
+    });
+    await expect(alice.mutation(api.goals.log, { goalId, value: 1, date: "2026-10-14" })).rejects.toThrow(
+      "Log what's already happened, today or before.",
+    );
+    await expect(alice.mutation(api.goals.log, { goalId, value: -1 })).rejects.toThrow(
+      "Progress can't be below 0.",
+    );
+  });
+
+  test("a goal says which habits feed it and counts its linked tasks, done ones too", async () => {
+    const { t, alice, today } = await setup();
+    const ship = await alice.mutation(api.organize.addGoal, { title: "Ship 3.0", kind: "tasks", target: 4 });
+    const weight = await alice.mutation(api.organize.addGoal, {
+      title: "Lose 5 kg",
+      kind: "number",
+      target: 5,
+    });
+    await alice.mutation(api.organize.addHabit, { title: "Gym", target: 4, goalId: weight });
+    const walk = await alice.mutation(api.organize.addHabit, { title: "Walk", target: 3 });
+    await alice.mutation(api.organize.updateHabit, { id: walk, goalId: weight });
+    const archived = await alice.mutation(api.organize.addHabit, {
+      title: "Swim",
+      target: 2,
+      goalId: weight,
+    });
+    await alice.mutation(api.organize.updateHabit, { id: archived, archived: true });
+    await alice.mutation(api.tasks.add, { title: "Weigh in", goalId: weight });
+    const a = await alice.mutation(api.tasks.add, { title: "Build Today", goalId: ship });
+    await alice.mutation(api.tasks.add, { title: "Build the menu", goalId: ship, date: today });
+    const gone = await alice.mutation(api.tasks.add, { title: "Old idea", goalId: ship });
+    await alice.mutation(api.tasks.complete, { id: a });
+    await alice.mutation(api.tasks.remove, { id: gone });
+    // An agent's task counts like the person's own.
+    await t.mutation(internal.agent.add_task, {
+      ownerId: ALICE.tokenIdentifier,
+      agent: "Claude",
+      title: "Ship notes",
+      goalId: ship,
+    });
+    const goals = await alice.query(api.views.goals, { today });
+    expect(goals.map((g) => [g.title, g.feeds, g.next?.title ?? null, g.current])).toEqual([
+      ["Ship 3.0", { habits: [], tasks: 3 }, "Build the menu", 1],
+      ["Lose 5 kg", { habits: ["Gym", "Walk"], tasks: 1 }, "Weigh in", 0],
+    ]);
+  });
+});

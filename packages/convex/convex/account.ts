@@ -279,6 +279,11 @@ export const deleteDataBatch = internalMutation({
           .take(left),
       () =>
         ctx.db
+          .query("goalEntries")
+          .withIndex("by_owner_and_goalId_and_date", (q) => q.eq("ownerId", ownerId))
+          .take(left),
+      () =>
+        ctx.db
           .query("goals")
           .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
           .take(left),

@@ -257,6 +257,11 @@ export function progress(): ProgressResult {
         progress: 0.425,
         pace: 0.6,
         next: null,
+        entries: [
+          { date: "2026-10-04", value: 30 },
+          { date: "2026-10-11", value: 42.5 },
+        ],
+        feeds: { habits: ["Run"], tasks: 0 },
       },
       {
         _id: "k97books0000000000000000000002",
@@ -271,6 +276,8 @@ export function progress(): ProgressResult {
         progress: 0.75,
         pace: null,
         next: null,
+        entries: [],
+        feeds: { habits: [], tasks: 12 },
       },
     ],
     habits: habits.map((h) => ({ ...h, days: days(30, (i) => i % 3 === 0) })),

@@ -602,29 +602,56 @@ export function goalView(g: Doc<"goals">, today: CivilDate) {
   };
 }
 
+/** How many entries a goal's trend line shows. */
+const GOAL_ENTRIES = 12;
+
 /**
- * Goals as Progress, a space and the task editor show them, each with its next step: the soonest open
- * task linked to it (by date, then time; undated ones after), or null when none is.
+ * Goals as Progress, a space and the task editor show them, each with its next step (the soonest
+ * open task linked to it, by date, then time, undated ones after, or null), its last entries for
+ * the trend line, oldest first, and what feeds it: the habits linked to it and how many tasks are.
  */
 async function goalViews(ctx: QueryCtx, ownerId: string, goals: Doc<"goals">[], today: CivilDate) {
   if (goals.length === 0) return [];
-  const open = await ctx.db
-    .query("tasks")
-    .withIndex("by_owner_and_deletedAt_and_doneAt_and_date", (q) =>
-      q.eq("ownerId", ownerId).eq("deletedAt", undefined).eq("doneAt", undefined),
-    )
-    .take(LIMIT * 4);
-  const linked = open
-    .filter((t) => t.goalId !== undefined && t.proposedBy === undefined)
-    .sort(
-      (a, b) =>
-        (a.date ?? "9999").localeCompare(b.date ?? "9999") ||
-        (a.time ?? 1e9) - (b.time ?? 1e9) ||
-        a._creationTime - b._creationTime,
-    );
-  const next = new Map<string, { _id: Id<"tasks">; title: string }>();
-  for (const t of linked) if (!next.has(t.goalId!)) next.set(t.goalId!, { _id: t._id, title: t.title });
-  return goals.map((g) => ({ ...goalView(g, today), next: next.get(g._id) ?? null }));
+  const habits = (
+    await ctx.db
+      .query("habits")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .take(100)
+  )
+    .filter((h) => h.archivedAt === undefined && h.goalId !== undefined)
+    .sort((a, b) => a.order - b.order);
+  return await Promise.all(
+    goals.map(async (g) => {
+      const linked = (
+        await ctx.db
+          .query("tasks")
+          .withIndex("by_owner_and_goalId", (q) => q.eq("ownerId", ownerId).eq("goalId", g._id))
+          .take(LIMIT * 2)
+      ).filter((t) => live(t) && t.proposedBy === undefined);
+      const [next] = linked
+        .filter((t) => t.doneAt === undefined)
+        .sort(
+          (a, b) =>
+            (a.date ?? "9999").localeCompare(b.date ?? "9999") ||
+            (a.time ?? 1e9) - (b.time ?? 1e9) ||
+            a._creationTime - b._creationTime,
+        );
+      const entries = await ctx.db
+        .query("goalEntries")
+        .withIndex("by_owner_and_goalId_and_date", (q) => q.eq("ownerId", ownerId).eq("goalId", g._id))
+        .order("desc")
+        .take(GOAL_ENTRIES);
+      return {
+        ...goalView(g, today),
+        next: next ? { _id: next._id, title: next.title } : null,
+        entries: entries.reverse().map((e) => ({ date: e.date, value: e.value })),
+        feeds: {
+          habits: habits.filter((h) => h.goalId === g._id).map((h) => h.title),
+          tasks: linked.length,
+        },
+      };
+    }),
+  );
 }
 
 export async function progressView(ctx: QueryCtx, ownerId: string, today: CivilDate) {

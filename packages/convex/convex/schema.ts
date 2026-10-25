@@ -118,7 +118,9 @@ export default defineSchema({
     .index("by_owner_and_deadline", ["ownerId", "deadline"])
     // Maintenance only (emptying the Trash), never read for a person.
     .index("by_deletedAt", ["deletedAt"])
-    .index("by_owner_and_proposedBy", ["ownerId", "proposedBy"]),
+    .index("by_owner_and_proposedBy", ["ownerId", "proposedBy"])
+    // What feeds a goal, on its card.
+    .index("by_owner_and_goalId", ["ownerId", "goalId"]),
 
   /** One row per occurrence done: a single task, or one date of a repeating one. */
   completions: defineTable({
@@ -185,7 +187,7 @@ export default defineSchema({
     /** Why it matters, in the person's words ("Keeps the scholarship open"), shown under the title. */
     why: v.optional(v.string()),
     spaceId: v.optional(v.id("spaces")),
-    /** "number": track a value (km, pages); "tasks": count linked tasks done. */
+    /** "number": track a value (km, pages, $ saved); "tasks": count linked tasks done. */
     kind: v.union(v.literal("number"), v.literal("tasks")),
     target: v.number(),
     current: v.number(),
@@ -194,6 +196,14 @@ export default defineSchema({
     dueDate: v.optional(v.string()),
     archivedAt: v.optional(v.number()),
   }).index("by_owner", ["ownerId"]),
+
+  /** A goal's value on a day, for its trend line; goals.log adds one and sets the goal's current. */
+  goalEntries: defineTable({
+    ownerId: v.string(),
+    goalId: v.id("goals"),
+    date: v.string(),
+    value: v.number(),
+  }).index("by_owner_and_goalId_and_date", ["ownerId", "goalId", "date"]),
 
   /** Time spent in Focus, one row per session; Review and Goals add these up. */
   focusSessions: defineTable({
