@@ -235,7 +235,16 @@ function ItemRow({
           : null
       }
       icon={icon}
-      fact={done && !habit ? null : fact}
+      fact={
+        done && !habit
+          ? null
+          : fact?.now && !day.settings.nowBadge && item.time !== null
+            ? // Settings' Now badge off: the row keeps saying its time.
+              {
+                text: `${formatClock(item.time)}${item.length ? `–${formatClock(item.time + item.length)}` : ""}`,
+              }
+            : fact
+      }
       pill={pill}
       repeats={Boolean(task?.repeat) && !done}
       reminds={Boolean(task?.reminders.length) && !done}

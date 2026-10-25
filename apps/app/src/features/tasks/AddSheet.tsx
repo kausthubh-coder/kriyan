@@ -2,6 +2,7 @@
 // The native sheet doesn't move for the keyboard, so the content grows by the keyboard's
 // height and the field, chips and button ride above it.
 
+import type { Id } from "@kriyan/convex/dataModel";
 import { View } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
@@ -13,11 +14,14 @@ export function AddSheet({
   onClose,
   initialText,
   defaultDate,
+  defaultSpaceId,
 }: {
   onClose: () => void;
   initialText?: string;
   /** Tasks with no day typed land here (the day Today shows). */
   defaultDate?: string;
+  /** Tasks with no #space land here (a space's Add). */
+  defaultSpaceId?: Id<"spaces">;
 }) {
   // `height` runs from 0 to minus the keyboard's height as it opens.
   const { height } = useReanimatedKeyboardAnimation();
@@ -32,6 +36,7 @@ export function AddSheet({
         autoFocus
         initialText={initialText}
         defaultDate={defaultDate}
+        defaultSpaceId={defaultSpaceId}
         onAdded={onClose}
         onClose={onClose}
       />

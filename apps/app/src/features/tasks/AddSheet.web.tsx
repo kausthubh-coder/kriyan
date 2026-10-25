@@ -1,6 +1,7 @@
 // Web: quick add as a sheet over a scrim (phones) or a dialog (desktop, when the route is
 // opened directly). The field is focused and sits above the keyboard.
 
+import type { Id } from "@kriyan/convex/dataModel";
 import { useRef } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { FadeIn, Keyframe } from "react-native-reanimated";
@@ -18,11 +19,14 @@ export function AddSheet({
   onClose,
   initialText,
   defaultDate,
+  defaultSpaceId,
 }: {
   onClose: () => void;
   initialText?: string;
   /** Tasks with no day typed land here (the day Today shows). */
   defaultDate?: string;
+  /** Tasks with no #space land here (a space's Add). */
+  defaultSpaceId?: Id<"spaces">;
 }) {
   const phone = useIsPhone();
   const layer = useRef<View>(null);
@@ -85,6 +89,7 @@ export function AddSheet({
           autoFocus
           initialText={initialText}
           defaultDate={defaultDate}
+          defaultSpaceId={defaultSpaceId}
           onAdded={onClose}
           onClose={onClose}
         />

@@ -1,7 +1,4 @@
 // Where Today's buttons go, and the routine actions.
-//
-// /menu and /goals are slice B's routes (the shell redesign); typed routes only know them once
-// B lands, so they're named here once.
 
 import type { Href } from "expo-router";
 import type { OptimisticLocalStore } from "convex/browser";
@@ -13,8 +10,8 @@ import { playSound } from "@/features/feel/sound";
 import { showToast } from "@/ui/toast";
 import type { RoutineView } from "./model";
 
-export const MENU_ROUTE = "/menu" as Href;
-export const GOALS_ROUTE = "/goals" as Href;
+export const MENU_ROUTE: Href = "/menu";
+export const GOALS_ROUTE: Href = "/goals";
 export const SETTINGS_ROUTE: Href = "/settings";
 
 /** Shows the ticks at once in the day's view; the server's answer replaces them. */

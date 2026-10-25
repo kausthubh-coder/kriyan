@@ -7,17 +7,10 @@ import type { TaskView, TodayView } from "@/data/views";
 export type RoutineView = TodayView["routines"][number];
 export type HabitView = TodayView["habits"][number];
 export type PrepFor = NonNullable<TaskView["prepFor"]>;
-export type TodaySettings = Pick<
-  TodayView["profile"],
-  "todayLayout" | "earlierWindow" | "showSpace" | "hideDone"
->;
+export type { TodayPrefs as TodaySettings } from "@/features/settings/todayPrefs";
 
 export function routinesOf(view: TodayView): RoutineView[] {
   return view.routines;
-}
-
-export function settingsOf(view: TodayView): TodaySettings {
-  return view.profile;
 }
 
 export function prepForOf(task: Pick<TaskView, "prepFor">): PrepFor | null {

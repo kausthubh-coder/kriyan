@@ -17,12 +17,12 @@ import {
 import { useClock } from "@/data/time";
 import { useDayView, useProfile, type TaskView, type TodayView } from "@/data/views";
 import { closedDay } from "@/features/review/closedDay";
+import { useTodayPrefs } from "@/features/settings/todayPrefs";
 import {
   habitItem,
   prepForOf,
   routineItem,
   routinesOf,
-  settingsOf,
   standaloneHabits,
   taskItem,
   type HabitView,
@@ -75,10 +75,11 @@ export function useDay(day: string): Day | undefined {
   const profile = useProfile();
   const { today, now } = useClock();
   const closedOn = closedDay.useValue((d) => d);
+  const prefs = useTodayPrefs();
+  const review = profile?.reviewTime ?? DEFAULT_REVIEW;
   return useMemo(
-    () =>
-      view ? compose(view, day, today, now, profile?.reviewTime ?? DEFAULT_REVIEW, closedOn) : undefined,
-    [view, day, today, now, profile?.reviewTime, closedOn],
+    () => (view ? compose(view, day, today, now, review, closedOn, prefs ?? view.profile) : undefined),
+    [view, day, today, now, review, closedOn, prefs],
   );
 }
 
@@ -89,10 +90,10 @@ function compose(
   clock: number,
   review: number,
   closedOn: string | null,
+  settings: TodaySettings,
 ): Day {
   const isToday = day === today;
   const now = isToday ? clock : null;
-  const settings = settingsOf(view);
   const sources = new Map<string, Source>();
   const keep = (i: DayItem) => !settings.hideDone || !i.done;
 
