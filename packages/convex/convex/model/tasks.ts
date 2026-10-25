@@ -8,7 +8,7 @@ import { firstOccurrence, parseTask } from "@kriyan/core/parse";
 import { nextAfterDone, sameRepeat, validateRepeat, type Repeat } from "@kriyan/core/repeat";
 import { validateReminder, type Reminder } from "@kriyan/core/reminders";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getProfile, owned } from "./owner";
 import { scheduleReminders, cancelReminders } from "./reminders";
 import { resolveSpacePath } from "./spaces";
@@ -20,12 +20,16 @@ export interface TaskFields {
   time?: number;
   length?: number;
   deadline?: string;
+  /** Minutes after midnight on the deadline; needs a deadline. */
+  dueTime?: number;
   repeat?: Repeat;
   reminders?: Reminder[];
   note?: string;
   steps?: Step[];
   event?: boolean;
   goalId?: Id<"goals">;
+  /** The agent's source id, unique per owner (see findByExternalId). */
+  externalId?: string;
 }
 
 export interface Step {
@@ -70,6 +74,14 @@ function check(fields: Partial<TaskFields>) {
     throw new ConvexError("The time must be within the day.");
   }
   if (
+    fields.dueTime !== undefined &&
+    (!Number.isInteger(fields.dueTime) || fields.dueTime < 0 || fields.dueTime > 1439)
+  ) {
+    throw new ConvexError("The due time must be within the day, in minutes after midnight.");
+  }
+  if (fields.externalId !== undefined && (!fields.externalId.trim() || fields.externalId.length > 200))
+    throw new ConvexError("The externalId must be 1 to 200 characters.");
+  if (
     fields.length !== undefined &&
     (!Number.isInteger(fields.length) || fields.length < 1 || fields.length > 1440)
   ) {
@@ -91,6 +103,28 @@ function check(fields: Partial<TaskFields>) {
   }
 }
 
+const NO_DEADLINE = "A due time needs a deadline: send the deadline with it.";
+
+/** The task with this externalId, deleted or not, or null. */
+export async function findByExternalId(
+  ctx: QueryCtx,
+  ownerId: string,
+  externalId: string,
+): Promise<Doc<"tasks"> | null> {
+  return await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_externalId", (q) => q.eq("ownerId", ownerId).eq("externalId", externalId.trim()))
+    .first();
+}
+
+async function checkExternalId(ctx: QueryCtx, ownerId: string, externalId: string, self?: Id<"tasks">) {
+  const taken = await findByExternalId(ctx, ownerId, externalId);
+  if (taken && taken._id !== self)
+    throw new ConvexError(
+      `Another task already has the externalId "${externalId.trim()}"; upsert_tasks updates it instead.`,
+    );
+}
+
 async function checkRefs(
   ctx: MutationCtx,
   ownerId: string,
@@ -107,7 +141,9 @@ export async function createTask(
   options: { source: "app" | "agent"; proposedBy?: string; addedBy?: string } = { source: "app" },
 ): Promise<Id<"tasks">> {
   check(fields);
+  if (fields.dueTime !== undefined && !fields.deadline) throw new ConvexError(NO_DEADLINE);
   await checkRefs(ctx, ownerId, fields);
+  if (fields.externalId !== undefined) await checkExternalId(ctx, ownerId, fields.externalId);
   const profile = await getProfile(ctx, ownerId);
   let date = fields.date;
   if (fields.repeat && !date) date = firstOccurrence(fields.repeat, todayIn(profile.timeZone));
@@ -122,6 +158,7 @@ export async function createTask(
     ...(fields.time !== undefined ? { time: fields.time } : {}),
     ...(fields.length !== undefined ? { length: fields.length } : {}),
     ...(fields.deadline ? { deadline: fields.deadline } : {}),
+    ...(fields.dueTime !== undefined ? { dueTime: fields.dueTime } : {}),
     ...(fields.repeat ? { repeat: fields.repeat, repeatFirst: date } : {}),
     reminders,
     ...(fields.note ? { note: fields.note } : {}),
@@ -132,6 +169,7 @@ export async function createTask(
     source: options.source,
     ...(options.proposedBy ? { proposedBy: options.proposedBy } : {}),
     ...(options.addedBy ? { addedBy: options.addedBy } : {}),
+    ...(fields.externalId !== undefined ? { externalId: fields.externalId.trim() } : {}),
   });
   await scheduleReminders(ctx, id);
   return id;
@@ -162,6 +200,7 @@ export async function addFromText(
       ...(parsed.time !== undefined ? { time: parsed.time } : {}),
       ...(parsed.length !== undefined ? { length: parsed.length } : {}),
       ...(parsed.deadline ? { deadline: parsed.deadline } : {}),
+      ...(parsed.dueTime !== undefined ? { dueTime: parsed.dueTime } : {}),
       ...(parsed.repeat ? { repeat: parsed.repeat } : {}),
       ...(parsed.reminders.length ? { reminders: parsed.reminders } : {}),
     },
@@ -181,12 +220,25 @@ export async function updateTask(
     if (v !== null && v !== undefined) (set as Record<string, unknown>)[k] = v;
   check(set);
   await checkRefs(ctx, ownerId, patch);
+  if (set.externalId !== undefined) await checkExternalId(ctx, ownerId, set.externalId, id);
   const next: Partial<Doc<"tasks">> = {};
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
     (next as Record<string, unknown>)[k] =
-      v === null ? CLEARED[k as keyof TaskFields] : k === "title" ? String(v).trim() : v;
+      v === null
+        ? CLEARED[k as keyof TaskFields]
+        : k === "title" || k === "externalId"
+          ? String(v).trim()
+          : v;
   }
+  // A due time belongs to its deadline: clearing the deadline clears the time too.
+  if (patch.deadline === null && patch.dueTime === undefined) next.dueTime = undefined;
+  const deadline = patch.deadline === null ? undefined : (patch.deadline ?? task.deadline);
+  const dueTime =
+    patch.dueTime === null || (patch.deadline === null && patch.dueTime === undefined)
+      ? undefined
+      : (patch.dueTime ?? task.dueTime);
+  if (dueTime !== undefined && !deadline) throw new ConvexError(NO_DEADLINE);
   const repeat = patch.repeat === null ? undefined : (patch.repeat ?? task.repeat);
   const date = patch.date === null ? undefined : (patch.date ?? task.date);
   if (repeat && !date) throw new ConvexError("A repeating task needs a date.");

@@ -1,12 +1,11 @@
 // Profile, push tokens and access tokens for the signed-in person.
 
 import { ConvexError, v } from "convex/values";
-import { isCivilDate } from "@kriyan/core/dates";
 import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { cancelReminders, scheduleReminders } from "./model/reminders";
 import { DEFAULT_PROFILE, getProfile, requireOwner } from "./model/owner";
-import { checkReminders } from "./model/tasks";
+import { updateSettings } from "./model/profile";
 import * as Tokens from "./model/tokens";
 import { reminderV } from "./validators";
 
@@ -81,50 +80,7 @@ export const updateProfile = mutation({
     semesterStart: v.optional(v.union(v.string(), v.null())),
     semesterEnd: v.optional(v.union(v.string(), v.null())),
   },
-  handler: async (ctx, patch) => {
-    const ownerId = await requireOwner(ctx);
-    const row = await ctx.db
-      .query("profiles")
-      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
-      .unique();
-    if (!row) throw new ConvexError("Open the app once to create your profile.");
-    const dayStart = patch.dayStart ?? row.dayStart;
-    const dayEnd = patch.dayEnd ?? row.dayEnd;
-    if (
-      !Number.isInteger(dayStart) ||
-      !Number.isInteger(dayEnd) ||
-      dayStart < 0 ||
-      dayEnd > 1440 ||
-      dayEnd <= dayStart
-    )
-      throw new ConvexError("Your day must end after it starts.");
-    if (
-      patch.dailyCapacity !== undefined &&
-      (!Number.isInteger(patch.dailyCapacity) || patch.dailyCapacity < 0 || patch.dailyCapacity > 1440)
-    )
-      throw new ConvexError("A day can hold from 0 to 24 hours of planned work.");
-    // Every new timed task copies these, so they get the same checks as a task's own.
-    if (patch.defaultReminders) checkReminders(patch.defaultReminders);
-    if (
-      patch.reviewTime !== undefined &&
-      (!Number.isInteger(patch.reviewTime) || patch.reviewTime < 0 || patch.reviewTime > 1439)
-    )
-      throw new ConvexError("The review time must be within the day.");
-    for (const key of ["semesterStart", "semesterEnd"] as const) {
-      const value = patch[key];
-      if (value && !isCivilDate(value)) throw new ConvexError("Semester dates look like 2026-10-13.");
-    }
-    const start = patch.semesterStart === undefined ? row.semesterStart : (patch.semesterStart ?? undefined);
-    const end = patch.semesterEnd === undefined ? row.semesterEnd : (patch.semesterEnd ?? undefined);
-    if (start && end && end <= start) throw new ConvexError("The semester must end after it starts.");
-    const { onboarded, semesterStart, semesterEnd, ...rest } = patch;
-    await ctx.db.patch(row._id, {
-      ...rest,
-      ...(semesterStart !== undefined ? { semesterStart: semesterStart ?? undefined } : {}),
-      ...(semesterEnd !== undefined ? { semesterEnd: semesterEnd ?? undefined } : {}),
-      ...(onboarded ? { onboardedAt: Date.now() } : {}),
-    });
-  },
+  handler: async (ctx, patch) => updateSettings(ctx, await requireOwner(ctx), patch),
 });
 
 /** Expo's push token shapes: ExponentPushToken[...], ExpoPushToken[...], or a bare id. */

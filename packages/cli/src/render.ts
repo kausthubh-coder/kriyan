@@ -2,7 +2,14 @@
 // and colour only for the space dot (and only when the terminal wants colour).
 
 import { todayIn, zonedParts, type CivilDate } from "@kriyan/core/dates";
-import { formatDate, formatDay, formatDuration, formatTime, formatTimeRange } from "@kriyan/core/format";
+import {
+  dueWhen,
+  formatDate,
+  formatDay,
+  formatDuration,
+  formatTime,
+  formatTimeRange,
+} from "@kriyan/core/format";
 import { freeMinutes } from "@kriyan/core/layout";
 import { schemes, type SpaceColor } from "@kriyan/core/tokens";
 
@@ -13,6 +20,7 @@ import type {
   GoalView,
   InboxResult,
   ProgressResult,
+  SearchResult,
   SpacesResult,
   TaskView,
   TodayResult,
@@ -95,6 +103,9 @@ const TASKS = { right: [0] };
 
 const when = (t: TaskView) => (t.time === null ? "" : formatTimeRange(t.time, t.length ?? undefined));
 
+/** "due 23:55" for a deadline with a time, else "due". */
+const due = (t: { dueTime: number | null }) => (t.dueTime === null ? "due" : `due ${formatTime(t.dueTime)}`);
+
 /** "Today, Tue 13 Oct" or "Wed 21 Oct". */
 export function dayLabel(date: CivilDate, today: CivilDate): string {
   const word = formatDay(date, today);
@@ -138,7 +149,7 @@ export function renderToday(day: TodayResult, view: View, refs: RefBook): string
     for (const t of tasks) lines.push(taskRow(t, whenOf(t), refs, view, showDone));
   };
   section("Schedule", day.scheduled, when);
-  section(isToday ? "Due today" : "Due that day", day.due, () => "");
+  section(isToday ? "Due today" : "Due that day", day.due, (t) => (t.dueTime === null ? "" : due(t)));
   section("Anytime", day.anytime, () => "");
   section("From earlier", day.earlier, (t) => (t.date ? formatDate(t.date, today) : ""));
   section("Done", day.done, () => "", false);
@@ -216,7 +227,7 @@ export function renderWeek(week: WeekResult, view: View, refs: RefBook, today: C
     lines.push({ text: "" }, { text: load ? `${labels[i]!.padEnd(labelWidth)}  ${load}` : labels[i]! });
     for (const t of d.scheduled) lines.push(taskRow(t, when(t), refs, view));
     for (const t of d.anytime) lines.push(taskRow(t, "", refs, view));
-    for (const t of d.deadlines) lines.push(taskRow(t, "due", refs, view));
+    for (const t of d.deadlines) lines.push(taskRow(t, due(t), refs, view));
     if (!d.scheduled.length && !d.anytime.length && !d.deadlines.length)
       lines.push({ text: "  Nothing planned" });
   });
@@ -245,6 +256,31 @@ export function renderInbox(inbox: InboxResult, view: View, refs: RefBook): stri
       TASKS,
     ),
   ].join("\n");
+}
+
+/** Search results: number, when it's planned (or due), title, space and anything not open. */
+export function renderSearch(found: SearchResult, refs: RefBook, today: CivilDate): string {
+  if (!found.tasks.length) return "No tasks match.";
+  const rows = found.tasks.map((t): Line => {
+    const planned = t.date
+      ? `${formatDate(t.date, today)}${t.time !== null ? ` ${formatTime(t.time)}` : ""}`
+      : t.deadline
+        ? `due ${dueWhen(t.deadline, t.dueTime, today)}`
+        : "";
+    return {
+      cells: [
+        refs.ref({ _id: t.taskId, title: t.title }),
+        planned,
+        t.title,
+        t.spacePath ?? "",
+        t.status === "open" ? "" : t.status,
+      ],
+    };
+  });
+  const more = found.cursor
+    ? ["", "There are more. Narrow the words, or add --json to page with the cursor."]
+    : [];
+  return [table(rows, TASKS), ...more].join("\n");
 }
 
 export function renderSpaces(spaces: SpacesResult, view: View): string {

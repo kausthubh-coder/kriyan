@@ -90,6 +90,9 @@ const taskFields: Record<string, Schema> = {
     description: "Length in minutes. Leave it out unless the person said how long; never guess.",
   },
   deadline: { ...date, description: "When it's due, if different from the day it's planned for." },
+  dueTime: minutes(
+    "The time on the deadline when it's due (23:55 is 1435). Needs a deadline. Put due times here, never in the title",
+  ),
   repeat: repeatSchema,
   reminders: remindersSchema,
   note: { type: "string", description: "Markdown." },
@@ -110,10 +113,21 @@ const taskFields: Record<string, Schema> = {
     description: "True for something attended (a class, a meeting) rather than ticked off.",
   },
   goalId: id("goal"),
+  externalId: {
+    type: "string",
+    maxLength: 200,
+    description:
+      "The id your source gives this item (a Moodle assignment's id). Unique per person; upsert_tasks finds the task by it.",
+  },
 };
 
 /** Fields that may be cleared with null in update_task. */
 const nullable = (s: Schema) => ({ oneOf: [s, { type: "null" }] });
+
+/** update_task's fields: null clears one. */
+const patchFields: Record<string, Schema> = Object.fromEntries(
+  Object.entries(taskFields).map(([k, s]) => [k, k === "title" ? s : nullable(s)]),
+);
 
 export interface OpSpec {
   name: string;
@@ -231,9 +245,7 @@ const BASE_OPS: OpSpec[] = [
     input: obj(
       {
         taskId: id("task"),
-        ...Object.fromEntries(
-          Object.entries(taskFields).map(([k, s]) => [k, k === "title" ? s : nullable(s)]),
-        ),
+        ...patchFields,
       },
       ["taskId"],
     ),
@@ -461,7 +473,254 @@ const BASE_OPS: OpSpec[] = [
   },
 ];
 
-export const OPS: OpSpec[] = BASE_OPS.map(named);
+const batch = (items: Schema, description: string): Schema => ({
+  type: "array",
+  minItems: 1,
+  maxItems: 100,
+  description,
+  items,
+});
+
+const taskIds: Schema = batch(id("task"), "Up to 100 task ids.");
+
+const range = (what: string) => ({ ...date, description: `${what}, inclusive.` });
+
+/**
+ * Operations for agents that work in bulk: search, batches, syncing from another system, ranges,
+ * undo, and the settings and archive operations the app has. Batches run in one transaction and
+ * report each item in place: one refused item doesn't stop the rest.
+ */
+const BULK_OPS: OpSpec[] = [
+  {
+    name: "search_tasks",
+    title: "Search tasks",
+    kind: "read",
+    description:
+      "Find tasks without reading whole views: by words in the title or note, space (with the spaces inside it), planned date range, deadline range, status, kind, the agent that added them or externalId. Open tasks by default. Returns compact rows with ids, newest first; pass the cursor back for the next page. Dates match a task's planned date (a repeat's next one); get_range lists every occurrence.",
+    input: obj({
+      text: { type: "string", description: "Words that must all appear in the title or note, in any case." },
+      spaceId: id("space"),
+      includeChildSpaces: {
+        type: "boolean",
+        description: "Include the spaces inside spaceId. Default true.",
+      },
+      dateFrom: range("Planned on or after"),
+      dateTo: range("Planned on or before"),
+      deadlineFrom: range("Due on or after"),
+      deadlineTo: range("Due on or before"),
+      status: { enum: ["open", "done", "deleted", "any"], description: "Default open." },
+      kind: { enum: ["event", "task"], description: "event: attended (a class); task: ticked off." },
+      addedBy: {
+        type: "string",
+        description: "The agent's name the task was added under, like 'Chitti school'.",
+      },
+      externalId: { type: "string", description: "The one task with this source id." },
+      limit: { type: "integer", minimum: 1, maximum: 100, description: "Rows per page. Default 25." },
+      cursor: { type: "string", description: "The cursor from the previous page." },
+    }),
+  },
+  {
+    name: "get_range",
+    title: "Get a range of days",
+    kind: "read",
+    description:
+      "Read any run of days up to 62 (a month or two): each day's blocks, anytime tasks, deadlines and planned hours against capacity, with repeats on every day they fall. Like get_week, without the inbox.",
+    input: obj({ start: range("The first day"), end: range("The last day") }, ["start", "end"]),
+  },
+  {
+    name: "add_tasks",
+    title: "Add many tasks",
+    kind: "write",
+    description:
+      "Add up to 100 tasks in one call, each like add_task (text or fields). Use this instead of many add_task calls. Each result says what was saved or why that one was refused; the rest still go in. For a sync you'll run again, use upsert_tasks.",
+    input: obj(
+      {
+        tasks: batch(
+          obj({
+            text: { type: "string", description: "One sentence, parsed like quick add." },
+            ...taskFields,
+          }),
+          "The tasks, each with either text or a title.",
+        ),
+      },
+      ["tasks"],
+    ),
+  },
+  {
+    name: "update_tasks",
+    title: "Change many tasks",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Change up to 100 tasks in one call, each patch like update_task (null clears a field). Each result says what was saved or why that one was refused.",
+    input: obj(
+      { updates: batch(obj({ taskId: id("task"), ...patchFields }, ["taskId"]), "One patch per task.") },
+      ["updates"],
+    ),
+  },
+  {
+    name: "upsert_tasks",
+    title: "Sync tasks by externalId",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Create or update up to 100 tasks by externalId, for a sync you run again and again (coursework from Moodle every morning): a new externalId adds the task, a known one changes only the fields that differ, and the same input again changes nothing. Fields you leave out stay as they are; null clears one. Reports created, updated, unchanged and skipped (deleted by the person, so not brought back). A done task stays done.",
+    input: obj(
+      {
+        tasks: batch(
+          obj({ ...patchFields, externalId: taskFields.externalId! }, ["externalId"]),
+          "The tasks, each with its externalId; a new one needs a title.",
+        ),
+      },
+      ["tasks"],
+    ),
+  },
+  {
+    name: "complete_tasks",
+    title: "Complete many tasks",
+    kind: "write",
+    destructive: true,
+    description:
+      "Tick off up to 100 tasks, each like complete_task: send the date you read it on so a retry can't tick a repeat's next occurrence. Each result has the completionId and date undo_complete takes.",
+    input: obj(
+      {
+        tasks: batch(obj({ taskId: id("task"), date: nullable(date) }, ["taskId"]), "The tasks to tick off."),
+      },
+      ["tasks"],
+    ),
+  },
+  {
+    name: "delete_tasks",
+    title: "Delete many tasks",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Delete up to 100 tasks, each with all its repeats. restore_tasks brings them back within 30 days. Check with the person first.",
+    input: obj({ taskIds }, ["taskIds"]),
+  },
+  {
+    name: "restore_tasks",
+    title: "Restore many tasks",
+    kind: "write",
+    idempotent: true,
+    description: "Bring back up to 100 tasks deleted in the last 30 days, as they were.",
+    input: obj({ taskIds }, ["taskIds"]),
+  },
+  {
+    name: "skip_occurrence",
+    title: "Skip one occurrence",
+    kind: "write",
+    destructive: true,
+    description:
+      "Skip one date of a repeating task (a class that's cancelled this week) without ticking it off: it moves to its next date by its rule. Send the date you read it on. Skipping the last one of an ended repeat deletes it.",
+    input: obj({ taskId: id("task"), date: nullable(date) }, ["taskId"]),
+  },
+  {
+    name: "list_changes",
+    title: "List your changes",
+    kind: "read",
+    description:
+      "List what agents changed in the last days (7 by default, at most 31), grouped into runs the way the app shows them ('Chitti school added 31'), newest first, each change with its id and whether it can be undone.",
+    input: obj({
+      days: { type: "integer", minimum: 1, maximum: 31 },
+      by: { type: "string", description: "Only this agent's changes, by the name they're listed under." },
+    }),
+  },
+  {
+    name: "undo_changes",
+    title: "Undo changes",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Undo a whole run (runId from list_changes) or chosen changes (actionIds), the same as Undo in the app: an add is deleted, a change or move put back, a tick taken back, a delete restored. Changes to spaces, habits, goals and settings can't be undone here.",
+    input: obj({
+      runId: { type: "string", description: "A run's id from list_changes." },
+      actionIds: batch({ type: "string" }, "Changes' ids from list_changes."),
+    }),
+  },
+  {
+    name: "delete_space",
+    title: "Archive a space",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Archive a space, as the app's Archive space does: it leaves every list. Its tasks stay as they are (open, dated, with reminders) and show with no space; spaces inside it move to the top level. It can't be brought back through the API, so check with the person first.",
+    input: obj({ spaceId: id("space") }, ["spaceId"]),
+  },
+  {
+    name: "update_habit",
+    title: "Change a habit",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description: "Rename a habit, change its weekly target (1 to 7) or its space (null for none).",
+    input: obj(
+      {
+        habitId: id("habit"),
+        title: { type: "string" },
+        target: { type: "integer", minimum: 1, maximum: 7 },
+        spaceId: nullable(id("space")),
+      },
+      ["habitId"],
+    ),
+  },
+  {
+    name: "delete_habit",
+    title: "Archive a habit",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description: "Archive a habit: it leaves Today's check-ins and Progress. Its history stays.",
+    input: obj({ habitId: id("habit") }, ["habitId"]),
+  },
+  {
+    name: "delete_goal",
+    title: "Archive a goal",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description: "Archive a goal: it leaves Goals and the task editor. Tasks linked to it stay.",
+    input: obj({ goalId: id("goal") }, ["goalId"]),
+  },
+  {
+    name: "get_settings",
+    title: "Get settings",
+    kind: "read",
+    description:
+      "Read the person's time zone, day start and end, daily capacity, default reminders, review time, semester dates and whether agents edit directly.",
+    input: obj({}),
+  },
+  {
+    name: "update_settings",
+    title: "Change settings",
+    kind: "write",
+    destructive: true,
+    idempotent: true,
+    description:
+      "Change the day's start and end, the daily capacity (minutes of planned work), default reminders for new timed tasks, the review time or the semester dates (null clears one). The time zone follows the person's device, and whether agents edit directly is theirs to choose in Settings.",
+    input: obj({
+      dayStart: minutes("When the day starts"),
+      dayEnd: {
+        type: "integer",
+        minimum: 1,
+        maximum: 1440,
+        description: "When the day ends, in minutes after midnight.",
+      },
+      dailyCapacity: { type: "integer", minimum: 0, maximum: 1440 },
+      defaultReminders: remindersSchema,
+      reviewTime: minutes("When Review today shows"),
+      semesterStart: nullable(date),
+      semesterEnd: nullable(date),
+    }),
+  },
+];
+
+export const OPS: OpSpec[] = [...BASE_OPS, ...BULK_OPS].map(named);
 
 export function findOp(name: string): OpSpec | undefined {
   return OPS.find((op) => op.name === name);

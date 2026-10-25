@@ -19,7 +19,7 @@ import {
 } from "lucide-react-native";
 import { createStore } from "@/data/store";
 import { addDays } from "@kriyan/core/dates";
-import { formatDay, formatDuration, formatTimeRange } from "@kriyan/core/format";
+import { formatDay, formatDue, formatDuration, formatTimeRange } from "@kriyan/core/format";
 import type { TaskView } from "@/data/views";
 import { selection } from "@/features/shell/context";
 import { rowRegistry } from "@/features/shell/rows";
@@ -101,7 +101,7 @@ export function facts(
           : day,
     });
   }
-  if (task.deadline) out.push({ icon: Flag, text: `Due ${formatDay(task.deadline, today)}` });
+  if (task.deadline) out.push({ icon: Flag, text: formatDue(task.deadline, task.dueTime, today) });
   if (!yearly && task.repeatText) out.push({ icon: Repeat2, text: task.repeatText });
   if (task.reminders.length) out.push({ icon: Bell, text: String(task.reminders.length) });
   if (task.hasNote) out.push({ icon: NotebookText, text: "Note" });

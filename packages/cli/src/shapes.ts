@@ -2,6 +2,7 @@
 // Type-only: nothing from the backend ends up in the published bundle.
 
 import type { goalView, inboxView, progressView, todayView, weekView } from "@kriyan/convex/model/views";
+import type { searchTasks } from "@kriyan/convex/model/search";
 import type { SpaceNode } from "@kriyan/convex/model/spaces";
 
 /** JSON turns branded ids into plain strings; the shapes are otherwise identical. */
@@ -21,3 +22,4 @@ export type SpacesResult = Json<SpaceNode>[];
 export type TaskView = TodayResult["scheduled"][number];
 export type GoalView = Json<ReturnType<typeof goalView>>;
 export type HabitView = TodayResult["habits"][number];
+export type SearchResult = Json<Awaited<ReturnType<typeof searchTasks>>>;

@@ -101,8 +101,14 @@ const SECTIONS: { id: string; title: string; intro: string; examples: string[] }
   {
     id: "deadlines",
     title: "Deadlines",
-    intro: "“due” and “by” set when something is due, without planning it for that day.",
-    examples: ["problem set due thu", "tax return by 31 oct", "slides fri 10am due mon"],
+    intro:
+      "“due” and “by” set when something is due, without planning it for that day. A time right after the due day is the due time.",
+    examples: [
+      "problem set due thu",
+      "tax return by 31 oct",
+      "slides fri 10am due mon",
+      "workshop 8 coding due fri 23:55",
+    ],
   },
 ];
 

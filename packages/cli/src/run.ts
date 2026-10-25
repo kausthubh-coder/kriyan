@@ -7,6 +7,7 @@ import { todayIn, type CivilDate } from "@kriyan/core/dates";
 import {
   describeReminder,
   describeRepeat,
+  dueWhen,
   formatDate,
   formatDay,
   formatDuration,
@@ -27,6 +28,7 @@ import {
   renderBlocks,
   renderInbox,
   renderProgress,
+  renderSearch,
   renderSpaces,
   renderToday,
   renderWeek,
@@ -36,6 +38,7 @@ import {
 import type {
   InboxResult,
   ProgressResult,
+  SearchResult,
   SpacesResult,
   TaskView,
   TodayResult,
@@ -160,13 +163,29 @@ async function progress(s: Session): Promise<void> {
   s.print(renderProgress(result, s.view));
 }
 
+async function search(s: Session): Promise<void> {
+  const text = rest(s).join(" ").trim();
+  if (!text) throw new UsageError("Say what to look for, like: kriyan search workshop");
+  const found = await s.api().call<SearchResult>("search_tasks", { text });
+  if (s.args.json) return s.printJson(found);
+  const refs = new RefBook();
+  s.print(renderSearch(found, refs, s.today()));
+  s.saveListing(refs);
+}
+
 /** What quick add understood, one line per part, in the words the app uses. */
 export function describeParsed(parsed: ParsedTask, today: CivilDate): string[] {
   const lines: [string, string][] = [];
   if (parsed.date) lines.push(["Date", dayLabel(parsed.date, today)]);
   if (parsed.time !== undefined) lines.push(["Time", formatTimeRange(parsed.time, parsed.length)]);
   else if (parsed.length !== undefined) lines.push(["Length", formatDuration(parsed.length)]);
-  if (parsed.deadline) lines.push(["Due", dayLabel(parsed.deadline, today)]);
+  if (parsed.deadline)
+    lines.push([
+      "Due",
+      parsed.dueTime === undefined
+        ? dayLabel(parsed.deadline, today)
+        : dueWhen(parsed.deadline, parsed.dueTime, today),
+    ]);
   if (parsed.spaceName) lines.push(["Space", parsed.spaceName]);
   if (parsed.repeat) lines.push(["Repeats", describeRepeat(parsed.repeat, parsed.date ?? today, today)]);
   if (parsed.reminders.length)
@@ -452,6 +471,7 @@ const COMMANDS: Record<string, Command> = {
   inbox,
   spaces,
   progress,
+  search,
   add,
   done,
   move,

@@ -54,6 +54,8 @@ export function task(fields: Partial<TaskView> & Pick<TaskView, "_id" | "title">
     projected: false,
     proposedBy: null,
     addedBy: null,
+    dueTime: null,
+    externalId: null,
     ...fields,
   };
 }

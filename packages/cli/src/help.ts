@@ -11,6 +11,7 @@ See your plan
   inbox                    Tasks without a date or a space
   spaces                   Your spaces as a tree
   progress                 Time done, goals and habits
+  search <words>           Find open tasks by words in their title or note
 
 Change it
   add <sentence>           Add a task the way you'd say it
@@ -50,6 +51,15 @@ Environment
 Exit codes: 0 done, 1 Kriyan said no, 2 a usage or network problem.`;
 
 export const COMMAND_HELP: Record<string, string> = {
+  search: `Usage: kriyan search <words> [--json]
+
+Finds open tasks with every word in their title or note, newest first, numbered so you can
+run done, move or rm on them next. For other filters (space, dates, done or deleted tasks),
+use kriyan call search_tasks with a JSON input.
+
+Examples
+  kriyan search workshop
+  kriyan search essay draft --json`,
   today: `Usage: kriyan today [date] [--json]
 
 Shows a day: what's on now and next, the schedule, anytime tasks, tasks from earlier days,

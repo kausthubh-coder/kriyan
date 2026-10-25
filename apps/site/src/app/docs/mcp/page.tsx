@@ -85,12 +85,34 @@ export default function McpDocs() {
         </li>
         <li>Agents never guess how long something takes. A length is only set when you said one.</li>
         <li>
+          Agents find tasks with <code>search_tasks</code> (by words, space, dates, status or the agent that
+          added them) instead of reading whole weeks, and read up to 62 days at once with{" "}
+          <code>get_range</code>.
+        </li>
+        <li>
+          Agents work in batches. <code>add_tasks</code>, <code>update_tasks</code>,{" "}
+          <code>complete_tasks</code>, <code>delete_tasks</code> and <code>restore_tasks</code> take up to 100
+          tasks in one call, and say for each one what was saved or why it was refused.
+        </li>
+        <li>
+          An agent that syncs from somewhere else, like coursework from Moodle, gives each task the
+          source&apos;s id and calls <code>upsert_tasks</code> each time. A new item is added, a changed one
+          updated, and the same sync again changes nothing, so you never get duplicates. A task you deleted
+          stays deleted.
+        </li>
+        <li>
+          A due time has its own field. &ldquo;Workshop 8 coding, due Fri 30 Oct at 23:55&rdquo; is saved as a
+          deadline and a due time, never in the title, and shows as &ldquo;Due Fri 30 Oct, 23:55&rdquo;.
+        </li>
+        <li>
           Kriyan has no AI of its own. In Ask, the app does a few things by itself, like adding a task or
           finding free time; anything else waits for your agent. <code>get_asks</code> lists what is waiting,
           and <code>answer_ask</code> replies under the request once the agent has done it.
         </li>
         <li>
           Every change an agent makes is listed in the app with the agent&apos;s name, and each one has Undo.
+          An agent can see its own runs with <code>list_changes</code> and take one back with{" "}
+          <code>undo_changes</code>.
         </li>
         <li>
           Captured tasks use the same words as quick add, so an agent can pass your sentence as it is. See{" "}
@@ -133,6 +155,8 @@ export default function McpDocs() {
         <li>&ldquo;Does my week fit? Move what doesn&apos;t to next week.&rdquo;</li>
         <li>&ldquo;Plan time for the essay before Friday around my classes.&rdquo;</li>
         <li>&ldquo;Add: Mum&apos;s birthday 16 oct every year, remind day before at 20:00.&rdquo;</li>
+        <li>&ldquo;Sync my Moodle assignments into the School space, with their due times.&rdquo;</li>
+        <li>&ldquo;What did you change this morning? Undo it.&rdquo;</li>
       </ul>
 
       <h2 id="trouble">If it doesn&apos;t connect</h2>

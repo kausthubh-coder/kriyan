@@ -53,6 +53,8 @@ export default defineSchema({
     /** Minutes. Optional, never invented. */
     length: v.optional(v.number()),
     deadline: v.optional(v.string()),
+    /** Minutes after midnight on the deadline when it's due ("23:55"); only with a deadline. */
+    dueTime: v.optional(v.number()),
     repeat: v.optional(repeatV),
     /** First date of the repeat, so counts and "every 2 weeks" stay anchored. */
     repeatFirst: v.optional(v.string()),
@@ -72,8 +74,16 @@ export default defineSchema({
     proposedBy: v.optional(v.string()),
     /** The agent that added it ("Codex"), shown as "from Codex". */
     addedBy: v.optional(v.string()),
+    /**
+     * The id an agent's source gives this task (a Moodle assignment's id), unique per owner, so a
+     * sync that runs every morning updates the task instead of adding it again.
+     */
+    externalId: v.optional(v.string()),
   })
     .index("by_owner_and_date", ["ownerId", "date"])
+    // Agents' search pages through a person's tasks newest first, by creation time.
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_and_externalId", ["ownerId", "externalId"])
     // Lists of open tasks read through these, so done and deleted rows, which pile up with
     // use, can never crowd an open task out of a bounded read.
     .index("by_owner_and_deletedAt_and_doneAt_and_date", ["ownerId", "deletedAt", "doneAt", "date"])

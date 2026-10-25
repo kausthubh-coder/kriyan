@@ -63,6 +63,17 @@ export function formatDay(date: CivilDate, today: CivilDate): string {
 
 export const formatTime = formatClock;
 
+/** When something is due: "Fri 30 Oct, 23:55", or "Tomorrow" when there's no due time. */
+export function dueWhen(deadline: CivilDate, dueTime: number | null | undefined, today: CivilDate): string {
+  const day = formatDay(deadline, today);
+  return dueTime === null || dueTime === undefined ? day : `${day}, ${formatClock(dueTime)}`;
+}
+
+/** "Due Fri 30 Oct, 23:55". */
+export function formatDue(deadline: CivilDate, dueTime: number | null | undefined, today: CivilDate): string {
+  return `Due ${dueWhen(deadline, dueTime, today)}`;
+}
+
 export function formatTimeRange(start: number, length: number | undefined): string {
   return length ? `${formatClock(start)}–${formatClock(start + length)}` : formatClock(start);
 }

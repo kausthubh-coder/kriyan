@@ -5,6 +5,7 @@ import {
   describeReminder,
   describeRepeat,
   formatDay,
+  formatDue,
   formatDuration,
   reminderBody,
   repeatPhrase,
@@ -47,6 +48,11 @@ describe("format", () => {
     expect(formatDay("2026-10-14", "2026-10-13")).toBe("Tomorrow");
     expect(formatDay("2026-10-16", "2026-10-13")).toBe("Fri 16 Oct");
     expect(formatDay("2027-01-04", "2026-10-13")).toBe("Mon 4 Jan 2027");
+  });
+
+  test("a due date reads with its due time when it has one", () => {
+    expect(formatDue("2026-10-30", 23 * 60 + 55, "2026-10-13")).toBe("Due Fri 30 Oct, 23:55");
+    expect(formatDue("2026-10-14", null, "2026-10-13")).toBe("Due Tomorrow");
   });
 
   test("lengths", () => {
@@ -228,6 +234,8 @@ describe("agent operations", () => {
       "add_goal",
       "propose_plan",
       "answer_ask",
+      "add_tasks",
+      "restore_tasks",
     ]);
   });
 });

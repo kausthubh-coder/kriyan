@@ -23,7 +23,7 @@ import {
 import { api } from "@kriyan/convex/api";
 import type { Id } from "@kriyan/convex/dataModel";
 import { diffDays, formatClock, type CivilDate } from "@kriyan/core/dates";
-import { formatDay, formatDuration, describeReminder, describeRepeat } from "@kriyan/core/format";
+import { formatDay, formatDue, formatDuration, describeReminder, describeRepeat } from "@kriyan/core/format";
 import { parseTask, type ParsedTask, type SpanKind } from "@kriyan/core/parse";
 import type { Repeat } from "@kriyan/core/repeat";
 import { useClock } from "@/data/time";
@@ -128,7 +128,7 @@ function chipsFor(parsed: ParsedTask, today: string, spaces: SpaceNode[] | undef
   if (parsed.deadline)
     out.push({
       key: "deadline",
-      label: `Due ${formatDay(parsed.deadline, today)}`,
+      label: formatDue(parsed.deadline, parsed.dueTime, today),
       icon: Flag,
       kinds: ["deadline"],
     });

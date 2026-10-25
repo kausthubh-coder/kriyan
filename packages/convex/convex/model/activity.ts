@@ -2,6 +2,7 @@
 // needs, so Today can say "Codex added 3 at 07:00" and Ask can list each change with Undo.
 
 import { ConvexError, type Infer } from "convex/values";
+import { groupRuns, runSummary } from "@kriyan/core/activity";
 import { zonedInstant, type CivilDate } from "@kriyan/core/dates";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -130,4 +131,52 @@ export async function undo(ctx: MutationCtx, ownerId: string, id: Id<"agentActio
       break;
   }
   await ctx.db.patch(id, { undoneAt: Date.now() });
+}
+
+/** How far back an agent can list and undo changes, like Ask's longest list. */
+export const CHANGES_DAYS = 31;
+
+export interface ChangeRun {
+  /** The run's first change; undo_changes takes it to undo the whole run. */
+  runId: Id<"agentActions">;
+  agent: string;
+  /** When the run started, as an ISO instant. */
+  at: string;
+  /** "added 31 and changed 2", counting what wasn't undone. */
+  summary: string;
+  changes: {
+    actionId: Id<"agentActions">;
+    kind: ActionKind;
+    title: string;
+    taskId: Id<"tasks"> | null;
+    undone: boolean;
+    undoable: boolean;
+  }[];
+}
+
+/** Agents' changes since an instant, grouped into runs the way Ask shows them, newest run first. */
+export async function runs(
+  ctx: QueryCtx,
+  ownerId: string,
+  since: number,
+  agent?: string,
+): Promise<ChangeRun[]> {
+  const wanted = agent?.trim().toLowerCase();
+  const actions = (await recent(ctx, ownerId, since, 500)).filter(
+    (a) => wanted === undefined || a.agent.toLowerCase() === wanted,
+  );
+  return groupRuns(actions).map((run) => ({
+    runId: run.actions[0]!._id,
+    agent: run.agent,
+    at: new Date(run.at).toISOString(),
+    summary: runSummary(run.actions),
+    changes: run.actions.map((a) => ({
+      actionId: a._id,
+      kind: a.kind,
+      title: a.title,
+      taskId: a.taskId,
+      undone: a.undone,
+      undoable: a.undoable,
+    })),
+  }));
 }

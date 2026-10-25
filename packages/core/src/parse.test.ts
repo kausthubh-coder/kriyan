@@ -73,6 +73,39 @@ describe("parseTask", () => {
     });
   });
 
+  test("a time after the due day is when it's due, not a block today", () => {
+    expect(parse("Workshop 8 coding due fri 11:55 PM #cs")).toEqual({
+      title: "Workshop 8 coding",
+      spaceName: "cs",
+      deadline: "2026-10-16",
+      dueTime: 23 * 60 + 55,
+      reminders: [],
+    });
+    expect(parse("lab report due at 17:00 on thu")).toEqual({
+      title: "lab report",
+      deadline: "2026-10-15",
+      dueTime: 17 * 60,
+      reminders: [],
+    });
+    expect(parse("essay sat 10am due mon 23:59")).toEqual({
+      title: "essay",
+      date: "2026-10-17",
+      time: 10 * 60,
+      deadline: "2026-10-19",
+      dueTime: 23 * 60 + 59,
+      reminders: [],
+    });
+  });
+
+  test("due with only a time is due today at that time", () => {
+    expect(parse("quiz due 9pm")).toEqual({
+      title: "quiz",
+      deadline: "2026-10-13",
+      dueTime: 21 * 60,
+      reminders: [],
+    });
+  });
+
   test("a time range sets the time and the length", () => {
     expect(parse("standup tomorrow 9:30-9:45am")).toEqual({
       title: "standup",

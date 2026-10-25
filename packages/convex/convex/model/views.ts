@@ -23,6 +23,8 @@ export interface TaskView {
   time: number | null;
   length: number | null;
   deadline: CivilDate | null;
+  /** Minutes after midnight on the deadline when it's due. */
+  dueTime: number | null;
   repeat: Doc<"tasks">["repeat"] | null;
   repeatFirst: CivilDate | null;
   repeatText: string | null;
@@ -39,6 +41,8 @@ export interface TaskView {
   proposedBy: string | null;
   /** The agent that added it, for the row's "from Codex". */
   addedBy: string | null;
+  /** The agent's source id, for syncs (upsert_tasks). */
+  externalId: string | null;
 }
 
 const LIMIT = 500;
@@ -56,6 +60,7 @@ function view(task: Doc<"tasks">, spaces: Map<string, SpaceNode>, at?: CivilDate
     time: task.time ?? null,
     length: task.length ?? null,
     deadline: task.deadline ?? null,
+    dueTime: task.dueTime ?? null,
     repeat: task.repeat ?? null,
     repeatFirst: task.repeatFirst ?? null,
     repeatText: task.repeat
@@ -70,10 +75,60 @@ function view(task: Doc<"tasks">, spaces: Map<string, SpaceNode>, at?: CivilDate
     projected: Boolean(at && task.date && at > task.date),
     proposedBy: task.proposedBy ?? null,
     addedBy: task.addedBy ?? null,
+    externalId: task.externalId ?? null,
   };
 }
 
-async function spaceMap(ctx: QueryCtx, ownerId: string) {
+export type TaskStatus = "open" | "done" | "deleted";
+
+/**
+ * A task in a line, for agents' search and batch replies: enough to recognise it and act on it
+ * by id, without the reminders, steps and repeat rule a full view carries.
+ */
+export interface TaskRow {
+  taskId: Id<"tasks">;
+  title: string;
+  status: TaskStatus;
+  spaceId: Id<"spaces"> | null;
+  spacePath: string | null;
+  date: CivilDate | null;
+  time: number | null;
+  length: number | null;
+  deadline: CivilDate | null;
+  dueTime: number | null;
+  event: boolean;
+  repeatText: string | null;
+  hasNote: boolean;
+  addedBy: string | null;
+  proposedBy: string | null;
+  externalId: string | null;
+}
+
+export function taskRow(task: Doc<"tasks">, spaces: Map<string, SpaceNode>): TaskRow {
+  const space = task.spaceId ? spaces.get(task.spaceId) : undefined;
+  return {
+    taskId: task._id,
+    title: task.title,
+    status: task.deletedAt !== undefined ? "deleted" : task.doneAt !== undefined ? "done" : "open",
+    spaceId: task.spaceId ?? null,
+    spacePath: space?.path ?? null,
+    date: task.date ?? null,
+    time: task.time ?? null,
+    length: task.length ?? null,
+    deadline: task.deadline ?? null,
+    dueTime: task.dueTime ?? null,
+    event: task.event,
+    repeatText: task.repeat
+      ? describeRepeat(task.repeat, task.repeatFirst ?? task.date ?? "1970-01-01")
+      : null,
+    hasNote: Boolean(task.note),
+    addedBy: task.addedBy ?? null,
+    proposedBy: task.proposedBy ?? null,
+    externalId: task.externalId ?? null,
+  };
+}
+
+export async function spaceMap(ctx: QueryCtx, ownerId: string) {
   const tree = spaceTree(await listSpaces(ctx, ownerId));
   return { tree, map: new Map(tree.map((s) => [s._id as string, s])) };
 }
@@ -256,12 +311,16 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
   };
 }
 
-export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate, today: CivilDate) {
-  civil(start, "start");
-  civil(today, "date");
+/** Each day from start to end, as the week shows them: blocks, anytime tasks, deadlines and load. */
+async function days(
+  ctx: QueryCtx,
+  ownerId: string,
+  start: CivilDate,
+  end: CivilDate,
+  today: CivilDate,
+  map: Map<string, SpaceNode>,
+) {
   const profile = await getProfile(ctx, ownerId);
-  const { map } = await spaceMap(ctx, ownerId);
-  const end = addDays(start, 6);
   const byDay = await plan(ctx, ownerId, start, end, map);
   const deadlines = (
     await ctx.db
@@ -270,8 +329,11 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
         q.eq("ownerId", ownerId).gte("deadline", start).lte("deadline", end),
       )
       .take(LIMIT)
-  ).filter((t) => live(t) && t.doneAt === undefined);
-  const days = Array.from({ length: 7 }, (_, i) => {
+  )
+    .filter((t) => live(t) && t.doneAt === undefined)
+    // What's due first comes first; a deadline with no time keeps its place after the timed ones.
+    .sort((a, b) => (a.dueTime ?? 1e9) - (b.dueTime ?? 1e9));
+  return Array.from({ length: diffDays(end, start) + 1 }, (_, i) => {
     const date = addDays(start, i);
     const items = byDay.get(date) ?? [];
     return {
@@ -284,13 +346,46 @@ export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate,
       capacity: profile.dailyCapacity,
     };
   });
+}
+
+export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate, today: CivilDate) {
+  civil(start, "start");
+  civil(today, "date");
+  const { map } = await spaceMap(ctx, ownerId);
+  const week = await days(ctx, ownerId, start, addDays(start, 6), today, map);
   const undated = await openUndated(ctx, ownerId);
   return {
     start,
-    days,
+    days: week,
     inbox: undated.filter((t) => !t.spaceId).map((t) => view(t, map)),
     unscheduled: undated.filter((t) => t.spaceId).map((t) => view(t, map)),
-    proposals: days.flatMap((d) => d.scheduled.concat(d.anytime)).filter((t) => t.proposedBy !== null).length,
+    proposals: week.flatMap((d) => d.scheduled.concat(d.anytime)).filter((t) => t.proposedBy !== null).length,
+  };
+}
+
+export const MAX_RANGE_DAYS = 62;
+
+/** Any run of days up to 62 (a month or two), each as the week shows it. */
+export async function rangeView(
+  ctx: QueryCtx,
+  ownerId: string,
+  start: CivilDate,
+  end: CivilDate,
+  today: CivilDate,
+) {
+  civil(start, "start");
+  civil(end, "end");
+  civil(today, "date");
+  if (end < start) throw new ConvexError("The end must be on or after the start.");
+  if (diffDays(end, start) + 1 > MAX_RANGE_DAYS)
+    throw new ConvexError(`Ask for at most ${MAX_RANGE_DAYS} days at a time.`);
+  const { map } = await spaceMap(ctx, ownerId);
+  const list = await days(ctx, ownerId, start, end, today, map);
+  return {
+    start,
+    end,
+    days: list,
+    proposals: list.flatMap((d) => d.scheduled.concat(d.anytime)).filter((t) => t.proposedBy !== null).length,
   };
 }
 
@@ -354,7 +449,7 @@ export async function inboxView(ctx: QueryCtx, ownerId: string) {
 }
 
 /** Every space inside this one, at any depth. `tree` lists parents before their children. */
-function descendants(spaceId: Id<"spaces">, tree: SpaceNode[]): Id<"spaces">[] {
+export function descendants(spaceId: Id<"spaces">, tree: SpaceNode[]): Id<"spaces">[] {
   const found = new Set<string>([spaceId]);
   const out: Id<"spaces">[] = [];
   for (const s of tree)

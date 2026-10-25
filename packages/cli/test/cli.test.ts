@@ -22,6 +22,52 @@ const api = new FakeApi({
   move_tasks: (b) => ({ result: { moved: (b.taskIds as string[]).length } }),
   delete_task: (b) => ({ result: { taskId: b.taskId } }),
   check_habit: (b) => ({ result: { habitId: b.habitId, done: b.done } }),
+  search_tasks: (b) => ({
+    result:
+      b.text === "workshop"
+        ? {
+            tasks: [
+              {
+                taskId: "k57workshop9000000000000000014",
+                title: "Workshop 9 coding",
+                status: "open",
+                spaceId: f.ids.calculus,
+                spacePath: "School / Calculus",
+                date: null,
+                time: null,
+                length: null,
+                deadline: "2026-10-30",
+                dueTime: 1435,
+                event: false,
+                repeatText: null,
+                hasNote: false,
+                addedBy: "Chitti school",
+                proposedBy: null,
+                externalId: "moodle:913",
+              },
+              {
+                taskId: "k57workshop8000000000000000015",
+                title: "Workshop 8 coding",
+                status: "done",
+                spaceId: f.ids.calculus,
+                spacePath: "School / Calculus",
+                date: "2026-10-12",
+                time: 600,
+                length: null,
+                deadline: null,
+                dueTime: null,
+                event: false,
+                repeatText: null,
+                hasNote: false,
+                addedBy: "Chitti school",
+                proposedBy: null,
+                externalId: "moodle:812",
+              },
+            ],
+            cursor: null,
+          }
+        : { tasks: [], cursor: null },
+  }),
   propose_plan: (b) => ({
     result: { taskIds: (b.blocks as unknown[]).map((_, i) => `k57proposed${i}`), proposed: true },
   }),
@@ -197,6 +243,14 @@ describe("adding", () => {
   Reminder  1h before
 `,
     });
+  });
+
+  test("add echoes a due time apart from the title", async () => {
+    const r = await run("add", "Workshop 8 coding due fri 11:55pm #cs");
+    expect(r.stdout).toBe(`Added "Workshop 8 coding"
+  Due    Fri 16 Oct, 23:55
+  Space  cs
+`);
   });
 
   test("add without quotes joins the words; nothing to schedule goes to the inbox", async () => {
@@ -408,6 +462,34 @@ describe("errors and exit codes", () => {
   });
 });
 
+describe("searching", () => {
+  test("search lists matches with numbers that done then takes", async () => {
+    const r = await run("search", "workshop");
+    expect(api.requests).toEqual([
+      { op: "search_tasks", auth: `Bearer ${f.TOKEN}`, body: { text: "workshop" } },
+    ]);
+    expect(r).toEqual({
+      code: 0,
+      stderr: "",
+      stdout: `  1  due Fri 30 Oct, 23:55  Workshop 9 coding  School / Calculus
+  2  Mon 12 Oct 10:00       Workshop 8 coding  School / Calculus  done
+`,
+    });
+    const done = await run("done", "1");
+    expect(done.stdout).toBe('Done "Workshop 9 coding".\n');
+  });
+
+  test("search with no match says so, and with no words is a usage error", async () => {
+    expect((await run("search", "garden")).stdout).toBe("No tasks match.\n");
+    expect(await run("search")).toEqual({
+      code: 2,
+      stdout: "",
+      stderr: "Say what to look for, like: kriyan search workshop\n",
+    });
+    expect((await run("search", "--help")).stdout.startsWith("Usage: kriyan search")).toBe(true);
+  });
+});
+
 describe("raw operations", () => {
   test("call runs any operation with a JSON input and prints JSON", async () => {
     const r = await run("call", "get_today", '{"date":"2026-10-15"}');
@@ -434,9 +516,9 @@ describe("raw operations", () => {
   test("ops lists every operation", async () => {
     const r = await run("ops");
     const lines = r.stdout.trimEnd().split("\n");
-    expect(lines).toHaveLength(25);
-    expect(lines[0]).toBe("get_today      read   Get today");
-    expect(lines.at(-1)).toBe("answer_ask     write  Answer a request");
+    expect(lines).toHaveLength(42);
+    expect(lines[0]).toBe("get_today        read   Get today");
+    expect(lines.at(-1)).toBe("update_settings  write  Change settings");
   });
 });
 

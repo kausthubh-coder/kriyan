@@ -24,6 +24,7 @@ import {
 } from "@kriyan/core/dates";
 import { freeMinutes, layoutDay } from "@kriyan/core/layout";
 import {
+  dueWhen,
   formatDay,
   formatDuration,
   formatTimeRange,
@@ -390,7 +391,7 @@ function TrayCard({ task, today }: { task: TaskView; today: CivilDate }) {
   const tone = spaceTone(task.color);
   const meta = [
     task.length ? formatDuration(task.length) : "No length",
-    ...(task.deadline ? [`due ${formatDay(task.deadline, today)}`] : []),
+    ...(task.deadline ? [`due ${dueWhen(task.deadline, task.dueTime, today)}`] : []),
   ].join(" · ");
   return (
     <DragSource taskId={task._id} title={task.title} color={tone.dot} length={task.length}>
@@ -981,7 +982,7 @@ function PlaceRow({ task, day, today }: { task: TaskView; day: CivilDate; today:
   const tone = spaceTone(task.color);
   const meta = [
     task.length ? formatDuration(task.length) : "No length",
-    ...(task.deadline ? [`due ${formatDay(task.deadline, today)}`] : []),
+    ...(task.deadline ? [`due ${dueWhen(task.deadline, task.dueTime, today)}`] : []),
   ].join(" · ");
   const where = formatDay(day, today);
   return (

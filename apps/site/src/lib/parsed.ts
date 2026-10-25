@@ -2,7 +2,14 @@
 // and the quick-add docs, so both show exactly what @kriyan/core/parse returns.
 
 import type { ParsedTask } from "@kriyan/core/parse";
-import { describeReminder, describeRepeat, formatDay, formatDuration, formatTime } from "@kriyan/core/format";
+import {
+  describeReminder,
+  describeRepeat,
+  dueWhen,
+  formatDay,
+  formatDuration,
+  formatTime,
+} from "@kriyan/core/format";
 
 export interface ParsedPart {
   label: string;
@@ -19,6 +26,6 @@ export function describeParsed(parsed: ParsedTask, today: string): ParsedPart[] 
     parts.push({ label: "Repeats", value: describeRepeat(parsed.repeat, parsed.date, today) });
   for (const reminder of parsed.reminders)
     parts.push({ label: "Reminder", value: describeReminder(reminder) });
-  if (parsed.deadline) parts.push({ label: "Due", value: formatDay(parsed.deadline, today) });
+  if (parsed.deadline) parts.push({ label: "Due", value: dueWhen(parsed.deadline, parsed.dueTime, today) });
   return parts;
 }

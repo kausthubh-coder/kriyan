@@ -6,6 +6,7 @@
 //   mum's birthday 16 oct every year
 //   run every 2 days after done
 //   problem set due thu
+//   workshop 8 coding due fri 23:55
 
 import {
   addDays,
@@ -34,6 +35,8 @@ export interface ParsedTask {
   repeat?: Repeat;
   reminders: Reminder[];
   deadline?: CivilDate;
+  /** Minutes after midnight on the deadline: "due fri 23:55". */
+  dueTime?: number;
   /** Where each recognised phrase sits in the input, for highlighting. */
   spans: { start: number; end: number; kind: SpanKind }[];
 }
@@ -221,12 +224,25 @@ export function parseTask(input: string, today: CivilDate): ParsedTask {
     },
   );
 
-  // due fri / by 13 oct
-  take(new RegExp(`(?<!\\S)(?:due|by)\\s+(${DATE})${END}`, "i"), "deadline", (m) => {
-    const date = parseDate(m[1]!, today);
-    if (!date) return false;
-    out.deadline = date;
-  });
+  // due fri / by 13 oct / due fri 23:55 / due at 5pm on fri. A time inside the phrase is when
+  // it's due, not when it's planned: "due fri 5pm" is no 5pm block today.
+  take(
+    new RegExp(
+      `(?<!\\S)(?:due|by)\\s+(?:(${DATE})(?:\\s+(?:at\\s+)?(${TIME}))?|(?:at\\s+)?(${TIME})(?:\\s+(?:on\\s+)?(${DATE}))?)${END}`,
+      "i",
+    ),
+    "deadline",
+    (m) => {
+      const dayText = m[1] ?? m[4];
+      const timeText = m[2] ?? m[3];
+      const date = dayText ? parseDate(dayText, today) : today;
+      if (!date) return false;
+      const time = timeText ? parseClock(timeText) : undefined;
+      if (time === null) return false;
+      out.deadline = date;
+      if (time !== undefined) out.dueTime = time;
+    },
+  );
 
   // for 1h / for 30 min / for 1h30
   take(

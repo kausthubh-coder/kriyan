@@ -1496,3 +1496,393 @@ describe("links", () => {
     expect(await alice.query(api.views.task, { id: "not-a-task-id" })).toBeNull();
   });
 });
+
+describe("agents working in bulk", () => {
+  // A student's agent syncing coursework: it calls the API with a token, as MCP and the CLI do.
+  async function withToken(name = "Chitti school") {
+    const ctx = await setup();
+    const { token } = await ctx.alice.mutation(api.account.createToken, { name });
+    const call = async (op: string, body: unknown = {}) => {
+      const res = await ctx.t.fetch(`/api/v1/${op}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, body: (await res.json()) as { result?: any; error?: string } };
+    };
+    const ok = async (op: string, body: unknown = {}) => {
+      const reply = await call(op, body);
+      if (reply.status !== 200) throw new Error(`${op}: ${reply.status} ${reply.body.error}`);
+      return reply.body.result;
+    };
+    return { ...ctx, call, ok };
+  }
+
+  test("a due time is saved apart from the title, reads back, and leaves with its deadline", async () => {
+    const { alice, ok, call, today } = await withToken();
+    const { taskId, task } = await ok("add_task", { text: "Workshop 8 coding due fri 11:55 PM #cs" });
+    expect([task.title, task.deadline, task.dueTime, task.date, task.time]).toEqual([
+      "Workshop 8 coding",
+      "2026-10-16",
+      1435,
+      null,
+      null,
+    ]);
+    const week = await alice.query(api.views.week, { start: "2026-10-12", today });
+    expect(week.days[4]!.deadlines.map((t) => [t.title, t.dueTime])).toEqual([["Workshop 8 coding", 1435]]);
+
+    const fields = await ok("add_task", { title: "Quiz 3", deadline: "2026-10-15", dueTime: 600 });
+    expect([fields.task.deadline, fields.task.dueTime]).toEqual(["2026-10-15", 600]);
+    expect(await call("add_task", { title: "Reading", dueTime: 600 })).toEqual({
+      status: 400,
+      body: { error: "A due time needs a deadline: send the deadline with it." },
+    });
+
+    const cleared = await ok("update_task", { taskId, deadline: null });
+    expect([cleared.task.deadline, cleared.task.dueTime]).toEqual([null, null]);
+    // Undo puts back both, since clearing the deadline took the time with it.
+    const [change] = await alice.query(api.assistant.activity, { today, days: 1 });
+    await alice.mutation(api.assistant.undoAction, { id: change!._id });
+    const back = await ok("get_task", { taskId });
+    expect([back.deadline, back.dueTime]).toEqual(["2026-10-16", 1435]);
+  });
+
+  test("add_tasks adds what it can in one call and says why the others were refused", async () => {
+    const { ok, alice, today } = await withToken();
+    const reply = await ok("add_tasks", {
+      tasks: [
+        { title: "Workshop 8 coding", deadline: "2026-10-16", dueTime: 1435 },
+        { title: "Lab 4", date: "2026-13-40" },
+        { title: "Essay plan", spaceId: "not-a-space" },
+        { text: "Read chapter 5 today" },
+      ],
+    });
+    expect([reply.added, reply.failed]).toEqual([2, 2]);
+    expect(
+      reply.results.map((r: any) => (r.ok ? [r.index, r.task.title, r.task.status] : [r.index, r.error])),
+    ).toEqual([
+      [0, "Workshop 8 coding", "open"],
+      [1, "The date must be a date like 2026-10-13."],
+      [2, "That space doesn't exist or isn't yours."],
+      [3, "Read chapter 5", "open"],
+    ]);
+    expect((await alice.query(api.views.today, { today })).anytime.map((t) => t.title)).toEqual([
+      "Read chapter 5",
+    ]);
+    const actions = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(actions.map((a) => [a.agent, a.kind, a.title])).toEqual([
+      ["Chitti school", "add", "Read chapter 5"],
+      ["Chitti school", "add", "Workshop 8 coding"],
+    ]);
+  });
+
+  test("update, complete, delete and restore take many tasks, each answered in place", async () => {
+    const { ok } = await withToken();
+    const { results } = await ok("add_tasks", {
+      tasks: [{ text: "Lab report today" }, { text: "Problem set today" }, { text: "Gym every mon 7am" }],
+    });
+    const [lab, set, gym] = results.map((r: any) => r.task.taskId as string);
+
+    const updated = await ok("update_tasks", {
+      updates: [
+        { taskId: lab, deadline: "2026-10-16", dueTime: 1020 },
+        { taskId: set, time: 2000 },
+        { taskId: "nope", title: "x" },
+      ],
+    });
+    expect([updated.updated, updated.failed]).toEqual([1, 2]);
+    expect(updated.results.map((r: any) => (r.ok ? [r.task.deadline, r.task.dueTime] : r.error))).toEqual([
+      ["2026-10-16", 1020],
+      "The time must be within the day.",
+      "That task doesn't exist or isn't yours.",
+    ]);
+
+    const done = await ok("complete_tasks", {
+      tasks: [{ taskId: lab, date: "2026-10-13" }, { taskId: gym, date: "2026-10-19" }, { taskId: set }],
+    });
+    expect(done.results.map((r: any) => (r.ok ? [r.taskId, r.finished, r.next] : r.error))).toEqual([
+      [lab, true, null],
+      [gym, false, "2026-10-26"],
+      [set, true, null],
+    ]);
+    expect([done.completed, done.failed]).toEqual([3, 0]);
+    // A retried call is refused per item instead of ticking the gym's next week too.
+    const retry = await ok("complete_tasks", { tasks: [{ taskId: gym, date: "2026-10-19" }] });
+    expect(retry.results).toEqual([
+      { index: 0, ok: false, error: "That task is on Mon 26 Oct now, so it wasn't ticked off again." },
+    ]);
+
+    const deleted = await ok("delete_tasks", { taskIds: [lab, gym] });
+    expect([deleted.deleted, deleted.failed]).toEqual([2, 0]);
+    expect((await ok("search_tasks", { status: "deleted" })).tasks.map((t: any) => t.taskId).sort()).toEqual(
+      [lab, gym].sort(),
+    );
+    const restored = await ok("restore_tasks", { taskIds: [lab, gym] });
+    expect(restored.restored).toBe(2);
+    expect((await ok("search_tasks", { status: "deleted" })).tasks).toEqual([]);
+  });
+
+  test("upsert_tasks syncs by externalId: created, then unchanged, then only what changed", async () => {
+    const { ok, call, alice, today } = await withToken();
+    const sync = [
+      {
+        externalId: "moodle:assign:812",
+        title: "Workshop 8 coding",
+        deadline: "2026-10-30",
+        dueTime: 1435,
+      },
+      {
+        externalId: "moodle:class:cs101",
+        title: "CS101 lecture",
+        date: "2026-10-13",
+        time: 600,
+        length: 90,
+        event: true,
+        repeat: { freq: "week", interval: 1, weekdays: [1, 3] },
+      },
+    ];
+    const first = await ok("upsert_tasks", { tasks: sync });
+    expect([first.created, first.updated, first.unchanged, first.skipped, first.failed]).toEqual([
+      2, 0, 0, 0, 0,
+    ]);
+
+    // The class has moved on to Thursday since; the same sync must not move it back or add it again.
+    const lecture = first.results[1].task.taskId;
+    await ok("complete_task", { taskId: lecture, date: "2026-10-13" });
+    const again = await ok("upsert_tasks", {
+      tasks: [sync[0], { ...sync[1], repeat: { interval: 1, weekdays: [1, 3], freq: "week" } }],
+    });
+    expect([again.created, again.updated, again.unchanged]).toEqual([0, 0, 2]);
+    expect(again.results.map((r: any) => r.status)).toEqual(["unchanged", "unchanged"]);
+    expect((await ok("get_task", { taskId: lecture })).date).toBe("2026-10-15");
+
+    const moved = await ok("upsert_tasks", {
+      tasks: [{ ...sync[0], dueTime: 1380, note: null }, sync[1]],
+    });
+    expect([moved.created, moved.updated, moved.unchanged]).toEqual([0, 1, 1]);
+    expect(moved.results[0].task.dueTime).toBe(1380);
+
+    // The person deleted the assignment: the next sync leaves it deleted.
+    await ok("delete_task", { taskId: first.results[0].task.taskId });
+    const later = await ok("upsert_tasks", { tasks: [sync[0]] });
+    expect([later.created, later.skipped, later.results[0].status]).toEqual([0, 1, "skipped"]);
+
+    expect(
+      (await call("upsert_tasks", { tasks: [{ externalId: "moodle:new" }] })).body.result.results,
+    ).toEqual([{ index: 0, ok: false, error: "A new task needs a title." }]);
+    expect(await call("add_task", { title: "Copy", externalId: "moodle:class:cs101" })).toEqual({
+      status: 400,
+      body: {
+        error:
+          'Another task already has the externalId "moodle:class:cs101"; upsert_tasks updates it instead.',
+      },
+    });
+    const actions = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(
+      actions.filter((a) => a.kind === "add" || a.kind === "change").map((a) => [a.kind, a.title]),
+    ).toEqual([
+      ["change", "Workshop 8 coding"],
+      ["add", "CS101 lecture"],
+      ["add", "Workshop 8 coding"],
+    ]);
+  });
+
+  test("search_tasks finds tasks by words, space, dates, status, kind and agent, a page at a time", async () => {
+    const { ok, call, alice } = await withToken();
+    const uni = await alice.mutation(api.organize.addSpace, { name: "Uni" });
+    const cs = await alice.mutation(api.organize.addSpace, { name: "CS101", parentId: uni });
+    await alice.mutation(api.tasks.add, { title: "Groceries", date: "2026-10-14" });
+    await ok("add_tasks", {
+      tasks: [
+        { title: "Workshop 8 coding", spaceId: cs, deadline: "2026-10-30", dueTime: 1435 },
+        { title: "Workshop 9 coding", spaceId: cs, deadline: "2026-11-06", note: "Recursion and trees" },
+        { title: "Essay draft", spaceId: uni, date: "2026-10-20" },
+        { title: "CS101 lecture", spaceId: cs, date: "2026-10-15", time: 600, event: true },
+      ],
+    });
+    const titles = async (filters: object) =>
+      (await ok("search_tasks", filters)).tasks.map((t: any) => t.title);
+
+    expect(await titles({ text: "workshop CODING" })).toEqual(["Workshop 9 coding", "Workshop 8 coding"]);
+    expect(await titles({ text: "trees" })).toEqual(["Workshop 9 coding"]);
+    expect(await titles({ spaceId: uni })).toEqual([
+      "CS101 lecture",
+      "Essay draft",
+      "Workshop 9 coding",
+      "Workshop 8 coding",
+    ]);
+    expect(await titles({ spaceId: uni, includeChildSpaces: false })).toEqual(["Essay draft"]);
+    expect(await titles({ deadlineFrom: "2026-10-24", deadlineTo: "2026-10-31" })).toEqual([
+      "Workshop 8 coding",
+    ]);
+    expect(await titles({ dateFrom: "2026-10-14", dateTo: "2026-10-15" })).toEqual([
+      "CS101 lecture",
+      "Groceries",
+    ]);
+    expect(await titles({ kind: "event" })).toEqual(["CS101 lecture"]);
+    expect(await titles({ addedBy: "chitti SCHOOL", kind: "task" })).toEqual([
+      "Essay draft",
+      "Workshop 9 coding",
+      "Workshop 8 coding",
+    ]);
+
+    const [row] = (await ok("search_tasks", { text: "workshop 8" })).tasks;
+    expect(row).toEqual({
+      taskId: row.taskId,
+      title: "Workshop 8 coding",
+      status: "open",
+      spaceId: cs,
+      spacePath: "Uni / CS101",
+      date: null,
+      time: null,
+      length: null,
+      deadline: "2026-10-30",
+      dueTime: 1435,
+      event: false,
+      repeatText: null,
+      hasNote: false,
+      addedBy: "Chitti school",
+      proposedBy: null,
+      externalId: null,
+    });
+    await ok("complete_task", { taskId: row.taskId });
+    expect(await titles({ status: "done" })).toEqual(["Workshop 8 coding"]);
+    expect(await titles({ text: "workshop" })).toEqual(["Workshop 9 coding"]);
+
+    const page1 = await ok("search_tasks", { status: "any", limit: 2 });
+    const page2 = await ok("search_tasks", { status: "any", limit: 2, cursor: page1.cursor });
+    const page3 = await ok("search_tasks", { status: "any", limit: 2, cursor: page2.cursor });
+    expect([page1.tasks, page2.tasks, page3.tasks].map((p) => p.map((t: any) => t.title))).toEqual([
+      ["CS101 lecture", "Essay draft"],
+      ["Workshop 9 coding", "Workshop 8 coding"],
+      ["Groceries"],
+    ]);
+    expect([typeof page1.cursor, page3.cursor]).toEqual(["string", null]);
+    expect((await call("search_tasks", { dateFrom: "next week" })).body).toEqual({
+      error: "The dateFrom must be a date like 2026-10-13.",
+    });
+  });
+
+  test("get_range reads a month with a weekly class on every day it falls, up to 62 days", async () => {
+    const { ok, call } = await withToken();
+    await ok("add_task", { text: "Calculus every tue and thu 9am for 1h" });
+    await ok("add_task", { title: "Essay", deadline: "2026-11-02", dueTime: 1435 });
+    const month = await ok("get_range", { start: "2026-10-13", end: "2026-11-12" });
+    expect(month.days.length).toBe(31);
+    const classes = month.days.filter((d: any) => d.scheduled.length).map((d: any) => d.date);
+    expect(classes.length).toBe(10);
+    expect(classes.slice(0, 3)).toEqual(["2026-10-13", "2026-10-15", "2026-10-20"]);
+    expect(month.days.find((d: any) => d.date === "2026-11-02").deadlines.map((t: any) => t.title)).toEqual([
+      "Essay",
+    ]);
+    expect((await call("get_range", { start: "2026-10-01", end: "2026-12-15" })).body).toEqual({
+      error: "Ask for at most 62 days at a time.",
+    });
+  });
+
+  test("an agent lists its runs and undoes a whole one, like Undo in the app", async () => {
+    const { ok, alice, today } = await withToken();
+    await ok("add_task", { title: "Call Mum", agent: "Claude" });
+    const added = await ok("add_tasks", {
+      tasks: [{ title: "Workshop 8" }, { title: "Workshop 9" }, { title: "Quiz 3" }],
+    });
+    await ok("update_task", { taskId: added.results[0].task.taskId, deadline: "2026-10-16" });
+
+    const { runs } = await ok("list_changes", { by: "chitti school" });
+    expect(runs.map((r: any) => [r.agent, r.summary, r.changes.length])).toEqual([
+      ["Chitti school", "added 3 and changed 1", 4],
+    ]);
+    expect(runs[0].changes.map((c: any) => [c.kind, c.title, c.undoable])).toEqual([
+      ["add", "Workshop 8", true],
+      ["add", "Workshop 9", true],
+      ["add", "Quiz 3", true],
+      ["change", "Workshop 8", true],
+    ]);
+
+    const undone = await ok("undo_changes", { runId: runs[0].runId });
+    expect([undone.undone, undone.failed]).toEqual([4, 0]);
+    expect((await ok("search_tasks", {})).tasks.map((t: any) => t.title)).toEqual(["Call Mum"]);
+    const after = await ok("list_changes", {});
+    expect(after.runs.map((r: any) => [r.agent, r.summary])).toEqual([
+      ["Chitti school", ""],
+      ["Claude", "added 1"],
+    ]);
+    // Undoing again changes nothing; the app's list shows them undone.
+    expect((await ok("undo_changes", { actionIds: [runs[0].changes[1].actionId] })).undone).toBe(1);
+    const listed = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect(listed.filter((a) => a.undone).length).toBe(4);
+  });
+
+  test("a cancelled class is skipped for one week, a retry skips nothing more, and Undo puts it back", async () => {
+    const { ok, call, alice, today } = await withToken();
+    const { taskId } = await ok("add_task", { text: "CS101 lecture every tue 10am for 1h" });
+    expect(await ok("skip_occurrence", { taskId, date: "2026-10-13" })).toEqual({
+      taskId,
+      skipped: "2026-10-13",
+      next: "2026-10-20",
+    });
+    expect((await call("skip_occurrence", { taskId, date: "2026-10-13" })).body).toEqual({
+      error: "That task is on Tue 20 Oct now, so nothing was skipped.",
+    });
+    const [skip] = await alice.query(api.assistant.activity, { today, days: 1 });
+    expect([skip?.kind, skip?.undoable]).toEqual(["move", true]);
+    await alice.mutation(api.assistant.undoAction, { id: skip!._id });
+    expect((await ok("get_task", { taskId })).date).toBe("2026-10-13");
+  });
+
+  test("spaces, habits and goals can be archived and habits changed, saying what stays", async () => {
+    const { ok, alice, today } = await withToken();
+    const uni = await alice.mutation(api.organize.addSpace, { name: "Uni" });
+    await alice.mutation(api.organize.addSpace, { name: "CS101", parentId: uni });
+    await ok("add_task", { title: "Essay", spaceId: uni, date: "2026-10-14" });
+    expect(await ok("delete_space", { spaceId: uni })).toEqual({
+      spaceId: uni,
+      archived: true,
+      openTasksKept: 1,
+      spacesMovedToTop: 1,
+    });
+    expect((await ok("list_spaces")).map((s: any) => s.path)).toEqual(["CS101"]);
+    expect(
+      (await ok("search_tasks", { text: "essay" })).tasks.map((t: any) => [t.title, t.spacePath]),
+    ).toEqual([["Essay", null]]);
+
+    const { habitId } = await ok("add_habit", { title: "Raed", target: 3 });
+    await ok("update_habit", { habitId, title: "Read 20 min", target: 5 });
+    expect((await alice.query(api.views.today, { today })).habits.map((h) => [h.title, h.target])).toEqual([
+      ["Read 20 min", 5],
+    ]);
+    await ok("delete_habit", { habitId });
+    expect((await alice.query(api.views.today, { today })).habits).toEqual([]);
+
+    const { goalId } = await ok("add_goal", { title: "Run 100 km", kind: "number", target: 100 });
+    expect(await ok("delete_goal", { goalId })).toEqual({ goalId, archived: true });
+    expect(await alice.query(api.views.goals, { today })).toEqual([]);
+  });
+
+  test("an agent reads and changes the day's settings, but not who may edit directly", async () => {
+    const { ok, call } = await withToken();
+    expect(await ok("get_settings")).toEqual({
+      timeZone: "UTC",
+      dayStart: 480,
+      dayEnd: 1320,
+      dailyCapacity: 420,
+      defaultReminders: [{ kind: "before", minutes: 10 }],
+      reviewTime: 1200,
+      agentsEditDirectly: false,
+      sounds: false,
+      semesterStart: null,
+      semesterEnd: null,
+    });
+    const { settings } = await ok("update_settings", {
+      dayStart: 420,
+      reviewTime: 1290,
+      semesterStart: "2026-09-01",
+      semesterEnd: "2026-12-18",
+    });
+    expect([settings.dayStart, settings.reviewTime, settings.semesterEnd]).toEqual([420, 1290, "2026-12-18"]);
+    expect((await call("update_settings", { dayStart: 1300, dayEnd: 1200 })).body).toEqual({
+      error: "Your day must end after it starts.",
+    });
+    expect((await call("update_settings", { agentsEditDirectly: true })).status).toBe(400);
+  });
+});

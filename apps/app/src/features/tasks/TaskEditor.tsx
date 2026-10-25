@@ -37,6 +37,7 @@ import type { Id } from "@kriyan/convex/dataModel";
 import {
   formatDate,
   formatDay,
+  formatDue,
   WEEKDAY_SHORT,
   formatDuration,
   describeReminder,
@@ -393,7 +394,7 @@ export function TaskEditor({ task, onClose, initialEdit }: Props) {
             <PropChip
               anchor={deadlineRef}
               icon={Flag}
-              text={task.deadline ? `Due ${formatDay(task.deadline, today)}` : null}
+              text={task.deadline ? formatDue(task.deadline, task.dueTime, today) : null}
               empty="Deadline"
               label="Deadline"
               expanded={sub === "deadline"}

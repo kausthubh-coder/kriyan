@@ -71,12 +71,14 @@ export const taskBeforeV = v.object({
   time: was(v.number()),
   length: was(v.number()),
   deadline: was(v.string()),
+  dueTime: was(v.number()),
   repeat: was(repeatV),
   reminders: was(v.array(reminderV)),
   note: was(v.string()),
   steps: was(v.array(stepV)),
   event: was(v.boolean()),
   goalId: was(v.id("goals")),
+  externalId: was(v.string()),
 });
 
 // The validators and the shared types in @kriyan/core must describe the same shapes.
