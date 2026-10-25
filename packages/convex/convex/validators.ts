@@ -97,6 +97,7 @@ export const taskBeforeV = v.object({
   event: was(v.boolean()),
   goalId: was(v.id("goals")),
   externalId: was(v.string()),
+  prepFor: was(v.id("tasks")),
 });
 
 // The validators and the shared types in @kriyan/core must describe the same shapes.

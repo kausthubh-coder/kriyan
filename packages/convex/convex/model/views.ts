@@ -45,13 +45,42 @@ export interface TaskView {
   addedBy: string | null;
   /** The agent's source id, for syncs (upsert_tasks). */
   externalId: string | null;
+  /** The test a study session prepares for, and days from this view's date (or today) to it. */
+  prepFor: { title: string; date: CivilDate | null; daysLeft: number | null } | null;
 }
 
 const LIMIT = 500;
 
-function view(task: Doc<"tasks">, spaces: Map<string, SpaceNode>, at?: CivilDate, done = false): TaskView {
-  const space = task.spaceId ? spaces.get(task.spaceId) : undefined;
+/** What a task's view looks up besides the task: its space, the test it prepares for, and today. */
+export interface TaskRefs {
+  spaces: Map<string, SpaceNode>;
+  /** By the study session's id: the task it prepares for. */
+  preps: Map<string, { title: string; date: CivilDate | null }>;
+  today: CivilDate;
+}
+
+/** The spaces and study sessions' tests a list of task views needs. */
+export async function taskRefs(ctx: QueryCtx, ownerId: string, today: CivilDate) {
+  const { tree, map } = await spaceMap(ctx, ownerId);
+  const sessions = await ctx.db
+    .query("tasks")
+    .withIndex("by_owner_and_prepFor", (q) => q.eq("ownerId", ownerId).gt("prepFor", "" as Id<"tasks">))
+    .take(LIMIT);
+  const preps: TaskRefs["preps"] = new Map();
+  for (const s of sessions) {
+    if (!live(s) || !s.prepFor) continue;
+    const test = await ctx.db.get(s.prepFor);
+    if (test && test.ownerId === ownerId && live(test))
+      preps.set(s._id, { title: test.title, date: test.date ?? null });
+  }
+  const refs: TaskRefs = { spaces: map, preps, today };
+  return { tree, map, refs };
+}
+
+function view(task: Doc<"tasks">, refs: TaskRefs, at?: CivilDate, done = false): TaskView {
+  const space = task.spaceId ? refs.spaces.get(task.spaceId) : undefined;
   const date = at ?? task.date ?? null;
+  const prep = refs.preps.get(task._id);
   return {
     _id: task._id,
     title: task.title,
@@ -78,6 +107,13 @@ function view(task: Doc<"tasks">, spaces: Map<string, SpaceNode>, at?: CivilDate
     proposedBy: task.proposedBy ?? null,
     addedBy: task.addedBy ?? null,
     externalId: task.externalId ?? null,
+    prepFor: prep
+      ? {
+          title: prep.title,
+          date: prep.date,
+          daysLeft: prep.date ? diffDays(prep.date, date ?? refs.today) : null,
+        }
+      : null,
   };
 }
 
@@ -178,25 +214,19 @@ async function openInSpace(ctx: QueryCtx, ownerId: string, spaceId: Id<"spaces">
 }
 
 /** Every task falling on each day of [from, to], with repeats projected forward. */
-async function plan(
-  ctx: QueryCtx,
-  ownerId: string,
-  from: CivilDate,
-  to: CivilDate,
-  spaces: Map<string, SpaceNode>,
-) {
+async function plan(ctx: QueryCtx, ownerId: string, from: CivilDate, to: CivilDate, refs: TaskRefs) {
   const byDay = new Map<CivilDate, TaskView[]>();
   const push = (d: CivilDate, t: TaskView) => byDay.set(d, [...(byDay.get(d) ?? []), t]);
   // A finished repeat's last date shows through its completion, below, like the others.
-  for (const t of await datedBetween(ctx, ownerId, from, to)) if (!t.repeat) push(t.date!, view(t, spaces));
+  for (const t of await datedBetween(ctx, ownerId, from, to)) if (!t.repeat) push(t.date!, view(t, refs));
   for (const t of await repeating(ctx, ownerId)) {
     if (!t.date || t.date > to) continue;
     // The pending date shows even when it was moved off the rule's usual days; later
     // occurrences follow the rule. Earlier ones are either done or "from earlier".
-    if (t.date >= from) push(t.date, view(t, spaces, t.date));
+    if (t.date >= from) push(t.date, view(t, refs, t.date));
     const after = t.date >= from ? t.date : from;
     for (const d of occurrencesBetween(t.repeat!, t.repeatFirst ?? t.date, after, to)) {
-      if (d > t.date) push(d, view(t, spaces, d));
+      if (d > t.date) push(d, view(t, refs, d));
     }
   }
   // Repeats done in the range show as done on their own day, however late they were ticked.
@@ -209,7 +239,7 @@ async function plan(
     if (!tasks.has(c.taskId)) tasks.set(c.taskId, await ctx.db.get(c.taskId));
     const task = tasks.get(c.taskId);
     if (!task || !live(task) || !task.repeat) continue;
-    push(c.date, view(task, spaces, c.date, true));
+    push(c.date, view(task, refs, c.date, true));
   }
   const sort = (a: TaskView, b: TaskView) =>
     (a.time ?? 1e9) - (b.time ?? 1e9) || a.title.localeCompare(b.title);
@@ -313,11 +343,11 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
   civil(today, "date");
   const profile = await getProfile(ctx, ownerId);
   const prefs = todayPrefs(profile);
-  const { map, tree } = await spaceMap(ctx, ownerId);
-  const day = (await plan(ctx, ownerId, today, today, map)).get(today) ?? [];
+  const { map, tree, refs } = await taskRefs(ctx, ownerId, today);
+  const day = (await plan(ctx, ownerId, today, today, refs)).get(today) ?? [];
   const earlier: EarlierView[] = (await leftovers(ctx, ownerId, today))
     .filter((l) => inEarlierWindow(l.ageDays, prefs.earlierWindow))
-    .map((l) => ({ ...view(l.task, map), ageDays: l.ageDays }));
+    .map((l) => ({ ...view(l.task, refs), ageDays: l.ageDays }));
   // Due today but planned for no day, or a later one: today's list is where they belong.
   const due = (
     await ctx.db
@@ -343,7 +373,7 @@ export async function todayView(ctx: QueryCtx, ownerId: string, today: CivilDate
     scheduled: day.filter((t) => t.time !== null),
     anytime: day.filter((t) => t.time === null && !t.done),
     done: day.filter((t) => t.time === null && t.done),
-    due: due.map((t) => view(t, map)),
+    due: due.map((t) => view(t, refs)),
     earlier,
     // A habit inside a routine is ticked there, so it doesn't show again on its own.
     habits: (await habitViews(ctx, ownerId, today, map)).filter((h) => h.routineId === null),
@@ -360,10 +390,10 @@ async function days(
   start: CivilDate,
   end: CivilDate,
   today: CivilDate,
-  map: Map<string, SpaceNode>,
+  refs: TaskRefs,
 ) {
   const profile = await getProfile(ctx, ownerId);
-  const byDay = await plan(ctx, ownerId, start, end, map);
+  const byDay = await plan(ctx, ownerId, start, end, refs);
   const deadlines = (
     await ctx.db
       .query("tasks")
@@ -383,7 +413,7 @@ async function days(
       isToday: date === today,
       scheduled: items.filter((t) => t.time !== null),
       anytime: items.filter((t) => t.time === null),
-      deadlines: deadlines.filter((t) => t.deadline === date).map((t) => view(t, map)),
+      deadlines: deadlines.filter((t) => t.deadline === date).map((t) => view(t, refs)),
       plannedMinutes: items.filter((t) => !t.event).reduce((sum, t) => sum + (t.length ?? 0), 0),
       capacity: profile.dailyCapacity,
     };
@@ -393,14 +423,14 @@ async function days(
 export async function weekView(ctx: QueryCtx, ownerId: string, start: CivilDate, today: CivilDate) {
   civil(start, "start");
   civil(today, "date");
-  const { map } = await spaceMap(ctx, ownerId);
-  const week = await days(ctx, ownerId, start, addDays(start, 6), today, map);
+  const { refs } = await taskRefs(ctx, ownerId, today);
+  const week = await days(ctx, ownerId, start, addDays(start, 6), today, refs);
   const undated = await openUndated(ctx, ownerId);
   return {
     start,
     days: week,
-    inbox: undated.filter((t) => !t.spaceId).map((t) => view(t, map)),
-    unscheduled: undated.filter((t) => t.spaceId).map((t) => view(t, map)),
+    inbox: undated.filter((t) => !t.spaceId).map((t) => view(t, refs)),
+    unscheduled: undated.filter((t) => t.spaceId).map((t) => view(t, refs)),
     proposals: week.flatMap((d) => d.scheduled.concat(d.anytime)).filter((t) => t.proposedBy !== null).length,
   };
 }
@@ -421,8 +451,8 @@ export async function rangeView(
   if (end < start) throw new ConvexError("The end must be on or after the start.");
   if (diffDays(end, start) + 1 > MAX_RANGE_DAYS)
     throw new ConvexError(`Ask for at most ${MAX_RANGE_DAYS} days at a time.`);
-  const { map } = await spaceMap(ctx, ownerId);
-  const list = await days(ctx, ownerId, start, end, today, map);
+  const { refs } = await taskRefs(ctx, ownerId, today);
+  const list = await days(ctx, ownerId, start, end, today, refs);
   return {
     start,
     end,
@@ -436,12 +466,13 @@ export async function oneTask(
   ctx: QueryCtx,
   ownerId: string,
   id: Id<"tasks">,
+  today: CivilDate,
 ): Promise<TaskView & { note: string | null }> {
   const task = owned(await ctx.db.get(id), ownerId, "task");
   if (task.deletedAt !== undefined)
     throw new ConvexError("That task is deleted; restore_task brings it back.");
-  const { map } = await spaceMap(ctx, ownerId);
-  return { ...view(task, map), note: task.note ?? null };
+  const { refs } = await taskRefs(ctx, ownerId, today);
+  return { ...view(task, refs), note: task.note ?? null };
 }
 
 /** The person's open goals, for the task editor's Goal field, without Progress's year of history. */
@@ -491,15 +522,15 @@ export async function trashView(ctx: QueryCtx, ownerId: string) {
 export async function inboxView(ctx: QueryCtx, ownerId: string, today: CivilDate) {
   civil(today, "date");
   const { earlierWindow } = todayPrefs(await getProfile(ctx, ownerId));
-  const { map } = await spaceMap(ctx, ownerId);
+  const { refs } = await taskRefs(ctx, ownerId, today);
   const undated = (await openUndated(ctx, ownerId)).filter((t) => !t.spaceId);
   const older: EarlierView[] = (await leftovers(ctx, ownerId, today))
     // A missed deadline with no day and no space is already in the list above.
     .filter((l) => !inEarlierWindow(l.ageDays, earlierWindow) && (l.task.date || l.task.spaceId))
     .sort((a, b) => a.ageDays - b.ageDays)
-    .map((l) => ({ ...view(l.task, map), ageDays: l.ageDays }));
+    .map((l) => ({ ...view(l.task, refs), ageDays: l.ageDays }));
   return {
-    tasks: undated.sort((a, b) => b.order - a.order).map((t) => view(t, map)),
+    tasks: undated.sort((a, b) => b.order - a.order).map((t) => view(t, refs)),
     older,
   };
 }
@@ -519,7 +550,7 @@ export function descendants(spaceId: Id<"spaces">, tree: SpaceNode[]): Id<"space
 export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spaces">, today: CivilDate) {
   civil(today, "date");
   const space = owned(await ctx.db.get(spaceId), ownerId, "space");
-  const { map, tree } = await spaceMap(ctx, ownerId);
+  const { map, tree, refs } = await taskRefs(ctx, ownerId, today);
   const node = map.get(spaceId);
   // A parent space holds what its spaces hold: Work lists and counts Kriyan's tasks too, so a
   // space with everything in its children never looks empty.
@@ -565,8 +596,8 @@ export async function spaceView(ctx: QueryCtx, ownerId: string, spaceId: Id<"spa
       parentId: space.parentId ?? null,
     },
     breadcrumb: ancestors(spaceId, map),
-    next: dated.map((t) => view(t, map)),
-    later: tasks.filter((t) => !t.date).map((t) => view(t, map)),
+    next: dated.map((t) => view(t, refs)),
+    later: tasks.filter((t) => !t.date).map((t) => view(t, refs)),
     children: childCounts,
     goals: await goalViews(ctx, ownerId, goals, today),
     stats: {

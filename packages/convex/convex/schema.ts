@@ -87,6 +87,8 @@ export default defineSchema({
     /** Something you attend (a class, a meeting) rather than tick off. */
     event: v.boolean(),
     goalId: v.optional(v.id("goals")),
+    /** The test or deadline this one prepares for: a study session before an exam. */
+    prepFor: v.optional(v.id("tasks")),
     order: v.number(),
     doneAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
@@ -120,7 +122,9 @@ export default defineSchema({
     .index("by_deletedAt", ["deletedAt"])
     .index("by_owner_and_proposedBy", ["ownerId", "proposedBy"])
     // What feeds a goal, on its card.
-    .index("by_owner_and_goalId", ["ownerId", "goalId"]),
+    .index("by_owner_and_goalId", ["ownerId", "goalId"])
+    // Study sessions, to show the test each prepares for.
+    .index("by_owner_and_prepFor", ["ownerId", "prepFor"]),
 
   /** One row per occurrence done: a single task, or one date of a repeating one. */
   completions: defineTable({

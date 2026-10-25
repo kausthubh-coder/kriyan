@@ -55,7 +55,7 @@ export const get_space = internalQuery({
 
 export const get_task = internalQuery({
   args: { ...read, taskId: v.id("tasks") },
-  handler: async (ctx, { ownerId, taskId }) => Views.oneTask(ctx, ownerId, taskId),
+  handler: async (ctx, { ownerId, today, taskId }) => Views.oneTask(ctx, ownerId, taskId, today),
 });
 
 export const list_spaces = internalQuery({
@@ -83,6 +83,7 @@ const taskFields = {
   event: v.optional(v.boolean()),
   goalId: v.optional(v.id("goals")),
   externalId: v.optional(v.string()),
+  prepFor: v.optional(v.id("tasks")),
 };
 
 /** A patch's fields; null clears one. */
@@ -101,6 +102,7 @@ const patchFields = {
   event: nullable(v.boolean()),
   goalId: nullable(v.id("goals")),
   externalId: nullable(v.string()),
+  prepFor: nullable(v.id("tasks")),
 };
 
 type NewTask = Omit<Tasks.TaskFields, "title"> & { title?: string; text?: string };
@@ -179,7 +181,7 @@ export const add_task = internalMutation({
   handler: async (ctx, { ownerId, agent, ...input }) => {
     const { _id: taskId } = await addOne(ctx, ownerId, agent, input);
     // The task as saved, so the agent sees what its sentence became.
-    return { taskId, task: await Views.oneTask(ctx, ownerId, taskId) };
+    return { taskId, task: await Views.oneTask(ctx, ownerId, taskId, await todayOf(ctx, ownerId)) };
   },
 });
 
@@ -187,7 +189,7 @@ export const update_task = internalMutation({
   args: { ...writer, taskId: v.id("tasks"), ...patchFields },
   handler: async (ctx, { ownerId, agent, taskId, ...patch }) => {
     await updateOne(ctx, ownerId, agent, taskId, patch);
-    return { taskId, task: await Views.oneTask(ctx, ownerId, taskId) };
+    return { taskId, task: await Views.oneTask(ctx, ownerId, taskId, await todayOf(ctx, ownerId)) };
   },
 });
 
@@ -405,6 +407,11 @@ export const answer_ask = internalMutation({
   },
 });
 
+/** The person's today, for a write's reply. */
+async function todayOf(ctx: QueryCtx, ownerId: string) {
+  return todayIn((await getProfile(ctx, ownerId)).timeZone);
+}
+
 async function titleOf(ctx: QueryCtx, taskId: Id<"tasks">): Promise<string> {
   return (await ctx.db.get(taskId))?.title ?? "A task";
 }
@@ -443,10 +450,16 @@ function idIn<T extends TableNames>(ctx: QueryCtx, table: T, raw: string, what: 
   return id;
 }
 
-function refsIn<T extends { spaceId?: string | null; goalId?: string | null }>(ctx: QueryCtx, item: T) {
-  const { spaceId, goalId, ...rest } = item;
+function refsIn<T extends { spaceId?: string | null; goalId?: string | null; prepFor?: string | null }>(
+  ctx: QueryCtx,
+  item: T,
+) {
+  const { spaceId, goalId, prepFor, ...rest } = item;
   return {
     ...rest,
+    ...(prepFor === undefined
+      ? {}
+      : { prepFor: prepFor === null ? null : idIn(ctx, "tasks", prepFor, "task to prepare for") }),
     ...(spaceId === undefined
       ? {}
       : { spaceId: spaceId === null ? null : idIn(ctx, "spaces", spaceId, "space") }),
@@ -460,6 +473,7 @@ const newTaskV = v.object({
   text: v.optional(v.string()),
   spaceId: v.optional(v.string()),
   goalId: v.optional(v.string()),
+  prepFor: v.optional(v.string()),
 });
 
 /** One patch in update_tasks or upsert_tasks: update_task's fields, with ids as strings. */
@@ -467,6 +481,7 @@ const patchItem = {
   ...patchFields,
   spaceId: nullable(v.string()),
   goalId: nullable(v.string()),
+  prepFor: nullable(v.string()),
 };
 
 export const add_tasks = internalMutation({

@@ -2298,3 +2298,89 @@ describe("goal entries and what feeds a goal", () => {
     ]);
   });
 });
+
+describe("study sessions", () => {
+  test("a session says which test it prepares for and how many days are left from its own day", async () => {
+    const { alice, today } = await setup();
+    const exam = await alice.mutation(api.tasks.add, {
+      title: "CSC 316 exam 2",
+      date: "2026-10-20",
+      time: 810,
+      length: 75,
+      event: true,
+    });
+    const study = await alice.mutation(api.tasks.add, {
+      title: "Study for CSC 316 exam 2",
+      date: today,
+      time: 510,
+      length: 90,
+      repeat: { freq: "day", interval: 1, end: { kind: "on", date: "2026-10-19" } },
+      prepFor: exam,
+    });
+    const day = await alice.query(api.views.today, { today });
+    expect(day.scheduled.map((t) => [t.title, t.prepFor])).toEqual([
+      ["Study for CSC 316 exam 2", { title: "CSC 316 exam 2", date: "2026-10-20", daysLeft: 7 }],
+    ]);
+    const week = await alice.query(api.views.week, { start: "2026-10-12", today });
+    expect(
+      week.days.map((d) => [d.date, d.scheduled.find((t) => t._id === study)?.prepFor?.daysLeft ?? null]),
+    ).toEqual([
+      ["2026-10-12", null],
+      ["2026-10-13", 7],
+      ["2026-10-14", 6],
+      ["2026-10-15", 5],
+      ["2026-10-16", 4],
+      ["2026-10-17", 3],
+      ["2026-10-18", 2],
+    ]);
+    // The exam itself prepares for nothing.
+    expect(week.days.flatMap((d) => d.scheduled).find((t) => t._id === exam)).toBeUndefined();
+    await alice.mutation(api.tasks.update, { id: study, prepFor: null });
+    expect((await alice.query(api.views.today, { today })).scheduled[0]!.prepFor).toBeNull();
+  });
+
+  test("a deleted test stops showing, and a task can't prepare for itself or someone else's", async () => {
+    const { t, alice, today } = await setup();
+    const exam = await alice.mutation(api.tasks.add, {
+      title: "Physics midterm",
+      date: "2026-10-16",
+      event: true,
+    });
+    const study = await alice.mutation(api.tasks.add, {
+      title: "Review chapter 7",
+      date: today,
+      prepFor: exam,
+    });
+    await expect(alice.mutation(api.tasks.update, { id: study, prepFor: study })).rejects.toThrow(
+      "A task can't prepare for itself.",
+    );
+    const bob = t.withIdentity(BOB);
+    await bob.mutation(api.account.ensureProfile, { timeZone: "UTC" });
+    await expect(bob.mutation(api.tasks.add, { title: "Copy", prepFor: exam })).rejects.toThrow(
+      "That task to prepare for doesn't exist or isn't yours.",
+    );
+    expect((await alice.query(api.views.today, { today })).anytime[0]!.prepFor).toEqual({
+      title: "Physics midterm",
+      date: "2026-10-16",
+      daysLeft: 3,
+    });
+    await alice.mutation(api.tasks.remove, { id: exam });
+    expect((await alice.query(api.views.today, { today })).anytime[0]!.prepFor).toBeNull();
+  });
+
+  test("an agent links a session to its test, reads it back, and Undo takes the link away", async () => {
+    const { t, alice, today } = await setup();
+    const owner = { ownerId: ALICE.tokenIdentifier, agent: "Claude" };
+    const exam = await alice.mutation(api.tasks.add, {
+      title: "Calculus exam",
+      date: "2026-10-23",
+      event: true,
+    });
+    const study = await alice.mutation(api.tasks.add, { title: "Practice integrals", date: today });
+    const { task } = await t.mutation(internal.agent.update_task, { ...owner, taskId: study, prepFor: exam });
+    expect(task.prepFor).toEqual({ title: "Calculus exam", date: "2026-10-23", daysLeft: 10 });
+    const [change] = await alice.query(api.assistant.activity, { today, days: 1 });
+    await alice.mutation(api.assistant.undoAction, { id: change!._id });
+    expect((await alice.query(api.views.task, { id: study }))?.prepFor).toBeUndefined();
+  });
+});
