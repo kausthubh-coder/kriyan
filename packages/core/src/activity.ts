@@ -62,3 +62,66 @@ export function runSummary(actions: Action[]): string {
   if (parts.length < 2) return parts.join("");
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
+
+const LINE_VERB: Record<Exclude<ActionKind, "other">, string> = {
+  add: "Added",
+  change: "Changed",
+  move: "Moved",
+  done: "Ticked off",
+  reopen: "Reopened",
+  delete: "Deleted",
+  restore: "Brought back",
+};
+
+/** "HW17", "HW17 and HW18", "HW17, HW18 and 29 more". */
+function nameSome(titles: string[]): string {
+  if (titles.length <= 2) return titles.join(" and ");
+  return `${titles.slice(0, 2).join(", ")} and ${titles.length - 2} more`;
+}
+
+export interface RunLine<A> {
+  /** "Added HW17, HW18 and 29 more". */
+  text: string;
+  /** The actions the line stands for, which its Undo puts back. */
+  actions: A[];
+}
+
+/**
+ * What an "other" action's title shares with its neighbours: the words before a colon ("Logged
+ * Lose 5 kg: 0.3 kg"), or its first two ("New space Thesis"). Lines group on it.
+ */
+function otherHead(title: string): [head: string, rest: string] {
+  const colon = title.indexOf(":");
+  if (colon > 0) return [title.slice(0, colon + 1), title.slice(colon + 1).trim()];
+  const words = title.split(" ");
+  return words.length > 2 ? [words.slice(0, 2).join(" "), words.slice(2).join(" ")] : [title, ""];
+}
+
+/**
+ * A run as the Agents page lists it: one line per kind of change, in the order the agent made
+ * them ("Added HW17, HW18 and 29 more", "Ticked off Lab 5 check-in"). An "other" action's title
+ * is already a phrase ("New space Thesis"), so those group by how they start ("New space
+ * Work, School and 2 more").
+ */
+export function runLines<A extends Action & { title: string }>(actions: A[]): RunLine<A>[] {
+  const lines: (RunLine<A> & { head: string; names: string[] })[] = [];
+  const byKey = new Map<string, (typeof lines)[number]>();
+  for (const action of actions) {
+    const [head, rest] =
+      action.kind === "other" ? otherHead(action.title) : [LINE_VERB[action.kind], action.title];
+    const key = `${action.kind}|${head}`;
+    const line = byKey.get(key);
+    if (line) {
+      line.actions.push(action);
+      if (rest && !line.names.includes(rest)) line.names.push(rest);
+    } else {
+      const fresh = { text: "", head, names: rest ? [rest] : [], actions: [action] };
+      byKey.set(key, fresh);
+      lines.push(fresh);
+    }
+  }
+  return lines.map(({ head, names, actions: list }) => ({
+    text: names.length ? `${head} ${nameSome(names)}` : head,
+    actions: list,
+  }));
+}

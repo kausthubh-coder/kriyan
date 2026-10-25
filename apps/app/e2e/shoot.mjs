@@ -6,7 +6,7 @@ import { BASE, artifact, launch, settle, signedInContext } from "./lib.mjs";
 
 const routes = process.argv.slice(2).length
   ? process.argv.slice(2).map((p) => (p.startsWith("/") ? p : `/${p}`))
-  : ["/today", "/upcoming", "/inbox", "/browse", "/progress", "/settings"];
+  : ["/today", "/menu", "/inbox", "/goals", "/agents", "/settings"];
 const widths = [
   { name: "390", viewport: { width: 390, height: 844 } },
   { name: "1440", viewport: { width: 1440, height: 900 } },
@@ -24,11 +24,11 @@ for (const { name, viewport } of widths) {
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   for (const route of routes) {
     if (route.startsWith("/space:")) {
-      // A space by name: open it from Browse, the way a person would.
-      await page.goto(`${BASE}/browse`);
+      // A space by name: open it from the menu, the way a person would.
+      await page.goto(`${BASE}/menu`);
       await settle(page);
       await page
-        .getByRole("link", { name: route.slice(7), exact: true })
+        .getByRole("link", { name: new RegExp(`^${route.slice(7)}(, \\d+)?$`) })
         .last()
         .click();
       await page.waitForURL(/\/space\//);

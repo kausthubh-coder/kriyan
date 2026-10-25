@@ -1,22 +1,23 @@
-// The web app: the sidebar on desktop, the navigation bar and add button below 760px.
-// The task and quick add are routes drawn over the screen behind them (transparent modals),
-// so the column stays put while the panel is open.
+// The web app (design v5): no tab bar. Desktop draws the quiet left rail beside the page; phones
+// get the pages alone, with Today's floating buttons and the menu as a page. The task and quick
+// add are routes drawn over the screen behind them (transparent modals), so the page stays put
+// while they're open.
 
 import { Stack, usePathname } from "expo-router";
 import { View } from "react-native";
 import { ASK_BAR_HEIGHT } from "@/features/ask/AskBar";
 import { useNotifications } from "@/features/notifications/register";
 import { CommandMenu } from "@/features/shell/CommandMenu";
-import { Dock, DOCK_CLEARANCE } from "@/features/shell/Dock";
+import { DOCK_CLEARANCE } from "@/features/shell/Dock";
+import { Rail } from "@/features/shell/Rail";
 import { useSession } from "@/features/shell/session";
 import { useShortcuts } from "@/features/shell/shortcuts";
-import { Sidebar } from "@/features/shell/Sidebar";
 import { OfflineNotice } from "@/features/shell/OfflineNotice";
 import { useIsPhone } from "@/theme/layout";
 import { c, s } from "@/theme/tokens";
 import { ToastHost } from "@/ui/toast";
 
-export const unstable_settings = { anchor: "(tabs)" };
+export const unstable_settings = { anchor: "today" };
 
 const overlay = {
   presentation: "transparentModal" as const,
@@ -31,27 +32,26 @@ export default function AppLayout() {
   useNotifications();
   const phone = useIsPhone();
   const path = usePathname();
-  // Focus takes the phone's whole screen: no navigation bar, one task. Desktop keeps the sidebar
-  // and centres Focus in the rest of the window, as B2 does.
-  const immersive = path.startsWith("/focus/");
-  // Like the prototype, the dock leaves for a sheet (a task, quick add) and the evening review.
-  // Today draws its own three buttons (v5), so the old dock stays off it.
-  const today = path === "/" || path === "/today";
-  const dock =
-    phone && !today && !immersive && !path.startsWith("/task/") && path !== "/add" && path !== "/review";
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg, height: "100%" }}>
-      {phone ? null : <Sidebar />}
+      {phone ? null : <Rail />}
       <View style={{ flex: 1, minWidth: 0 }}>
         <OfflineNotice />
         <Stack
           screenOptions={{ headerShown: false, animation: "none", contentStyle: { backgroundColor: c.bg } }}
         >
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="today" />
           <Stack.Screen name="index" />
-          <Stack.Screen name="space/[id]" />
+          <Stack.Screen name="menu" />
           <Stack.Screen name="inbox" />
+          <Stack.Screen name="space/[id]" />
+          <Stack.Screen name="goals" />
+          <Stack.Screen name="agents" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="upcoming" />
+          <Stack.Screen name="ask" />
+          <Stack.Screen name="progress" />
+          <Stack.Screen name="browse" />
           <Stack.Screen name="review" />
           <Stack.Screen name="focus/[id]" />
           <Stack.Screen name="trash" />
@@ -59,8 +59,7 @@ export default function AppLayout() {
           <Stack.Screen name="add" options={overlay} />
         </Stack>
       </View>
-      {dock ? <Dock /> : null}
-      {/* On a phone's Ask, above the ask box as well as the dock. */}
+      {/* On phones above Today's floating buttons (and Ask's box); on desktop in the corner. */}
       <ToastHost bottom={phone ? DOCK_CLEARANCE + (path === "/ask" ? ASK_BAR_HEIGHT : 0) : s.s6} />
       <CommandMenu />
     </View>

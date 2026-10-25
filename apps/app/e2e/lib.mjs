@@ -42,13 +42,10 @@ export async function signedInContext(
     });
     const page = await ctx.newPage();
     await page.goto(`${BASE}/today`);
-    // Wait for whichever renders: the app's navigation (signed in) or the sign-in form.
+    // Wait for whichever comes first: a signed-in Clerk user (design v5 has no navigation bar on
+    // phones to wait for) or the sign-in form.
     const ok = await Promise.race([
-      page
-        .getByRole("navigation", { name: "Main" })
-        .first()
-        .waitFor({ timeout: 60000 })
-        .then(() => true),
+      page.waitForFunction(() => Boolean(window.Clerk?.user), undefined, { timeout: 60000 }).then(() => true),
       page
         .getByRole("button", { name: /^(Sign in|Continue with Google|Plan my first day)$/ })
         .first()

@@ -1,6 +1,15 @@
-// The app's root is Today (v5: one screen, no tabs).
+// The app's root opens Today (`/today`, the stack's anchor). A plain <Redirect> replaced this route
+// with a second copy of Today on top of the anchor's, so after a cold start on Android the first
+// Back only removed that copy. dismissTo goes back to the anchor instead, leaving one entry.
 
-import { TodayScreen } from "@/features/today/TodayScreen";
+import { useCallback } from "react";
+import { router, useFocusEffect } from "expo-router";
 
-export { RouteError as ErrorBoundary } from "@/ui/RouteError";
-export default TodayScreen;
+export default function Index() {
+  useFocusEffect(
+    useCallback(() => {
+      router.dismissTo("/today");
+    }, []),
+  );
+  return null;
+}

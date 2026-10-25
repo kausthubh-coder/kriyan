@@ -89,8 +89,8 @@ const browser = await launch();
   const inbox = (await op("get_inbox")).tasks;
   const desks = inbox.find((t) => t.title === "Look into standing desks");
   await op("delete_task", { taskId: desks._id });
-  // On a phone, Settings is under Browse.
-  await page.goto(`${BASE}/browse`);
+  // On a phone, Settings is in the menu.
+  await page.goto(`${BASE}/menu`);
   await settle(page);
   await page.getByRole("link", { name: "Settings" }).click();
   await settle(page);

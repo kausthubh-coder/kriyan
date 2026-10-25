@@ -88,7 +88,7 @@ for (const [w, h] of [
   // Loading: the skeleton in the final layout, while the data is on its way.
   const slow = await ctx.newPage();
   await slow.route(/convex\.cloud/, (route) => setTimeout(() => route.continue(), 4000));
-  await slow.goto(`${BASE}/progress`);
+  await slow.goto(`${BASE}/goals`);
   await slow.waitForSelector('[data-testid="skeleton"]', { timeout: 60000 }).catch(() => undefined);
   await slow.screenshot({ path: artifact(`state-loading-${w}.png`) });
   await ctx.close();

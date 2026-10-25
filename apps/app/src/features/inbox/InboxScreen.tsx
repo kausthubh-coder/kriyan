@@ -1,138 +1,77 @@
-// The Inbox: everything captured without a home. Each row offers Today, Pick a day and Move
-// to space without opening the task, with the same words on phones and desktop. An empty Inbox
-// is the one place the app celebrates.
+// The Inbox (docs/design/v5 prototype `page("inbox")`): ideas captured with no day yet, and what
+// was planned or due before last week and never done, which Today no longer shows. Each row
+// opens the task, where it gets a day or is let go.
 
-import { useRef, useState } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
-import { CalendarDays, CheckCheck, Layers, Plus, Sun } from "lucide-react-native";
-import type { Id } from "@kriyan/convex/dataModel";
+import { formatDate } from "@kriyan/core/format";
 import { useClock } from "@/data/time";
-import { useInboxView, type TaskView } from "@/data/views";
-import { moveTasks, updateTask } from "@/features/tasks/actions";
-import { DayPicker, SpacePicker } from "@/features/tasks/pickers";
-import { QuickAdd } from "@/features/tasks/QuickAdd";
-import { TaskRow } from "@/features/tasks/TaskRow";
+import { useInboxView, useProfile, type TaskView } from "@/data/views";
+import { todayPrefsOf } from "@/features/settings/todayPrefs";
+import { ListRow } from "@/features/shell/ListRow";
+import { Page, PageEmpty, PageLabel } from "@/features/shell/Page";
 import { useIsPhone } from "@/theme/layout";
 import { s } from "@/theme/tokens";
 import { Button } from "@/ui/Button";
 import { Skeleton } from "@/ui/bits";
-import { Icon } from "@/ui/Icon";
-import { Popover } from "@/ui/Popover";
-import { PageHead, Screen } from "@/ui/Screen";
 import { Txt } from "@/ui/Txt";
+import { toInbox } from "./data";
 
-export function InboxScreen() {
-  const inbox = useInboxView()?.tasks;
-  const { today } = useClock();
-  const phone = useIsPhone();
-  const sub = inbox
-    ? inbox.length
-      ? `${inbox.length} without a day or a space`
-      : "Everything has a home"
-    : " ";
-  return (
-    <Screen title="Inbox" sub={sub} back>
-      <PageHead title="Inbox" sub={sub} />
-      <QuickAdd variant="inline" placeholder="Capture anything, sort it later" />
-      {inbox === undefined ? (
-        <View testID="skeleton" style={{ gap: s.s4 }}>
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} width={`${70 - i * 12}%`} />
-          ))}
-        </View>
-      ) : inbox.length === 0 ? (
-        <View style={{ gap: s.s3, paddingVertical: s.s6, alignItems: "flex-start" }}>
-          <Icon icon={CheckCheck} size={24} tone="ink2" />
-          <Txt variant="title" heading={2}>
-            Inbox zero
-          </Txt>
-          <Txt variant="body" tone="ink3" style={{ maxWidth: 420 }}>
-            Everything you’ve captured has a day or a space. New ideas without either land here.
-          </Txt>
-          {phone ? (
-            <Button
-              icon={Plus}
-              label="Capture a task"
-              onPress={() => router.push("/add")}
-              style={{ marginLeft: -s.s3 }}
-            />
-          ) : null}
-        </View>
-      ) : (
-        <View>
-          {inbox.map((t) => (
-            <InboxRow key={t._id} task={t} today={today} phone={phone} />
-          ))}
-        </View>
-      )}
-    </Screen>
-  );
+/** "Was due Wed 14 Oct" or "Was Wed 14 Oct": when it was meant to happen. */
+function olderMeta(t: TaskView, today: string): string | undefined {
+  if (t.deadline && !t.date) return `Was due ${formatDate(t.deadline, today)}`;
+  if (t.date) return `Was ${formatDate(t.date, today)}`;
+  return undefined;
 }
 
-function InboxRow({ task, today, phone }: { task: TaskView; today: string; phone: boolean }) {
-  const [open, setOpen] = useState<"day" | "space" | null>(null);
-  const dayRef = useRef<View>(null);
-  const spaceRef = useRef<View>(null);
-  // The same three words at both widths. Phones put them under the title (on the row they
-  // would push the title off a 390px screen); desktop keeps them on the row, centred on the
-  // title's line rather than stretching the row taller than the title.
-  const actions = (
-    <View
-      style={{
-        flexDirection: "row",
-        flexWrap: "wrap",
-        alignItems: "center",
-        gap: s.s1,
-        ...(phone ? { marginLeft: 34 - s.s3, marginTop: -s.s2 } : { marginVertical: -s.s1 }),
-      }}
-    >
-      <Button icon={phone ? undefined : Sun} label="Today" onPress={() => void moveTasks([task], today)} />
-      <Button
-        ref={dayRef}
-        icon={phone ? undefined : CalendarDays}
-        label="Pick a day"
-        onPress={() => setOpen("day")}
-      />
-      <Button
-        ref={spaceRef}
-        icon={phone ? undefined : Layers}
-        label="Move to space"
-        onPress={() => setOpen("space")}
-      />
-    </View>
-  );
+export function InboxScreen() {
+  const view = useInboxView();
+  const { today } = useClock();
+  const phone = useIsPhone();
+  const inbox = view ? toInbox(view) : undefined;
+  const profile = useProfile();
+  // Older than the window Settings gives Today ("What's left from earlier").
+  const earlier = profile ? todayPrefsOf(profile).earlierWindow : "week";
+  const olderLabel =
+    earlier === "month"
+      ? "From before last month"
+      : earlier === "none"
+        ? "From earlier"
+        : "From before last week";
   return (
-    <View>
-      <TaskRow task={task} today={today} trailing={phone ? undefined : actions} />
-      {phone ? actions : null}
-      <Popover open={open === "day"} onClose={() => setOpen(null)} anchor={dayRef} title="Pick a day">
-        <DayPicker
-          value={null}
-          today={today}
-          allowNone={false}
-          onPick={(date) => {
-            setOpen(null);
-            if (date) void moveTasks([task], date);
-          }}
+    <Page tabTitle="Inbox" title="Inbox" sub="No day yet. Give each a day, or let it go." add={{}}>
+      {inbox === undefined ? (
+        <View testID="skeleton" style={{ gap: s.s6, paddingTop: s.s6 }}>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} width={`${70 - i * 12}%`} height={16} />
+          ))}
+        </View>
+      ) : inbox.ideas.length === 0 && inbox.older.length === 0 ? (
+        <PageEmpty
+          title="Nothing waiting"
+          body="Everything you've captured has a day. Ideas you add without one land here."
+          action={phone ? null : <Button label="Add an idea" onPress={() => router.push("/add")} />}
         />
-      </Popover>
-      <Popover
-        open={open === "space"}
-        onClose={() => setOpen(null)}
-        anchor={spaceRef}
-        title="Move to space"
-        width={280}
-      >
-        <SpacePicker
-          value={null}
-          allowNone={false}
-          onPick={(id) => {
-            setOpen(null);
-            if (id) void updateTask({ id: task._id, spaceId: id as Id<"spaces"> });
-          }}
-        />
-      </Popover>
-    </View>
+      ) : (
+        <>
+          <PageLabel>Ideas</PageLabel>
+          {inbox.ideas.length ? (
+            inbox.ideas.map((t) => <ListRow key={t._id} task={t} />)
+          ) : (
+            <Txt variant="body" tone="ink3" style={{ paddingVertical: s.s4 }}>
+              No ideas without a day.
+            </Txt>
+          )}
+          {inbox.older.length ? (
+            <>
+              <PageLabel>{olderLabel}</PageLabel>
+              {inbox.older.map((t) => (
+                <ListRow key={t._id} task={t} meta={olderMeta(t, today)} />
+              ))}
+            </>
+          ) : null}
+        </>
+      )}
+    </Page>
   );
 }

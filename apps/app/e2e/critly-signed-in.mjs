@@ -15,16 +15,20 @@ const screens = [
   { name: "review", go: (p) => p.goto(`${BASE}/review`) },
   { name: "upcoming", go: (p) => p.goto(`${BASE}/upcoming`) },
   { name: "inbox", go: (p) => p.goto(`${BASE}/inbox`) },
-  { name: "browse", go: (p) => p.goto(`${BASE}/browse`) },
-  { name: "progress", go: (p) => p.goto(`${BASE}/progress`) },
+  { name: "menu", go: (p) => p.goto(`${BASE}/menu`) },
+  { name: "goals", go: (p) => p.goto(`${BASE}/goals`) },
+  { name: "agents", go: (p) => p.goto(`${BASE}/agents`) },
   { name: "settings", go: (p) => p.goto(`${BASE}/settings`) },
   { name: "recently deleted", go: (p) => p.goto(`${BASE}/trash`) },
   {
     name: "space",
     go: async (p) => {
-      await p.goto(`${BASE}/browse`);
+      await p.goto(`${BASE}/menu`);
       await settle(p);
-      await p.getByRole("link", { name: "Kriyan", exact: true }).last().click();
+      await p
+        .getByRole("link", { name: /^Kriyan(, \d+)?$/ })
+        .last()
+        .click();
       await p.waitForURL(/\/space\//);
     },
   },
