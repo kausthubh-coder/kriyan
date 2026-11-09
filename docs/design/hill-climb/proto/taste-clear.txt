@@ -1,0 +1,25 @@
+Tasting http://127.0.0.1:50284…
+http://127.0.0.1:50284/prototype.html?do=place:email,open:clear · 390x844
+
+  squint  ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/clear/prototype-390.squint.png
+  lead    button.btn.pri "Move all 4" leads clearly, 5.75× over div.tt "12:00"
+  boxes   5 (5 fill), 0 divider lines, nested 2 deep
+  edges   15 left edges (3 for text)
+  overlay ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/clear/prototype-390.taste.png
+
+http://127.0.0.1:50284/prototype.html?do=place:email,open:clear · 1440x900
+
+  squint  ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/clear/prototype-1440.squint.png
+  lead    button.btn.pri "Move all 4" leads clearly, 5.78× over div.tt "12:00"
+  boxes   8 (7 fill, 2 shadow), 0 divider lines, nested 3 deep
+  edges   21 left edges (6 for text), 1 near miss
+  overlay ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/clear/prototype-1440.taste.png
+  look    A box in a box in a box (3 deep): div#device.device > section.card.one > span.tag "NEXT". Let the inner group sit on its parent's surface and separate it with space.
+          https://critly.vercel.app/whitespace
+  look    Two edges where one would do: div.scrim.in sits 0px inside div#device.device "07:40 Mon 9 November 2026 9 MON …", and both draw one. Drop the inner edge or the outer one.
+          https://critly.vercel.app/shadows-not-borders
+  look    Edges 4px apart: h2 "LOOK" starts at 197px and button.on "System" at 201px. Line them up on one edge.
+          https://critly.vercel.app/alignment
+
+Open each squint and overlay image and look at it. These are things to look at, not failures; a screen can have a reason for any of them.
+critly taste: 3 things to look at · 2 screens · images in ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/clear · exit 0

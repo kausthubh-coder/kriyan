@@ -1,0 +1,31 @@
+Tasting http://127.0.0.1:52945…
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:0 · 390x844
+
+  squint  taste/add/prototype-390.squint.png
+  lead    button.btn.pri "Add to To plan" leads clearly, 1.71× over section.card.one "Next"
+  boxes   35 (34 fill, 28 shadow), 0 divider lines, nested 2 deep
+  edges   38 left edges (3 for text)
+  overlay taste/add/prototype-390.taste.png
+  look    49% of the text on screen is 600 or heavier. When everything is bold nothing leads; step details down to 400 and a lighter tone.
+          https://critly.vercel.app/visual-hierarchy
+
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:0 · 1440x900
+
+  squint  taste/add/prototype-1440.squint.png
+  lead    button.btn.pri "Add to To plan" leads clearly, 1.71× over section.card.one "Next"
+  boxes   37 (36 fill, 29 shadow), 0 divider lines, nested 3 deep
+  edges   43 left edges (6 for text), 1 near miss
+  overlay taste/add/prototype-1440.taste.png
+  look    A box in a box in a box (3 deep): div#device.device.typing > section.card.one > span.tag "NEXT". Let the inner group sit on its parent's surface and separate it with space.
+          https://critly.vercel.app/whitespace
+  look    A box in a box in a box (3 deep): div#device.device.typing > div.comp > div.inwrap "Problem set 6 2h by fri". Let the inner group sit on its parent's surface and separate it with space.
+          https://critly.vercel.app/whitespace
+  look    A box in a box in a box (3 deep): div#device.device.typing > div.kb > span "q", and 26 more like it. Let the inner group sit on its parent's surface and separate it with space.
+          https://critly.vercel.app/whitespace
+  look    Two edges where one would do: div.scrim sits 0px inside div#device.device.typing "07:40 Mon 9 November 2026 9 MON …", and both draw one. Drop the inner edge or the outer one.
+          https://critly.vercel.app/edges-and-elevation
+  look    Edges 4px apart: h2 "LOOK" starts at 197px and button.on "System" at 201px. Line them up on one edge.
+          https://critly.vercel.app/alignment
+
+Open each squint and overlay image and look at it. These are things to look at, not failures; a screen can have a reason for any of them.
+critly taste: 6 things to look at · 2 screens · images in taste/add · exit 0

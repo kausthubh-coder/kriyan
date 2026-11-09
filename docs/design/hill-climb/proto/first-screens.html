@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kriyan Today: two first screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Kriyan v5 (Joi) look. Colours are packages/core/src/tokens.ts; sizes and spaces are .critly/policy.json:
+   type 12 14 16 20 28 40 80, space 4 8 12 16 24 32 48 64. */
+:root{
+  color-scheme:light;
+  --bg:oklch(100% 0 0); --raised:oklch(100% 0 0); --float:oklch(100% 0 0); --chip:oklch(100% 0 0);
+  --sunken:oklch(96.5% 0.002 286); --sheet:oklch(96.5% 0.002 286); --page:oklch(96.5% 0.002 286);
+  --ink:oklch(17% 0.004 286); --ink2:oklch(36% 0.008 286); --ink3:oklch(51% 0.008 286); --on-ink:oklch(100% 0 0);
+  --now:oklch(55% 0.19 29); --now-fill:oklch(55% 0.19 29 / 0.08);
+  --parse:oklch(53% 0.18 255); --parse-fill:oklch(53% 0.18 255 / 0.1); --parse-inv:oklch(72% 0.14 250);
+  --done:oklch(52% 0.13 150);
+  --hover:oklch(0% 0 0 / 0.04); --select:oklch(0% 0 0 / 0.07); --line:oklch(0% 0 0 / 0.09); --line-strong:oklch(0% 0 0 / 0.16);
+  --scrim:oklch(0% 0 0 / 0.32);
+  --card:oklch(13% 0.003 286); --head:oklch(13% 0.003 286); --head-ink:oklch(100% 0 0); --head-dim:oklch(66% 0.008 286);
+  --head-fill:oklch(19% 0.004 286); --head-line:oklch(26% 0.005 286); --head-now:oklch(68% 0.19 27);
+  --bezel:oklch(13% 0.003 286);
+  --sp-blue:oklch(95.5% 0.03 245); --sp-blue-dot:oklch(58% 0.17 245);
+  --sp-purple:oklch(95.5% 0.03 305); --sp-purple-dot:oklch(58% 0.17 305);
+  --sp-green:oklch(95.5% 0.03 150); --sp-green-dot:oklch(58% 0.17 150);
+  --sp-pink:oklch(95.5% 0.03 345); --sp-pink-dot:oklch(58% 0.17 345);
+  --sp-teal:oklch(95.5% 0.03 195); --sp-teal-dot:oklch(58% 0.17 195);
+  --wall-a:oklch(30% 0.05 265); --wall-b:oklch(42% 0.07 320); --wall-c:oklch(58% 0.09 35);
+  --shadow-raised:0 0 0 1px oklch(0% 0 0 / 0.05),0 1px 2px oklch(0% 0 0 / 0.06);
+  --shadow-float:0 0 0 1px oklch(0% 0 0 / 0.06),0 2px 6px oklch(0% 0 0 / 0.06),0 16px 40px oklch(0% 0 0 / 0.12);
+  --ease:cubic-bezier(0.23,1,0.32,1);
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:oklch(19.5% 0.005 286); --raised:oklch(19.5% 0.005 286); --float:oklch(23% 0.005 286); --chip:oklch(100% 0 0 / 0.09);
+  --sunken:oklch(21.5% 0.005 286); --sheet:oklch(23% 0.005 286); --page:oklch(15% 0.003 286);
+  --ink:oklch(96.5% 0.003 286); --ink2:oklch(86% 0.006 286); --ink3:oklch(72% 0.008 286); --on-ink:oklch(15% 0.004 286);
+  --now:oklch(68% 0.19 27); --now-fill:oklch(68% 0.19 27 / 0.16);
+  --parse:oklch(72% 0.14 250); --parse-fill:oklch(72% 0.14 250 / 0.16); --parse-inv:oklch(53% 0.18 255);
+  --done:oklch(72% 0.15 150);
+  --hover:oklch(100% 0 0 / 0.05); --select:oklch(100% 0 0 / 0.09); --line:oklch(100% 0 0 / 0.08); --line-strong:oklch(100% 0 0 / 0.15);
+  --scrim:oklch(0% 0 0 / 0.55);
+  --card:oklch(0% 0 0); --bezel:oklch(26% 0.005 286);
+  --sp-blue:oklch(25% 0.03 245); --sp-blue-dot:oklch(64% 0.17 245);
+  --sp-purple:oklch(25% 0.03 305); --sp-purple-dot:oklch(64% 0.17 305);
+  --sp-green:oklch(25% 0.03 150); --sp-green-dot:oklch(64% 0.17 150);
+  --sp-pink:oklch(25% 0.03 345); --sp-pink-dot:oklch(64% 0.17 345);
+  --sp-teal:oklch(25% 0.03 195); --sp-teal-dot:oklch(64% 0.17 195);
+  --shadow-raised:inset 0 0 0 1px oklch(100% 0 0 / 0.05),0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-float:inset 0 0 0 1px oklch(100% 0 0 / 0.08),0 2px 6px oklch(0% 0 0 / 0.3),0 16px 40px oklch(0% 0 0 / 0.45);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:oklch(19.5% 0.005 286); --raised:oklch(19.5% 0.005 286); --float:oklch(23% 0.005 286); --chip:oklch(100% 0 0 / 0.09);
+    --sunken:oklch(21.5% 0.005 286); --sheet:oklch(23% 0.005 286); --page:oklch(15% 0.003 286);
+    --ink:oklch(96.5% 0.003 286); --ink2:oklch(86% 0.006 286); --ink3:oklch(72% 0.008 286); --on-ink:oklch(15% 0.004 286);
+    --now:oklch(68% 0.19 27); --now-fill:oklch(68% 0.19 27 / 0.16);
+    --parse:oklch(72% 0.14 250); --parse-fill:oklch(72% 0.14 250 / 0.16); --parse-inv:oklch(53% 0.18 255);
+    --done:oklch(72% 0.15 150);
+    --hover:oklch(100% 0 0 / 0.05); --select:oklch(100% 0 0 / 0.09); --line:oklch(100% 0 0 / 0.08); --line-strong:oklch(100% 0 0 / 0.15);
+    --scrim:oklch(0% 0 0 / 0.55);
+    --card:oklch(0% 0 0); --bezel:oklch(26% 0.005 286);
+    --sp-blue:oklch(25% 0.03 245); --sp-blue-dot:oklch(64% 0.17 245);
+    --sp-purple:oklch(25% 0.03 305); --sp-purple-dot:oklch(64% 0.17 305);
+    --sp-green:oklch(25% 0.03 150); --sp-green-dot:oklch(64% 0.17 150);
+    --sp-pink:oklch(25% 0.03 345); --sp-pink-dot:oklch(64% 0.17 345);
+    --sp-teal:oklch(25% 0.03 195); --sp-teal-dot:oklch(64% 0.17 195);
+    --shadow-raised:inset 0 0 0 1px oklch(100% 0 0 / 0.05),0 1px 2px oklch(0% 0 0 / 0.3);
+    --shadow-float:inset 0 0 0 1px oklch(100% 0 0 / 0.08),0 2px 6px oklch(0% 0 0 / 0.3),0 16px 40px oklch(0% 0 0 / 0.45);
+  }
+}
+
+*{box-sizing:border-box}
+html{background:var(--page);color:var(--ink);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);font:400 16px/24px Inter,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-0.01em;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit;letter-spacing:inherit}
+button{background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;text-align:inherit}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--parse);outline-offset:2px}
+.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.s{width:16px;height:16px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* ---------- the page around the phone ---------- */
+.stage{display:grid;grid-template-columns:280px 390px 280px;gap:48px;justify-content:center;align-items:start;padding:48px 24px;min-height:100dvh}
+.panel{display:flex;flex-direction:column;gap:32px;font-size:14px;line-height:20px;color:var(--ink2)}
+.panel section{display:flex;flex-direction:column;gap:8px}
+.panel h2{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink3)}
+.panel ol{margin:0;padding:0 0 0 16px;display:flex;flex-direction:column;gap:8px}
+.panel output{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.dbtn{min-height:44px;padding:8px 16px;border-radius:12px;background:var(--raised);box-shadow:var(--shadow-raised);font-size:14px;line-height:20px;font-weight:500;color:var(--ink);display:flex;align-items:center;justify-content:space-between;gap:8px;transition:transform 160ms var(--ease)}
+.dbtn:active{transform:scale(0.97)}
+.dbtn small{font-size:12px;line-height:16px;color:var(--ink3);font-weight:400}
+.dbtn[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
+.dbtn[aria-pressed="true"] small{color:var(--on-ink)}
+.drow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.scrub{width:100%;height:44px;margin:0;accent-color:var(--ink);background:transparent}
+@media (max-width:1040px){
+  .stage{grid-template-columns:390px;gap:32px}
+  .device{order:-1}
+}
+@media (max-width:430px){
+  .stage{grid-template-columns:minmax(0,1fr);padding:0;gap:0}
+  .panel{padding:32px 16px}
+}
+
+/* ---------- the phone ---------- */
+.device{width:390px;height:844px;border-radius:54px;position:relative;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px var(--bezel),var(--shadow-float);user-select:none;-webkit-user-select:none;isolation:isolate}
+@media (max-width:430px){.device{width:100%;height:100dvh;border-radius:0;box-shadow:none}}
+.sb{height:48px;display:flex;justify-content:space-between;align-items:center;padding:0 32px;font-weight:600;font-size:16px;font-variant-numeric:tabular-nums;position:relative;z-index:12}
+.scroll,.page{position:absolute;inset:48px 0 0 0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.scroll::-webkit-scrollbar,.page::-webkit-scrollbar,.float::-webkit-scrollbar,.full .fb::-webkit-scrollbar{display:none}
+.end{height:128px}
+
+.top{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 32px 0}
+.dayb{display:flex;align-items:center;gap:8px;font-weight:700;font-size:40px;line-height:44px;letter-spacing:-0.04em;border-radius:12px}
+.dayb .dot{width:12px;height:12px;border-radius:50%;background:var(--now);margin-top:8px}
+.dayb .i{color:var(--ink3);margin-top:8px}
+.date{text-align:right;font-weight:500;font-size:16px;line-height:20px;color:var(--ink3);padding-top:4px}
+
+.strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:16px 16px 0}
+.strip button{padding:8px 0;border-radius:12px;text-align:center;min-height:56px}
+.strip button:active{background:var(--hover)}
+.strip b{display:block;font-weight:500;font-size:20px;line-height:24px;color:var(--ink3);font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
+.strip span{display:block;font-weight:500;font-size:12px;line-height:16px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink3)}
+.strip .on{background:var(--sunken)}
+.strip .on b,.strip .td b{color:var(--ink)}
+.strip .td span{color:var(--now)}
+
+/* The one card at the top: Next, Now or Not started. */
+.card{margin:16px 16px 0;border-radius:24px;background:var(--card);color:var(--head-ink);padding:16px;display:flex;flex-direction:column;gap:12px}
+.card.one{flex-direction:row;align-items:center}
+.card .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.card .lab{display:flex;align-items:center;gap:8px;font-size:14px;line-height:24px;font-weight:500;color:var(--head-dim);font-variant-numeric:tabular-nums}
+.tag{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:4px 8px;border-radius:8px;background:var(--head-line);color:var(--head-ink);white-space:nowrap}
+.tag.live{background:var(--head-now);color:var(--head)}
+.card h2{font-size:20px;line-height:24px;font-weight:600;letter-spacing:-0.02em;text-wrap:balance}
+.card .sub{font-size:14px;line-height:20px;font-weight:500;color:var(--head-dim);font-variant-numeric:tabular-nums}
+.card .acts{display:flex;gap:8px}
+.cb{height:44px;padding:0 12px;border-radius:999px;font-size:14px;line-height:20px;font-weight:600;background:var(--head-line);color:var(--head-ink);white-space:nowrap;font-variant-numeric:tabular-nums;transition:transform 160ms var(--ease);flex:none}
+.cb.pri{background:var(--head-ink);color:var(--head);padding:0 24px}
+.cb:active{transform:scale(0.97)}
+/* Behind an open sheet the card steps back, so the sheet's own button leads. */
+[inert] .card{opacity:0.5}
+.quiet{padding:16px 32px 0;font-size:14px;line-height:20px;font-weight:500;color:var(--ink3);font-variant-numeric:tabular-nums}
+
+/* To plan: everything that has no time yet, each with a suggested time. */
+.pile{margin:12px 16px 0;border-radius:24px;background:var(--sunken);padding:4px}
+.pile .hd{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:0 12px;font-weight:600;font-size:16px}
+.pile .hd span{font-weight:500;font-size:12px;line-height:16px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.pr{display:flex;align-items:center;gap:4px;min-height:52px;padding:0 12px 0 0;border-radius:18px;touch-action:pan-y}
+.pr.lift{opacity:0.4}
+.chk{width:44px;height:48px;display:grid;place-items:center;flex:none;border-radius:12px}
+.chk i{width:20px;height:20px;border-radius:6px;border:2px solid var(--ink3);display:grid;place-items:center;color:var(--on-ink)}
+.chk i .i{width:12px;height:12px;stroke-width:3;display:none}
+.chk.on i{background:var(--ink3);border-color:var(--ink3)}
+.chk.on i .i{display:block}
+.chk:active i{background:var(--select)}
+.pt{flex:1;min-width:0;min-height:48px;padding:4px 0;display:flex;flex-direction:column;justify-content:center;font-size:16px;line-height:20px;font-weight:500;border-radius:8px}
+.pt small{font-size:12px;line-height:16px;color:var(--ink3);font-weight:400;font-variant-numeric:tabular-nums}
+.sug{position:relative;height:32px;padding:0 12px;border-radius:999px;background:var(--chip);color:var(--parse);font-weight:600;font-size:14px;line-height:20px;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none;transition:transform 160ms var(--ease)}
+.sug::after{content:"";position:absolute;inset:-6px -4px}
+.sug:active{transform:scale(0.97)}
+.sug.none{color:var(--ink2)}
+.pile .ft{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:0 4px 0 4px;font-size:12px;line-height:16px;color:var(--ink3)}
+.lnk{color:var(--parse);font-weight:600;font-size:14px;line-height:20px;min-height:44px;min-width:44px;padding:0 8px;border-radius:12px;white-space:nowrap;flex:none}
+.lnk:active{background:var(--hover)}
+
+/* The day: space-tinted blocks, dashed free stretches, one red now. */
+.tl{padding:12px 16px 0 0;display:flex;flex-direction:column;gap:4px}
+.r{display:grid;grid-template-columns:56px minmax(0,1fr)}
+.tt{font-size:12px;line-height:16px;color:var(--ink3);text-align:right;padding:16px 8px 0 0;font-weight:500;font-variant-numeric:tabular-nums}
+.blk{border-radius:18px;position:relative;display:flex;align-items:stretch;overflow:hidden;min-height:64px;background:var(--sunken);touch-action:pan-y}
+.blk .lead{width:44px;height:48px;flex:none;display:grid;place-items:center;color:var(--ink2);margin-top:4px}
+.blk .chk{margin-top:4px}
+.blk .body{flex:1;min-width:0;padding:12px 16px 12px 0;display:flex;flex-direction:column;border-radius:12px}
+.blk .ti{font-weight:600;font-size:16px;line-height:24px}
+.blk .me{font-size:12px;line-height:16px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.blk.done{background:var(--sunken)}
+.blk.done .ti{text-decoration:line-through;color:var(--ink3);font-weight:500}
+.blk.done .me{color:var(--ink3)}
+.blk.live{box-shadow:inset 0 0 0 2px var(--ink)}
+.blk.lift{opacity:0.4}
+.blk .nowl{position:absolute;left:0;right:0;height:2px;background:var(--now);pointer-events:none}
+.s-blue{background:var(--sp-blue)}.s-purple{background:var(--sp-purple)}.s-green{background:var(--sp-green)}.s-pink{background:var(--sp-pink)}.s-teal{background:var(--sp-teal)}
+.gap{min-height:44px;width:100%;border:1.5px dashed var(--line-strong);border-radius:12px;display:flex;align-items:center;padding:0 16px;color:var(--ink3);font-size:14px;line-height:20px;font-weight:500;position:relative;font-variant-numeric:tabular-nums}
+.gap:active{background:var(--hover)}
+.gap.now{border-color:var(--now);color:var(--now)}
+.dragging .gap.can{border-color:var(--parse);background:var(--parse-fill);color:var(--parse)}
+.dragging .gap.over>span:not(.slot){opacity:0}
+.slot{position:absolute;left:4px;right:4px;min-height:24px;border-radius:8px;background:var(--parse);color:var(--on-ink);font-size:12px;line-height:16px;font-weight:600;display:flex;align-items:center;padding:0 12px;pointer-events:none}
+.earl{min-height:44px;padding:0 16px;font-size:14px;line-height:20px;font-weight:500;color:var(--ink3);display:flex;align-items:center;gap:4px;border-radius:12px;width:100%}
+.earl:active{background:var(--hover)}
+.ghost{position:fixed;left:0;top:0;z-index:100;pointer-events:none;padding:8px 16px;border-radius:18px;background:var(--float);color:var(--ink);box-shadow:var(--shadow-float);font-size:14px;line-height:20px;font-weight:600;white-space:nowrap;will-change:transform}
+.ghost small{font-size:12px;line-height:16px;font-weight:500;color:var(--ink3);margin-left:8px}
+
+.fabs{position:absolute;left:0;right:0;bottom:24px;display:flex;justify-content:space-between;align-items:center;padding:0 32px;pointer-events:none;z-index:5}
+.fab{pointer-events:auto;min-width:56px;height:56px;border-radius:999px;background:var(--float);box-shadow:var(--shadow-float);display:grid;place-items:center;color:var(--ink);font-size:14px;font-weight:600;transition:transform 160ms var(--ease)}
+.fab.add{width:96px}
+.fab.txt{padding:0 16px}
+.fab:active{transform:scale(0.97)}
+
+/* Sheets: Joi's floating card with big tiles. */
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:10}
+.float{position:absolute;left:12px;right:12px;bottom:12px;border-radius:42px;background:var(--sheet);padding:0 24px 24px;z-index:11;box-shadow:var(--shadow-float);max-height:calc(100% - 72px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;will-change:transform}
+.grab{position:relative;align-self:center;width:72px;height:32px;display:grid;place-items:center;flex:none;border-radius:12px}
+.grab::after{content:"";position:absolute;inset:-6px 0}
+.grab i{width:40px;height:4px;border-radius:2px;background:var(--line-strong)}
+.float .k{font-size:14px;line-height:20px;font-weight:500;color:var(--ink2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.float h2,.full h2{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-0.02em;text-wrap:balance}
+.float h2{margin-top:4px}
+.float .sub,.full .sub{font-size:16px;line-height:24px;color:var(--ink2);font-weight:500;margin-top:4px;font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--ink3)}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:24px}
+.tiles.t3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tiles.t1{grid-template-columns:1fr}
+.tile{min-height:80px;border-radius:18px;background:var(--select);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:500;font-size:14px;line-height:20px;padding:8px 4px;text-align:center;transition:transform 160ms var(--ease)}
+.tile small{font-size:12px;line-height:16px;font-weight:500;color:var(--ink2);font-variant-numeric:tabular-nums}
+.tile.pri{background:var(--ink);color:var(--on-ink);font-weight:600}
+.tile.pri small{color:var(--on-ink)}
+.tile:active{transform:scale(0.97)}
+.btn{min-height:48px;border-radius:18px;padding:0 24px;font-size:16px;line-height:24px;font-weight:600;background:var(--select);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-variant-numeric:tabular-nums;transition:transform 160ms var(--ease)}
+.btn.pri{background:var(--ink);color:var(--on-ink)}
+.btn.blue{background:var(--chip);color:var(--parse);box-shadow:var(--shadow-raised)}
+.btn.wide{width:100%}
+.btn:active{transform:scale(0.97)}
+.btn[aria-disabled="true"]{opacity:0.4}
+.stack{display:flex;flex-direction:column;gap:8px;margin-top:24px}
+.fine{font-size:12px;line-height:16px;color:var(--ink3);margin-top:12px}
+.lbl{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink3);margin-top:24px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{min-height:44px;padding:0 16px;border-radius:999px;background:var(--select);font-size:14px;line-height:20px;font-weight:500;color:var(--ink);display:inline-flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;white-space:nowrap;transition:transform 160ms var(--ease)}
+button.chip:active{transform:scale(0.97)}
+.chip.on{background:var(--ink);color:var(--on-ink)}
+.chip.blue{background:var(--chip);color:var(--parse);font-weight:600;box-shadow:var(--shadow-raised)}
+.chip.blue.on{background:var(--parse);color:var(--on-ink);box-shadow:none}
+span.chip{min-height:32px;padding:0 12px}
+span.chip.blue{background:var(--parse-fill);box-shadow:none}
+.stepper{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:16px}
+.stepper b{font-size:20px;line-height:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.rnd{width:44px;height:44px;border-radius:999px;background:var(--select);display:grid;place-items:center;flex:none;transition:transform 160ms var(--ease)}
+.rnd:active{transform:scale(0.97)}
+.rnd[aria-disabled="true"]{opacity:0.4}
+.mrows{display:flex;flex-direction:column;margin:16px -12px 0}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 12px;border-radius:18px;font-size:16px;line-height:24px;font-weight:500}
+.mrow:active{background:var(--select)}
+.mrow small{display:block;font-size:12px;line-height:16px;color:var(--ink3);font-weight:400}
+.mrow .i{color:var(--ink3)}
+.mrow em{font-style:normal;font-size:14px;color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.full{position:absolute;left:0;right:0;top:48px;bottom:0;background:var(--bg);border-radius:32px 32px 0 0;z-index:11;display:flex;flex-direction:column;box-shadow:var(--shadow-float)}
+.full .fh{display:flex;justify-content:space-between;align-items:center;padding:16px 16px 0 24px}
+.full .fb{flex:1;overflow-y:auto;padding:0 24px 24px;scrollbar-width:none}
+.full .ff{padding:12px 24px 32px}
+.full .rows{margin:16px -12px 0}
+.inwrap{position:relative;margin-top:16px;height:44px}
+.inwrap .mirror,.inwrap input{position:absolute;inset:0;font:600 20px/44px Inter,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-0.02em;padding:0;margin:0;border:0;white-space:pre;overflow:hidden;width:100%}
+.inwrap .mirror{pointer-events:none;color:var(--ink)}
+.inwrap .mirror em{font-style:normal;color:var(--parse)}
+.inwrap input{background:transparent;color:transparent;caret-color:var(--parse);outline:none}
+.inwrap input::placeholder{color:var(--ink3)}
+.inwrap:focus-within{box-shadow:0 2px 0 var(--parse)}
+.field{width:100%;min-height:48px;border-radius:12px;border:0;background:var(--chip);box-shadow:var(--shadow-raised);padding:0 16px;font-size:16px;line-height:24px;color:var(--ink)}
+.field::placeholder{color:var(--ink3)}
+.err{font-size:14px;line-height:20px;color:var(--now);margin-top:8px;font-weight:500}
+
+/* Toasts: one at a time, above the round buttons. */
+.toasts{position:absolute;left:16px;right:16px;bottom:96px;z-index:50;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink);color:var(--on-ink);border-radius:18px;padding:4px 8px 4px 16px;min-height:52px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:500;font-size:14px;line-height:20px;box-shadow:var(--shadow-float);font-variant-numeric:tabular-nums}
+.toast span{padding:8px 0}
+.sheet-open .toasts{bottom:auto;top:56px}
+.toast button{color:var(--parse-inv);font-weight:600;min-width:44px;min-height:44px;padding:0 8px;border-radius:12px;white-space:nowrap;flex:none}
+
+/* Other screens */
+.page{padding:0 24px}
+.back{width:44px;height:44px;border-radius:999px;background:var(--sunken);display:grid;place-items:center;margin-top:8px;transition:transform 160ms var(--ease)}
+.back:active{transform:scale(0.97)}
+.page h1{margin-top:16px;font-size:40px;line-height:44px;font-weight:700;letter-spacing:-0.04em}
+.page .lede{font-size:16px;line-height:24px;color:var(--ink3);font-weight:500;margin-top:8px;text-wrap:pretty}
+.wk{display:flex;flex-direction:column;gap:8px;margin:24px -12px 0}
+.wd{display:block;width:100%;border-radius:18px;padding:12px}
+.wd:active{background:var(--hover)}
+.wd.td{background:var(--sunken)}
+.wd .h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:16px;line-height:24px;font-weight:600}
+.wd .h span{font-size:12px;line-height:16px;color:var(--ink3);font-weight:500;font-variant-numeric:tabular-nums}
+.wi{display:grid;grid-template-columns:48px 24px minmax(0,1fr);align-items:center;font-size:14px;line-height:24px}
+.wi time{font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.wi .i{color:var(--ink3)}
+.wi.ev{color:var(--ink3)}
+.wi.sg time{color:var(--parse);font-weight:600}
+.wi.dn span{text-decoration:line-through;color:var(--ink3)}
+.wi .none{color:var(--ink3)}
+.goals{display:flex;flex-direction:column;gap:12px;margin-top:24px}
+.goal{padding:16px;border-radius:24px;background:var(--sunken);display:flex;flex-direction:column;gap:8px}
+.goal .gh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:20px;line-height:24px;font-weight:600;letter-spacing:-0.02em}
+.goal .gh span{font-size:12px;line-height:16px;font-weight:500;color:var(--ink3);letter-spacing:0;white-space:nowrap}
+.bar{height:8px;border-radius:4px;background:var(--select);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px}
+.goal p{font-size:14px;line-height:20px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.goal .fed{color:var(--ink3)}
+.ask{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.ask .lbl{margin-top:0}
+.ask .say{font-size:16px;line-height:24px;font-weight:500;color:var(--ink);text-wrap:pretty}
+.ask .acts{display:flex;gap:8px;flex-wrap:wrap}
+.set{display:flex;flex-direction:column;gap:32px;margin-top:24px}
+.grp{display:flex;flex-direction:column;gap:8px}
+.grp h3{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink3)}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:56px;font-size:16px;line-height:24px;font-weight:500}
+.srow small,.grp>small{display:block;font-size:12px;line-height:16px;color:var(--ink3);font-weight:400;text-wrap:pretty}
+.step{display:flex;align-items:center;gap:8px;flex:none}
+.step b{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:var(--sunken);border-radius:12px;padding:4px}
+.seg button{min-height:44px;border-radius:8px;font-size:14px;line-height:20px;font-weight:500;text-align:center;color:var(--ink2);padding:4px}
+.seg button small{display:block;font-size:12px;line-height:16px;font-weight:400;color:var(--ink3);font-variant-numeric:tabular-nums}
+.seg .on{background:var(--chip);box-shadow:var(--shadow-raised);color:var(--ink)}
+.sw{position:relative;width:52px;height:32px;border-radius:999px;background:var(--line-strong);flex:none}
+.sw::before{content:"";position:absolute;left:4px;top:4px;width:24px;height:24px;border-radius:50%;background:var(--raised);box-shadow:var(--shadow-raised);transition:transform 160ms var(--ease)}
+.sw::after{content:"";position:absolute;inset:-6px 0}
+.sw[aria-checked="true"]{background:var(--ink)}
+.sw[aria-checked="true"]::before{transform:translateX(20px);background:var(--on-ink)}
+
+/* Lock screen with the live card */
+.lock{position:absolute;inset:0;z-index:40;background:linear-gradient(165deg,var(--wall-a),var(--wall-b) 55%,var(--wall-c));color:var(--head-ink);display:flex;flex-direction:column;align-items:center;padding:64px 16px 32px}
+.lock .ld{font-size:20px;line-height:24px;font-weight:500}
+.lock .lt{font-size:80px;line-height:80px;font-weight:600;letter-spacing:-0.05em;font-variant-numeric:tabular-nums;margin-top:8px}
+.lock .card{margin:32px 0 0;width:100%;background:var(--head-fill)}
+.lock .who{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--head-dim)}
+.lock .lq{margin-top:32px;width:100%;border-radius:24px;background:var(--head-fill);padding:16px;font-size:14px;line-height:20px;font-weight:500;color:var(--head-ink)}
+.lock .open{margin-top:auto;min-height:44px;padding:0 24px;border-radius:999px;background:var(--head-fill);font-size:14px;font-weight:600;color:var(--head-ink)}
+
+.blk.past{background:var(--sunken)}
+.blk.past .ti{color:var(--ink3);font-weight:500}
+.blk.past .me{color:var(--ink3)}
+.tiles.tight{margin-top:8px}
+.card .acts{flex-wrap:wrap}
+.cb.pri{padding:0 16px}
+.card.one .cb.pri{padding:0 24px}
+.lnk.more{color:var(--ink2);font-weight:500}
+.pile .ft span{padding:8px 0 8px 8px}
+.float:focus,.full:focus{outline:none}
+.float .lone{margin-top:16px}
+.full .pr{padding:0 12px}
+.full .sug{background:var(--parse-fill)}
+.full .sug.none{background:var(--select)}
+.full .pr .i{color:var(--done)}
+.goal .lbl{margin-top:0}
+.goal .chips{margin-top:0}
+.goal .acts{display:flex;gap:8px;flex-wrap:wrap}
+.wd .h,.wi{width:100%}
+.wi .dot{justify-self:start}
+.wi .none{grid-column:1 / -1}
+.dbtn[aria-disabled="true"]{opacity:0.4}
+
+/* Motion: enter 220 ms, press 160 ms, ease-out. Reduced motion keeps the fades and drops the travel. */
+@keyframes up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.in .scrim,.in.scrim{animation:fade 220ms var(--ease)}
+.in.float,.in.full{animation:up 220ms var(--ease)}
+.toast{animation:up 220ms var(--ease)}
+@media (prefers-reduced-motion:reduce){
+  .in.float,.in.full,.toast{animation:fade 160ms linear}
+  .dbtn,.cb,.sug,.fab,.tile,.btn,.chip,.rnd,.back{transition:none}
+  .dbtn:active,.cb:active,.sug:active,.fab:active,.tile:active,.btn:active,button.chip:active,.rnd:active,.back:active{transform:none;opacity:0.7}
+}
+[data-still] *{animation:none!important}
+@media (hover:hover){
+  .strip button:hover,.earl:hover,.wd:hover,.lnk:hover,.gap:hover{background:var(--hover)}
+  .strip .on:hover,.wd.td:hover{background:var(--sunken)}
+  .mrow:hover{background:var(--select)}
+}
+
+/* Only for this comparison page */
+.cmp{display:grid;grid-template-columns:repeat(2,390px);gap:64px;justify-content:center;padding:48px 24px}
+.opt{display:flex;flex-direction:column;gap:24px}
+.opt .device{order:0}
+.opt .cap{display:flex;flex-direction:column;gap:4px;min-height:112px}
+.opt h1{font-size:20px;line-height:24px;font-weight:600;letter-spacing:-0.02em;display:flex;align-items:center;gap:8px}
+.opt p{font-size:14px;line-height:20px;color:var(--ink2);text-wrap:pretty}
+.pick{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:4px 8px;border-radius:8px;background:var(--ink);color:var(--on-ink)}
+.why{grid-column:1 / -1;max-width:640px;justify-self:center;font-size:14px;line-height:20px;color:var(--ink2);text-wrap:pretty}
+.why b{color:var(--ink);font-weight:600}
+/* Option A only: a suggestion drawn on the day, dashed until you keep it */
+.blk.sg{background:transparent;border:1.5px dashed var(--parse)}
+.blk.sg .body{padding:12px 0 12px 16px}
+.keep{width:48px;flex:none;display:grid;place-items:center}
+.keep i{width:32px;height:32px;border-radius:50%;background:var(--parse);color:var(--on-ink);display:grid;place-items:center}
+.a-hint{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px 0 32px}
+.lnk.more{color:var(--ink2);font-weight:500}
+@media (max-width:900px){.cmp{grid-template-columns:390px}.why{grid-column:1}}
+</style></head><body>
+<svg id="sprite" width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-week" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></symbol>
+  <symbol id="i-later" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+</svg>
+<main class="cmp">
+  <div class="opt" id="a"><div class="cap"><h1>A · Suggestions sit on the day</h1><p>Kriyan draws each suggestion as a dashed block at its time. Tick it to keep it there, drag it somewhere else, or open it to say not today.</p></div><div class="device"><div class="sb"><span>07:40</span><svg width="44" height="12" viewBox="0 0 44 12" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/><rect x="24" y="1" width="18" height="10" rx="3"/></svg></div><div class="scroll"><header class="top"><button class="dayb">Mon<span class="dot"></span><svg class="i " aria-hidden="true"><use href="#i-down"/></svg></button><div class="date">9 November<br>2026</div></header>
+<nav class="strip"><button class="on td"><b>9</b><span>Mon</span></button><button class=""><b>10</b><span>Tue</span></button><button class=""><b>11</b><span>Wed</span></button><button class=""><b>12</b><span>Thu</span></button><button class=""><b>13</b><span>Fri</span></button><button class=""><b>14</b><span>Sat</span></button><button class=""><b>15</b><span>Sun</span></button></nav><section class="card one"><div class="txt"><div class="lab"><span class="tag">Next</span>Free until 12:00</div><h2>Time for Email TA</h2></div><button class="cb pri">Start</button></section>
+<div class="quiet a-hint"><span>3 suggested times on your day. Tick one to keep it, or drag it.</span><button class="lnk">Keep all 3</button></div>
+<div class="tl">
+<div class="r"><div class="tt">08:00</div><div class="blk sg" style="min-height:64px"><button class="body"><span class="ti">Email TA</span><span class="me">08:00–08:10 · suggested</span></button><button class="keep" aria-label="Keep Email TA at 08:00"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button></div></div>
+<div class="r"><div class="tt">08:45</div><div class="blk sg" style="min-height:64px"><button class="body"><span class="ti">CSC 316 exam prep</span><span class="me">08:45–09:45 · session 1 of 5</span></button><button class="keep" aria-label="Keep CSC 316 exam prep at 08:45"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button></div></div>
+<div class="r"><div class="tt">10:30</div><div class="blk sg" style="min-height:94px"><button class="body"><span class="ti">CSC 316 lab report</span><span class="me">10:30–12:00 · session 1 of 2</span></button><button class="keep" aria-label="Keep CSC 316 lab report at 10:30"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button></div></div>
+<div class="r"><div class="tt">12:00</div><div class="blk s-pink" style="min-height:64px"><span class="lead"><svg class="i " aria-hidden="true"><use href="#i-clock"/></svg></span><button class="body"><span class="ti">Lunch</span><span class="me">12:00–12:45</span></button></div></div>
+<div class="r"><div class="tt"></div><button class="gap" style="min-height:52px"><span>1 h 45 free</span></button></div>
+<div class="r"><div class="tt">14:30</div><div class="blk s-purple" style="min-height:78px"><span class="lead"><svg class="i " aria-hidden="true"><use href="#i-clock"/></svg></span><button class="body"><span class="ti">MA 241 lecture</span><span class="me">14:30–15:45</span></button></div></div>
+<div class="r"><div class="tt">16:00</div><div class="blk s-green" style="min-height:64px"><button class="chk" aria-label="Mark done"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button><button class="body"><span class="ti">Gym</span><span class="me">16:00–16:45 · 1 of 3 this week</span></button></div></div>
+</div><div class="end"></div></div><div class="fabs"><button class="fab" aria-label="Menu"><svg class="i " aria-hidden="true"><use href="#i-menu"/></svg></button><button class="fab add" aria-label="Add"><svg class="i " aria-hidden="true"><use href="#i-plus"/></svg></button><button class="fab" aria-label="Week"><svg class="i " aria-hidden="true"><use href="#i-week"/></svg></button></div></div></div>
+  <div class="opt" id="b"><div class="cap"><h1>B · To plan, with suggested times <span class="pick">Picked</span></h1><p>The day holds only what you put on it. Each thing to plan offers a time: tap it to place it there, drag the row onto any free stretch, or open the row to pick another time.</p></div><div class="device"><div class="sb"><span>07:40</span><svg width="44" height="12" viewBox="0 0 44 12" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/><rect x="24" y="1" width="18" height="10" rx="3"/></svg></div><div class="scroll"><header class="top"><button class="dayb">Mon<span class="dot"></span><svg class="i " aria-hidden="true"><use href="#i-down"/></svg></button><div class="date">9 November<br>2026</div></header>
+<nav class="strip"><button class="on td"><b>9</b><span>Mon</span></button><button class=""><b>10</b><span>Tue</span></button><button class=""><b>11</b><span>Wed</span></button><button class=""><b>12</b><span>Thu</span></button><button class=""><b>13</b><span>Fri</span></button><button class=""><b>14</b><span>Sat</span></button><button class=""><b>15</b><span>Sun</span></button></nav><section class="card one"><div class="txt"><div class="lab"><span class="tag">Next</span>Free until 12:00</div><h2>Time for Email TA</h2></div><button class="cb pri">Start</button></section>
+<section class="pile"><div class="hd">To plan<span>Tap a time, or hold and drag</span></div>
+<div class="pr"><button class="chk" aria-label="Mark done"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button><button class="pt"><span>Email TA</span><small>10 min</small></button><button class="sug">08:00</button></div>
+<div class="pr"><button class="chk" aria-label="Mark done"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button><button class="pt"><span>CSC 316 exam prep</span><small>1 h · session 1 of 5 · exam Mon 23 Nov</small></button><button class="sug">08:45</button></div>
+<div class="pr"><button class="chk" aria-label="Mark done"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button><button class="pt"><span>CSC 316 lab report</span><small>1 h 30 · session 1 of 2 · due Wed</small></button><button class="sug">10:30</button></div>
+<div class="ft"><button class="lnk more">1 more</button><button class="lnk">Place all 3</button></div></section>
+<div class="tl">
+<div class="r"><div class="tt"></div><button class="gap now" style="min-height:112px"><span>Now, 4 h 20 free until 12:00</span></button></div>
+<div class="r"><div class="tt">12:00</div><div class="blk s-pink" style="min-height:64px"><span class="lead"><svg class="i " aria-hidden="true"><use href="#i-clock"/></svg></span><button class="body"><span class="ti">Lunch</span><span class="me">12:00–12:45</span></button></div></div>
+<div class="r"><div class="tt"></div><button class="gap" style="min-height:52px"><span>1 h 45 free</span></button></div>
+<div class="r"><div class="tt">14:30</div><div class="blk s-purple" style="min-height:78px"><span class="lead"><svg class="i " aria-hidden="true"><use href="#i-clock"/></svg></span><button class="body"><span class="ti">MA 241 lecture</span><span class="me">14:30–15:45</span></button></div></div>
+<div class="r"><div class="tt">16:00</div><div class="blk s-green" style="min-height:64px"><button class="chk" aria-label="Mark done"><i><svg class="i " aria-hidden="true"><use href="#i-check"/></svg></i></button><button class="body"><span class="ti">Gym</span><span class="me">16:00–16:45 · 1 of 3 this week</span></button></div></div>
+</div><div class="end"></div></div><div class="fabs"><button class="fab" aria-label="Menu"><svg class="i " aria-hidden="true"><use href="#i-menu"/></svg></button><button class="fab add" aria-label="Add"><svg class="i " aria-hidden="true"><use href="#i-plus"/></svg></button><button class="fab" aria-label="Week"><svg class="i " aria-hidden="true"><use href="#i-week"/></svg></button></div></div></div>
+  <p class="why"><b>Why B.</b> A block on the day always means you put it there, so the day never looks planned for you, which is the thing you ruled out. One list holds everything without a time: today's suggestions, new work suggested for another day, and things with no length yet. A needs a second strip for those. The same row and blue time is reused by Clear today and by new Moodle work, so there is one gesture to learn. What B costs is height: the day starts lower until the list empties, and A shows the shape of the morning sooner.</p>
+</main>
+</body></html>

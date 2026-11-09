@@ -1,0 +1,47 @@
+{
+  "$schema": "../../../../node_modules/@kausthubh/critly/policy.schema.json",
+  "fonts": [
+    "Inter"
+  ],
+  "typeScale": [
+    12,
+    14,
+    16,
+    20,
+    28,
+    40,
+    80
+  ],
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+  ],
+  "schemes": {
+    "light": {},
+    "dark": {
+      "media": true
+    }
+  },
+  "pages": [
+    "/prototype.html?do=open:item:prep1"
+  ],
+  "bannedPhrases": [
+    "overdue",
+    "garden",
+    "Oops",
+    "lorem"
+  ],
+  "rules": {
+    "spacing-scale": "error",
+    "nested-radius": "error",
+    "off-token-color": "error",
+    "focus-ring": "error"
+  },
+  "note": "Same values as .critly/policy.json; these are the three screens for the taste pass."
+}

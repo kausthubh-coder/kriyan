@@ -1,0 +1,1622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Kriyan planner prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Kriyan v5 (Joi) look. Colours are packages/core/src/tokens.ts; sizes and spaces are .critly/policy.json:
+   type 12 14 16 20 28 40 80, space 4 8 12 16 24 32 48 64. */
+:root{
+  color-scheme:light;
+  --bg:oklch(100% 0 0); --raised:oklch(100% 0 0); --float:oklch(100% 0 0); --chip:oklch(100% 0 0);
+  --sunken:oklch(96.5% 0.002 286); --sheet:oklch(96.5% 0.002 286); --page:oklch(96.5% 0.002 286);
+  --ink:oklch(17% 0.004 286); --ink2:oklch(36% 0.008 286); --ink3:oklch(51% 0.008 286); --on-ink:oklch(100% 0 0);
+  --now:oklch(55% 0.19 29); --now-fill:oklch(55% 0.19 29 / 0.08);
+  --parse:oklch(53% 0.18 255); --parse-fill:oklch(53% 0.18 255 / 0.1); --parse-inv:oklch(72% 0.14 250);
+  --done:oklch(52% 0.13 150);
+  --hover:oklch(0% 0 0 / 0.04); --select:oklch(0% 0 0 / 0.07); --line:oklch(0% 0 0 / 0.09); --line-strong:oklch(0% 0 0 / 0.16);
+  --scrim:oklch(0% 0 0 / 0.32);
+  --card:oklch(13% 0.003 286); --head:oklch(13% 0.003 286); --head-ink:oklch(100% 0 0); --head-dim:oklch(66% 0.008 286);
+  --head-fill:oklch(19% 0.004 286); --head-line:oklch(26% 0.005 286); --head-now:oklch(68% 0.19 27);
+  --bezel:oklch(13% 0.003 286);
+  --sp-blue:oklch(95.5% 0.03 245); --sp-blue-dot:oklch(58% 0.17 245);
+  --sp-purple:oklch(95.5% 0.03 305); --sp-purple-dot:oklch(58% 0.17 305);
+  --sp-green:oklch(95.5% 0.03 150); --sp-green-dot:oklch(58% 0.17 150);
+  --sp-pink:oklch(95.5% 0.03 345); --sp-pink-dot:oklch(58% 0.17 345);
+  --sp-teal:oklch(95.5% 0.03 195); --sp-teal-dot:oklch(58% 0.17 195);
+  --wall-a:oklch(30% 0.05 265); --wall-b:oklch(42% 0.07 320); --wall-c:oklch(58% 0.09 35);
+  --shadow-raised:0 0 0 1px oklch(0% 0 0 / 0.05),0 1px 2px oklch(0% 0 0 / 0.06);
+  --shadow-float:0 0 0 1px oklch(0% 0 0 / 0.06),0 2px 6px oklch(0% 0 0 / 0.06),0 16px 40px oklch(0% 0 0 / 0.12);
+  --ease:cubic-bezier(0.23,1,0.32,1);
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:oklch(19.5% 0.005 286); --raised:oklch(19.5% 0.005 286); --float:oklch(23% 0.005 286); --chip:oklch(100% 0 0 / 0.09);
+  --sunken:oklch(21.5% 0.005 286); --sheet:oklch(23% 0.005 286); --page:oklch(15% 0.003 286);
+  --ink:oklch(96.5% 0.003 286); --ink2:oklch(86% 0.006 286); --ink3:oklch(72% 0.008 286); --on-ink:oklch(15% 0.004 286);
+  --now:oklch(68% 0.19 27); --now-fill:oklch(68% 0.19 27 / 0.16);
+  --parse:oklch(72% 0.14 250); --parse-fill:oklch(72% 0.14 250 / 0.16); --parse-inv:oklch(53% 0.18 255);
+  --done:oklch(72% 0.15 150);
+  --hover:oklch(100% 0 0 / 0.05); --select:oklch(100% 0 0 / 0.09); --line:oklch(100% 0 0 / 0.08); --line-strong:oklch(100% 0 0 / 0.15);
+  --scrim:oklch(0% 0 0 / 0.55);
+  --card:oklch(0% 0 0); --bezel:oklch(26% 0.005 286);
+  --sp-blue:oklch(25% 0.03 245); --sp-blue-dot:oklch(64% 0.17 245);
+  --sp-purple:oklch(25% 0.03 305); --sp-purple-dot:oklch(64% 0.17 305);
+  --sp-green:oklch(25% 0.03 150); --sp-green-dot:oklch(64% 0.17 150);
+  --sp-pink:oklch(25% 0.03 345); --sp-pink-dot:oklch(64% 0.17 345);
+  --sp-teal:oklch(25% 0.03 195); --sp-teal-dot:oklch(64% 0.17 195);
+  --shadow-raised:inset 0 0 0 1px oklch(100% 0 0 / 0.05),0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-float:inset 0 0 0 1px oklch(100% 0 0 / 0.08),0 2px 6px oklch(0% 0 0 / 0.3),0 16px 40px oklch(0% 0 0 / 0.45);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:oklch(19.5% 0.005 286); --raised:oklch(19.5% 0.005 286); --float:oklch(23% 0.005 286); --chip:oklch(100% 0 0 / 0.09);
+    --sunken:oklch(21.5% 0.005 286); --sheet:oklch(23% 0.005 286); --page:oklch(15% 0.003 286);
+    --ink:oklch(96.5% 0.003 286); --ink2:oklch(86% 0.006 286); --ink3:oklch(72% 0.008 286); --on-ink:oklch(15% 0.004 286);
+    --now:oklch(68% 0.19 27); --now-fill:oklch(68% 0.19 27 / 0.16);
+    --parse:oklch(72% 0.14 250); --parse-fill:oklch(72% 0.14 250 / 0.16); --parse-inv:oklch(53% 0.18 255);
+    --done:oklch(72% 0.15 150);
+    --hover:oklch(100% 0 0 / 0.05); --select:oklch(100% 0 0 / 0.09); --line:oklch(100% 0 0 / 0.08); --line-strong:oklch(100% 0 0 / 0.15);
+    --scrim:oklch(0% 0 0 / 0.55);
+    --card:oklch(0% 0 0); --bezel:oklch(26% 0.005 286);
+    --sp-blue:oklch(25% 0.03 245); --sp-blue-dot:oklch(64% 0.17 245);
+    --sp-purple:oklch(25% 0.03 305); --sp-purple-dot:oklch(64% 0.17 305);
+    --sp-green:oklch(25% 0.03 150); --sp-green-dot:oklch(64% 0.17 150);
+    --sp-pink:oklch(25% 0.03 345); --sp-pink-dot:oklch(64% 0.17 345);
+    --sp-teal:oklch(25% 0.03 195); --sp-teal-dot:oklch(64% 0.17 195);
+    --shadow-raised:inset 0 0 0 1px oklch(100% 0 0 / 0.05),0 1px 2px oklch(0% 0 0 / 0.3);
+    --shadow-float:inset 0 0 0 1px oklch(100% 0 0 / 0.08),0 2px 6px oklch(0% 0 0 / 0.3),0 16px 40px oklch(0% 0 0 / 0.45);
+  }
+}
+
+*{box-sizing:border-box}
+html{background:var(--page);color:var(--ink);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);font:400 16px/24px Inter,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-0.01em;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit;letter-spacing:inherit}
+button{background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;text-align:inherit}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--parse);outline-offset:2px}
+.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.s{width:16px;height:16px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* ---------- the page around the phone ---------- */
+.stage{display:grid;grid-template-columns:280px 390px 280px;gap:48px;justify-content:center;align-items:start;padding:48px 24px;min-height:100dvh}
+.panel{display:flex;flex-direction:column;gap:32px;font-size:14px;line-height:20px;color:var(--ink2)}
+.panel section{display:flex;flex-direction:column;gap:8px}
+.panel h2{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink3)}
+.panel ol{margin:0;padding:0 0 0 16px;display:flex;flex-direction:column;gap:8px}
+.panel output{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.dbtn{min-height:44px;padding:8px 16px;border-radius:12px;background:var(--raised);box-shadow:var(--shadow-raised);font-size:14px;line-height:20px;font-weight:500;color:var(--ink);display:flex;align-items:center;justify-content:space-between;gap:8px;transition:transform 160ms var(--ease)}
+.dbtn:active{transform:scale(0.97)}
+.dbtn small{font-size:12px;line-height:16px;color:var(--ink3);font-weight:400}
+.dbtn[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
+.dbtn[aria-pressed="true"] small{color:var(--on-ink)}
+.drow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.scrub{width:100%;height:44px;margin:0;accent-color:var(--ink);background:transparent}
+@media (max-width:1040px){
+  .stage{grid-template-columns:390px;gap:32px}
+  .device{order:-1}
+}
+@media (max-width:430px){
+  .stage{grid-template-columns:minmax(0,1fr);padding:0;gap:0}
+  .panel{padding:32px 16px}
+}
+
+/* ---------- the phone ---------- */
+.device{width:390px;height:844px;border-radius:54px;position:relative;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 0 0 10px var(--bezel),var(--shadow-float);user-select:none;-webkit-user-select:none;isolation:isolate}
+@media (max-width:430px){.device{width:100%;height:100dvh;border-radius:0;box-shadow:none}}
+.sb{height:48px;display:flex;justify-content:space-between;align-items:center;padding:0 32px;font-weight:600;font-size:16px;font-variant-numeric:tabular-nums;position:relative;z-index:12}
+.scroll,.page{position:absolute;inset:48px 0 0 0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.scroll::-webkit-scrollbar,.page::-webkit-scrollbar,.float::-webkit-scrollbar,.full .fb::-webkit-scrollbar{display:none}
+.end{height:128px}
+
+.top{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 32px 0}
+.dayb{display:flex;align-items:center;gap:8px;font-weight:700;font-size:40px;line-height:44px;letter-spacing:-0.04em;border-radius:12px}
+.dayb .dot{width:12px;height:12px;border-radius:50%;background:var(--now);margin-top:8px}
+.dayb .i{color:var(--ink3);margin-top:8px}
+.date{text-align:right;font-weight:500;font-size:16px;line-height:20px;color:var(--ink3);padding-top:4px}
+
+.strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:16px 16px 0}
+.strip button{padding:8px 0;border-radius:12px;text-align:center;min-height:56px}
+.strip button:active{background:var(--hover)}
+.strip b{display:block;font-weight:500;font-size:20px;line-height:24px;color:var(--ink3);font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
+.strip span{display:block;font-weight:500;font-size:12px;line-height:16px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink3)}
+.strip .on{background:var(--sunken)}
+.strip .on b,.strip .td b{color:var(--ink)}
+.strip .td span{color:var(--now)}
+
+/* The one card at the top: Next, Now or Not started. */
+.card{margin:16px 16px 0;border-radius:24px;background:var(--card);color:var(--head-ink);padding:16px;display:flex;flex-direction:column;gap:12px}
+.card.one{flex-direction:row;align-items:center}
+.card .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.card .lab{display:flex;align-items:center;gap:8px;font-size:14px;line-height:24px;font-weight:500;color:var(--head-dim);font-variant-numeric:tabular-nums}
+.tag{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:4px 8px;border-radius:8px;background:var(--head-line);color:var(--head-ink);white-space:nowrap}
+.tag.live{background:var(--head-now);color:var(--head)}
+.card h2{font-size:20px;line-height:24px;font-weight:600;letter-spacing:-0.02em;text-wrap:balance}
+.card .sub{font-size:14px;line-height:20px;font-weight:500;color:var(--head-dim);font-variant-numeric:tabular-nums}
+.card .acts{display:flex;gap:8px}
+.cb{height:44px;padding:0 12px;border-radius:999px;font-size:14px;line-height:20px;font-weight:600;background:var(--head-line);color:var(--head-ink);white-space:nowrap;font-variant-numeric:tabular-nums;transition:transform 160ms var(--ease);flex:none}
+.cb.pri{background:var(--head-ink);color:var(--head);padding:0 24px}
+.cb:active{transform:scale(0.97)}
+/* Behind an open sheet the card steps back, so the sheet's own button leads. */
+[inert] .card{opacity:0.5}
+/* With the keyboard up the screen is for typing, so it steps back further. */
+.typing [inert] .card{opacity:0.24}
+.quiet{padding:16px 32px 0;font-size:14px;line-height:20px;font-weight:500;color:var(--ink3);font-variant-numeric:tabular-nums}
+
+/* To plan: everything that has no time yet, each with a suggested time. */
+.pile{margin:12px 16px 0;border-radius:24px;background:var(--sunken);padding:4px}
+.pile .hd{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:0 12px;font-weight:600;font-size:16px}
+.pile .hd span{font-weight:500;font-size:12px;line-height:16px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.pr{display:flex;align-items:center;gap:4px;min-height:52px;padding:0 12px 0 0;border-radius:18px;touch-action:pan-y}
+.pr.lift{opacity:0.4}
+.chk{width:44px;height:48px;display:grid;place-items:center;flex:none;border-radius:12px}
+.chk i{width:20px;height:20px;border-radius:6px;border:2px solid var(--ink3);display:grid;place-items:center;color:var(--on-ink)}
+.chk i .i{width:12px;height:12px;stroke-width:3;display:none}
+.chk.on i{background:var(--ink3);border-color:var(--ink3)}
+.chk.on i .i{display:block}
+.chk:active i{background:var(--select)}
+.pt{flex:1;min-width:0;min-height:48px;padding:4px 0;display:flex;flex-direction:column;justify-content:center;font-size:16px;line-height:20px;font-weight:500;border-radius:8px}
+.pt small{font-size:12px;line-height:16px;color:var(--ink3);font-weight:400;font-variant-numeric:tabular-nums}
+.sug{position:relative;height:32px;padding:0 12px;border-radius:999px;background:var(--chip);color:var(--parse);font-weight:600;font-size:14px;line-height:20px;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none;transition:transform 160ms var(--ease)}
+.sug::after{content:"";position:absolute;inset:-6px -4px}
+.sug:active{transform:scale(0.97)}
+.sug.none{color:var(--ink2)}
+.pile .ft{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:0 4px 0 4px;font-size:12px;line-height:16px;color:var(--ink3)}
+.lnk{color:var(--parse);font-weight:600;font-size:14px;line-height:20px;min-height:44px;min-width:44px;padding:0 8px;border-radius:12px;white-space:nowrap;flex:none}
+.lnk:active{background:var(--hover)}
+
+/* The day: space-tinted blocks, dashed free stretches, one red now. */
+.tl{padding:12px 16px 0 0;display:flex;flex-direction:column;gap:4px}
+.r{display:grid;grid-template-columns:56px minmax(0,1fr)}
+.tt{font-size:12px;line-height:16px;color:var(--ink3);text-align:right;padding:16px 8px 0 0;font-weight:500;font-variant-numeric:tabular-nums}
+.blk{border-radius:18px;position:relative;display:flex;align-items:stretch;overflow:hidden;min-height:64px;background:var(--sunken);touch-action:pan-y}
+.blk .lead{width:44px;height:48px;flex:none;display:grid;place-items:center;color:var(--ink2);margin-top:4px}
+.blk .chk{margin-top:4px}
+.blk .body{flex:1;min-width:0;padding:12px 16px 12px 0;display:flex;flex-direction:column;border-radius:12px}
+.blk .ti{font-weight:600;font-size:16px;line-height:24px}
+.blk .me{font-size:12px;line-height:16px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.blk.done{background:var(--sunken)}
+.blk.done .ti{text-decoration:line-through;color:var(--ink3);font-weight:500}
+.blk.done .me{color:var(--ink3)}
+.blk.live{box-shadow:inset 0 0 0 2px var(--ink)}
+.blk.lift{opacity:0.4}
+.blk .nowl{position:absolute;left:0;right:0;height:2px;background:var(--now);pointer-events:none}
+.s-blue{background:var(--sp-blue)}.s-purple{background:var(--sp-purple)}.s-green{background:var(--sp-green)}.s-pink{background:var(--sp-pink)}.s-teal{background:var(--sp-teal)}
+.gap{min-height:44px;width:100%;border:1.5px dashed var(--line-strong);border-radius:12px;display:flex;align-items:center;padding:0 16px;color:var(--ink3);font-size:14px;line-height:20px;font-weight:500;position:relative;font-variant-numeric:tabular-nums}
+.gap:active{background:var(--hover)}
+.gap.now{border-color:var(--now);color:var(--now)}
+.dragging .gap.can{border-color:var(--parse);background:var(--parse-fill);color:var(--parse)}
+.dragging .gap.over>span:not(.slot){opacity:0}
+.slot{position:absolute;left:4px;right:4px;min-height:24px;border-radius:8px;background:var(--parse);color:var(--on-ink);font-size:12px;line-height:16px;font-weight:600;display:flex;align-items:center;padding:0 12px;pointer-events:none}
+.earl{min-height:44px;padding:0 16px;font-size:14px;line-height:20px;font-weight:500;color:var(--ink3);display:flex;align-items:center;gap:4px;border-radius:12px;width:100%}
+.earl:active{background:var(--hover)}
+.ghost{position:fixed;left:0;top:0;z-index:100;pointer-events:none;padding:8px 16px;border-radius:18px;background:var(--float);color:var(--ink);box-shadow:var(--shadow-float);font-size:14px;line-height:20px;font-weight:600;white-space:nowrap;will-change:transform}
+.ghost small{font-size:12px;line-height:16px;font-weight:500;color:var(--ink3);margin-left:8px}
+
+.fabs{position:absolute;left:0;right:0;bottom:24px;display:flex;justify-content:space-between;align-items:center;padding:0 32px;pointer-events:none;z-index:5}
+.fab{pointer-events:auto;min-width:56px;height:56px;border-radius:999px;background:var(--float);box-shadow:var(--shadow-float);display:grid;place-items:center;color:var(--ink);font-size:14px;font-weight:600;transition:transform 160ms var(--ease)}
+.fab.add{width:96px}
+.fab.txt{padding:0 16px}
+.fab:active{transform:scale(0.97)}
+
+/* Sheets: Joi's floating card with big tiles. */
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:10}
+.float{position:absolute;left:12px;right:12px;bottom:12px;border-radius:42px;background:var(--sheet);padding:0 24px 24px;z-index:11;box-shadow:var(--shadow-float);max-height:calc(100% - 72px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;will-change:transform}
+.grab{position:relative;align-self:center;width:72px;height:32px;display:grid;place-items:center;flex:none;border-radius:12px}
+.grab::after{content:"";position:absolute;inset:-6px 0}
+.grab i{width:40px;height:4px;border-radius:2px;background:var(--line-strong)}
+.float .k{font-size:14px;line-height:20px;font-weight:500;color:var(--ink2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.float h2,.full h2{font-size:28px;line-height:32px;font-weight:600;letter-spacing:-0.02em;text-wrap:balance}
+.float h2{margin-top:4px}
+.float .sub,.full .sub{font-size:16px;line-height:24px;color:var(--ink2);font-weight:500;margin-top:4px;font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--ink3)}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:24px}
+.tiles.t3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tiles.t1{grid-template-columns:1fr}
+.tile{min-height:80px;border-radius:18px;background:var(--select);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:500;font-size:14px;line-height:20px;padding:8px 4px;text-align:center;transition:transform 160ms var(--ease)}
+.tile small{font-size:12px;line-height:16px;font-weight:500;color:var(--ink2);font-variant-numeric:tabular-nums}
+.tile.pri{background:var(--ink);color:var(--on-ink);font-weight:600}
+.tile.pri small{color:var(--on-ink)}
+.tile:active{transform:scale(0.97)}
+.btn{min-height:48px;border-radius:18px;padding:0 24px;font-size:16px;line-height:24px;font-weight:600;background:var(--select);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-variant-numeric:tabular-nums;transition:transform 160ms var(--ease)}
+.btn.pri{background:var(--ink);color:var(--on-ink)}
+.btn.blue{background:var(--chip);color:var(--parse);box-shadow:var(--shadow-raised)}
+.btn.wide{width:100%}
+.btn:active{transform:scale(0.97)}
+.btn[aria-disabled="true"]{opacity:0.4}
+.stack{display:flex;flex-direction:column;gap:8px;margin-top:24px}
+.fine{font-size:12px;line-height:16px;color:var(--ink3);margin-top:12px}
+.lbl{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink3);margin-top:24px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{min-height:44px;padding:0 16px;border-radius:999px;background:var(--select);font-size:14px;line-height:20px;font-weight:500;color:var(--ink);display:inline-flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;white-space:nowrap;transition:transform 160ms var(--ease)}
+button.chip:active{transform:scale(0.97)}
+.chip.on{background:var(--ink);color:var(--on-ink)}
+.chip.blue{background:var(--chip);color:var(--parse);font-weight:600;box-shadow:var(--shadow-raised)}
+.chip.blue.on{background:var(--parse);color:var(--on-ink);box-shadow:none}
+span.chip{min-height:32px;padding:0 12px}
+span.chip.blue{background:var(--parse-fill);box-shadow:none}
+.stepper{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:16px}
+.stepper b{font-size:20px;line-height:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.rnd{width:44px;height:44px;border-radius:999px;background:var(--select);display:grid;place-items:center;flex:none;transition:transform 160ms var(--ease)}
+.rnd:active{transform:scale(0.97)}
+.rnd[aria-disabled="true"]{opacity:0.4}
+.mrows{display:flex;flex-direction:column;margin:16px -12px 0}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 12px;border-radius:18px;font-size:16px;line-height:24px;font-weight:500}
+.mrow:active{background:var(--select)}
+.mrow small{display:block;font-size:12px;line-height:16px;color:var(--ink3);font-weight:400}
+.mrow .i{color:var(--ink3)}
+.mrow em{font-style:normal;font-size:14px;color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.full{position:absolute;left:0;right:0;top:48px;bottom:0;background:var(--bg);border-radius:32px 32px 0 0;z-index:11;display:flex;flex-direction:column;box-shadow:var(--shadow-float)}
+.full .fh{display:flex;justify-content:space-between;align-items:center;padding:16px 16px 0 24px}
+.full .fb{flex:1;overflow-y:auto;padding:0 24px 24px;scrollbar-width:none}
+.full .ff{padding:12px 24px 32px}
+.full .rows{margin:16px -12px 0}
+.inwrap{position:relative;margin-top:16px;height:44px}
+.inwrap .mirror,.inwrap input{position:absolute;inset:0;font:600 20px/44px Inter,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-0.02em;padding:0;margin:0;border:0;white-space:pre;overflow:hidden;width:100%}
+.inwrap .mirror{pointer-events:none;color:var(--ink)}
+.inwrap .mirror em{font-style:normal;color:var(--parse)}
+.inwrap input{background:transparent;color:transparent;caret-color:var(--parse);outline:none}
+.inwrap input::placeholder{color:var(--ink3)}
+.inwrap:focus-within{box-shadow:0 2px 0 var(--parse)}
+/* Add: a short sheet that rides on the keyboard. Dark chips are what Kriyan read; blue is the time it suggests. */
+.comp{position:absolute;left:0;right:0;bottom:272px;z-index:11;border-radius:32px 32px 0 0;background:var(--sheet);padding:0 16px 16px;max-height:calc(100% - 336px);overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;will-change:transform}
+.comp::-webkit-scrollbar{display:none}
+.comp:focus{outline:none}
+.comp .inwrap{margin-top:0;flex:none}
+.comp .lbl{margin-top:16px}
+.comp .fine{margin-top:8px}
+.comp .err{margin-top:12px}
+.comp .btn{margin-top:16px}
+.acs{display:flex;flex-wrap:wrap;gap:12px 8px;margin-top:12px}
+.lbl+.acs{margin-top:8px}
+.ac{position:relative;height:32px;padding:0 12px;border-radius:999px;background:var(--select);color:var(--ink2);font-size:14px;line-height:20px;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums;transition:transform 160ms var(--ease)}
+.ac::after{content:"";position:absolute;inset:-6px 0}
+.ac:active{transform:scale(0.97)}
+.ac.got{color:var(--ink)}
+.ac.no{background:var(--hover);color:var(--ink3)}
+.ac.ed{box-shadow:inset 0 0 0 2px var(--ink)}
+.ac.on{background:var(--ink);color:var(--on-ink)}
+.ac.tm{background:var(--chip);color:var(--parse);font-weight:600;box-shadow:var(--shadow-raised)}
+.ac.tm.on{background:var(--parse);color:var(--on-ink);box-shadow:none}
+/* A drawn keyboard, so the sheet is judged in the space a real one leaves. A phone shows its own. */
+.kb{position:absolute;left:0;right:0;bottom:0;height:272px;z-index:11;padding:12px 4px 0;display:flex;flex-direction:column;gap:12px;background:linear-gradient(var(--select),var(--select)),var(--sheet)}
+.kb div{display:flex;gap:4px;justify-content:center}
+.kb span{flex:1 1 0;height:44px;border-radius:8px;background:var(--chip);box-shadow:var(--shadow-raised);display:grid;place-items:center;font-size:20px;line-height:24px;color:var(--ink)}
+.kb .r2{padding:0 16px}
+.kb .w{flex:1.5 1 0;background:var(--select);box-shadow:none;font-size:14px;line-height:20px;font-weight:500}
+.kb .sp{flex:5 1 0;font-size:14px;line-height:20px;color:var(--ink3)}
+@media (hover:none) and (pointer:coarse){
+  .kb{display:none}
+  .comp{bottom:0;max-height:calc(100% - 64px)}
+}
+.field{width:100%;min-height:48px;border-radius:12px;border:0;background:var(--chip);box-shadow:var(--shadow-raised);padding:0 16px;font-size:16px;line-height:24px;color:var(--ink)}
+.field::placeholder{color:var(--ink3)}
+.err{font-size:14px;line-height:20px;color:var(--now);margin-top:8px;font-weight:500}
+
+/* Toasts: one at a time, above the round buttons. */
+.toasts{position:absolute;left:16px;right:16px;bottom:96px;z-index:50;pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink);color:var(--on-ink);border-radius:18px;padding:4px 8px 4px 16px;min-height:52px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:500;font-size:14px;line-height:20px;box-shadow:var(--shadow-float);font-variant-numeric:tabular-nums}
+.toast span{padding:8px 0}
+.sheet-open .toasts{bottom:auto;top:56px}
+.toast button{color:var(--parse-inv);font-weight:600;min-width:44px;min-height:44px;padding:0 8px;border-radius:12px;white-space:nowrap;flex:none}
+
+/* Other screens */
+.page{padding:0 24px}
+.back{width:44px;height:44px;border-radius:999px;background:var(--sunken);display:grid;place-items:center;margin-top:8px;transition:transform 160ms var(--ease)}
+.back:active{transform:scale(0.97)}
+.page h1{margin-top:16px;font-size:40px;line-height:44px;font-weight:700;letter-spacing:-0.04em}
+.page .lede{font-size:16px;line-height:24px;color:var(--ink3);font-weight:500;margin-top:8px;text-wrap:pretty}
+/* Week: one strip per day from 07:00 to 23:00. Grey is fixed, ink is placed, blue is only suggested. */
+.wkt{font-weight:700;font-size:40px;line-height:44px;letter-spacing:-0.04em}
+.wk{padding:16px 16px 0}
+.wax,.wdh,.wl{display:grid;grid-template-columns:64px minmax(0,1fr) 16px;column-gap:8px;align-items:center;padding:0 16px;width:100%}
+.wax{height:16px}
+.wax div{position:relative;height:16px;font-size:12px;line-height:16px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.wax span{position:absolute;top:0}
+.wd{border-radius:18px}
+.wdh{min-height:44px;border-radius:18px}
+.wdh:active{background:var(--hover)}
+.wdh .i{color:var(--ink3)}
+.wn{display:flex;flex-direction:column}
+.wn b{font-size:14px;line-height:20px;font-weight:500;color:var(--ink2);font-variant-numeric:tabular-nums}
+.wd.td .wn b{font-weight:600;color:var(--ink)}
+.wn small{font-size:12px;line-height:16px;font-weight:500;color:var(--ink3)}
+.wbar{position:relative;display:block;height:16px;border-radius:4px;background:var(--sunken)}
+.bit{position:absolute;top:0;bottom:0;min-width:4px;border-radius:4px}
+.bit.ev{background:var(--ink3);opacity:0.4}
+.bit.pl{background:var(--ink)}
+.bit.dn{background:var(--ink3)}
+.bit.sg,.bit.pv{background:var(--parse)}
+.nowt{position:absolute;top:-4px;bottom:-4px;width:2px;border-radius:1px;background:var(--now)}
+.wl{min-height:44px;border-radius:12px;font-size:14px;line-height:20px;touch-action:pan-y}
+.wl:active{background:var(--hover)}
+.wl.lift{opacity:0.4}
+.wl time{font-size:12px;font-weight:500;color:var(--ink3);font-variant-numeric:tabular-nums}
+.wlb{grid-column:2 / 4;display:flex;align-items:baseline;gap:8px;min-width:0}
+.wlb span{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wlb small{flex:none;font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.wl.dn .wlb span{text-decoration:line-through;color:var(--ink3)}
+.dragging .wd.over{background:var(--parse-fill)}
+.wleg{display:flex;gap:16px;padding:8px 32px 0;font-size:12px;line-height:16px;color:var(--ink3)}
+.wleg span{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.wleg i{width:8px;height:8px;border-radius:2px}
+.wleg .ev{background:var(--ink3);opacity:0.4}.wleg .pl{background:var(--ink)}.wleg .sg{background:var(--parse)}
+.pile.wt{margin-top:24px}
+.pile.wt .hd{padding-right:4px;line-height:20px}
+.pile.wt .hd span{display:block}
+.pile.wt .pr{padding-left:12px}
+.goals{display:flex;flex-direction:column;gap:12px;margin-top:24px}
+.goal{padding:16px;border-radius:24px;background:var(--sunken);display:flex;flex-direction:column;gap:8px}
+.goal .gh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:20px;line-height:24px;font-weight:600;letter-spacing:-0.02em}
+.goal .gh span{font-size:12px;line-height:16px;font-weight:500;color:var(--ink3);letter-spacing:0;white-space:nowrap}
+.bar{height:8px;border-radius:4px;background:var(--select);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px}
+.goal p{font-size:14px;line-height:20px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.goal .fed{color:var(--ink3)}
+.ask{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.ask .lbl{margin-top:0}
+.ask .say{font-size:16px;line-height:24px;font-weight:500;color:var(--ink);text-wrap:pretty}
+.ask .acts{display:flex;gap:8px;flex-wrap:wrap}
+.set{display:flex;flex-direction:column;gap:32px;margin-top:24px}
+.grp{display:flex;flex-direction:column;gap:8px}
+.grp h3{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink3)}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:56px;font-size:16px;line-height:24px;font-weight:500}
+.srow small,.grp>small{display:block;font-size:12px;line-height:16px;color:var(--ink3);font-weight:400;text-wrap:pretty}
+.step{display:flex;align-items:center;gap:8px;flex:none}
+.step b{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:var(--sunken);border-radius:12px;padding:4px}
+.seg button{min-height:44px;border-radius:8px;font-size:14px;line-height:20px;font-weight:500;text-align:center;color:var(--ink2);padding:4px}
+.seg button small{display:block;font-size:12px;line-height:16px;font-weight:400;color:var(--ink3);font-variant-numeric:tabular-nums}
+.seg .on{background:var(--chip);box-shadow:var(--shadow-raised);color:var(--ink)}
+.sw{position:relative;width:52px;height:32px;border-radius:999px;background:var(--line-strong);flex:none}
+.sw::before{content:"";position:absolute;left:4px;top:4px;width:24px;height:24px;border-radius:50%;background:var(--raised);box-shadow:var(--shadow-raised);transition:transform 160ms var(--ease)}
+.sw::after{content:"";position:absolute;inset:-6px 0}
+.sw[aria-checked="true"]{background:var(--ink)}
+.sw[aria-checked="true"]::before{transform:translateX(20px);background:var(--on-ink)}
+
+/* Lock screen with the live card */
+.lock{position:absolute;inset:0;z-index:40;background:linear-gradient(165deg,var(--wall-a),var(--wall-b) 55%,var(--wall-c));color:var(--head-ink);display:flex;flex-direction:column;align-items:center;padding:64px 16px 32px}
+.lock .ld{font-size:20px;line-height:24px;font-weight:500}
+.lock .lt{font-size:80px;line-height:80px;font-weight:600;letter-spacing:-0.05em;font-variant-numeric:tabular-nums;margin-top:8px}
+.lock .card{margin:32px 0 0;width:100%;background:var(--head-fill)}
+.lock .who{font-size:12px;line-height:16px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--head-dim)}
+.lock .lq{margin-top:32px;width:100%;border-radius:24px;background:var(--head-fill);padding:16px;font-size:14px;line-height:20px;font-weight:500;color:var(--head-ink)}
+.lock .open{margin-top:auto;min-height:44px;padding:0 24px;border-radius:999px;background:var(--head-fill);font-size:14px;font-weight:600;color:var(--head-ink)}
+
+.blk.past{background:var(--sunken)}
+.blk.past .ti{color:var(--ink3);font-weight:500}
+.blk.past .me{color:var(--ink3)}
+.tiles.tight{margin-top:8px}
+.card .acts{flex-wrap:wrap}
+.cb.pri{padding:0 16px}
+.card.one .cb.pri{padding:0 24px}
+.lnk.more{color:var(--ink2);font-weight:500}
+.pile .ft span{padding:8px 0 8px 8px}
+.float:focus,.full:focus{outline:none}
+.float .lone{margin-top:16px}
+.full .pr{padding:0 12px}
+.full .sug{background:var(--parse-fill)}
+.full .sug.none{background:var(--select)}
+.full .pr .i{color:var(--done)}
+.goal .lbl{margin-top:0}
+.goal .chips{margin-top:0}
+.goal .acts{display:flex;gap:8px;flex-wrap:wrap}
+.dbtn[aria-disabled="true"]{opacity:0.4}
+
+/* Motion: enter 220 ms, press 160 ms, ease-out. Reduced motion keeps the fades and drops the travel. */
+@keyframes up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.in .scrim,.in.scrim{animation:fade 220ms var(--ease)}
+.in.float,.in.full,.in.comp{animation:up 220ms var(--ease)}
+.toast{animation:up 220ms var(--ease)}
+@media (prefers-reduced-motion:reduce){
+  .in.float,.in.full,.in.comp,.toast{animation:fade 160ms linear}
+  .dbtn,.cb,.sug,.fab,.tile,.btn,.chip,.ac,.rnd,.back{transition:none}
+  .dbtn:active,.cb:active,.sug:active,.fab:active,.tile:active,.btn:active,button.chip:active,.ac:active,.rnd:active,.back:active{transform:none;opacity:0.7}
+}
+[data-still] *{animation:none!important}
+@media (hover:hover){
+  .strip button:hover,.earl:hover,.wdh:hover,.wl:hover,.lnk:hover,.gap:hover{background:var(--hover)}
+  .strip .on:hover{background:var(--sunken)}
+  .mrow:hover{background:var(--select)}
+}
+</style>
+</head>
+<body>
+<svg id="sprite" width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-week" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></symbol>
+  <symbol id="i-later" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+</svg>
+
+<main class="stage">
+  <aside class="panel" id="controls" aria-label="Prototype controls">
+    <section>
+      <h2>Clock</h2>
+      <p>It is <output id="clockout">Mon 9 Nov, 07:40</output>. The slider only moves the clock.</p>
+      <label class="vh" for="scrub">Time of day</label>
+      <input class="scrub" id="scrub" type="range" min="420" max="1380" step="5" value="460">
+      <p>Each scene also sets up the story so far: what you placed, started and finished.</p>
+      <div class="drow">
+        <button class="dbtn" data-act="scene:0"><span>07:40<br><small>Next</small></span></button>
+        <button class="dbtn" data-act="scene:1"><span>08:50<br><small>Now</small></span></button>
+        <button class="dbtn" data-act="scene:2"><span>10:45<br><small>Not started</small></span></button>
+        <button class="dbtn" data-act="scene:3"><span>12:50<br><small>Moved session</small></span></button>
+      </div>
+    </section>
+    <section>
+      <h2>Things that happen</h2>
+      <button class="dbtn" data-act="sim:moodle" id="simbtn">Simulate new Moodle work</button>
+      <p id="simnote" hidden>That's both sample assignments. Reset the day to bring them in again.</p>
+      <button class="dbtn" data-act="lock:toggle" id="lockbtn" aria-pressed="false">Show the lock screen</button>
+    </section>
+    <section>
+      <h2>Look</h2>
+      <div class="seg" id="themeseg" role="group" aria-label="Theme">
+        <button data-act="theme:system">System</button>
+        <button data-act="theme:light">Light</button>
+        <button data-act="theme:dark">Dark</button>
+      </div>
+    </section>
+    <section>
+      <button class="dbtn" data-act="reset">Reset the day</button>
+    </section>
+  </aside>
+
+  <div class="device" id="device">
+    <div id="view"></div>
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  </div>
+
+  <aside class="panel" aria-label="What to try">
+    <section>
+      <h2>What to try</h2>
+      <ol>
+        <li>Tap a blue time in To plan to put that thing there.</li>
+        <li>Hold a row (or just drag with a mouse) and drop it on a dashed free stretch. It snaps to 15 minutes.</li>
+        <li>Tap a row or a block for its sheet: Start, Done, Move, Not today.</li>
+        <li>Drag a study session to after lunch, then look at To plan: Kriyan learned from it.</li>
+        <li>Tap the day name for the day menu, then Clear today.</li>
+        <li>Press Add and type "Problem set 6 2h by fri", or tap an example. Tap a chip to change it; tap the blue time to place it.</li>
+        <li>The right round button opens the week. Tap a blue time, drag a row onto a day, or drag a placed line to another day. Tap a day to open it.</li>
+        <li>Menu has Goals and Settings.</li>
+      </ol>
+    </section>
+    <section>
+      <h2>What is faked</h2>
+      <p>Nothing is saved; a reload starts the day again. Kriyan learns after one move here; the app would wait for a few. Haptics and the real lock-screen card need the phone.</p>
+    </section>
+  </aside>
+</main>
+
+<script>
+(() => {
+"use strict";
+// One state object, one render. Every change the person makes goes through commit(), which keeps
+// a snapshot so the toast's Undo can put it back.
+
+const $ = (s, r = document) => r.querySelector(s);
+const TODAY = 0, WAKE = 420, WIND = 1380, LUNCH_END = 765, DATE0 = 9;
+const DAYN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAYF = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const SPACES = {
+  csc: { name: "CSC 316", c: "blue" }, ma: { name: "MA 241", c: "purple" }, health: { name: "Health", c: "green" },
+  life: { name: "Life", c: "pink" }, none: { name: "", c: "" },
+};
+const BATT = `<svg width="44" height="12" viewBox="0 0 44 12" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/><rect x="24" y="1" width="18" height="10" rx="3"/></svg>`;
+const EX = ["Problem set 6 2h by fri", "gym 45m 3 times a week", "csc 316 exam nov 23 9am prep 5h", "buy stamps"];
+const GEX = ["Read 3 books by 31 Dec", "Learn 200 Spanish words by 28 Feb"];
+const MOODLE = [
+  { title: "MA 241 problem set 5", space: "ma", len: 120, coursework: true, due: "due Fri", dueLong: "due Fri 13 Nov", dueDay: 4 },
+  { title: "CSC 316 quiz review", space: "csc", len: 45, coursework: true, due: "due Thu", dueLong: "due Thu 12 Nov", dueDay: 3 },
+];
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const I = (n, c = "") => `<svg class="i ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const hm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const dur = (m) => (m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60}` : `${m / 60} h`);
+const up15 = (m) => Math.ceil(m / 15) * 15, dn15 = (m) => Math.floor(m / 15) * 15;
+const wd = (d) => DAYN[((d % 7) + 7) % 7];
+const dateLabel = (d) => `${wd(d)} ${DATE0 + d} Nov`;
+const whenT = (d, s) => (d === TODAY ? hm(s) : `${wd(d)} ${hm(s)}`);
+const dayWord = (d) => (d === TODAY ? "Today" : dateLabel(d));
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
+const list = (a) => (a.length < 2 ? a.join("") : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`);
+
+function seed() {
+  const todo = (id, title, o) => ({ id, title, space: "none", len: null, coursework: false, ses: "", due: "", dueLong: "", day: null, start: null, ...o });
+  return {
+    now: 460, viewDay: 0, screen: "today", back: null, sheet: null, lock: false,
+    max: 240, prefs: { morning: true, afternoon: true, evening: false }, learn: true, learned: false,
+    pileOpen: false, earlierOpen: false, placedOnce: false, prefErr: false, goalDraft: null, moodle: 0, nid: 1,
+    events: [
+      { id: "lunch", title: "Lunch", space: "life", days: [0, 1, 2, 3, 4, 5, 6], start: 720, len: 45, rep: "every day" },
+      { id: "ma", title: "MA 241 lecture", space: "ma", days: [0, 2, 4], start: 870, len: 75, rep: "Mon, Wed and Fri" },
+      { id: "csc", title: "CSC 316 lecture", space: "csc", days: [1, 3], start: 615, len: 75, rep: "Tue and Thu" },
+      { id: "sam", title: "Dinner with Sam", space: "life", days: [0], start: 1140, len: 75, rep: "" },
+    ],
+    skips: {},
+    items: [
+      todo("email", "Email TA", { space: "csc", len: 10, prefDay: 0, pref: 480 }),
+      todo("prep1", "CSC 316 exam prep", { space: "csc", len: 60, coursework: true, ses: "session 1 of 5", due: "exam Mon 23 Nov", dueLong: "exam Mon 23 Nov", prefDay: 0, pref: 525 }),
+      todo("lab1", "CSC 316 lab report", { space: "csc", len: 90, coursework: true, ses: "session 1 of 2", due: "due Wed", dueLong: "due Wed 11 Nov", dueDay: 2, prefDay: 0, pref: 630 }),
+      todo("gym1", "Gym", { space: "health", len: 45, ses: "1 of 3 this week", goal: "Weigh 72 kg", day: 0, start: 960 }),
+      todo("stamps", "Buy stamps", {}),
+      todo("lab2", "CSC 316 lab report", { space: "csc", len: 90, coursework: true, ses: "session 2 of 2", due: "due Wed", dueLong: "due Wed 11 Nov", dueDay: 2, prefDay: 1, pref: 510 }),
+      todo("prep2", "CSC 316 exam prep", { space: "csc", len: 60, coursework: true, ses: "session 2 of 5", due: "exam Mon 23 Nov", dueLong: "exam Mon 23 Nov", prefDay: 2, pref: 540 }),
+      todo("gym2", "Gym", { space: "health", len: 45, ses: "2 of 3 this week", goal: "Weigh 72 kg", prefDay: 2, pref: 960 }),
+      todo("prep3", "CSC 316 exam prep", { space: "csc", len: 60, coursework: true, ses: "session 3 of 5", due: "exam Mon 23 Nov", dueLong: "exam Mon 23 Nov", prefDay: 4, pref: 540 }),
+      todo("gym3", "Gym", { space: "health", len: 45, ses: "3 of 3 this week", goal: "Weigh 72 kg", prefDay: 4, pref: 960 }),
+    ],
+    goals: [
+      { id: "weigh", title: "Weigh 72 kg", by: "Mon 1 Mar", status: "75.2 kg now, 3.2 kg to go. On pace.", pct: 0.3, c: "green", fed: "Gym, 3 a week" },
+      { id: "save", title: "Save $1000", by: "Thu 31 Dec", status: "$380 of $1000. On pace.", pct: 0.38, c: "teal", fed: "Put aside $90, Fridays" },
+    ],
+  };
+}
+
+let S = seed(), theme = "system", history = [], toastTimer = 0, sheetIn = false, opener = null, suppressClick = false;
+const view = $("#view"), device = $("#device");
+const item = (id) => S.items.find((i) => i.id === id);
+const KEEP = ["items", "events", "skips", "goals", "max", "prefs", "learn", "learned", "moodle", "nid"];
+const snap = () => JSON.stringify(Object.fromEntries(KEEP.map((k) => [k, S[k]])));
+
+function commit(fn, msg) {
+  history.push(snap());
+  if (history.length > 40) history.shift();
+  fn();
+  resuggest();
+  const text = typeof msg === "function" ? msg() : msg;
+  render();
+  if (text) toast(text, { label: "Undo", act: "undo" });
+}
+function undo() {
+  const h = history.pop();
+  if (!h) return;
+  Object.assign(S, JSON.parse(h));
+  hideToast();
+  render();
+}
+
+// ---------- the planner: it only ever suggests ----------
+// Days past Sunday are next week: repeating classes and meals come round again, one-off events don't.
+const evs = (d) => S.events.filter((e) => e.days.includes(e.rep ? d % 7 : d) && !S.skips[`${e.id}:${d}`]);
+function occ(d, skipId) {
+  const a = evs(d).map((e) => [e.start, e.start + e.len]);
+  for (const i of S.items) if (i.day === d && i.start != null && i.id !== skipId) a.push([i.start, i.start + (i.len || 15)]);
+  return a;
+}
+const free = (a, s, len) => s >= WAKE && s + len <= WIND && !a.some(([x, y]) => s < y && s + len > x);
+const cwOn = (d, skipId) => S.items.reduce((n, i) => n + (i.coursework && i.day === d && i.start != null && i.id !== skipId ? i.len || 0 : 0), 0);
+const cwDay = (d) => cwOn(d) + S.items.reduce((n, i) => n + (i.coursework && i.start == null && !i.done && i.sug && i.sug.day === d ? i.len : 0), 0);
+const inPrefs = (s) => (s < 720 && S.prefs.morning) || (s >= 720 && s < 1020 && S.prefs.afternoon) || (s >= 1020 && S.prefs.evening);
+const okTime = (it, d, t, len) => t >= (d === TODAY ? S.now : WAKE) && free(occ(d, it.id), t, len);
+
+function findSlot(it, o = {}) {
+  const len = o.len || it.len;
+  if (!len) return null;
+  const fd = o.fromDay ?? TODAY, last = o.last ?? Math.min(it.lastDay ?? 6, it.dueDay ?? 99);
+  for (let d = fd; d <= last; d++) {
+    if (it.coursework && cwOn(d, it.id) + ((o.cwx || {})[d] || 0) + len > S.max) continue;
+    const a = occ(d, it.id).concat((o.extra || {})[d] || []);
+    let base = d === TODAY ? up15(S.now) : 480;
+    if (d === fd && o.from != null) base = Math.max(base, o.from);
+    if (it.pref != null && (o.anyPref || d === it.prefDay)) base = Math.max(base, it.pref);
+    if (it.coursework && S.learned) base = Math.max(base, LUNCH_END);
+    for (let t = up15(base); t + len <= WIND; t += 15) if (free(a, t, len) && (!it.coursework || inPrefs(t))) return { day: d, start: t };
+  }
+  return null;
+}
+function note(extra, cwx, it, s) {
+  (extra[s.day] ||= []).push([s.start, s.start + it.len]);
+  if (it.coursework) cwx[s.day] = (cwx[s.day] || 0) + it.len;
+}
+function resuggest() {
+  const extra = {}, cwx = {};
+  for (const it of S.items) {
+    if (it.start != null) continue;
+    it.sug = null;
+    if (it.done) continue;
+    it.sug = findSlot(it, { fromDay: Math.max(TODAY, it.prefDay ?? TODAY, it.notBefore ?? TODAY), extra, cwx });
+    if (it.sug) note(extra, cwx, it, it.sug);
+  }
+}
+function pileItems(d) {
+  const key = (i) => (i.sug ? i.sug.day * 2000 + i.sug.start : 99999);
+  return S.items
+    .filter((i) => i.start == null && !i.done && ((i.sug && i.sug.day === d) || (d === TODAY && (i.isNew || !i.sug) && !(i.notBefore > TODAY))))
+    .sort((a, b) => key(a) - key(b));
+}
+// Dropped on a day in the week: the free time that day nearest the time it had.
+function slotOn(it, d, len) {
+  const a = occ(d, it.id), lo = d === TODAY ? up15(S.now) : 480, want = Math.max(lo, it.start ?? (it.sug ? it.sug.start : it.pref ?? 540));
+  let best = null, cost = Infinity;
+  for (let t = lo; t + len <= WIND; t += 15) {
+    if (!free(a, t, len)) continue;
+    const c = Math.abs(t - want) + (it.coursework && (!inPrefs(t) || (S.learned && t < LUNCH_END)) ? 2000 : 0);
+    if (c < cost) { best = t; cost = c; }
+  }
+  return best;
+}
+function weekTray() {
+  const key = (i) => (i.sug ? i.sug.day * 2000 + i.sug.start : 99999);
+  return S.items.filter((i) => i.start == null && !i.done && !(i.sug && i.sug.day > 6)).sort((a, b) => key(a) - key(b));
+}
+function entries(d) {
+  const a = evs(d).map((e) => ({ type: "ev", id: e.id, title: e.title, space: e.space, start: e.start, end: e.start + e.len }));
+  for (const it of S.items)
+    if (it.day === d && it.start != null) a.push({ type: "it", id: it.id, it, title: it.title, space: it.space, start: it.start, end: it.start + (it.len || 15) });
+  return a.sort((x, y) => x.start - y.start);
+}
+// The next suggested time after the stretch you're in now, for a session whose time has come.
+function laterSlot(it) {
+  const es = entries(TODAY).filter((e) => e.id !== it.id && e.end > S.now);
+  const next = es.find((e) => e.start >= S.now) || es[0];
+  return findSlot(it, { fromDay: TODAY, from: next ? next.end : WIND });
+}
+// Where today's work could go when the day is cleared: later days, same time of day where it fits.
+function clearPlan(day) {
+  const todo = S.items
+    .filter((i) => !i.done && ((i.day === day && i.start != null) || (i.start == null && i.sug && i.sug.day === day)))
+    .map((it) => ({ it, placed: it.start != null, was: it.start != null ? it.start : it.sug.start }))
+    .sort((a, b) => a.was - b.was);
+  const extra = {}, cwx = {};
+  for (const o of S.items) if (o.start == null && !o.done && o.sug && o.sug.day !== day) note(extra, cwx, o, o.sug);
+  for (const p of todo) {
+    p.slot = findSlot({ ...p.it, pref: p.was }, { fromDay: day + 1, extra, cwx, anyPref: true });
+    if (p.slot) note(extra, cwx, p.it, p.slot);
+  }
+  return todo;
+}
+
+// ---------- the one card ----------
+function topCard() {
+  const t = S.now, es = entries(TODAY), todos = es.filter((e) => e.type === "it" && !e.it.done);
+  const live = todos.find((e) => e.it.started);
+  if (live) {
+    const it = live.it, over = t - live.end, inm = Math.max(0, t - (it.startedAt ?? live.start));
+    const sub = [cap(it.ses), it.len ? `until ${hm(live.end)}` : "", it.len && over > 0 ? `${dur(over)} over` : `${dur(inm)} in`];
+    const acts = [["Done", `done:${it.id}`, 1]];
+    if (it.len) acts.push(["+15 min", `plus15:${it.id}`]);
+    return { tag: "Now", live: true, title: it.title, sub: sub.filter(Boolean).join(" · "), acts };
+  }
+  const due = todos.find((e) => e.start <= t);
+  if (due) {
+    const it = due.it, late = t - due.start, nx = laterSlot(it);
+    const acts = [["Start", `start:${it.id}`, 1], ["Done already", `already:${it.id}`]];
+    if (nx) acts.push([`Move to ${whenT(nx.day, nx.start)}`, `moveto:${it.id}:${nx.day}:${nx.start}`]);
+    const sub = [cap(it.ses), `set for ${hm(due.start)}`, it.from ? `moved from ${it.from}` : ""].filter(Boolean).join(" · ");
+    return { tag: late >= 10 ? "Not started" : "Next", title: late >= 10 ? it.title : `Time for ${it.title}`, sub: cap(sub), acts };
+  }
+  const open = (e) => !(e.type === "it" && e.it.done);
+  const cur = es.find((e) => e.type === "ev" && e.start <= t && e.end > t);
+  if (cur) {
+    const then = es.find((e) => e.start >= cur.end && open(e));
+    return { line: `${cur.title} until ${hm(cur.end)}${then ? ` · then ${then.title}` : ""}` };
+  }
+  const next = es.find((e) => e.start > t && open(e)), until = next ? next.start : WIND;
+  const cand = pileItems(TODAY).find((i) => i.sug && i.sug.day === TODAY && i.len <= until - t);
+  if (cand) return { tag: "Next", lab: `Free until ${hm(until)}`, title: `Time for ${cand.title}`, one: true, acts: [["Start", `start:${cand.id}`, 1]] };
+  if (next && next.type === "it") return { tag: "Next", lab: `Free until ${hm(until)}`, title: `Then ${next.title}`, one: true, acts: [["Start early", `start:${next.id}`, 1]] };
+  if (next) return { line: `Free until ${hm(until)} · then ${next.title}` };
+  return { line: "Nothing else planned today." };
+}
+function cardHtml(c, who) {
+  if (!c) return "";
+  if (c.line) return `<p class="quiet">${esc(c.line)}</p>`;
+  const lab = `<div class="lab">${who ? `<span class="who">Kriyan</span>` : ""}<span class="tag${c.live ? " live" : ""}">${c.tag}</span>${c.lab ? esc(c.lab) : ""}</div>`;
+  const acts = c.acts.map(([l, a, p]) => `<button class="cb${p ? " pri" : ""}" data-act="${a}">${esc(l)}</button>`).join("");
+  if (c.one && !who) return `<section class="card one" aria-label="${c.tag}"><div class="txt">${lab}<h2>${esc(c.title)}</h2></div>${acts}</section>`;
+  return `<section class="card" aria-label="${c.tag}"><div class="txt">${lab}<h2>${esc(c.title)}</h2>${c.sub ? `<p class="sub">${esc(c.sub)}</p>` : ""}</div><div class="acts">${acts}</div></section>`;
+}
+
+// ---------- Today ----------
+function pileHtml(d) {
+  const all = pileItems(d), isT = d === TODAY;
+  const learned = S.learned && isT ? `<div class="ft"><span>You usually move study to after lunch, so suggestions start there now.</span><button class="lnk" data-act="learn:off">Turn off</button></div>` : "";
+  if (!all.length) return learned ? `<section class="pile">${learned}</section>` : isT && S.placedOnce ? `<p class="quiet">Everything for today has a time.</p>` : "";
+  const show = S.pileOpen ? all : all.slice(0, 3), more = all.length - show.length;
+  const n = all.filter((i) => i.sug && i.sug.day === d).length, cw = cwDay(d);
+  const side = !S.placedOnce ? "Tap a time, or hold and drag" : cw ? `${dur(cw)} of ${dur(S.max)} coursework` : "";
+  const row = (i) => {
+    const s = i.sug, chip = s ? (s.day === d ? hm(s.start) : `${wd(s.day)} ${hm(s.start)}`) : "Pick a time";
+    const sub = [i.isNew ? "New" : "", i.len ? dur(i.len) : "No length yet", i.ses, i.due].filter(Boolean).join(" · ");
+    const chipBtn = s
+      ? `<button class="sug" data-act="place:${i.id}" aria-label="Place ${esc(i.title)} at ${whenT(s.day, s.start)}">${chip}</button>`
+      : `<button class="sug none" data-act="open:pick:${i.id}" aria-label="Pick a time for ${esc(i.title)}">${chip}</button>`;
+    return `<div class="pr" data-drag="${i.id}"><button class="chk" data-act="done:${i.id}" aria-label="Mark ${esc(i.title)} done"><i>${I("check")}</i></button><button class="pt" data-act="open:item:${i.id}"><span>${esc(i.title)}</span><small>${esc(sub)}</small></button>${chipBtn}</div>`;
+  };
+  const foot = more || n > 1
+    ? `<div class="ft">${more ? `<button class="lnk more" data-act="pile:more">${more} more</button>` : "<span></span>"}${n > 1 ? `<button class="lnk" data-act="placeall">Place all ${n}</button>` : ""}</div>`
+    : "";
+  return `<section class="pile" aria-label="To plan"><div class="hd">${isT ? "To plan" : `To plan ${DAYN[d]}`}<span>${side}</span></div>${show.map(row).join("")}${foot}${learned}</section>`;
+}
+function blockRow(e, d, past) {
+  const tone = SPACES[e.space] && SPACES[e.space].c, h = Math.min(140, Math.max(64, Math.round((e.end - e.start) * 1.05)));
+  const nowIn = d === TODAY && S.now > e.start && S.now < e.end;
+  const nl = nowIn ? `<span class="nowl" style="top:${Math.round(((S.now - e.start) / (e.end - e.start)) * h)}px"></span>` : "";
+  if (e.type === "ev")
+    return `<div class="r"><div class="tt">${hm(e.start)}</div><div class="blk ${past ? "past" : tone ? `s-${tone}` : ""}" style="min-height:${h}px"><span class="lead">${I("clock")}</span><button class="body" data-act="open:ev:${e.id}"><span class="ti">${esc(e.title)}</span><span class="me">${hm(e.start)}–${hm(e.end)}</span></button>${nl}</div></div>`;
+  const it = e.it;
+  const me = [it.len ? `${hm(e.start)}–${hm(e.end)}` : hm(e.start), it.ses, it.from ? `from ${it.from}` : "", it.started ? "started" : ""].filter(Boolean).join(" · ");
+  return `<div class="r"><div class="tt">${hm(e.start)}</div><div class="blk ${it.done ? "done" : tone ? `s-${tone}` : ""}${it.started ? " live" : ""}" style="min-height:${h}px"${it.done ? "" : ` data-drag="${it.id}"`}>${it.fixed ? `<span class="lead">${I("clock")}</span>` : `<button class="chk${it.done ? " on" : ""}" data-act="done:${it.id}" aria-pressed="${!!it.done}" aria-label="${it.done ? "Mark not done" : "Mark done"}: ${esc(it.title)}"><i>${I("check")}</i></button>`}<button class="body" data-act="open:item:${it.id}"><span class="ti">${esc(it.title)}</span><span class="me">${esc(me)}</span></button>${nl}</div></div>`;
+}
+function gapRow(s, e, isNow) {
+  const m = e - s;
+  if (m < (isNow ? 15 : 30)) return "";
+  const h = Math.round(Math.min(112, Math.max(44, m * 0.45)));
+  return `<div class="r"><div class="tt"></div><button class="gap${isNow ? " now" : ""}" style="min-height:${h}px" data-s="${s}" data-e="${e}" data-act="open:gap:${s}:${e}" aria-label="Free from ${hm(s)} to ${hm(e)}. Put something here"><span>${isNow ? `Now, ${dur(m)} free until ${hm(e)}` : e === WIND ? `Free from ${hm(s)}` : `${dur(m)} free`}</span></button></div>`;
+}
+function timeline(d) {
+  const isT = d === TODAY, es = entries(d);
+  const early = isT ? es.filter((e) => e.end <= S.now && (e.type === "ev" || e.it.done)) : [];
+  let rows = "", cur = isT ? S.now : WAKE;
+  if (early.length) {
+    rows += `<div class="r"><div class="tt"></div><button class="earl" data-act="earlier:toggle" aria-expanded="${S.earlierOpen}">Earlier today · ${early.length} done${I("down", "s")}</button></div>`;
+    if (S.earlierOpen) rows += early.map((e) => blockRow(e, d, true)).join("");
+  }
+  for (const e of es.filter((x) => !early.includes(x))) {
+    if (e.start > cur) rows += gapRow(cur, e.start, isT && cur === S.now);
+    rows += blockRow(e, d);
+    cur = Math.max(cur, e.end);
+  }
+  if (WIND > cur) rows += gapRow(cur, WIND, isT && cur === S.now);
+  return `<div class="tl">${rows}</div>`;
+}
+function todayScreen() {
+  const d = S.viewDay, isT = d === TODAY;
+  const strip = DAYN.map((n, i) => `<button data-act="day:${i}" class="${i === d ? "on" : ""}${i === TODAY ? " td" : ""}" aria-label="${DAYF[i]} ${DATE0 + i} November"${i === d ? ' aria-current="date"' : ""}><b>${DATE0 + i}</b><span>${n}</span></button>`).join("");
+  const right = isT
+    ? `<button class="fab" data-act="nav:week" aria-label="Open this week">${I("week")}</button>`
+    : S.back === "week"
+      ? `<button class="fab txt" data-act="nav:week">Week</button>`
+      : `<button class="fab txt" data-act="day:0">Today</button>`;
+  return `<div class="scroll" data-sk="day${d}">
+<header class="top"><button class="dayb" data-act="open:daymenu" aria-label="${DAYF[d]}. Open the day menu">${DAYN[d]}${isT ? '<span class="dot"></span>' : ""}${I("down")}</button><div class="date">${DATE0 + d} November<br>2026</div></header>
+<nav class="strip" aria-label="This week">${strip}</nav>
+${isT ? cardHtml(topCard()) : ""}${pileHtml(d)}${timeline(d)}<div class="end"></div></div>
+<div class="fabs"><button class="fab" data-act="open:menu" aria-label="Open the menu">${I("menu")}</button><button class="fab add" data-act="open:add" aria-label="Add something">${I("plus")}</button>${right}</div>`;
+}
+
+// ---------- sheets ----------
+const tile = (label, icon, act, pri) => `<button class="tile${pri ? " pri" : ""}" data-act="${act}">${I(icon)}<span>${label}</span></button>`;
+function itemSheet() {
+  const it = item(S.sheet.id);
+  if (!it) return "";
+  const sp = SPACES[it.space], placed = it.start != null;
+  const k = [sp.name, it.ses, it.dueLong, it.goal ? `helps ${it.goal}` : ""].filter(Boolean).join(" · ") || "To-do";
+  const head = (sub) => `<div class="k">${sp.c ? `<span class="dot" style="background:var(--sp-${sp.c}-dot)"></span>` : ""}${esc(k)}</div><h2>${esc(it.title)}</h2><p class="sub">${esc(sub)}</p>`;
+  const day = placed ? it.day : it.sug ? it.sug.day : S.viewDay, notL = day === TODAY ? "Not today" : `Not ${wd(day)}`;
+  if (it.done) return `${head("Done")}<div class="stack"><button class="btn wide" data-act="done:${it.id}">Mark not done</button></div>`;
+  if (placed) {
+    const sub = `${dayWord(it.day)} ${it.len ? `${hm(it.start)}–${hm(it.start + it.len)}` : hm(it.start)}${it.from ? `, moved from ${it.from}` : ""}`;
+    const a = it.started ? tile("Done", "check", `done:${it.id}`, 1) : tile("Start", "play", `start:${it.id}`, 1);
+    const b = it.started ? (it.len ? tile("+15 min", "plus", `plus15:${it.id}`) : "") : tile("Done", "check", `done:${it.id}`);
+    return `${head(sub)}<div class="tiles${b ? "" : " t3"}">${a}${b}${tile("Move", "arrow", `open:pick:${it.id}`)}${tile(notL, "later", `nottoday:${it.id}`)}</div>`;
+  }
+  const sub = `Not on the day yet · ${it.len ? dur(it.len) : "no length yet"}`;
+  const top = it.sug
+    ? `<button class="btn pri wide" data-act="place:${it.id}">Place at ${whenT(it.sug.day, it.sug.start)}</button>`
+    : `<button class="btn pri wide" data-act="open:pick:${it.id}">Pick a time</button>`;
+  return `${head(sub)}<div class="stack">${top}</div><div class="tiles tight${it.sug ? "" : " t3"}">${tile("Start now", "play", `start:${it.id}`)}${tile("Done", "check", `done:${it.id}`)}${it.sug ? tile("Pick a time", "arrow", `open:pick:${it.id}`) : ""}${tile(notL, "later", `nottoday:${it.id}`)}</div>`;
+}
+function evSheet() {
+  const e = S.events.find((x) => x.id === S.sheet.id), d = S.viewDay, sp = SPACES[e.space];
+  const k = [sp.name, e.rep ? `repeats ${e.rep}` : ""].filter(Boolean).join(" · ");
+  return `<div class="k"><span class="dot" style="background:var(--sp-${sp.c}-dot)"></span>${esc(k)}</div><h2>${esc(e.title)}</h2><p class="sub">${dayWord(d)} ${hm(e.start)}–${hm(e.start + e.len)}</p>
+<div class="stack"><button class="btn wide" data-act="skip:${e.id}">${e.rep ? "Skip once" : "Take off the day"}</button></div><p class="fine">That frees ${hm(e.start)}–${hm(e.start + e.len)} ${d === TODAY ? "today" : `on ${dateLabel(d)}`}${e.rep ? ". The other days stay." : "."}</p>`;
+}
+function pickCands(it, d, len) {
+  const a = occ(d, it.id), out = [];
+  let prev = false;
+  for (let t = up15(d === TODAY ? S.now : WAKE); t + len <= WIND; t += 15) {
+    const f = free(a, t, len);
+    if (f && !prev) out.push(t);
+    prev = f;
+  }
+  return out;
+}
+function pickSheet() {
+  const sh = S.sheet, it = item(sh.id), len = sh.len, placed = it.start != null;
+  let h = `<div class="k">${placed ? "Move" : "Place"} · only this one moves</div><h2>${esc(it.title)}</h2><p class="sub">${esc([len ? dur(len) : "No length yet", it.ses].filter(Boolean).join(" · "))}</p>`;
+  if (!it.len)
+    h += `<p class="lbl">How long?</p><div class="chips">${[15, 30, 45, 60].map((m) => `<button class="chip${len === m ? " on" : ""}" data-act="picklen:${m}" aria-pressed="${len === m}">${dur(m)}</button>`).join("")}</div>`;
+  h += `<p class="lbl">Day</p><div class="chips">${DAYN.map((n, d) => (d < TODAY ? "" : `<button class="chip${d === sh.day ? " on" : ""}" data-act="pickday:${d}" aria-pressed="${d === sh.day}">${d === TODAY ? "Today" : `${n} ${DATE0 + d}`}</button>`)).join("")}</div>`;
+  if (len) {
+    const cands = pickCands(it, sh.day, len), sg = !placed && it.sug && it.sug.day === sh.day ? it.sug.start : null;
+    if (sh.time == null || !okTime(it, sh.day, sh.time, len)) sh.time = sg ?? cands[0] ?? null;
+    const set = [...new Set(cands.concat(sg != null ? [sg] : [], sh.time != null ? [sh.time] : []))].sort((a, b) => a - b).slice(0, 8);
+    h += `<p class="lbl">Time</p>`;
+    if (sh.time == null) h += `<p class="fine">No free stretch of ${dur(len)} on ${dateLabel(sh.day)}. Try another day.</p>`;
+    else
+      h += `<div class="chips">${set.map((t) => `<button class="chip${t === sg ? " blue" : ""}${t === sh.time ? " on" : ""}" data-act="picktime:${t}" aria-pressed="${t === sh.time}">${hm(t)}</button>`).join("")}</div>
+<div class="stepper"><button class="rnd" data-act="pickstep:-1" aria-label="15 minutes earlier">${I("minus")}</button><b>${hm(sh.time)}–${hm(sh.time + len)}</b><button class="rnd" data-act="pickstep:1" aria-label="15 minutes later">${I("plus")}</button></div>
+<p class="fine">${sh.msg || (sg != null ? "The blue time is Kriyan's suggestion. Plus and minus step to the next free 15 minutes." : "Plus and minus step to the next free 15 minutes.")}</p>`;
+  } else h += `<p class="fine">Kriyan never guesses a length. Pick one and the free times show up.</p>`;
+  const ready = len && sh.time != null;
+  h += `<div class="stack"><button class="btn pri wide" data-act="pickok"${ready ? "" : ' aria-disabled="true"'}>${ready ? `${placed ? "Move to" : "Place at"} ${whenT(sh.day, sh.time)}` : placed ? "Move" : "Place"}</button></div>`;
+  return h;
+}
+function gapSheet() {
+  const { s, e } = S.sheet, d = S.viewDay, st = up15(s);
+  const fit = pileItems(d).filter((i) => i.len && i.len <= e - st);
+  const rows = fit.map((i) => `<button class="mrow" data-act="gapplace:${i.id}:${st}"><span>${esc(i.title)}<small>${esc([dur(i.len), i.ses].filter(Boolean).join(" · "))}</small></span><em>${hm(st)}</em></button>`).join("");
+  return `<div class="k">Free time</div><h2>${hm(s)}–${hm(e)}</h2>${
+    fit.length
+      ? `<p class="sub">${dur(e - s)} free. Pick what goes here.</p><div class="mrows">${rows}</div>`
+      : `<p class="sub">Nothing in To plan fits here.</p><div class="stack"><button class="btn wide" data-act="open:add">Add a to-do</button></div>`
+  }`;
+}
+function dayMenu() {
+  const d = S.viewDay, isT = d === TODAY, n = pileItems(d).filter((i) => i.sug && i.sug.day === d).length, cw = cwDay(d);
+  const sub = [n ? `${n} to plan` : "", cw ? `${dur(cw)} of ${dur(S.max)} coursework` : "No coursework"].filter(Boolean).join(" · ");
+  return `<div class="k">${isT ? "Today" : "This day"}</div><h2>${dateLabel(d)}</h2><p class="sub">${sub}</p><div class="mrows">
+${n > 1 ? `<button class="mrow" data-act="placeall"><span>Place all ${n} at suggested times<small>You can still move each one after.</small></span>${I("right")}</button>` : ""}
+<button class="mrow" data-act="open:clear"><span>${isT ? "Clear today" : `Clear ${wd(d)}`}<small>Any reason. Each thing gets a suggested new time.</small></span>${I("right")}</button>
+<button class="mrow" data-act="nav:week"><span>See this week</span>${I("right")}</button></div>`;
+}
+function menuSheet() {
+  return `<div class="k">Kriyan</div><div class="mrows lone">
+<button class="mrow" data-act="nav:week"><span>This week</span>${I("right")}</button>
+<button class="mrow" data-act="nav:goals"><span>Goals</span>${I("right")}</button>
+<button class="mrow" data-act="nav:settings"><span>Settings<small>Daily coursework maximum, preferred times, look</small></span>${I("right")}</button></div>`;
+}
+function clearSheet() {
+  const sh = S.sheet, day = sh.day, isT = day === TODAY, plan = clearPlan(day);
+  const moved = sh.moved.filter((id) => !plan.some((p) => p.it.id === id)).map(item).filter(Boolean);
+  const stay = evs(day).filter((e) => !isT || e.start + e.len > S.now).map((e) => e.title);
+  const rows = plan.map(({ it, placed, was, slot }) => {
+    const sub = `${placed ? "Set for" : "Suggested for"} ${hm(was)} · ${dur(it.len)}`;
+    const chip = slot
+      ? `<button class="sug" data-act="clear:one:${it.id}:${slot.day}:${slot.start}" aria-label="Move ${esc(it.title)} to ${whenT(slot.day, slot.start)}">${wd(slot.day)} ${hm(slot.start)}</button>`
+      : `<button class="sug none" data-act="clear:pick:${it.id}">Pick a time</button>`;
+    return `<div class="pr"><button class="pt" data-act="clear:pick:${it.id}"><span>${esc(it.title)}</span><small>${esc(sub)}</small></button>${chip}</div>`;
+  }).join("");
+  const done = moved.map((it) => `<div class="pr"><span class="pt"><span>${esc(it.title)}</span><small>Moved to ${whenT(it.day, it.start)}</small></span>${I("check")}</div>`).join("");
+  const n = plan.filter((p) => p.slot).length;
+  const empty = !plan.length && !moved.length ? `<p class="sub">Nothing to move. ${isT ? "Today" : dateLabel(day)} has no to-dos left.</p>` : "";
+  return `<div class="fh"><h2>${isT ? "Clear today" : `Clear ${dateLabel(day)}`}</h2><button class="rnd" data-act="close" aria-label="Close">${I("x")}</button></div>
+<div class="fb"><p class="sub">Any reason is fine. Each thing gets a suggested new time. Tap a time to move that one, or open a row to pick another.</p>${empty}<div class="rows">${rows}${done}</div>
+${stay.length ? `<p class="fine">${esc(list(stay))} ${stay.length === 1 ? "stays" : "stay"} on the day. Skip one from its own sheet.</p>` : ""}</div>
+<div class="ff">${n ? `<button class="btn pri wide" data-act="clear:all">${n === 1 ? "Move it" : moved.length ? `Move the other ${n}` : `Move all ${n}`}</button>` : `<button class="btn pri wide" data-act="close">Done</button>`}</div>`;
+}
+
+// ---------- Add: type a sentence, see what Kriyan understood, change any of it ----------
+const KINDS = { todo: "To-do", repeat: "Repeat", event: "Event", goal: "Goal" };
+const LENS = [10, 30, 60, 120];
+const KB = `<div class="kb" aria-hidden="true">${["qwertyuiop", "asdfghjkl", "zxcvbnm"].map((r, i) => `<div${i === 1 ? ' class="r2"' : ""}>${i === 2 ? '<span class="w"></span>' : ""}${[...r].map((c) => `<span>${c}</span>`).join("")}${i === 2 ? '<span class="w"></span>' : ""}</div>`).join("")}<div><span class="w">123</span><span class="sp">space</span><span class="w">done</span></div></div>`;
+const repWord = (n) => (n >= 7 ? "Every day" : `${n} a week`);
+const whenL = (d, s) => (d === TODAY ? `Today ${hm(s)}` : d <= 6 ? `${wd(d)} ${hm(s)}` : `${dateLabel(d)}, ${hm(s)}`);
+function parse(text) {
+  const low = text.toLowerCase(), spans = [], r = {};
+  const take = (re, fn) => {
+    for (const m of low.matchAll(new RegExp(re.source, "g"))) {
+      const s = m.index, e = s + m[0].length;
+      if (spans.some(([a, b]) => s < b && e > a)) continue;
+      if (fn(m) === false) continue;
+      spans.push([s, e]);
+      return;
+    }
+  };
+  const D = "(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)";
+  const di = (w) => DAYN.findIndex((n) => n.toLowerCase() === w.slice(0, 3));
+  const nov = (n) => (n >= DATE0 && n <= 30 ? n - DATE0 : null);
+  take(/\bprep\s+(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?\b/, (m) => { r.prep = Math.max(1, Math.round(+m[1])); });
+  take(/\b(?:(\d+)\s*(?:times|x)|(once)|(twice))\s+(?:a|per|each)\s+week\b/, (m) => { r.rep = m[1] ? Math.min(7, Math.max(1, +m[1])) : m[2] ? 1 : 2; });
+  take(/\b(?:every\s?day|daily)\b/, () => { r.rep = 7; });
+  take(/\b(\d+)\s*h\s*(\d{1,2})(?:\s*m(?:in)?)?\b/, (m) => { r.len = +m[1] * 60 + +m[2]; });
+  take(/\b(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?\b/, (m) => { r.len = Math.round(+m[1] * 60); });
+  take(/\b(\d+)\s*m(?:in(?:s|utes)?)?\b/, (m) => { r.len = +m[1]; });
+  take(new RegExp(`\\b(?:by|due)\\s+(?:(today)|(tomorrow)|${D})\\b`), (m) => { r.dueDay = m[1] ? 0 : m[2] ? 1 : di(m[3]); });
+  take(new RegExp(`\\b(?:on\\s+)?(?:${D}\\s+)?(\\d{1,2})\\s+nov(?:ember)?\\b`), (m) => { const d = nov(+m[2]); if (d == null) return false; r.day = d; });
+  take(/\b(?:on\s+)?nov(?:ember)?\s+(\d{1,2})(?:st|nd|rd|th)?\b/, (m) => { const d = nov(+m[1]); if (d == null) return false; r.day = d; });
+  take(new RegExp(`\\b(?:on\\s+)?(?:(today)|(tomorrow)|${D})\\b`), (m) => { if (r.day == null) r.day = m[1] ? 0 : m[2] ? 1 : di(m[3]); });
+  take(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/, (m) => { const h = +m[1], mi = +(m[2] || 0); if (h < 1 || h > 12 || mi > 59) return false; r.time = ((h % 12) + (m[3] === "pm" ? 12 : 0)) * 60 + mi; });
+  take(/\b(?:at\s+)?(\d{1,2}):(\d{2})\b/, (m) => { if (r.time != null || +m[1] > 23 || +m[2] > 59) return false; r.time = +m[1] * 60 + +m[2]; });
+  spans.sort((a, b) => a[0] - b[0]);
+  let title = "", at = 0;
+  for (const [s, e] of spans) { title += text.slice(at, s); at = e; }
+  title += text.slice(at);
+  r.title = cap(title.replace(/\s+/g, " ").trim().replace(/\bcsc\s?316\b/i, "CSC 316").replace(/\bma\s?241\b/i, "MA 241"));
+  r.space = /\bcsc\s?316\b/.test(low) ? "csc" : /\bma\s?241\b/.test(low) ? "ma" : /\b(?:gym|run|workout|swim)\b/.test(low) ? "health" : "none";
+  r.coursework = r.space === "csc" || r.space === "ma" || /problem set|essay|report|reading|exam|quiz|midterm|study|homework|lab\b|revision/.test(low);
+  r.kind = r.rep ? "repeat" : r.time != null ? "event" : "todo";
+  r.spans = spans;
+  return r;
+}
+// What the sentence and the chips add up to, with a suggested time for each thing that can have one.
+function draft() {
+  const sh = S.sheet, o = sh.o, p = parse(sh.text);
+  const pick = (k, v) => (k in o ? (o[k] < 0 ? null : o[k]) : v ?? null);
+  const d = { title: p.title, kind: o.kind || p.kind, space: o.space || p.space, coursework: p.coursework, len: pick("len", p.len), due: pick("due", p.dueDay), day: pick("day", p.day), prep: pick("prep", p.prep), rep: pick("rep", p.rep), fixed: null, set: "", slots: [], need: "" };
+  if (d.kind === "goal") return d;
+  if (p.time != null) d.fixed = { day: d.day ?? TODAY, time: p.time };
+  if (d.kind === "event" && !d.fixed) d.need = "An event needs a time. Type one, like thu 14:00.";
+  if (d.kind === "repeat" && !d.rep) d.need = "Pick how often it repeats.";
+  if (d.need) return d;
+  const extra = {}, cwx = {};
+  for (const x of S.items) if (x.start == null && !x.done && x.sug) note(extra, cwx, x, x.sug);
+  const sug = (tmp, opt) => {
+    const s = findSlot({ id: "tmp", ...tmp }, { extra, cwx, ...opt });
+    if (s) note(extra, cwx, tmp, s);
+    return s;
+  };
+  if (d.kind === "repeat") {
+    d.set = "repeat";
+    // Keep the time of day you already do this at, on days that don't have one yet.
+    const same = S.items.filter((x) => x.title.toLowerCase() === d.title.toLowerCase());
+    const pref = same.map((x) => x.pref ?? x.start).find((v) => v != null);
+    const on = (dd) => same.some((x) => (x.start != null ? x.day : x.sug ? x.sug.day : x.prefDay) === dd);
+    for (let i = 0; i < d.rep; i++) {
+      let dd = Math.floor((i * 7) / d.rep);
+      if (on(dd) && dd < 6) dd++;
+      d.slots.push(d.len ? sug({ len: d.len, coursework: d.coursework, pref, prefDay: dd }, { fromDay: dd }) : null);
+    }
+  } else if (d.prep) {
+    // Prep is spread over the days before the thing it prepares for, the last one the day before.
+    const hi = (d.fixed ? d.fixed.day : d.due ?? 7) - 1, lo = TODAY + 1;
+    if (hi >= lo) {
+      d.set = "prep";
+      for (let i = 0; i < d.prep; i++) d.slots.push(sug({ len: 60, coursework: true }, { fromDay: d.prep > 1 ? lo + Math.round((i * (hi - lo)) / (d.prep - 1)) : lo, last: hi }));
+    }
+  } else if (!d.fixed && d.len) {
+    const s = sh.alt || sug({ len: d.len, coursework: d.coursework, dueDay: d.due != null && d.due <= 6 ? d.due : undefined }, { fromDay: Math.min(6, Math.max(TODAY, d.day ?? TODAY)) });
+    if (s) d.slots.push(s);
+  }
+  return d;
+}
+// Other times for one to-do: after lunch on the suggested day, then the first free time on each day up to when it's due.
+function addAlts(d) {
+  const extra = {}, cwx = {}, out = [], cur = d.slots[0];
+  for (const x of S.items) if (x.start == null && !x.done && x.sug) note(extra, cwx, x, x.sug);
+  const tmp = { id: "tmp", len: d.len, coursework: d.coursework };
+  const add = (s) => { if (s && !out.some((q) => q.day === s.day && q.start === s.start)) out.push(s); };
+  add(cur);
+  if (cur && cur.start < LUNCH_END) add(findSlot(tmp, { fromDay: cur.day, last: cur.day, from: LUNCH_END, extra, cwx }));
+  for (let dd = TODAY; dd <= Math.min(6, d.due ?? 6) && out.length < 5; dd++) add(findSlot(tmp, { fromDay: dd, last: dd, extra, cwx }));
+  return out.sort((a, b) => a.day * 2000 + a.start - (b.day * 2000 + b.start));
+}
+// The one button says what it will do.
+function addLabel(d) {
+  const sel = S.sheet.sel, n = d.slots.length, k = d.slots.filter((s, i) => s && sel[i]).length;
+  if (d.kind === "goal") return "Add to Goals";
+  if (d.set === "prep") return k ? `Add and place ${k === n ? `all ${n}` : `${k} of ${n}`} sessions` : `Add with ${n} prep ${n === 1 ? "session" : "sessions"}`;
+  if (d.set === "repeat") return !k ? `Add ${n} to To plan` : k === n ? `Place all ${n}` : `Place ${k}, add ${n - k} to To plan`;
+  if (d.fixed) return `Add at ${d.fixed.day > 6 ? `${dateLabel(d.fixed.day)}, ${hm(d.fixed.time)}` : whenT(d.fixed.day, d.fixed.time)}`;
+  return k ? `Place at ${whenT(d.slots[0].day, d.slots[0].start)}` : "Add to To plan";
+}
+function addOut() {
+  const sh = S.sheet, e = sh.edit, err = sh.err ? `<p class="err">${esc(sh.err)}</p>` : "";
+  const go = (label, off) => `<button class="btn pri wide" data-act="add:go"${off ? ' aria-disabled="true"' : ""}>${esc(label)}</button>`;
+  const row = (label, chips, fine) => `<p class="lbl">${label}</p><div class="acs">${chips}</div>${fine ? `<p class="fine">${fine}</p>` : ""}`;
+  if (!sh.text.trim()) return `${row("Try one", EX.map((x, i) => `<button class="ac" data-act="add:ex:${i}">${x}</button>`).join(""))}${err}${go("Add to To plan", true)}`;
+  const d = draft(), ch = [];
+  const chip = (key, label, set) => ch.push(`<button class="ac ${set ? "got" : "no"}${e === key ? " ed" : ""}" data-act="add:edit:${key}" aria-expanded="${e === key}">${esc(label)}</button>`);
+  const opt = (key, val, label, on) => `<button class="ac${on ? " on" : ""}" data-act="add:set:${key}:${val}" aria-pressed="${!!on}">${esc(label)}</button>`;
+  const tm = (s, i) => (s ? `<button class="ac tm${sh.sel[i] ? " on" : ""}" data-act="add:tog:${i}" aria-pressed="${!!sh.sel[i]}">${whenL(s.day, s.start)}</button>` : "");
+  chip("kind", KINDS[d.kind], d.kind !== "todo");
+  if (d.kind === "repeat") chip("rep", d.rep ? repWord(d.rep) : "How often?", !!d.rep);
+  chip("space", SPACES[d.space].name || "No space", d.space !== "none");
+  if (d.kind !== "goal") chip("len", d.len ? dur(d.len) : "No length", !!d.len);
+  const wk = d.fixed || (d.due == null && d.day != null) ? "day" : "due", wv = d.fixed ? d.fixed.day : wk === "day" ? d.day : d.due;
+  if (d.kind !== "repeat") chip(wk, d.fixed ? `${dateLabel(wv)}, ${hm(d.fixed.time)}` : wv == null ? "No date" : `${wk === "day" ? "On" : d.kind === "goal" ? "By" : "Due"} ${dateLabel(wv)}`, wv != null);
+  if (d.prep && d.kind !== "goal") chip("prep", `Prep ${d.prep} h`, true);
+  let sec = "";
+  if (e === "kind") sec = row("Kind", Object.entries(KINDS).map(([k, n]) => opt("kind", k, n, d.kind === k)).join(""));
+  else if (e === "rep") sec = row("How often?", [1, 2, 3, 4, 5, 7].map((n) => opt("rep", n, repWord(n), d.rep === n)).join(""));
+  else if (e === "space") sec = row("Space", ["csc", "ma", "health", "life", "none"].map((k) => opt("space", k, SPACES[k].name || "No space", d.space === k)).join(""));
+  else if (e === "len") sec = row("How long?", [...new Set(LENS.concat(d.len || []))].sort((a, b) => a - b).map((m) => opt("len", m, dur(m), d.len === m)).join("") + opt("len", -1, "No length", !d.len));
+  else if (e === "due" || e === "day") sec = row(e === "due" ? "Due" : "Day", (d.fixed ? "" : opt(e, -1, "No date", wv == null)) + DAYN.map((n, i) => opt(e, i, i === TODAY ? "Today" : `${n} ${DATE0 + i}`, wv === i)).join("") + (wv > 6 ? opt(e, wv, dateLabel(wv), true) : ""));
+  else if (e === "prep") sec = row("Prep", opt("prep", -1, "No prep", false) + [...new Set([2, 3, 4, 5, 6].concat(d.prep || []))].sort((a, b) => a - b).map((h) => opt("prep", h, `${h} h`, d.prep === h)).join(""));
+  else if (e === "time") sec = row("Other times", addAlts(d).map((s) => `<button class="ac tm${sh.sel[0] && s.day === d.slots[0].day && s.start === d.slots[0].start ? " on" : ""}" data-act="add:alt:${s.day}:${s.start}">${whenL(s.day, s.start)}</button>`).join(""));
+  else if (d.need) sec = `<p class="fine">${d.need}</p>`;
+  else if (d.set && d.slots.some(Boolean)) sec = row(d.set === "prep" ? `${d.slots.length} prep ${d.slots.length === 1 ? "session" : "sessions"} of 1 h` : "Suggested times", d.slots.map(tm).join(""), "Tap a time to place it there. The rest wait in To plan.");
+  else if (d.slots[0]) sec = row("Suggested time", `${tm(d.slots[0], 0)}<button class="ac" data-act="add:edit:time">Other times</button>`, sh.sel[0] ? "Tap it again to leave this in To plan." : "Tap the time to place it there.");
+  else if (!d.len && d.kind !== "goal") sec = row("How long?", LENS.map((m) => opt("len", m, dur(m), false)).join(""), d.fixed ? "" : "Pick a length to get a suggested time, or add it without one.");
+  else if (!d.fixed && d.kind !== "goal") sec = `<p class="fine">No free time fits this week. It waits in To plan.</p>`;
+  return `<div class="acs">${ch.join("")}</div>${sec}${err}${go(addLabel(d), !!d.need)}`;
+}
+function addSheet() {
+  return `<button class="grab" data-act="close" aria-label="Close"><i></i></button><div class="inwrap"><div class="mirror" id="mir" aria-hidden="true"></div><input id="addin" data-k="addin" aria-label="What do you need to do?" placeholder="What do you need to do?" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" spellcheck="false" value="${esc(S.sheet.text)}"></div><div id="addout">${addOut()}</div>`;
+}
+function paintMirror() {
+  const mir = $("#mir"), inp = $("#addin");
+  if (!mir || !inp) return;
+  const text = S.sheet.text, { spans } = parse(text);
+  let h = "", at = 0;
+  for (const [s, e] of spans) { h += esc(text.slice(at, s)) + `<em>${esc(text.slice(s, e))}</em>`; at = e; }
+  mir.innerHTML = h + esc(text.slice(at));
+  mir.scrollLeft = inp.scrollLeft;
+}
+function renderAdd() {
+  const out = $("#addout"), k = out.contains(document.activeElement) ? keyOf(document.activeElement) : null;
+  out.innerHTML = addOut();
+  paintMirror();
+  // Focus stays on the chip a keyboard user pressed, and otherwise in the field, so the keyboard stays up.
+  ((k && out.querySelector(`[data-act="${k}"]`)) || $("#addin")).focus({ preventScroll: true });
+}
+function addGo() {
+  const sh = S.sheet;
+  if (!sh.text.trim()) { sh.err = "Type what you need to do first."; renderAdd(); return; }
+  const d = draft(), sel = sh.sel;
+  if (d.need) return;
+  let msg = "Added to To plan", placed = 0;
+  commit(() => {
+    const mk = (o) => {
+      const it = { id: `n${S.nid++}`, title: d.title || "Untitled", space: d.space, len: d.len || null, coursework: d.coursework, ses: "", due: "", dueLong: "", day: null, start: null, ...o };
+      S.items.push(it);
+      return it;
+    };
+    // A time you tapped goes on the day. The rest keep their suggestion and wait in To plan.
+    const put = (it, s, on) => {
+      if (s && on) { Object.assign(it, { day: s.day, start: s.start }); placed++; }
+      else if (s) Object.assign(it, { prefDay: s.day, pref: s.start, isNew: s.day <= 6 });
+      else it.isNew = true;
+    };
+    if (d.kind === "goal") {
+      S.goals.push({ id: `g${S.nid++}`, title: d.title || "Untitled", by: d.due != null ? dateLabel(d.due) : "", status: "Just started.", pct: 0, c: "purple", fed: "", ask: true, opts: null, oi: 0 });
+      msg = "Added to Goals";
+    } else if (d.set === "repeat") {
+      const n = d.slots.length;
+      d.slots.forEach((s, i) => put(mk({ ses: `${i + 1} of ${n} this week` }), s, sel[i]));
+      msg = !placed ? `Added ${n} to To plan` : placed === n ? `Placed ${n} at suggested times` : `Placed ${placed}. ${n - placed} in To plan`;
+    } else {
+      const it = mk(d.due != null ? { due: `due ${wd(d.due)}`, dueLong: `due ${dateLabel(d.due)}`, dueDay: d.due <= 6 ? d.due : undefined } : {});
+      if (d.fixed) {
+        Object.assign(it, { day: d.fixed.day, start: d.fixed.time, fixed: d.kind === "event" });
+        msg = d.fixed.day <= 6 ? `Added at ${whenT(d.fixed.day, d.fixed.time)}` : `Added for ${dateLabel(d.fixed.day)}`;
+      } else if (d.set !== "prep" && d.slots[0] && sel[0]) {
+        put(it, d.slots[0], true);
+        msg = `Placed at ${whenT(it.day, it.start)}`;
+      } else {
+        it.isNew = true;
+        if (sh.alt) Object.assign(it, { prefDay: sh.alt.day, pref: sh.alt.start });
+        else if (d.day != null && d.day <= 6) it.prefDay = d.day;
+      }
+      if (d.set === "prep") {
+        const n = d.slots.length, by = d.fixed ? d.fixed.day : d.due ?? 7, was = placed, byL = d.fixed || d.due != null ? `for ${dateLabel(by)}` : "";
+        d.slots.forEach((s, i) => put(mk({ title: `${it.title} prep`, len: 60, coursework: true, ses: `session ${i + 1} of ${n}`, dueLong: byL, dueDay: undefined, lastDay: by - 1 }), s, sel[i]));
+        msg += placed > was ? `. Placed ${placed - was} of ${n} prep sessions` : `. ${n} prep ${n === 1 ? "session" : "sessions"} in To plan`;
+      }
+    }
+    if (placed) S.placedOnce = true;
+    else S.pileOpen = true;
+    S.sheet = null;
+  }, () => msg);
+}
+
+// ---------- other screens ----------
+// ---------- Week: see how full each day is, and give what's left a day ----------
+const pct = (m) => +(((m - WAKE) / (WIND - WAKE)) * 100).toFixed(2);
+function weekScreen() {
+  const seg = (c, s, len) => `<i class="bit ${c}" style="left:${pct(s)}%;width:${pct(WAKE + len)}%"></i>`;
+  const days = DAYN.map((n, d) => {
+    const es = entries(d), todo = es.filter((e) => e.type === "it");
+    const sugs = S.items.filter((i) => i.start == null && !i.done && i.sug && i.sug.day === d), full = cwOn(d) >= S.max;
+    const bar = es.map((e) => seg(e.type === "ev" || e.it.fixed ? "ev" : e.it.done ? "dn" : "pl", e.start, e.end - e.start)).join("") + sugs.map((i) => seg("sg", i.sug.start, i.len)).join("") + (d === TODAY ? `<i class="nowt" style="left:${pct(S.now)}%"></i>` : "");
+    const say = [`${todo.length} placed`, sugs.length ? `${sugs.length} suggested` : "", full ? "full" : ""].filter(Boolean).join(", ");
+    const lines = todo.map((e) => `<button class="wl${e.it.done ? " dn" : ""}" data-act="open:item:${e.id}"${e.it.done ? "" : ` data-drag="${e.id}"`}><time>${hm(e.start)}</time><span class="wlb"><span>${esc(e.title)}</span><small>${esc([(/\d+ of \d+/.exec(e.it.ses) || [""])[0], e.it.len ? dur(e.it.len) : ""].filter(Boolean).join(" · "))}</small></span></button>`).join("");
+    return `<div class="wd${d === TODAY ? " td" : ""}" data-d="${d}"><button class="wdh" data-act="day:${d}" aria-label="Open ${DAYF[d]} ${DATE0 + d} November. ${say}"><span class="wn"><b>${n} ${DATE0 + d}</b>${full ? "<small>Full</small>" : ""}</span><span class="wbar">${bar}</span>${I("right", "s")}</button>${lines}</div>`;
+  }).join("");
+  const tray = weekTray(), n = tray.filter((i) => i.sug).length, later = S.items.filter((i) => i.start == null && !i.done && i.sug && i.sug.day > 6).length;
+  const row = (i) => {
+    const sub = [i.len ? dur(i.len) : "No length yet", i.ses, i.due].filter(Boolean).join(" · ");
+    const chip = i.sug
+      ? `<button class="sug" data-act="place:${i.id}" aria-label="Place ${esc(i.title)} at ${wd(i.sug.day)} ${hm(i.sug.start)}">${wd(i.sug.day)} ${hm(i.sug.start)}</button>`
+      : `<button class="sug none" data-act="open:pick:${i.id}" aria-label="Pick a time for ${esc(i.title)}">Pick a time</button>`;
+    return `<div class="pr" data-drag="${i.id}"><button class="pt" data-act="open:item:${i.id}"><span>${esc(i.title)}</span><small>${esc(sub)}</small></button>${chip}</div>`;
+  };
+  const more = later ? `${later} more wait for next week.` : "";
+  const pile = tray.length
+    ? `<section class="pile wt" aria-label="To plan this week"><div class="hd"><div>To plan this week${S.placedOnce ? "" : "<span>Tap a time, or drag a row onto a day</span>"}</div>${n > 1 ? `<button class="lnk" data-act="placeweek">Place all ${n}</button>` : ""}</div>${tray.map(row).join("")}${more ? `<div class="ft"><span>${more}</span></div>` : ""}</section>`
+    : `<p class="quiet">Everything this week has a time.${more ? ` ${more}` : ""}</p>`;
+  return `<div class="scroll" data-sk="week">
+<header class="top"><h1 class="wkt">This week</h1><div class="date">${DATE0}–${DATE0 + 6} November<br>2026</div></header>
+<section class="wk" aria-label="Days"><div class="wax" aria-hidden="true"><i></i><div>${[480, 720, 960, 1200].map((h) => `<span style="left:${pct(h)}%">${hm(h)}</span>`).join("")}</div></div>${days}</section>
+<p class="wleg" aria-hidden="true"><span><i class="ev"></i>Classes and meals</span><span><i class="pl"></i>Placed</span><span><i class="sg"></i>Suggested</span></p>
+${pile}<div class="end"></div></div>
+<div class="fabs"><button class="fab" data-act="open:menu" aria-label="Open the menu">${I("menu")}</button><button class="fab add" data-act="open:add" aria-label="Add something">${I("plus")}</button><button class="fab txt" data-act="day:0">Today</button></div>`;
+}
+function goalsScreen() {
+  const ask = (g) => {
+    if (!g.ask) return "";
+    if (g.opts && g.opts.length)
+      return `<div class="ask"><p class="lbl">What gets you there?</p><p class="say">${esc(g.opts[g.oi].say)}</p><div class="acts"><button class="btn pri" data-act="goal:add:${g.id}">Add this repeat</button><button class="btn" data-act="goal:change:${g.id}">Change</button></div></div>`;
+    return `<div class="ask"><p class="lbl">What gets you there?</p><label class="vh" for="rep${g.id}">A repeat that feeds this goal</label><input class="field" id="rep${g.id}" data-k="rep${g.id}" placeholder="Practice 30 min, 3 a week" autocomplete="off" value="${esc(g.typed || "")}">${g.err ? `<p class="err">Name the repeat first, like Practice 30 min, 3 a week.</p>` : ""}<div class="acts"><button class="btn pri" data-act="goal:typed:${g.id}">Add this repeat</button></div></div>`;
+  };
+  const cards = S.goals.map((g) => `<section class="goal"><div class="gh">${esc(g.title)}<span>${g.by ? `by ${esc(g.by)}` : "no date yet"}</span></div><div class="bar"><i style="width:${Math.round(g.pct * 100)}%;background:var(--sp-${g.c}-dot)"></i></div><p>${esc(g.status)}</p>${g.fed ? `<p class="fed">Fed by ${esc(g.fed)}</p>` : ""}${ask(g)}</section>`).join("");
+  const dr = S.goalDraft;
+  const form = dr
+    ? `<section class="goal"><p class="lbl">New goal</p><label class="vh" for="goalin">Goal and date</label><input class="field" id="goalin" data-k="goalin" placeholder="Read 3 books by 31 Dec" autocomplete="off" enterkeyhint="done" value="${esc(dr.text)}"><div class="chips">${GEX.map((x, i) => `<button class="chip" data-act="goal:ex:${i}">${x}</button>`).join("")}</div>${dr.err ? `<p class="err">Say where you're heading first, like Read 3 books by 31 Dec.</p>` : ""}<div class="acts"><button class="btn pri" data-act="goal:save">Add goal</button><button class="btn" data-act="goal:cancel">Cancel</button></div></section>`
+    : `<button class="btn wide" data-act="goal:new">${I("plus")}Add a goal</button>`;
+  return `<div class="page" data-sk="goals"><button class="back" data-act="nav:today" aria-label="Back to Today">${I("left")}</button><h1>Goals</h1>
+<p class="lede">Each goal says what feeds it.</p><div class="goals">${cards}${form}</div><div class="end"></div></div>`;
+}
+function settingsScreen() {
+  const P = [["morning", "Morning", "07:00–12:00"], ["afternoon", "Afternoon", "12:00–17:00"], ["evening", "Evening", "17:00–23:00"]];
+  const edge = S.max <= 60 ? "1 h is the least." : S.max >= 480 ? "8 h is the most." : "";
+  return `<div class="page" data-sk="settings"><button class="back" data-act="nav:today" aria-label="Back to Today">${I("left")}</button><h1>Settings</h1><div class="set">
+<section class="grp"><h3>Coursework</h3><div class="srow"><span>Most coursework a day<small>Kriyan never suggests more than this for one day. Classes, meals and gym don't count.${edge ? ` ${edge}` : ""}</small></span><span class="step"><button class="rnd" data-act="max:-1" aria-label="30 minutes less"${S.max <= 60 ? ' aria-disabled="true"' : ""}>${I("minus")}</button><b>${dur(S.max)}</b><button class="rnd" data-act="max:1" aria-label="30 minutes more"${S.max >= 480 ? ' aria-disabled="true"' : ""}>${I("plus")}</button></span></div></section>
+<section class="grp"><h3>Preferred times</h3><small>When Kriyan suggests coursework. You can still place anything anywhere.</small>
+<div class="seg" role="group" aria-label="Preferred times">${P.map(([k, n, t]) => `<button data-act="pref:${k}" class="${S.prefs[k] ? "on" : ""}" aria-pressed="${S.prefs[k]}">${n}<small>${t}</small></button>`).join("")}</div>
+${S.prefErr ? `<small>Keep at least one, or Kriyan has nowhere to suggest.</small>` : ""}
+<div class="srow"><span>Learn from where I move things<small>${S.learned ? "You usually move study to after lunch, so suggestions start there now." : S.learn ? "When you keep moving something to another time of day, suggestions follow." : "Off. Suggestions only follow the times above."}</small></span><button class="sw" role="switch" aria-checked="${S.learn}" data-act="learn:toggle" aria-label="Learn from where I move things"></button></div></section>
+<section class="grp"><h3>Look</h3><div class="seg" role="group" aria-label="Theme">${["system", "light", "dark"].map((t) => `<button data-act="theme:${t}" class="${theme === t ? "on" : ""}" aria-pressed="${theme === t}">${cap(t)}</button>`).join("")}</div></section>
+<section class="grp"><h3>Agents</h3><div class="srow"><span>Claude<small>Connected over MCP. Brings in new work from Moodle. It arrives in To plan with a suggested time, never on a day.</small></span></div></section>
+</div><div class="end"></div></div>`;
+}
+function lockHtml() {
+  const c = topCard();
+  const body = !c ? "" : c.line ? `<div class="lq"><span class="who">Kriyan</span><br>${esc(c.line)}</div>` : cardHtml(c, true);
+  return `<div class="lock" aria-label="Lock screen"><div class="ld">Monday 9 November</div><div class="lt">${hm(S.now)}</div>${body}<button class="open" data-act="lock:toggle">Open Kriyan</button></div>`;
+}
+
+// ---------- render ----------
+function sheetHtml() {
+  const sh = S.sheet;
+  if (!sh) return "";
+  const an = sheetIn ? " in" : "", scrim = `<div class="scrim${an}" data-act="close"></div>`;
+  if (sh.type === "add") return `${scrim}<div class="comp${an}" role="dialog" aria-modal="true" tabindex="-1" aria-label="Add">${addSheet()}</div>${KB}`;
+  if (sh.type === "clear") return `${scrim}<div class="full${an}" role="dialog" aria-modal="true" tabindex="-1" aria-label="Clear the day">${clearSheet()}</div>`;
+  const body = { item: itemSheet, ev: evSheet, pick: pickSheet, gap: gapSheet, daymenu: dayMenu, menu: menuSheet }[sh.type]();
+  return `${scrim}<div class="float${an}" role="dialog" aria-modal="true" tabindex="-1"><button class="grab" data-act="close" aria-label="Close"><i></i></button>${body}</div>`;
+}
+const keyOf = (el) => el && el.dataset && (el.dataset.k || el.dataset.act);
+function render() {
+  resuggest();
+  const sc = view.querySelector("[data-sk]"), sk = sc && sc.dataset.sk, st = sc ? sc.scrollTop : 0;
+  const fl = view.querySelector(".float,.full .fb,.comp"), fst = fl ? fl.scrollTop : 0, had = !!fl;
+  const ae = document.activeElement, key = ae && device.contains(ae) ? keyOf(ae) : null;
+  const sel = ae && ae.tagName === "INPUT" && ae.type !== "range" ? [ae.selectionStart, ae.selectionEnd] : null;
+  const screen = { today: todayScreen, week: weekScreen, goals: goalsScreen, settings: settingsScreen }[S.screen]();
+  // What sits behind an open sheet or the lock screen is inert: no taps, no focus, not read out.
+  view.innerHTML = `<div class="sb"><span>${hm(S.now)}</span>${BATT}</div><div${S.sheet || S.lock ? " inert" : ""}>${screen}</div>${sheetHtml()}${S.lock ? lockHtml() : ""}`;
+  const sc2 = view.querySelector("[data-sk]");
+  if (sc2 && sc2.dataset.sk === sk) sc2.scrollTop = st;
+  const fl2 = view.querySelector(".float,.full .fb,.comp");
+  if (fl2 && !sheetIn) fl2.scrollTop = fst;
+  const dlg = view.querySelector(".float");
+  if (dlg) dlg.style.touchAction = dlg.scrollHeight > dlg.clientHeight ? "pan-y" : "none";
+  device.classList.toggle("sheet-open", !!dlg);
+  device.classList.toggle("typing", !!view.querySelector(".comp"));
+  if (S.sheet && S.sheet.type === "add") paintMirror();
+  const find = (k) => k && [...view.querySelectorAll("[data-k],[data-act]")].find((e) => keyOf(e) === k);
+  if (sheetIn) {
+    sheetIn = false;
+    const f = view.querySelector(".comp input") || view.querySelector(".float,.full");
+    if (f) f.focus({ preventScroll: true });
+  } else {
+    const el = find(key) || (had && !S.sheet ? find(opener) : null);
+    if (el && el !== document.activeElement) {
+      el.focus({ preventScroll: true });
+      if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {}
+    }
+  }
+  $("#scrub").value = S.now;
+  $("#clockout").textContent = `Mon 9 Nov, ${hm(S.now)}`;
+  $("#lockbtn").setAttribute("aria-pressed", String(S.lock));
+  $("#lockbtn").textContent = S.lock ? "Hide the lock screen" : "Show the lock screen";
+  $("#simbtn").setAttribute("aria-disabled", String(S.moodle >= MOODLE.length));
+  $("#simnote").hidden = S.moodle < MOODLE.length;
+  for (const b of document.querySelectorAll("#themeseg button")) {
+    const on = b.dataset.act === `theme:${theme}`;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  }
+}
+function toast(text, action) {
+  $("#toasts").innerHTML = `<div class="toast"><span>${esc(text)}</span>${action ? `<button data-act="${action.act}">${esc(action.label)}</button>` : ""}</div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, action ? 8000 : 4000);
+}
+function hideToast() {
+  clearTimeout(toastTimer);
+  $("#toasts").innerHTML = "";
+}
+
+// ---------- actions ----------
+function openSheet(type, a, b) {
+  if (!S.sheet) opener = keyOf(document.activeElement);
+  const prev = S.sheet;
+  if (type === "pick") {
+    const it = item(a), s = it.start != null ? { day: it.day, start: it.start } : it.sug;
+    S.sheet = { type, id: a, day: s ? Math.min(6, s.day) : Math.max(S.viewDay, TODAY), time: s ? s.start : null, len: it.len || null, back: prev && prev.type === "clear" ? prev : null };
+  } else if (type === "gap") S.sheet = { type, s: +a, e: +b };
+  else if (type === "add") S.sheet = { type, text: "", o: {}, sel: {}, edit: null, alt: null, err: "" };
+  else if (type === "clear") S.sheet = { type, day: S.viewDay, moved: [] };
+  else S.sheet = { type, id: a };
+  // A full sheet is a new job; a toast left over from the last one would only compete with its button.
+  if (type === "add" || type === "clear") hideToast();
+  sheetIn = !prev || prev.type !== type;
+  render();
+}
+function closeSheet() {
+  const back = S.sheet && S.sheet.back;
+  S.sheet = back || null;
+  render();
+}
+function mv(it, day, start) {
+  if (it.start != null) it.from = it.day === day ? hm(it.start) : `${wd(it.day)} ${hm(it.start)}`;
+  Object.assign(it, { day, start, started: false, isNew: false });
+  delete it.notBefore;
+}
+function place(it, day, start, o = {}) {
+  const was = it.start != null, sg = it.sug;
+  commit(() => {
+    // The one learning example: a study suggestion for the morning that the person puts after lunch.
+    if (!was && S.learn && !S.learned && it.coursework && sg && sg.day === day && sg.start < LUNCH_END && start >= LUNCH_END) S.learned = true;
+    if (o.len) it.len = o.len;
+    mv(it, day, start);
+    S.placedOnce = true;
+    S.sheet = o.sheet || null;
+  }, `${was ? "Moved to" : "Placed at"} ${S.screen === "week" ? `${wd(day)} ${hm(start)}` : whenT(day, start)}`);
+}
+function start(it) {
+  commit(() => {
+    for (const o of S.items) o.started = false;
+    if (it.start == null || it.day !== TODAY || S.now < it.start || S.now >= it.start + (it.len || 0)) Object.assign(it, { day: TODAY, start: S.now });
+    Object.assign(it, { started: true, startedAt: S.now, isNew: false });
+    Object.assign(S, { viewDay: TODAY, screen: "today", back: null });
+    S.sheet = null;
+    S.placedOnce = true;
+  }, `Started ${it.title}`);
+}
+function toggleDone(it) {
+  const msg = it.done ? `Not done: ${it.title}` : `Done: ${it.title}`;
+  commit(() => { it.done = !it.done; it.started = false; S.sheet = null; }, msg);
+}
+function notToday(it) {
+  const d = it.start != null ? it.day : it.sug ? it.sug.day : S.viewDay, off = d === TODAY ? "today" : wd(d);
+  commit(() => {
+    Object.assign(it, { start: null, day: null, started: false, isNew: false, notBefore: d + 1, prefDay: d + 1 });
+    delete it.from;
+    S.sheet = null;
+  }, () => (it.sug ? `Off ${off}. Suggested ${whenT(it.sug.day, it.sug.start)}` : `Off ${off}. No free time fits this week`));
+}
+function setTheme(t) {
+  theme = t;
+  if (t === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+  render();
+}
+function scene(n) {
+  const lock = S.lock;
+  S = seed();
+  S.lock = lock;
+  history = [];
+  hideToast();
+  const set = (id, o) => Object.assign(item(id), { day: TODAY }, o);
+  if (n >= 1) { set("email", { start: 480, done: true }); set("prep1", { start: 525, started: true, startedAt: 525 }); set("lab1", { start: 630 }); S.now = 530; S.placedOnce = true; }
+  if (n >= 2) { set("prep1", { started: false, done: true }); S.now = 645; }
+  if (n >= 3) { set("lab1", { start: 765, from: "10:30" }); S.now = 770; }
+  sheetIn = false;
+  render();
+}
+function simMoodle() {
+  if (S.moodle >= MOODLE.length) return;
+  const it = { ...MOODLE[S.moodle], id: `m${S.moodle}`, ses: "", isNew: true, day: null, start: null };
+  S.moodle++;
+  S.items.push(it);
+  S.pileOpen = true;
+  render();
+  toast(`New from Moodle: ${it.title}, ${dur(it.len)}, ${it.due}.`, it.sug ? { label: `Place ${whenT(it.sug.day, it.sug.start)}`, act: `place:${it.id}` } : null);
+}
+function goalAct(y, z) {
+  const g = S.goals.find((x) => x.id === z);
+  if (y === "new") { S.goalDraft = { text: "" }; render(); $("#goalin").focus(); }
+  else if (y === "ex") { S.goalDraft.text = GEX[+z]; S.goalDraft.err = false; render(); $("#goalin").focus(); }
+  else if (y === "cancel") { S.goalDraft = null; render(); }
+  else if (y === "save") {
+    const text = S.goalDraft.text.trim();
+    if (!text) { S.goalDraft.err = true; render(); $("#goalin").focus(); return; }
+    const m = /\s+by\s+(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?$/i.exec(text);
+    let by = "";
+    if (m) {
+      const mi = "janfebmaraprmayjunjulaugsepoctnovdec".indexOf(m[2].toLowerCase()) / 3, dt = new Date(mi >= 10 ? 2026 : 2027, mi, +m[1]);
+      by = `${DAYN[(dt.getDay() + 6) % 7]} ${+m[1]} ${cap(m[2].toLowerCase())}`;
+    }
+    const title = (m ? text.slice(0, m.index) : text).trim();
+    const opts = /\bread\b/i.test(title)
+      ? [{ say: "Read 40 min, 5 evenings a week. About a book every 2 weeks, so 3 by Mon 21 Dec.", fed: "Read 40 min, 5 evenings a week", title: "Read", len: 40 }, { say: "Read 1 h, 3 evenings a week. About a book every 2 weeks, so 3 by Mon 21 Dec.", fed: "Read 1 h, 3 evenings a week", title: "Read", len: 60 }]
+      : null;
+    commit(() => { S.goals.push({ id: `g${S.nid++}`, title, by, status: "Just started.", pct: 0, c: "purple", fed: "", ask: true, opts, oi: 0 }); S.goalDraft = null; }, "Goal added");
+  } else if (y === "change") { g.oi = (g.oi + 1) % g.opts.length; render(); }
+  else if (y === "add" || y === "typed") {
+    let fed, title, len;
+    if (y === "add") ({ fed, title, len } = g.opts[g.oi]);
+    else {
+      fed = (g.typed || "").trim();
+      if (!fed) { g.err = true; render(); $(`#rep${g.id}`).focus(); return; }
+      const mm = /(\d+)\s*min/i.exec(fed), hh = /(\d+(?:\.\d+)?)\s*h\b/i.exec(fed);
+      len = mm ? +mm[1] : hh ? Math.round(+hh[1] * 60) : null;
+      title = fed.split(/[\d,]/)[0].trim() || fed;
+    }
+    commit(() => {
+      Object.assign(g, { fed, ask: false, err: false });
+      S.items.push({ id: `n${S.nid++}`, title, space: "none", len, coursework: false, ses: "", due: "", dueLong: "", goal: g.title, day: null, start: null, isNew: true, prefDay: TODAY, pref: 1260 });
+      S.pileOpen = true;
+    }, `Added the repeat. ${title} is in To plan`);
+  }
+}
+function act(a) {
+  const [x, y, z, w, v] = a.split(":");
+  switch (x) {
+    case "nav": Object.assign(S, { screen: y, back: null, sheet: null }); render(); return;
+    // A day opened from the week keeps a way back to it.
+    case "day": Object.assign(S, { back: +y !== TODAY && (S.screen === "week" || S.back) ? "week" : null, viewDay: +y, screen: "today", sheet: null, pileOpen: false }); render(); return;
+    case "open": openSheet(y, z, w); return;
+    case "close": closeSheet(); return;
+    case "undo": undo(); return;
+    case "place": { const it = item(y); if (it && it.sug) place(it, it.sug.day, it.sug.start); else if (it) openSheet("pick", y); return; }
+    case "placeall": {
+      const d = S.viewDay, l = pileItems(d).filter((i) => i.sug && i.sug.day === d);
+      if (l.length) commit(() => { for (const i of l) mv(i, d, i.sug.start); S.sheet = null; S.placedOnce = true; }, `Placed ${l.length} at suggested times`);
+      return;
+    }
+    case "placeweek": {
+      const l = weekTray().filter((i) => i.sug);
+      if (l.length) commit(() => { for (const i of l) mv(i, i.sug.day, i.sug.start); S.placedOnce = true; }, `Placed ${l.length} at suggested times`);
+      return;
+    }
+    case "start": start(item(y)); return;
+    case "done": case "already": toggleDone(item(y)); return;
+    case "plus15": { const it = item(y); commit(() => { it.len += 15; }, () => `Until ${hm(it.start + it.len)}`); return; }
+    case "moveto": place(item(y), +z, +w); return;
+    case "nottoday": notToday(item(y)); return;
+    case "gapplace": place(item(y), S.viewDay, +z); return;
+    case "skip": { const e = S.events.find((q) => q.id === y), d = S.viewDay; commit(() => { S.skips[`${y}:${d}`] = true; S.sheet = null; }, `${e.title} is off ${d === TODAY ? "today" : wd(d)}`); return; }
+    case "pile": S.pileOpen = true; render(); return;
+    case "earlier": S.earlierOpen = !S.earlierOpen; render(); return;
+    case "learn":
+      if (y === "off") commit(() => { S.learn = false; S.learned = false; }, "Kriyan won't learn from your moves. Settings turns it back on");
+      else { S.learn = !S.learn; if (!S.learn) S.learned = false; render(); }
+      return;
+    // Another day keeps the same time when it's free there.
+    case "pickday": Object.assign(S.sheet, { day: +y, msg: "" }); render(); return;
+    case "picktime": Object.assign(S.sheet, { time: +y, msg: "" }); render(); return;
+    case "picklen": Object.assign(S.sheet, { len: +y, msg: "" }); render(); return;
+    case "pickstep": {
+      const sh = S.sheet, it = item(sh.id), lo = sh.day === TODAY ? S.now : WAKE;
+      for (let t = sh.time + 15 * +y; t >= lo && t + sh.len <= WIND; t += 15 * +y) if (okTime(it, sh.day, t, sh.len)) { Object.assign(sh, { time: t, msg: "" }); render(); return; }
+      sh.msg = +y < 0 ? "Nothing free earlier that day." : "Nothing free later that day.";
+      render();
+      return;
+    }
+    case "pickok": {
+      const sh = S.sheet, it = item(sh.id);
+      place(it, sh.day, sh.time, { len: it.len ? 0 : sh.len, sheet: sh.back ? { ...sh.back, moved: sh.back.moved.concat(it.id) } : null });
+      return;
+    }
+    case "clear": {
+      const sh = S.sheet;
+      if (y === "pick") { openSheet("pick", z); const p = clearPlan(sh.day).find((q) => q.it.id === z); if (p && p.slot) { Object.assign(S.sheet, { day: p.slot.day, time: p.slot.start }); render(); } return; }
+      if (y === "one") { const it = item(z); commit(() => { mv(it, +w, +v); sh.moved.push(z); }, `Moved to ${whenT(+w, +v)}`); return; }
+      const plan = clearPlan(sh.day).filter((p) => p.slot), days = [...new Set(plan.map((p) => p.slot.day))].sort().map(wd);
+      commit(() => { for (const p of plan) mv(p.it, p.slot.day, p.slot.start); S.sheet = null; }, `Cleared ${sh.day === TODAY ? "today" : wd(sh.day)}. ${plan.length} moved to ${list(days)}`);
+      return;
+    }
+    case "max": { const n = S.max + 30 * +y; if (n >= 60 && n <= 480) { S.max = n; render(); } return; }
+    case "pref": {
+      const on = Object.values(S.prefs).filter(Boolean).length;
+      if (S.prefs[y] && on === 1) S.prefErr = true;
+      else { S.prefs[y] = !S.prefs[y]; S.prefErr = false; }
+      render();
+      return;
+    }
+    case "theme": setTheme(y); return;
+    case "goal": goalAct(y, z); return;
+    case "add": {
+      const sh = S.sheet;
+      if (y === "go") { addGo(); return; }
+      if (y === "ex") { Object.assign(sh, { text: EX[+z], o: {}, sel: {}, edit: null, alt: null, err: "" }); render(); $("#addin").focus(); return; }
+      if (y === "edit") sh.edit = sh.edit === z ? null : z;
+      else if (y === "tog") sh.sel[z] = !sh.sel[z];
+      else if (y === "alt") Object.assign(sh, { alt: { day: +z, start: +w }, sel: { 0: true }, edit: null });
+      else if (y === "set") {
+        sh.o[z] = z === "kind" || z === "space" ? w : +w;
+        Object.assign(sh, { sel: {}, alt: null, edit: z === "kind" && w === "repeat" && !draft().rep ? "rep" : null });
+      }
+      sh.err = "";
+      renderAdd();
+      return;
+    }
+    case "scene": scene(+y); return;
+    case "reset": scene(0); return;
+    case "sim": simMoodle(); return;
+    case "lock": S.lock = !S.lock; render(); return;
+  }
+}
+
+document.addEventListener("click", (e) => {
+  if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
+  const b = e.target.closest("[data-act]");
+  if (!b || b.getAttribute("aria-disabled") === "true") return;
+  act(b.dataset.act);
+});
+document.addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.id === "scrub") { S.now = +t.value; render(); }
+  else if (t.id === "addin") {
+    // New words can change what's suggested, so a chosen time doesn't carry over; chips you set by hand do.
+    Object.assign(S.sheet, { text: t.value, sel: {}, alt: null, edit: null, err: "" });
+    if (!t.value.trim()) S.sheet.o = {};
+    renderAdd();
+  }
+  else if (t.id === "goalin") S.goalDraft.text = t.value;
+  else if (t.id && t.id.startsWith("rep")) { const g = S.goals.find((q) => `rep${q.id}` === t.id); if (g) g.typed = t.value; }
+});
+document.addEventListener("scroll", (e) => { if (e.target.id === "addin") paintMirror(); }, true);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (S.sheet) { closeSheet(); e.preventDefault(); }
+    else if (S.lock) { S.lock = false; render(); }
+  } else if (e.key === "Enter" && e.target.id === "addin") {
+    // Adding closes the sheet and hands focus back to the Add button; without this the same Enter would press it.
+    e.preventDefault();
+    act("add:go");
+  }
+  else if (e.key === "Enter" && e.target.id === "goalin") act("goal:save");
+  else if (e.key === "Tab" && S.sheet) {
+    // Keep Tab inside the open sheet.
+    const dlg = view.querySelector('[role="dialog"]'), f = [...dlg.querySelectorAll("button,input")].filter((q) => q.getAttribute("aria-disabled") !== "true");
+    if (!f.length) return;
+    const inside = dlg.contains(document.activeElement) && document.activeElement !== dlg;
+    if (e.shiftKey && (!inside || document.activeElement === f[0])) { f[f.length - 1].focus(); e.preventDefault(); }
+    else if (!e.shiftKey && (!inside || document.activeElement === f[f.length - 1])) { f[0].focus(); e.preventDefault(); }
+  }
+});
+$("#toasts").addEventListener("pointerenter", () => clearTimeout(toastTimer));
+$("#toasts").addEventListener("pointerleave", () => { clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 4000); });
+
+// ---------- gestures: drag onto a free stretch or a day of the week, swipe a sheet down ----------
+// Both have a visible twin: the blue time and the sheet's Move for the drag, the grabber and Escape for the swipe.
+let dg = null, sw = null;
+function beginDrag(x, y) {
+  const it = item(dg.id);
+  Object.assign(dg, { on: true, len: it.len || 15, hint: it.len ? dur(it.len) : "no length yet" });
+  dg.src.classList.add("lift");
+  device.classList.add("dragging");
+  dg.g = document.createElement("div");
+  dg.g.className = "ghost";
+  dg.g.innerHTML = `${esc(it.title)}<small>${dg.hint}</small>`;
+  document.body.appendChild(dg.g);
+  for (const gp of view.querySelectorAll(".gap")) gp.classList.toggle("can", dn15(+gp.dataset.e - dg.len) >= up15(+gp.dataset.s));
+  moveDrag(x, y);
+}
+function moveDrag(x, y) {
+  Object.assign(dg, { lx: x, ly: y });
+  const dr = device.getBoundingClientRect(), gw = dg.g.offsetWidth;
+  dg.g.style.transform = `translate(${Math.round(Math.max(dr.left + 8, Math.min(dr.right - gw - 8, x - gw / 2)))}px,${Math.round(y - 64)}px)`;
+  const el = document.elementFromPoint(x, y), wk = S.screen === "week", gp = el && el.closest(wk ? ".wd" : ".gap.can");
+  if (dg.over && dg.over !== gp) { dg.over.classList.remove("over"); const o = dg.over.querySelector(".slot,.pv"); if (o) o.remove(); }
+  dg.over = gp || null;
+  dg.t = null;
+  if (wk) {
+    // In the week a whole day takes the drop, at the free time nearest the one it had. The label under the finger says which.
+    const it = item(dg.id), d = gp ? +gp.dataset.d : null, len = dg.len, same = !gp || (it.start != null && it.day === d);
+    const t = same ? null : slotOn(it, d, len);
+    if (gp) gp.classList.toggle("over", t != null);
+    if (t != null) {
+      let pv = gp.querySelector(".pv");
+      if (!pv) { pv = document.createElement("i"); pv.className = "bit pv"; gp.querySelector(".wbar").appendChild(pv); }
+      Object.assign(pv.style, { left: `${pct(t)}%`, width: `${pct(WAKE + len)}%` });
+    }
+    dg.g.lastChild.textContent = same ? dg.hint : t == null ? `No room on ${DAYN[d]}` : it.len ? `${DAYN[d]} ${hm(t)}–${hm(t + len)}` : DAYN[d];
+    Object.assign(dg, { t, day: d });
+  } else if (gp) {
+    dg.day = S.viewDay;
+    const r = gp.getBoundingClientRect(), s = +gp.dataset.s, e = +gp.dataset.e, len = dg.len;
+    const t = Math.max(up15(s), Math.min(dn15(e - len), Math.round((s + ((y - r.top) / r.height) * (e - s) - len / 2) / 15) * 15));
+    let sl = gp.querySelector(".slot");
+    if (!sl) { sl = document.createElement("span"); sl.className = "slot"; gp.appendChild(sl); gp.classList.add("over"); }
+    const h = Math.max(24, (len / (e - s)) * r.height);
+    sl.style.height = `${h}px`;
+    sl.style.top = `${Math.min(r.height - h - 3, ((t - s) / (e - s)) * r.height)}px`;
+    sl.textContent = `${hm(t)}–${hm(t + len)}`;
+    dg.t = t;
+  }
+  const sc = view.querySelector(".scroll"), sr = sc.getBoundingClientRect();
+  dg.vy = y < sr.top + 72 ? -8 : y > sr.bottom - 140 ? 8 : 0;
+  if (dg.vy && !dg.raf) {
+    const step = () => {
+      if (!dg || !dg.vy) { if (dg) dg.raf = 0; return; }
+      sc.scrollTop += dg.vy;
+      dg.raf = requestAnimationFrame(step);
+      moveDrag(dg.lx, dg.ly);
+    };
+    dg.raf = requestAnimationFrame(step);
+  }
+}
+function endDrag(drop) {
+  const d = dg;
+  dg = null;
+  clearTimeout(d.timer);
+  if (!d.on) return;
+  cancelAnimationFrame(d.raf);
+  d.g.remove();
+  d.src.classList.remove("lift");
+  device.classList.remove("dragging");
+  if (d.over) { d.over.classList.remove("over"); const o = d.over.querySelector(".slot,.pv"); if (o) o.remove(); }
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 60);
+  if (!drop || d.t == null) return;
+  const it = item(d.id);
+  if (it.len) place(it, d.day, d.t);
+  else { S.sheet = { type: "pick", id: it.id, day: d.day, time: d.t, len: null, back: null }; sheetIn = true; render(); }
+}
+document.addEventListener("pointerdown", (e) => {
+  if (e.button) return;
+  const fl = e.target.closest(".float,.comp");
+  if (fl && !e.target.closest("input") && fl.scrollTop <= 0) sw = { f: fl, y: e.clientY, t: performance.now(), pid: e.pointerId, on: false };
+  const src = e.target.closest("[data-drag]");
+  if (!src || S.sheet || S.lock) return;
+  dg = { id: src.dataset.drag, src, x: e.clientX, y: e.clientY, pid: e.pointerId, touch: e.pointerType === "touch", on: false, timer: 0, raf: 0 };
+  // Touch: hold 250 ms to pick up, so a scroll that starts on a row stays a scroll.
+  if (dg.touch) dg.timer = setTimeout(() => { if (dg && !dg.on) beginDrag(dg.x, dg.y); }, 250);
+});
+document.addEventListener("pointermove", (e) => {
+  if (sw && e.pointerId === sw.pid) {
+    const dy = e.clientY - sw.y;
+    if (!sw.on && dy > 8) { sw.on = true; sw.f.style.transition = "none"; }
+    else if (!sw.on && dy < -8) sw = null;
+    if (sw && sw.on) sw.f.style.transform = `translateY(${Math.max(0, dy)}px)`;
+  }
+  if (!dg || e.pointerId !== dg.pid) return;
+  const far = Math.hypot(e.clientX - dg.x, e.clientY - dg.y);
+  if (!dg.on) {
+    if (dg.touch) { if (far > 8) endDrag(false); return; }
+    if (far < 6) return;
+    beginDrag(e.clientX, e.clientY);
+  }
+  moveDrag(e.clientX, e.clientY);
+});
+const pointerEnd = (drop) => (e) => {
+  if (sw && e.pointerId === sw.pid) {
+    const { f, on, y, t } = sw, dy = e.clientY - y;
+    sw = null;
+    if (on) {
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 60);
+      if (drop && (dy > 96 || dy / (performance.now() - t) > 0.6)) closeSheet();
+      else { f.style.transition = "transform 220ms var(--ease)"; f.style.transform = ""; }
+    }
+  }
+  if (dg && e.pointerId === dg.pid) endDrag(drop);
+};
+// A tap on a chip or the drawn keyboard leaves focus in the field; on a phone the keyboard would drop otherwise.
+document.addEventListener("mousedown", (e) => { if (e.target.closest(".comp,.kb") && !e.target.closest("input")) e.preventDefault(); });
+document.addEventListener("pointerup", pointerEnd(true));
+document.addEventListener("pointercancel", pointerEnd(false));
+document.addEventListener("touchmove", (e) => { if (dg && dg.on) e.preventDefault(); }, { passive: false });
+document.addEventListener("contextmenu", (e) => { if (dg) e.preventDefault(); });
+
+render();
+// ?do=open:clear or ?do=scene:2,open:item:lab1 opens the page in that state, for screenshots and checks.
+const todo = new URLSearchParams(location.search).get("do");
+if (todo) {
+  document.documentElement.dataset.still = "1";
+  for (const a of todo.split(",")) act(a);
+}
+})();
+</script>
+</body>
+</html>

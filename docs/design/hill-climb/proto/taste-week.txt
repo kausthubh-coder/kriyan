@@ -1,0 +1,23 @@
+Tasting http://127.0.0.1:52945…
+http://127.0.0.1:52945/prototype.html?do=nav:week · 390x844
+
+  squint  taste/week/prototype-390.squint.png
+  lead    h1.wkt "This week" leads clearly, 4.1× over div "To plan this week Tap a time, or…"
+  boxes   1 (1 fill), 0 divider lines, nested 1 deep
+  edges   10 left edges (7 for text)
+  overlay taste/week/prototype-390.taste.png
+  look    53% of the text on screen is 600 or heavier. When everything is bold nothing leads; step details down to 400 and a lighter tone.
+          https://critly.vercel.app/visual-hierarchy
+
+http://127.0.0.1:52945/prototype.html?do=nav:week · 1440x900
+
+  squint  taste/week/prototype-1440.squint.png
+  lead    h1.wkt "This week" leads clearly, 4.31× over div "To plan this week Tap a time, or…"
+  boxes   2 (2 fill, 1 shadow), 0 divider lines, nested 2 deep
+  edges   16 left edges (10 for text), 1 near miss
+  overlay taste/week/prototype-1440.taste.png
+  look    Edges 4px apart: h2 "LOOK" starts at 197px and button.on "System" at 201px. Line them up on one edge.
+          https://critly.vercel.app/alignment
+
+Open each squint and overlay image and look at it. These are things to look at, not failures; a screen can have a reason for any of them.
+critly taste: 2 things to look at · 2 screens · images in taste/week · exit 0
