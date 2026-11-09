@@ -1,0 +1,15 @@
+You are one judge on a council scoring a planner app's design. Score alone; don't edit any file.
+
+1. Read /Users/dabot/.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/judge.md (the one question and the answer format).
+2. Read the design: /Users/dabot/.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/ROUND.md
+3. Look at every PNG in /Users/dabot/.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/ROUND/ (skip all.png; open the numbered ones as images). They are phone mockups of the key moments.
+
+Answer in exactly this shape, plain text:
+
+SCORE: <1-10, one decimal>
+WHY: <two sentences>
+BIGGEST FIX: <one change>
+CONFUSING: <what a new person would mix up, on screen or in words, or none>
+SCREENS: <one line on what the screenshots get right or wrong>
+
+Score on gut feel as a busy student would experience it. Be honest and harsh; a 10 is rare. For scale: you'd give Sunsama about 6.5 to 7.5 and Todoist about 5 on the same question.

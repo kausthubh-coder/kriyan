@@ -1,0 +1,74 @@
+{
+  "$schema": "../../../../node_modules/@kausthubh/critly/policy.schema.json",
+  "fonts": [
+    "Inter"
+  ],
+  "typeScale": [
+    12,
+    14,
+    16,
+    20,
+    28,
+    40,
+    80
+  ],
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+  ],
+  "schemes": {
+    "light": {},
+    "dark": {
+      "media": true
+    }
+  },
+  "pages": [
+    "/prototype.html",
+    "/prototype.html?do=scene:1",
+    "/prototype.html?do=scene:2",
+    "/prototype.html?do=open:item:prep1",
+    "/prototype.html?do=scene:2,open:item:lab1",
+    "/prototype.html?do=open:pick:prep1",
+    "/prototype.html?do=open:pick:stamps",
+    "/prototype.html?do=open:gap:765:870",
+    "/prototype.html?do=open:daymenu",
+    "/prototype.html?do=open:menu",
+    "/prototype.html?do=place:email,open:clear",
+    "/prototype.html?do=open:add",
+    "/prototype.html?do=open:add,add:ex:0",
+    "/prototype.html?do=open:add,add:ex:0,add:edit:space",
+    "/prototype.html?do=open:add,add:ex:0,add:tog:0,add:edit:time",
+    "/prototype.html?do=open:add,add:ex:1,add:tog:0",
+    "/prototype.html?do=open:add,add:ex:2",
+    "/prototype.html?do=open:add,add:ex:3",
+    "/prototype.html?do=sim:moodle",
+    "/prototype.html?do=nav:week",
+    "/prototype.html?do=nav:week,placeweek",
+    "/prototype.html?do=nav:week,day:2",
+    "/prototype.html?do=day:1",
+    "/prototype.html?do=nav:goals,goal:new,goal:ex:0,goal:save",
+    "/prototype.html?do=nav:goals,goal:new,goal:ex:1,goal:save,goal:new",
+    "/prototype.html?do=nav:settings",
+    "/prototype.html?do=open:ev:ma",
+    "/prototype.html?do=placeall"
+  ],
+  "bannedPhrases": [
+    "overdue",
+    "garden",
+    "Oops",
+    "lorem"
+  ],
+  "rules": {
+    "spacing-scale": "error",
+    "nested-radius": "error",
+    "off-token-color": "error",
+    "focus-ring": "error"
+  },
+  "note": "Same values as .critly/policy.json; only the page list differs, so the check can open the prototype file."
+}

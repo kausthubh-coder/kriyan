@@ -1,0 +1,35 @@
+Tasting http://127.0.0.1:50284…
+http://127.0.0.1:50284/prototype.html?do=open:item:prep1 · 390x844
+
+  squint  ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/sheet/prototype-390.squint.png
+  lead    button.btn.pri "Place at 08:45" leads, only just, 1.49× over section.card.one "Next"
+  boxes   6 (6 fill, 1 shadow), 0 divider lines, nested 2 deep
+  edges   20 left edges (4 for text), 1 near miss
+  overlay ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/sheet/prototype-390.taste.png
+  look    button.btn.pri "Place at 08:45" leads, but only 1.49× over section.card.one "Next". If it is the point of the screen, quiet the runner-up; if it isn't, the screen leads with the wrong thing.
+          https://critly.vercel.app/visual-hierarchy
+  look    48% of the text on screen is 600 or heavier. When everything is bold nothing leads; step details down to 400 and a lighter tone.
+          https://critly.vercel.app/visual-hierarchy
+  look    Edges 5.5px apart: h2 "CSC 316 exam prep" starts at 36px and button.tile "Start now" at 41.5px. Line them up on one edge.
+          https://critly.vercel.app/alignment
+
+http://127.0.0.1:50284/prototype.html?do=open:item:prep1 · 1440x900
+
+  squint  ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/sheet/prototype-1440.squint.png
+  lead    nothing leads: button.btn.pri "Place at 08:45" is only 1.15× over section.card.one "Next"
+  boxes   8 (8 fill, 2 shadow), 0 divider lines, nested 3 deep
+  edges   26 left edges (7 for text), 2 near misses
+  overlay ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/sheet/prototype-1440.taste.png
+  look    Nothing leads: button.btn.pri "Place at 08:45", section.card.one "Next" weigh within 20% of each other. Decide which one this screen is for, and quiet the others with tone or weight, not size.
+          https://critly.vercel.app/visual-hierarchy
+  look    A box in a box in a box (3 deep): div#device.device.sheet-open > section.card.one > span.tag "NEXT". Let the inner group sit on its parent's surface and separate it with space.
+          https://critly.vercel.app/whitespace
+  look    Two edges where one would do: div.scrim.in sits 0px inside div#device.device.sheet-open "07:40 Mon 9 November 2026 9 MON …", and both draw one. Drop the inner edge or the outer one.
+          https://critly.vercel.app/shadows-not-borders
+  look    Edges 4px apart: h2 "LOOK" starts at 197px and button.on "System" at 201px. Line them up on one edge.
+          https://critly.vercel.app/alignment
+  look    Edges 5.5px apart: h2 "CSC 316 exam prep" starts at 561px and button.tile "Start now" at 566.5px. Line them up on one edge.
+          https://critly.vercel.app/alignment
+
+Open each squint and overlay image and look at it. These are things to look at, not failures; a screen can have a reason for any of them.
+critly taste: 8 things to look at · 2 screens · images in ../../.t3/worktrees/kriyan/hill-climb-types/docs/design/hill-climb/proto/taste/sheet · exit 0

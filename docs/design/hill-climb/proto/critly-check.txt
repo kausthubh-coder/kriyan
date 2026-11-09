@@ -1,0 +1,115 @@
+Checking http://127.0.0.1:52945…
+http://127.0.0.1:52945/prototype.html
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=scene:1
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=scene:2
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:item:prep1
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=scene:2,open:item:lab1
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:pick:prep1
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:pick:stamps
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:gap:765:870
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:daymenu
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:menu
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=place:email,open:clear
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:add
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:0
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:0,add:edit:space
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:0,add:tog:0,add:edit:time
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:1,add:tog:0
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:2
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:add,add:ex:3
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=sim:moodle
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=nav:week
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=nav:week,placeweek
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=nav:week,day:2
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=day:1
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=nav:goals,goal:new,goal:ex:0,goal:save
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=nav:goals,goal:new,goal:ex:1,goal:save,goal:new
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=nav:settings
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=open:ev:ma
+
+  no findings
+
+http://127.0.0.1:52945/prototype.html?do=placeall
+
+  no findings
+
+checked 28 pages × 2 viewports × 2 schemes · 12,504 elements · 19 rules · skipped: reduced-motion, layout-shift, overlay-focus (needs interaction; not in this version)
+critly check: 0 errors · 28 pages × 2 viewports × 2 schemes · exit 0

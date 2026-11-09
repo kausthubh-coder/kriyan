@@ -1,0 +1,151 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Round 4 mockups</title><link rel="stylesheet" href="../mock/kriyan.css">
+<style>
+.spark { color: #8e8e93; font-size: 13px; }
+.lock { background: linear-gradient(160deg,#2b3a55,#5b4a6b 60%,#a26a5e); color:#fff; }
+.lock .time { text-align:center; font-weight:700; font-size:86px; letter-spacing:-.04em; margin-top:30px; }
+.lock .ld { text-align:center; font-size:18px; font-weight:600; opacity:.85; margin-top:40px; }
+.live { margin: 40px 14px 0; background: rgba(30,30,32,.72); backdrop-filter: blur(20px); border-radius: 26px; padding: 14px 16px; color:#fff; }
+.step { font-size:13px; font-weight:600; color:var(--meta); letter-spacing:.04em; }
+.read { display:flex; gap:10px; align-items:center; min-height:56px; border-bottom:2px dotted var(--rule); font-size:15.5px; font-weight:500; }
+.read .m { margin-left:auto; color:var(--ink2); font-size:13px; text-align:right; }
+.tick { width:20px; height:20px; border-radius:6px; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:12px; flex:none; }
+</style></head><body>
+
+<!-- 1. First run: timetable read from a photo -->
+<div class="wrap" data-name="first-run"><div class="cap">First run, step 3 of 4: classes from a photo</div><div class="phone">
+  <div class="sb"><span>21:12</span><span>●●● ▮</span></div>
+  <div class="pad" style="padding-top:18px">
+    <div class="step">STEP 3 OF 4</div>
+    <div class="h1" style="margin-top:8px">Your classes</div>
+    <div class="sub">Read from your timetable photo. Untick anything that's wrong.</div>
+    <div style="margin-top:14px">
+      <div class="read"><span class="tick">✓</span><span class="dot d-cs"></span>CSC 316<span class="m">Tue Thu<br>10:15–11:30</span></div>
+      <div class="read"><span class="tick">✓</span><span class="dot d-ma"></span>MA 241<span class="m">Mon Wed Fri<br>14:30–15:45</span></div>
+      <div class="read"><span class="tick">✓</span><span class="dot d-me"></span>ENG 331<span class="m">Tue Thu<br>13:30–14:45</span></div>
+      <div class="read"><span class="tick">✓</span><span class="dot d-lf"></span>CSC 316 lab<span class="m">Wed<br>09:00–10:50</span></div>
+    </div>
+    <div class="small" style="margin-top:12px">Each becomes a fixed repeat until the semester ends, Fri 11 Dec.</div>
+  </div>
+  <div style="position:absolute;left:22px;right:22px;bottom:34px"><div class="addb">Looks right</div><div style="text-align:center;margin-top:12px;font-weight:600;font-size:15px;color:var(--ink2)">Add one by hand</div></div>
+</div></div>
+
+<!-- 2. Monday morning: planned, Now card -->
+<div class="wrap" data-name="today"><div class="cap">Monday 07:40: nothing to decide</div><div class="phone">
+  <div class="sb"><span>07:40</span><span>●●● ▮</span></div>
+  <div class="top"><div class="day">Mon<i></i></div><div class="date">9 November<br>2026</div></div>
+  <div class="card dark" style="margin-top:16px">
+    <div class="k">Free until 08:45</div>
+    <div class="h">Next: Prep for CSC 316 exam</div>
+    <div class="p">08:45–09:45 · session 1 of 5 · exam in 14 days</div>
+  </div>
+  <div class="pad small" style="margin-top:10px">✦ Planned 3 blocks, 3 h 15 · <b style="color:var(--ink2)">Undo</b></div>
+  <div class="tl">
+    <div class="tlr"><div class="tlt">07:00</div><div><div class="blk s-hl done"><div class="bt"><span class="box on"></span><span class="tx">Morning</span></div><div class="bm">07:00–07:25 · 3 steps</div></div></div></div>
+    <div class="tlr"><div class="tlt"></div><div><div class="nowl"></div></div></div>
+    <div class="tlr"><div class="tlt">08:45</div><div><div class="blk s-cs"><div class="bt"><span class="box"></span><span class="tx">Prep for CSC 316 exam</span><span class="spark">✦</span></div><div class="bm">08:45–09:45 · 1 of 5</div></div></div></div>
+    <div class="tlr"><div class="tlt">10:30</div><div><div class="blk s-me"><div class="bt"><span class="box"></span><span class="tx">Lab report</span><span class="spark">✦</span></div><div class="bm">10:30–12:00 · 1 h 30 of 3 h · due Wed</div></div></div></div>
+    <div class="tlr"><div class="tlt">14:30</div><div><div class="blk s-ma"><div class="bt"><span class="box"></span><span class="tx">MA 241</span></div><div class="bm">14:30–15:45</div></div></div></div>
+    <div class="tlr"><div class="tlt">16:00</div><div><div class="blk s-hl"><div class="bt"><span class="ring"></span><span class="tx">Gym</span><span class="spark">✦</span><span class="tag grey">1 of 3</span></div><div class="bm">16:00–16:45</div></div></div></div>
+  </div>
+  <div class="fabs"><span class="fab">☰</span><span class="fab add">+</span><span class="fab">▦</span></div>
+</div></div>
+
+<!-- 3. In a block: Now card with timer -->
+<div class="wrap" data-name="now"><div class="cap">08:52: in a block</div><div class="phone">
+  <div class="sb"><span>08:52</span><span>●●● ▮</span></div>
+  <div class="top"><div class="day">Mon<i></i></div><div class="date">9 November<br>2026</div></div>
+  <div class="card dark" style="margin-top:16px">
+    <div class="k">Now · until 09:45</div>
+    <div class="h">Prep for CSC 316 exam</div>
+    <div class="p">Session 1 of 5 · 7 min in</div>
+    <div class="btns"><span class="btn pri">Done</span><span class="btn">Pause</span><span class="btn">Not today</span></div>
+    <div style="border-top:1px solid #333;margin-top:14px;padding-top:10px" class="p">Next: Lab report at 10:30 · due Wed</div>
+  </div>
+  <div class="tl">
+    <div class="tlr"><div class="tlt">08:45</div><div><div class="blk s-cs now"><div class="bt"><span class="box"></span><span class="tx">Prep for CSC 316 exam</span><span class="spark">✦</span></div><div class="bm">08:45–09:45 · 1 of 5</div><div class="nowl" style="margin-top:6px"></div></div></div></div>
+    <div class="tlr"><div class="tlt"></div><div><div class="gapr">45 min free</div></div></div>
+    <div class="tlr"><div class="tlt">10:30</div><div><div class="blk s-me"><div class="bt"><span class="box"></span><span class="tx">Lab report</span><span class="spark">✦</span></div><div class="bm">10:30–12:00 · 1 h 30 of 3 h · due Wed</div></div></div></div>
+  </div>
+  <div class="fabs"><span class="fab">☰</span><span class="fab add">+</span><span class="fab">▦</span></div>
+</div></div>
+
+<!-- 4. Lock screen -->
+<div class="wrap" data-name="lock"><div class="cap">Lock screen: the Now card follows you</div><div class="phone lock">
+  <div class="ld">Monday 9 November</div>
+  <div class="time">8:45</div>
+  <div class="live">
+    <div style="font-size:12px;font-weight:600;opacity:.7;letter-spacing:.04em">KRIYAN · NOW UNTIL 09:45</div>
+    <div style="font-weight:650;font-size:18px;margin-top:4px">Prep for CSC 316 exam</div>
+    <div style="font-size:13.5px;opacity:.75;margin-top:2px">Session 1 of 5 · exam in 14 days</div>
+    <div class="btns"><span class="btn" style="background:#fff;color:#000">Start</span><span class="btn" style="background:rgba(255,255,255,.16);color:#fff">Not today</span></div>
+    <div style="font-size:13px;opacity:.6;margin-top:10px">Next: Lab report at 10:30</div>
+  </div>
+</div></div>
+
+<!-- 5. Heads-up: won't fit -->
+<div class="wrap" data-name="heads-up"><div class="cap">Heads-up: it won't fit before it's due</div><div class="phone">
+  <div class="sb"><span>18:05</span><span>●●● ▮</span></div>
+  <div class="top"><div class="day">Mon<i></i></div><div class="date">9 November<br>2026</div></div>
+  <div class="card" style="background:#fff6e8;margin-top:16px">
+    <div class="k" style="color:#b07a1f">Heads-up</div>
+    <div class="h" style="font-size:18px">Lab report won't fit before Wed</div>
+    <div class="p">1 h 30 left, and only 45 min free before it's due. Move Tuesday's gym to Thursday and it fits.</div>
+    <div class="btns"><span class="btn pri">Do that</span><span class="btn">Other options</span></div>
+  </div>
+  <div class="tl">
+    <div class="tlr"><div class="tlt">16:00</div><div><div class="blk s-hl done"><div class="bt"><span class="ring"></span><span class="tx">Gym</span><span class="tag grey">1 of 3</span></div><div class="bm">16:00–16:45</div></div></div></div>
+    <div class="tlr"><div class="tlt"></div><div><div class="nowl"></div></div></div>
+    <div class="tlr"><div class="tlt">19:00</div><div><div class="blk s-lf"><div class="bt"><span class="box"></span><span class="tx">Dinner with Sam</span></div><div class="bm">19:00–20:30</div></div></div></div>
+    <div class="tlr"><div class="tlt"></div><div><div class="gapr">Wind down at 23:00</div></div></div>
+  </div>
+  <div class="fabs"><span class="fab">☰</span><span class="fab add">+</span><span class="fab">▦</span></div>
+</div></div>
+
+<!-- 6. Add an exam with prep -->
+<div class="wrap" data-name="add-exam"><div class="cap">Add: an exam carries its own prep</div><div class="phone">
+  <div class="sb"><span>21:30</span><span>●●● ▮</span></div>
+  <div class="top"><div class="day">Mon<i></i></div><div class="date">9 November<br>2026</div></div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="big">CSC 316 exam <em>nov 23 9am</em> <em>prep 6h</em><span class="caret"></span></div>
+    <div style="margin-top:14px"><span class="chip blue">At Mon 23 Nov, 09:00</span><span class="chip blue">Prep 6 h</span><span class="chip blue"><span class="dot d-cs"></span>CSC 316</span><span class="chip">Reminder</span></div>
+    <div class="small">Kriyan spreads 6 h of prep over the 2 weeks before, around your classes.</div>
+    <div class="addb">Add exam</div>
+  </div>
+</div></div>
+
+<!-- 7. Slip: Now card offers replan -->
+<div class="wrap" data-name="slip"><div class="cap">13:50: a block didn't happen</div><div class="phone">
+  <div class="sb"><span>13:50</span><span>●●● ▮</span></div>
+  <div class="top"><div class="day">Mon<i></i></div><div class="date">9 November<br>2026</div></div>
+  <div class="card dark" style="margin-top:16px">
+    <div class="k">Lab report didn't happen</div>
+    <div class="h">Replan the rest?</div>
+    <div class="p">It moves to 17:00 today; nothing else changes.</div>
+    <div class="btns"><span class="btn pri">Replan</span><span class="btn">Tomorrow</span></div>
+    <div style="border-top:1px solid #333;margin-top:14px;padding-top:10px" class="p">Next: MA 241 at 14:30</div>
+  </div>
+  <div class="tl">
+    <div class="tlr"><div class="tlt">10:30</div><div><div class="blk s-me" style="opacity:.5"><div class="bt"><span class="box"></span><span class="tx">Lab report</span><span class="spark">✦</span></div><div class="bm">10:30–12:00 · 1 h 30 of 3 h · due Wed</div></div></div></div>
+    <div class="tlr"><div class="tlt"></div><div><div class="nowl"></div></div></div>
+    <div class="tlr"><div class="tlt">14:30</div><div><div class="blk s-ma"><div class="bt"><span class="box"></span><span class="tx">MA 241</span></div><div class="bm">14:30–15:45</div></div></div></div>
+    <div class="tlr"><div class="tlt">16:00</div><div><div class="blk s-hl"><div class="bt"><span class="ring"></span><span class="tx">Gym</span><span class="spark">✦</span><span class="tag grey">1 of 3</span></div><div class="bm">16:00–16:45</div></div></div></div>
+  </div>
+  <div class="fabs"><span class="fab">☰</span><span class="fab add">+</span><span class="fab">▦</span></div>
+</div></div>
+
+<!-- 8. Goal -->
+<div class="wrap" data-name="goal"><div class="cap">A new goal asks "What gets you there?"</div><div class="phone">
+  <div class="sb"><span>20:10</span><span>●●● ▮</span></div>
+  <div class="pad" style="padding-top:20px"><div class="h1">Weigh 72 kg</div><div class="sub">By Mon 1 Mar · now 76 kg</div>
+    <div class="bar"><i class="d-hl" style="width:8%"></i></div><div class="small" style="margin-top:6px">0.4 kg of 4 kg</div>
+  </div>
+  <div class="card"><div class="k">What gets you there?</div>
+    <div class="row" style="border:0"><span class="ring"></span>Gym 45m, 3 a week<span class="m">Repeat</span></div>
+    <div class="p">Kriyan finds three slots a week around your classes.</div>
+    <div class="btns"><span class="btn pri">Add it</span><span class="btn">Change</span><span class="btn">Skip</span></div>
+  </div>
+</div></div>
+
+</body></html>
