@@ -2,6 +2,7 @@
 // week on Upcoming. The screen on show registers itself as the drop zone; a drag source
 // reports where the pointer is.
 
+import { formatClock } from "@kriyan/core/dates";
 import { createStore } from "@/data/store";
 
 export const STEP = 15;
@@ -59,6 +60,11 @@ export interface ExternalDrag {
 
 export const externalDrag = createStore<ExternalDrag | null>(null);
 
+/** Where a dragged task would land, as the ghost and the free stretch under it say it. */
+export function landingText(minutes: number, length: number | null): string {
+  return length ? `${formatClock(minutes)}–${formatClock(minutes + length)}` : formatClock(minutes);
+}
+
 /** Minutes for a window y over the zone, or null when the pointer is outside it. */
 export function minutesAt(
   rect: { x: number; y: number; width: number; height: number },
@@ -71,23 +77,25 @@ export function minutesAt(
   return clampDay(snap(minutes));
 }
 
-/** A free stretch a dragged task can be dropped on: where it is on screen, and its start. */
+/** A free stretch a dragged task can be dropped on: where it is on screen, and its start and end. */
 export interface SlotRect {
   y: number;
   height: number;
   minutes: number;
+  /** Where the stretch ends; without it a drop lands at its start. */
+  to?: number;
 }
 
-const slots = new Map<
-  string,
-  { minutes: number; measure: () => Promise<{ y: number; height: number } | null> }
->();
+interface Slot {
+  minutes: number;
+  to?: number;
+  measure: () => Promise<{ y: number; height: number } | null>;
+}
+
+const slots = new Map<string, Slot>();
 
 /** A free-stretch row offers itself as a drop target while it's on screen. */
-export function registerSlot(
-  key: string,
-  slot: { minutes: number; measure: () => Promise<{ y: number; height: number } | null> },
-): () => void {
+export function registerSlot(key: string, slot: Slot): () => void {
   slots.set(key, slot);
   return () => {
     if (slots.get(key) === slot) slots.delete(key);
@@ -96,9 +104,9 @@ export function registerSlot(
 
 export async function measureSlots(): Promise<SlotRect[]> {
   const out = await Promise.all(
-    [...slots.values()].map(async (sl) => {
+    [...slots.values()].map(async (sl): Promise<SlotRect | null> => {
       const box = await sl.measure();
-      return box && box.height > 0 ? { y: box.y, height: box.height, minutes: sl.minutes } : null;
+      return box && box.height > 0 ? { y: box.y, height: box.height, minutes: sl.minutes, to: sl.to } : null;
     }),
   );
   return out.filter((sl): sl is SlotRect => sl !== null);
@@ -106,5 +114,20 @@ export async function measureSlots(): Promise<SlotRect[]> {
 
 /** The slot under a window y, with a little slack above and below. */
 export function slotAt(list: SlotRect[], y: number): SlotRect | null {
+  "worklet";
   return list.find((sl) => y >= sl.y - 8 && y <= sl.y + sl.height + 8) ?? null;
+}
+
+/**
+ * Where in a stretch a drop at window y lands: the stretch's top is its start, its foot its end,
+ * on the quarter hour, and never so late that a task with a length runs past the end. A gap row
+ * is short, so the person sees the time on it while dragging and moves until it's right.
+ */
+export function slotMinutes(sl: SlotRect, y: number, length: number | null): number {
+  "worklet";
+  const to = sl.to ?? sl.minutes;
+  const latest = Math.max(sl.minutes, to - Math.max(length ?? 0, STEP));
+  const share = sl.height > 0 ? Math.min(1, Math.max(0, (y - sl.y) / sl.height)) : 0;
+  const at = Math.round((sl.minutes + share * (to - sl.minutes)) / STEP) * STEP;
+  return Math.min(latest, Math.max(sl.minutes, at));
 }

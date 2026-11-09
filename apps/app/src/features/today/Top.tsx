@@ -2,12 +2,12 @@
 // date on the right, then the week. Tapping the day pulls the summary down. A dot over a day
 // says something is due on it.
 
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { addDays, weekday } from "@kriyan/core/dates";
 import { formatDate, MONTH_LONG, WEEKDAY_SHORT } from "@kriyan/core/format";
-import { weekDays, type FitChip } from "@kriyan/core/today";
+import { weekDays } from "@kriyan/core/today";
 import { useDue } from "@/data/views";
-import { c, family, r, s, spaceTone } from "@/theme/tokens";
+import { c, family, r, s } from "@/theme/tokens";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
 import { T, ty } from "./parts";
@@ -115,91 +115,6 @@ export function Top({
           );
         })}
       </View>
-    </View>
-  );
-}
-
-/** "To fit in": one row of chips that scrolls sideways; a chip opens Fill for that task, a long press the task. */
-export function FitIn({
-  chips,
-  onPick,
-  onOpen,
-}: {
-  chips: FitChip[];
-  onPick: (id: string) => void;
-  /** A long press opens the task itself (to tick it off, edit or remove it). */
-  onOpen: (id: string) => void;
-}) {
-  if (!chips.length) return null;
-  return (
-    <View
-      aria-label={`To fit in, ${chips.length}`}
-      style={{
-        marginTop: s.s4,
-        borderRadius: r.box,
-        backgroundColor: c.sunken,
-        paddingTop: s.s2,
-        overflow: "hidden",
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingHorizontal: s.s4,
-          gap: s.s2,
-        }}
-      >
-        <T s="strong">{`To fit in ${chips.length}`}</T>
-        <T s="small" tone="ink3" lines={1} extra={{ flexShrink: 1 }}>
-          Swipe, tap one to give it a time
-        </T>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: s.s2, paddingHorizontal: s.s3, paddingBottom: s.s1 }}
-      >
-        {chips.map(({ item, note }) => (
-          <Press
-            key={item.id}
-            role="button"
-            accessibilityLabel={`Fit in ${item.title}, ${note}`}
-            onPress={() => onPick(item.id)}
-            onLongPress={() => onOpen(item.id)}
-            hoverBg={null}
-            // A 32 chip in a 44 target.
-            style={{ height: 44, justifyContent: "center" }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: s.s2,
-                height: 32,
-                paddingLeft: s.s3,
-                paddingRight: s.s3,
-                borderRadius: r.pill,
-                backgroundColor: c.bg,
-              }}
-            >
-              <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: item.color ? spaceTone(item.color).dot : c.ink3,
-                }}
-              />
-              <T s="body">{item.title}</T>
-              <T s="small" tone="ink3" tnum>
-                {note}
-              </T>
-            </View>
-          </Press>
-        ))}
-      </ScrollView>
     </View>
   );
 }

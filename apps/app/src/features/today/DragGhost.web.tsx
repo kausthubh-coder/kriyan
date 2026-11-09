@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { c, r, s, shadows } from "@/theme/tokens";
 import { Dot } from "@/ui/bits";
 import { Txt } from "@/ui/Txt";
-import { externalDrag } from "./drag";
+import { externalDrag, landingText } from "./drag";
 
 export function DragGhost() {
   const drag = externalDrag.useValue((d) => d);
@@ -32,6 +32,11 @@ export function DragGhost() {
       <Txt variant="label" numberOfLines={1}>
         {drag.title}
       </Txt>
+      {drag.over?.minutes != null && !drag.over.date ? (
+        <Txt variant="label" tnum style={{ color: c.parse }}>
+          {landingText(drag.over.minutes, drag.length)}
+        </Txt>
+      ) : null}
     </View>
   );
 }

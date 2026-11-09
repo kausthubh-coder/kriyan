@@ -6,7 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanima
 import { c, r, s, shadows } from "@/theme/tokens";
 import { Dot } from "@/ui/bits";
 import { Txt } from "@/ui/Txt";
-import { externalDrag } from "./drag";
+import { externalDrag, landingText } from "./drag";
 import { dragging, fingerX, fingerY } from "./DragSource";
 
 /** Render once at the root of the screen; it measures where that root sits on screen. */
@@ -50,6 +50,11 @@ export function DragGhost() {
           <Txt variant="label" numberOfLines={1}>
             {drag.title}
           </Txt>
+          {drag.over?.minutes != null && !drag.over.date ? (
+            <Txt variant="label" tnum style={{ color: c.parse }}>
+              {landingText(drag.over.minutes, drag.length)}
+            </Txt>
+          ) : null}
         </Animated.View>
       ) : null}
     </View>

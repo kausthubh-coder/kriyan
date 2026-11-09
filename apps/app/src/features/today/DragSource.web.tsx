@@ -4,13 +4,15 @@
 import { useRef, type ReactNode } from "react";
 import { View } from "react-native";
 import { useIsPhone } from "@/theme/layout";
-import { dropZone, externalDrag, minutesAt, type Drop } from "./drag";
+import { dropZone, externalDrag, minutesAt, slotAt, slotMinutes, type Drop } from "./drag";
 
 interface Props {
   taskId: string;
   title: string;
   color: string;
   length: number | null;
+  /** Android's long press without moving; the web opens the row with a click instead. */
+  onHold?: (taskId: string) => void;
   children: ReactNode;
 }
 
@@ -41,10 +43,16 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
       const x = ev.clientX;
       const y = ev.clientY;
       // Measure each move: the page may scroll while dragging.
-      void (zone ? zone.measure() : Promise.resolve(null)).then((rect) => {
+      void Promise.all([
+        zone ? zone.measure() : Promise.resolve(null),
+        zone?.slots ? zone.slots() : Promise.resolve(null),
+      ]).then(([rect, list]) => {
         if (ended) return;
         let over: Drop | null = null;
-        if (rect && zone) {
+        if (list) {
+          const sl = slotAt(list, y);
+          over = sl ? { minutes: slotMinutes(sl, y, length) } : null;
+        } else if (rect && zone) {
           if (zone.hit) over = zone.hit(rect, x, y);
           else {
             const minutes = minutesAt(rect, zone, x, y);

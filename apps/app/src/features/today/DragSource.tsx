@@ -9,7 +9,7 @@ import Animated, { makeMutable, useAnimatedStyle, useSharedValue, withTiming } f
 import { scheduleOnRN } from "react-native-worklets";
 import { dropHaptic, liftHaptic } from "@/features/tasks/haptics";
 import { rowMenu } from "@/features/tasks/TaskRow";
-import { dropZone, externalDrag, STEP, type SlotRect } from "./drag";
+import { dropZone, externalDrag, slotAt, slotMinutes, STEP, type SlotRect } from "./drag";
 
 /** The finger in window coordinates, for the ghost the Today screen draws. */
 const finger = { x: makeMutable(0), y: makeMutable(0), dragging: makeMutable(0) };
@@ -30,6 +30,8 @@ interface Props {
   title: string;
   color: string;
   length: number | null;
+  /** Held without moving; the row's menu by default. */
+  onHold?: (taskId: string) => void;
   children: ReactNode;
 }
 
@@ -61,10 +63,11 @@ function setOver(minutes: number | null) {
     externalDrag.set({ ...drag, over: minutes === null ? null : { minutes } });
 }
 
-/** Held without moving: the row's menu instead of a drag. */
-function hold(taskId: string) {
+/** Held without moving: the row's menu (or the caller's own) instead of a drag. */
+function hold(taskId: string, onHold: ((taskId: string) => void) | undefined) {
   externalDrag.set(null);
-  rowMenu.set(taskId);
+  if (onHold) onHold(taskId);
+  else rowMenu.set(taskId);
 }
 
 function finish(commit: boolean) {
@@ -77,7 +80,7 @@ function finish(commit: boolean) {
   }
 }
 
-export function DragSource({ taskId, title, color, length, children }: Props) {
+export function DragSource({ taskId, title, color, length, onHold, children }: Props) {
   const f = fingerShared();
   const z0 = zoneShared();
   const sl0 = slotsShared();
@@ -100,9 +103,8 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
       const list = sl0.value;
       let next = -1;
       if (list) {
-        for (const sl of list) {
-          if (e.absoluteY >= sl.y - 8 && e.absoluteY <= sl.y + sl.height + 8) next = sl.minutes;
-        }
+        const sl = slotAt(list, e.absoluteY);
+        if (sl) next = slotMinutes(sl, e.absoluteY, length);
       } else if (
         z.ready &&
         e.absoluteX >= z.x &&
@@ -119,7 +121,7 @@ export function DragSource({ taskId, title, color, length, children }: Props) {
       }
     })
     .onEnd((e) => {
-      if (Math.abs(e.translationX) < 8 && Math.abs(e.translationY) < 8) scheduleOnRN(hold, taskId);
+      if (Math.abs(e.translationX) < 8 && Math.abs(e.translationY) < 8) scheduleOnRN(hold, taskId, onHold);
       else scheduleOnRN(finish, true);
     })
     .onFinalize(() => {

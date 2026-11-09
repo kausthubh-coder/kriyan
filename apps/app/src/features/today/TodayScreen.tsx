@@ -17,7 +17,7 @@ import { createStore } from "@/data/store";
 import { useClock } from "@/data/time";
 import { useDue } from "@/data/views";
 import { quickAddTarget, selection } from "@/features/shell/context";
-import { checkHabit, completeTask } from "@/features/tasks/actions";
+import { checkHabit, completeTask, fillTask } from "@/features/tasks/actions";
 import { QuickAdd, whenWords, type QuickAddHandle } from "@/features/tasks/QuickAdd";
 import { useIsPhone } from "@/theme/layout";
 import { c, r, s, scheme, shadows } from "@/theme/tokens";
@@ -29,10 +29,13 @@ import { Blocks, type BlockHandlers } from "./Blocks";
 import { FillCard, HabitCard, ItemCard, RoutineCard, type FillCandidate } from "./Cards";
 import { Curtain, Sentence } from "./Curtain";
 import { DayList } from "./DayList";
+import { measureSlots, registerDropZone } from "./drag";
+import { DragGhost } from "./DragGhost";
+import { FitIn } from "./FitIn";
 import { MENU_ROUTE, SETTINGS_ROUTE, tickRoutineAll, tickRoutinePart } from "./links";
 import { MonthCard } from "./MonthCard";
 import { FloatCard, T } from "./parts";
-import { FitIn, Top } from "./Top";
+import { Top } from "./Top";
 import { useDay, type Day } from "./useDay";
 
 /** The day Today shows; null follows today. It outlives a trip to a task and back. */
@@ -94,6 +97,36 @@ export function TodayScreen() {
     else showToast("No free time left today. Try tomorrow.");
   };
 
+  // A task dragged from To fit in lands on a free stretch: at once when it has a length, else
+  // Fill opens at that time to ask how long (Kriyan never guesses one).
+  useFocusEffect(
+    useCallback(
+      () =>
+        registerDropZone({
+          measure: async () => null,
+          startMinutes: 0,
+          hourPx: 60,
+          topPad: 0,
+          slots: measureSlots,
+          onDrop: (taskId, drop) => {
+            const d = data;
+            const src = d?.sources.get(taskId);
+            if (!d || src?.type !== "task" || drop.minutes === null) return;
+            const at = drop.minutes;
+            const task = src.task;
+            if (task.length) {
+              void fillTask(task, d.day, at, task.length);
+              return;
+            }
+            const gap = d.entries.find((e) => e.kind === "gap" && e.from <= at && at < e.to);
+            const to = gap?.kind === "gap" ? gap.to : d.dayEnd;
+            setSheet({ kind: "fill", from: at, to, preselect: taskId });
+          },
+        }),
+      [data],
+    ),
+  );
+
   useDesktopKeys(!phone, day, setDay, data);
 
   const sheets = data ? (
@@ -138,6 +171,7 @@ export function TodayScreen() {
         </ScrollView>
         <RightPanel data={data} day={day} today={today} setDay={setDay} />
         {sheets}
+        <DragGhost />
       </View>
     );
 
@@ -148,7 +182,12 @@ export function TodayScreen() {
       onSummary={() => setSheet({ kind: "curtain" })}
       setDay={setDay}
       onMonth={() => setSheet({ kind: "month" })}
-      overlay={sheets}
+      overlay={
+        <>
+          {sheets}
+          <DragGhost />
+        </>
+      }
     >
       {content}
     </PhoneToday>

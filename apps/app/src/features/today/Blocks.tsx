@@ -4,7 +4,7 @@
 // and the block you're in carries the red now line. Classes hold what's due during them; a space's
 // time block names the space's next task; a routine shows its parts to tick.
 
-import { memo, useEffect, type ReactNode } from "react";
+import { memo, useEffect, useRef, type ReactNode } from "react";
 import { View } from "react-native";
 import {
   Asterisk,
@@ -36,6 +36,7 @@ import { c, family, hex, r, s, spaceTone } from "@/theme/tokens";
 import { Icon } from "@/ui/Icon";
 import { Press } from "@/ui/Press";
 import { Txt } from "@/ui/Txt";
+import { externalDrag, landingText, registerSlot } from "./drag";
 import { prepForOf, type RoutineView } from "./model";
 import { Pill, SpaceBox, T, ty } from "./parts";
 import type { Day, Source } from "./useDay";
@@ -104,7 +105,7 @@ export function Blocks({ day, on }: { day: Day; on: BlockHandlers }) {
     if (e.kind === "gap") {
       rows.push(
         <Row key={`g${e.from}`} hour="">
-          <Gap from={e.from} to={e.to} now={e.now} onPress={() => on.fill(e.from, e.to)} />
+          <Gap date={day.day} from={e.from} to={e.to} now={e.now} onPress={() => on.fill(e.from, e.to)} />
         </Row>,
       );
       return;
@@ -587,55 +588,115 @@ function Thin({
 }
 
 /** A free stretch: "1 h 45 free", or in red "Now, 2 h 50 free until 13:30". Tapping it opens Fill. */
-function Gap({ from, to, now, onPress }: { from: number; to: number; now: boolean; onPress: () => void }) {
+/**
+ * A free stretch: tap it to fill it, or drop a task from To fit in on it. While a task is over it,
+ * it says where the task would land, so the person can move until the time is right.
+ */
+function Gap({
+  date,
+  from,
+  to,
+  now,
+  onPress,
+}: {
+  date: string;
+  from: number;
+  to: number;
+  now: boolean;
+  onPress: () => void;
+}) {
   const phone = useIsPhone();
+  const ref = useRef<View>(null);
+  // Plain values, so the store hands back the same snapshot until the landing time changes.
+  const at = externalDrag.useValue((d) => {
+    const m = d?.over?.minutes;
+    return m !== null && m !== undefined && m >= from && m < to ? m : null;
+  });
+  const length = externalDrag.useValue((d) => d?.length ?? null);
+  useEffect(
+    () =>
+      registerSlot(`${date}:${from}`, {
+        minutes: from,
+        to,
+        measure: () =>
+          new Promise((resolve) => {
+            if (!ref.current) return resolve(null);
+            ref.current.measureInWindow((_x, y, _w, height) => resolve({ y, height }));
+          }),
+      }),
+    [date, from, to],
+  );
   const span = formatSpan(to - from);
   const text = now ? `Now, ${span} free until ${formatClock(to)}` : `${span} free`;
-  return (
-    <Press
-      role="button"
-      accessibilityLabel={`${text}. Fill ${formatClock(from)}–${formatClock(to)}`}
-      onPress={onPress}
-      scale={false}
-      hoverBg={null}
-      style={({ hovered }) => ({
-        minHeight: phone ? 44 : 40,
-        marginVertical: s.s1,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: s.s4,
-        borderRadius: r.card,
-        borderWidth: 1.5,
-        borderStyle: "dashed",
-        borderColor: now ? c.now : hovered ? c.ink3 : c.lineStrong,
-      })}
-    >
-      <Txt style={[ty.body, { color: now ? c.now : c.ink3 }]}>
-        {now ? (
-          <>
-            <Txt style={[ty.body, family("600"), { color: c.now }]}>Now</Txt>
-            {`, ${span} free until ${formatClock(to)}`}
-          </>
-        ) : (
-          <>
-            <Txt style={[ty.body, family("600"), { color: c.ink2 }]}>{span}</Txt>
-            {" free"}
-          </>
-        )}
-      </Txt>
+  if (at !== null)
+    return (
       <View
+        ref={ref}
+        collapsable={false}
         style={{
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          backgroundColor: c.sunken,
-          alignItems: "center",
+          minHeight: phone ? 44 : 40,
+          marginVertical: s.s1,
           justifyContent: "center",
+          paddingHorizontal: s.s4,
+          borderRadius: r.card,
+          borderWidth: 1.5,
+          borderStyle: "dashed",
+          borderColor: c.parse,
+          backgroundColor: c.parseFill,
         }}
       >
-        <Icon icon={Plus} size={14} tone="ink3" strokeWidth={2.5} />
+        <Txt style={[ty.body, family("600"), { color: c.parse }]}>
+          {`Put it at ${landingText(at, length)}`}
+        </Txt>
       </View>
-    </Press>
+    );
+  return (
+    <View ref={ref} collapsable={false}>
+      <Press
+        role="button"
+        accessibilityLabel={`${text}. Fill ${formatClock(from)}–${formatClock(to)}`}
+        onPress={onPress}
+        scale={false}
+        hoverBg={null}
+        style={({ hovered }) => ({
+          minHeight: phone ? 44 : 40,
+          marginVertical: s.s1,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: s.s4,
+          borderRadius: r.card,
+          borderWidth: 1.5,
+          borderStyle: "dashed",
+          borderColor: now ? c.now : hovered ? c.ink3 : c.lineStrong,
+        })}
+      >
+        <Txt style={[ty.body, { color: now ? c.now : c.ink3 }]}>
+          {now ? (
+            <>
+              <Txt style={[ty.body, family("600"), { color: c.now }]}>Now</Txt>
+              {`, ${span} free until ${formatClock(to)}`}
+            </>
+          ) : (
+            <>
+              <Txt style={[ty.body, family("600"), { color: c.ink2 }]}>{span}</Txt>
+              {" free"}
+            </>
+          )}
+        </Txt>
+        <View
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: c.sunken,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon icon={Plus} size={14} tone="ink3" strokeWidth={2.5} />
+        </View>
+      </Press>
+    </View>
   );
 }
